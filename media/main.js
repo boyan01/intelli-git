@@ -1,16 +1,28 @@
 // @ts-check
 
+// Global utility
+/**
+ * @param {string} text
+ */
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
 (function () {
     // @ts-ignore
     const vscode = acquireVsCodeApi();
 
     // Restore state and convert serialized Sets back to Set objects
     const savedState = vscode.getState();
-    /** @type {{ files: Array<{path: string, status: string, staged: boolean}>, branches: {current: string, all: string[]}, amend: boolean, collapsedGroups: Set<string>, groupByDirectory: boolean, stashList: Array<{index: number, message: string, branch: string}>, activeTab: string, expandedStashes: Set<number>, stashFiles: Object.<number, Array<{path: string, status: string}>> }} */
+    /** @type {{ files: Array<{path: string, status: string, staged: boolean}>, branches: {current: string, all: string[]}, amend: boolean, collapsedGroups: Set<string>, groupByDirectory: boolean, stashList: Array<{index: number, message: string, branch: string}>, activeTab: string, expandedStashes: Set<number>, stashFiles: Object.<number, Array<{path: string, status: string}>>, selectedFiles: Set<string> }} */
     let state = savedState ? {
         ...savedState,
         collapsedGroups: new Set(Array.isArray(savedState.collapsedGroups) ? savedState.collapsedGroups : []),
-        expandedStashes: new Set(Array.isArray(savedState.expandedStashes) ? savedState.expandedStashes : [])
+        expandedStashes: new Set(Array.isArray(savedState.expandedStashes) ? savedState.expandedStashes : []),
+        selectedFiles: new Set(Array.isArray(savedState.selectedFiles) ? savedState.selectedFiles : [])
     } : {
         files: [],
         branches: { current: '', all: [] },
@@ -20,7 +32,8 @@
         stashList: [],
         activeTab: 'commit',
         expandedStashes: new Set(),
-        stashFiles: {}
+        stashFiles: {},
+        selectedFiles: new Set()
     };
 
     const elements = {
@@ -28,7 +41,9 @@
         commitMsg: /** @type {HTMLTextAreaElement} */ (document.getElementById('commit-msg')),
         amendCheckbox: /** @type {HTMLInputElement} */ (document.getElementById('amend-checkbox')),
         commitBtn: document.getElementById('commit-btn'),
-        commitPushBtn: document.getElementById('commit-push-btn')
+        commitPushBtn: document.getElementById('commit-push-btn'),
+        rollbackBtn: /** @type {HTMLButtonElement} */ (document.getElementById('rollback-btn')),
+        stashBtn: /** @type {HTMLButtonElement} */ (document.getElementById('stash-btn'))
     };
 
     // Helper function to serialize state with Set objects
@@ -36,19 +51,12 @@
         vscode.setState({
             ...state,
             collapsedGroups: Array.from(state.collapsedGroups || []),
-            expandedStashes: Array.from(state.expandedStashes || [])
+            expandedStashes: Array.from(state.expandedStashes || []),
+            selectedFiles: Array.from(state.selectedFiles || [])
         });
     }
 
-    /**
-     * @param {string} text
-     */
-    function escapeHtml(text) {
-        if (!text) return '';
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
+
 
     window.addEventListener('message', event => {
         const message = event.data;
@@ -56,9 +64,35 @@
             case 'update':
                 state.files = message.files;
                 state.branches = message.branches;
+                // On refresh, we might want to update selection?
+                // For now, keep existing selection if possible.
+                // Or maybe default select everything if selection is empty? 
+                // Let's keep it simple: retain selection, clean up missing files.
+                if (state.selectedFiles.size === 0 && state.files.length > 0) {
+                    // Check if this is the first load?
+                }
+
+                // Cleanup missing files from selection
+                const filePaths = new Set(state.files.map(f => f.path));
+                for (const path of state.selectedFiles) {
+                    if (!filePaths.has(path)) {
+                        state.selectedFiles.delete(path);
+                    }
+                }
+
+                // Default: Select all if selection is empty? 
+                // Or just respect current state. 
+                // If we want default behavior like "Staged" view having everything unchecked initially if unstaged... 
+                // But user wants "Default changes list".
+                // Let's default to selecting all if nothing is selected? 
+                // Or maybe just select modified files by default?
+                // Actually, let's select all files by default on FIRST load or if we want.
+                // For now, just clean up.
+
                 saveState();
                 render();
                 break;
+            // ... (other cases)
             case 'clearMessage':
                 if (elements.commitMsg) {
                     elements.commitMsg.value = '';
@@ -143,7 +177,7 @@
     }
 
     function updateFileActionButtons() {
-        const checkedCount = document.querySelectorAll('.file-checkbox:checked').length;
+        const checkedCount = state.selectedFiles.size;
         const disabled = checkedCount === 0;
 
         const rollbackBtn = /** @type {HTMLButtonElement} */ (document.getElementById('rollback-btn'));
@@ -215,63 +249,88 @@
         document.querySelectorAll('.file-group-header').forEach(header => {
             header.addEventListener('click', (e) => {
                 if ((/** @type {HTMLElement} */ (e.target)).classList.contains('checkbox')) return;
+                const groupId = /** @type {HTMLElement} */(header).dataset.group;
+                if (groupId) toggleGroupCollapse(groupId);
+            });
+        });
 
-                const groupId = /** @type {HTMLElement} */ (header).dataset.group;
-                if (!groupId) return;
+        // Group selection (Select/Deselect All)
+        document.querySelectorAll('.group-checkbox').forEach(cb => {
+            cb.addEventListener('change', (e) => {
+                e.stopPropagation();
 
-                if (!state.collapsedGroups) state.collapsedGroups = new Set();
+                const isAllSelected = /** @type {HTMLElement} */(e.target).dataset.allSelected === 'true';
+                const groupId = /** @type {HTMLElement} */(e.target).dataset.group;
 
-                if (state.collapsedGroups.has(groupId)) {
-                    state.collapsedGroups.delete(groupId);
+                // Find files in this group - currently hardcoded 'default', but logic handles dynamic
+                // Since we merged everything into 'default', we just use state.files essentially
+                // But let's assume filtering could happen.
+
+                let groupFiles = state.files; // Default group has all files
+
+                // If it was all selected, we verify unselect all.
+                if (isAllSelected) {
+                    groupFiles.forEach(f => state.selectedFiles.delete(f.path));
                 } else {
-                    state.collapsedGroups.add(groupId);
+                    groupFiles.forEach(f => state.selectedFiles.add(f.path));
+                }
+
+                saveState();
+                renderFiles(); // Re-render to update checkboxes and counts
+            });
+        });
+
+        // File selection
+        document.querySelectorAll('.file-checkbox').forEach(cb => {
+            cb.addEventListener('change', (e) => {
+                e.stopPropagation();
+
+                const el = /** @type {HTMLInputElement} */ (cb);
+                const path = el.dataset.path;
+                if (!path) return;
+
+                if (el.checked) {
+                    state.selectedFiles.add(path);
+                } else {
+                    state.selectedFiles.delete(path);
                 }
                 saveState();
+
+                // We can just update buttons and this checkbox, OR re-render group header count too.
+                // Re-rendering everything is easiest to keep group header "All" state correct.
                 renderFiles();
             });
         });
 
-        // Group checkbox - stage/unstage all in group
-        document.querySelectorAll('.group-checkbox').forEach(checkbox => {
-            checkbox.addEventListener('change', (e) => {
-                e.stopPropagation();
-                const cb = /** @type {HTMLInputElement} */ (checkbox);
-                const isStaged = cb.dataset.staged === 'true';
-
-                if (cb.checked && !isStaged) {
-                    vscode.postMessage({ type: 'stage-all' });
-                } else if (!cb.checked && isStaged) {
-                    vscode.postMessage({ type: 'unstage-all' });
-                }
-            });
-        });
-
-        // File checkbox - stage/unstage individual file
-        document.querySelectorAll('.file-checkbox').forEach(checkbox => {
-            checkbox.addEventListener('change', (e) => {
-                e.stopPropagation();
-                updateFileActionButtons(); // Update buttons immediately
-
-                const cb = /** @type {HTMLInputElement} */ (checkbox);
-                const path = cb.dataset.path;
-                if (!path) return;
-
-                vscode.postMessage({
-                    type: cb.checked ? 'stage' : 'unstage',
-                    path: path
-                });
-            });
-        });
-
-        // File item double-click - open file
+        // Prevent default context menu on file items
         document.querySelectorAll('.file-item').forEach(item => {
-            item.addEventListener('dblclick', () => {
-                const path = /** @type {HTMLElement} */ (item).dataset.path;
-                if (path) {
-                    vscode.postMessage({ type: 'openFile', path });
-                }
+            item.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
             });
         });
+
+        // File open
+        document.querySelectorAll('.file-item .name').forEach(nameEl => {
+            nameEl.addEventListener('click', (e) => {
+                const path = /** @type {HTMLElement} */(nameEl.parentElement).dataset.path;
+                vscode.postMessage({ type: 'openFile', path });
+            });
+        });
+    }
+
+    /**
+     * @param {string} groupId
+     */
+    function toggleGroupCollapse(groupId) {
+        if (!state.collapsedGroups) state.collapsedGroups = new Set();
+
+        if (state.collapsedGroups.has(groupId)) {
+            state.collapsedGroups.delete(groupId);
+        } else {
+            state.collapsedGroups.add(groupId);
+        }
+        saveState();
+        renderFiles();
     }
 
     /**
@@ -403,20 +462,14 @@
             return;
         }
 
-        const stagedFiles = state.files.filter(f => f.staged);
-        const unstagedFiles = state.files.filter(f => !f.staged);
+        // Combine and sort all files
+        // Sort by staged status (staged first) then by path, or just path?
+        // User request: "Default Changelist... don't distinguish staged vs other". 
+        // This implies just a flat list? Or just one group.
+        // Let's sort by path for consistency.
+        const allFiles = [...state.files].sort((a, b) => a.path.localeCompare(b.path));
 
-        let html = '';
-
-        // Staged Changes Group
-        if (stagedFiles.length > 0) {
-            html += renderFileGroup('staged', '已暂存的更改', stagedFiles, true);
-        }
-
-        // Unstaged Changes Group
-        if (unstagedFiles.length > 0) {
-            html += renderFileGroup('changes', '更改', unstagedFiles, false);
-        }
+        let html = renderFileGroup('default', 'Default Changelist', allFiles);
 
         elements.fileList.innerHTML = html;
         attachFileListEventListeners();
@@ -427,19 +480,22 @@
      * @param {string} groupId
      * @param {string} title
      * @param {Array<{path: string, status: string, staged: boolean}>} files
-     * @param {boolean} isStaged
      */
-    function renderFileGroup(groupId, title, files, isStaged) {
+    function renderFileGroup(groupId, title, files) {
         const isCollapsed = state.collapsedGroups?.has?.(groupId);
-        const allChecked = files.every(f => f.staged);
+        // All checked if every file in this group is in selectedFiles
+        const allChecked = files.length > 0 && files.every(f => state.selectedFiles.has(f.path));
+
+        // Count selected files in this group
+        const selectedCount = files.filter(f => state.selectedFiles.has(f.path)).length;
 
         let html = `
             <div class="file-group" data-group="${groupId}">
                 <div class="file-group-header ${isCollapsed ? 'collapsed' : ''}" data-group="${groupId}">
-                    <input type="checkbox" class="checkbox group-checkbox" ${allChecked ? 'checked' : ''} data-group="${groupId}" data-staged="${isStaged}">
+                    <input type="checkbox" class="checkbox group-checkbox" ${allChecked ? 'checked' : ''} data-group="${groupId}" data-all-selected="${allChecked}">
                     <span class="arrow codicon codicon-chevron-down"></span>
                     <span class="title">${title}</span>
-                    <span class="count">${files.length} 个文件</span>
+                    <span class="count">${selectedCount}/${files.length} 个文件</span>
                 </div>
         `;
 
@@ -448,10 +504,11 @@
                 const statusClass = getStatusClass(file.status);
                 const statusIcon = getStatusIcon(file.status);
                 const fileName = file.path.split('/').pop();
+                const isSelected = state.selectedFiles.has(file.path);
 
                 html += `
                     <div class="file-item" data-path="${escapeHtml(file.path)}">
-                        <input type="checkbox" class="checkbox file-checkbox" ${file.staged ? 'checked' : ''} data-path="${escapeHtml(file.path)}">
+                        <input type="checkbox" class="checkbox file-checkbox" ${isSelected ? 'checked' : ''} data-path="${escapeHtml(file.path)}">
                         <i class="codicon ${statusIcon} icon"></i>
                         <span class="name ${statusClass}" title="${escapeHtml(file.path)}">${escapeHtml(fileName || file.path)}</span>
                     </div>
@@ -489,49 +546,7 @@
         }
     }
 
-    function updateFileActionButtons() {
-        const checkedCount = document.querySelectorAll('.file-checkbox:checked').length;
-        const disabled = checkedCount === 0;
 
-        const rollbackBtn = /** @type {HTMLButtonElement} */ (document.getElementById('rollback-btn'));
-        const stashBtn = /** @type {HTMLButtonElement} */ (document.getElementById('stash-btn'));
-
-        if (rollbackBtn) rollbackBtn.disabled = disabled;
-        if (stashBtn) stashBtn.disabled = disabled;
-    }
-
-    function attachFileListEventListeners() {
-        // ... (previous code) ...
-
-        // File checkbox - stage/unstage individual file
-        document.querySelectorAll('.file-checkbox').forEach(checkbox => {
-            checkbox.addEventListener('change', (e) => {
-                e.stopPropagation();
-                // Update buttons immediately
-                updateFileActionButtons();
-
-                const cb = /** @type {HTMLInputElement} */ (checkbox);
-                const path = cb.dataset.path;
-                if (!path) return;
-
-                vscode.postMessage({
-                    type: cb.checked ? 'stage' : 'unstage',
-                    path: path
-                });
-            });
-        });
-
-        // ... (rest of listeners) ...
-    }
-
-    // ...
-
-    // Update buttons initially and after render
-    const originalRenderFiles = renderFiles;
-    // We can't easily wrap renderFiles due to scope, so we'll just add the call at the end of renderFiles definition if possible, 
-    // or just ensure we call updateFileActionButtons inside renderFiles.
-    // Since I'm replacing attachFileListEventListeners, I can't inject into renderFiles easily without replacing it too.
-    // Let's replace attachFileListEventListeners and renderFiles partially or fully.
 
 
     // View options dropdown
@@ -633,7 +648,8 @@
         vscode.postMessage({
             type: 'commit',
             message: msg,
-            amend: state.amend
+            amend: state.amend,
+            files: Array.from(state.selectedFiles)
         });
     });
 
@@ -646,7 +662,26 @@
         vscode.postMessage({
             type: 'commitAndPush',
             message: msg,
-            amend: state.amend
+            amend: state.amend,
+            files: Array.from(state.selectedFiles)
+        });
+    });
+
+    // Rollback Button
+    elements.rollbackBtn?.addEventListener('click', () => {
+        if (state.selectedFiles.size === 0) return;
+        vscode.postMessage({
+            type: 'rollback',
+            files: Array.from(state.selectedFiles)
+        });
+    });
+
+    // Stash Button
+    elements.stashBtn?.addEventListener('click', () => {
+        if (state.selectedFiles.size === 0) return;
+        vscode.postMessage({
+            type: 'stash',
+            files: Array.from(state.selectedFiles)
         });
     });
 

@@ -38,10 +38,10 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
                     this.refresh();
                     break;
                 case 'commit':
-                    await this._handleCommit(data.message, data.amend);
+                    await this._handleCommit(data.message, data.amend, data.files);
                     break;
                 case 'commitAndPush':
-                    await this._handleCommitAndPush(data.message, data.amend);
+                    await this._handleCommitAndPush(data.message, data.amend, data.files);
                     break;
                 case 'stage':
                     await this.gitService.stageFile(data.path);
@@ -116,12 +116,12 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
         this.refresh();
     }
 
-    private async _handleCommit(message: string, amend: boolean = false) {
+    private async _handleCommit(message: string, amend: boolean = false, files?: string[]) {
         try {
             if (amend) {
-                await this.gitService!.commitAmend(message);
+                await this.gitService!.commitAmend(message, files);
             } else {
-                await this.gitService!.commit(message);
+                await this.gitService!.commit(message, files);
             }
             vscode.window.showInformationMessage('提交成功!');
             this.refresh();
@@ -131,12 +131,12 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
         }
     }
 
-    private async _handleCommitAndPush(message: string, amend: boolean = false) {
+    private async _handleCommitAndPush(message: string, amend: boolean = false, files?: string[]) {
         try {
             if (amend) {
-                await this.gitService!.commitAmend(message);
+                await this.gitService!.commitAmend(message, files);
             } else {
-                await this.gitService!.commit(message);
+                await this.gitService!.commit(message, files);
             }
             vscode.window.showInformationMessage('提交成功!');
             this.refresh();

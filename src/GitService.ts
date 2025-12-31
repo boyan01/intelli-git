@@ -226,17 +226,31 @@ export class GitService {
     public async popStash(index: number): Promise<void> {
         await this.git.stash(['pop', `stash@{${index}}`]);
     }
-
     public async dropStash(index: number): Promise<void> {
         await this.git.stash(['drop', `stash@{${index}}`]);
     }
 
-    public async commit(message: string): Promise<void> {
-        await this.git.commit(message);
+    public async commit(message: string, files?: string[]): Promise<void> {
+        if (files && files.length > 0) {
+            await this.git.commit(message, files);
+        } else {
+            await this.git.commit(message);
+        }
     }
 
-    public async commitAmend(message: string): Promise<void> {
-        await this.git.commit(message, ['--amend']);
+    public async commitAmend(message?: string, files?: string[]): Promise<void> {
+        const options: string[] = ['--amend'];
+        if (message) {
+            options.push('-m', message);
+        } else {
+             options.push('--no-edit');
+        }
+        
+        if (files && files.length > 0) {
+            await this.git.commit([...options, ...files]);
+        } else {
+            await this.git.commit(options);
+        }
     }
 
     public async getLastCommitMessage(): Promise<string> {

@@ -340,6 +340,7 @@
     font-size: 12px;
     background: var(--vscode-sideBarSectionHeader-background);
     cursor: pointer;
+    user-select: none;
 }
 
 .file-group-header:hover {
@@ -375,6 +376,7 @@
     padding: 3px 8px 3px 24px;
     gap: 6px;
     cursor: pointer;
+    user-select: none;
 }
 
 .file-item:hover {
