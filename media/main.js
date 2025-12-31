@@ -40,6 +40,16 @@
         });
     }
 
+    /**
+     * @param {string} text
+     */
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
     window.addEventListener('message', event => {
         const message = event.data;
         switch (message.type) {
@@ -82,6 +92,9 @@
                 state.stashFiles[message.index] = message.files;
                 saveState();
                 renderStashList();
+                break;
+            case 'switchTab':
+                switchTab(message.tab);
                 break;
         }
     });
@@ -129,6 +142,17 @@
         attachStashListEventListeners();
     }
 
+    function updateFileActionButtons() {
+        const checkedCount = document.querySelectorAll('.file-checkbox:checked').length;
+        const disabled = checkedCount === 0;
+
+        const rollbackBtn = /** @type {HTMLButtonElement} */ (document.getElementById('rollback-btn'));
+        const stashBtn = /** @type {HTMLButtonElement} */ (document.getElementById('stash-btn'));
+
+        if (rollbackBtn) rollbackBtn.disabled = disabled;
+        if (stashBtn) stashBtn.disabled = disabled;
+    }
+
     function attachStashListEventListeners() {
         // Click on header to expand/collapse
         document.querySelectorAll('.stash-item-header').forEach(header => {
@@ -138,10 +162,43 @@
             });
 
             // Right click for context menu (use VS Code QuickPick)
+            // Right click for context menu
             header.addEventListener('contextmenu', (e) => {
                 e.preventDefault();
+                const mouseEvent = /** @type {MouseEvent} */ (e);
                 const index = parseInt(/** @type {HTMLElement} */(header).dataset.index || '0');
-                vscode.postMessage({ type: 'showStashActions', index });
+
+                const menu = new PopupMenu();
+                menu.show([
+                    {
+                        label: '弹出 (Pop)',
+                        icon: 'check',
+                        description: '应用并删除',
+                        action: () => {
+                            vscode.postMessage({ type: 'popStash', index });
+                        }
+                    },
+                    {
+                        label: '应用 (Apply)',
+                        icon: 'arrow-up',
+                        description: '应用不删除',
+                        action: () => {
+                            vscode.postMessage({ type: 'applyStash', index });
+                        }
+                    },
+                    {
+                        type: 'separator'
+                    },
+                    {
+                        label: '删除 (Drop)',
+                        icon: 'trash',
+                        description: '删除贮藏',
+                        danger: true,
+                        action: () => {
+                            vscode.postMessage({ type: 'dropStash', index });
+                        }
+                    }
+                ], mouseEvent.clientX, mouseEvent.clientY);
             });
         });
 
@@ -152,6 +209,70 @@
                 const stashIndex = parseInt(el.dataset.stashIndex || '0');
                 const filePath = el.dataset.path || '';
                 vscode.postMessage({ type: 'showStashFileDiff', index: stashIndex, filePath });
+            });
+        });
+    }
+
+    function attachFileListEventListeners() {
+        // Group header click - toggle collapse
+        document.querySelectorAll('.file-group-header').forEach(header => {
+            header.addEventListener('click', (e) => {
+                if ((/** @type {HTMLElement} */ (e.target)).classList.contains('checkbox')) return;
+
+                const groupId = /** @type {HTMLElement} */ (header).dataset.group;
+                if (!groupId) return;
+
+                if (!state.collapsedGroups) state.collapsedGroups = new Set();
+
+                if (state.collapsedGroups.has(groupId)) {
+                    state.collapsedGroups.delete(groupId);
+                } else {
+                    state.collapsedGroups.add(groupId);
+                }
+                saveState();
+                renderFiles();
+            });
+        });
+
+        // Group checkbox - stage/unstage all in group
+        document.querySelectorAll('.group-checkbox').forEach(checkbox => {
+            checkbox.addEventListener('change', (e) => {
+                e.stopPropagation();
+                const cb = /** @type {HTMLInputElement} */ (checkbox);
+                const isStaged = cb.dataset.staged === 'true';
+
+                if (cb.checked && !isStaged) {
+                    vscode.postMessage({ type: 'stage-all' });
+                } else if (!cb.checked && isStaged) {
+                    vscode.postMessage({ type: 'unstage-all' });
+                }
+            });
+        });
+
+        // File checkbox - stage/unstage individual file
+        document.querySelectorAll('.file-checkbox').forEach(checkbox => {
+            checkbox.addEventListener('change', (e) => {
+                e.stopPropagation();
+                updateFileActionButtons(); // Update buttons immediately
+
+                const cb = /** @type {HTMLInputElement} */ (checkbox);
+                const path = cb.dataset.path;
+                if (!path) return;
+
+                vscode.postMessage({
+                    type: cb.checked ? 'stage' : 'unstage',
+                    path: path
+                });
+            });
+        });
+
+        // File item double-click - open file
+        document.querySelectorAll('.file-item').forEach(item => {
+            item.addEventListener('dblclick', () => {
+                const path = /** @type {HTMLElement} */ (item).dataset.path;
+                if (path) {
+                    vscode.postMessage({ type: 'openFile', path });
+                }
             });
         });
     }
@@ -219,37 +340,49 @@
     }
 
     // Tab switching
+    /**
+     * @param {string} tabName
+     */
+    function switchTab(tabName) {
+        if (!tabName) return;
+
+        // Update tab active state
+        document.querySelectorAll('.tab').forEach(t => {
+            const el = /** @type {HTMLElement} */ (t);
+            if (el.dataset.tab === tabName) {
+                el.classList.add('active');
+            } else {
+                el.classList.remove('active');
+            }
+        });
+
+        // Update content visibility
+        document.querySelectorAll('.tab-content').forEach(content => {
+            content.classList.remove('active');
+        });
+        const targetContent = document.getElementById(`${tabName}-tab-content`);
+        targetContent?.classList.add('active');
+
+        // Save active tab
+        state.activeTab = tabName;
+        saveState();
+
+        // Load stash list when switching to stash tab
+        if (tabName === 'stash') {
+            vscode.postMessage({ type: 'getStashList' });
+        }
+    }
+
     document.querySelectorAll('.tab').forEach(tab => {
         tab.addEventListener('click', () => {
             const tabName = /** @type {HTMLElement} */ (tab).dataset.tab;
-            if (!tabName) return;
-
-            // Update tab active state
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            tab.classList.add('active');
-
-            // Update content visibility
-            document.querySelectorAll('.tab-content').forEach(content => {
-                content.classList.remove('active');
-            });
-            const targetContent = document.getElementById(`${tabName}-tab-content`);
-            targetContent?.classList.add('active');
-
-            // Save active tab
-            state.activeTab = tabName;
-            saveState();
-
-            // Load stash list when switching to stash tab
-            if (tabName === 'stash') {
-                vscode.postMessage({ type: 'getStashList' });
+            if (tabName) {
+                switchTab(tabName);
             }
         });
     });
 
-    // Stash tab refresh button
-    document.getElementById('stash-refresh-btn')?.addEventListener('click', () => {
-        vscode.postMessage({ type: 'getStashList' });
-    });
+
 
     // Restore active tab on load
     if (state.activeTab && state.activeTab !== 'commit') {
@@ -290,6 +423,7 @@
 
         elements.fileList.innerHTML = html;
         attachFileListEventListeners();
+        updateFileActionButtons();
     }
 
     /**
@@ -358,46 +492,27 @@
         }
     }
 
+    function updateFileActionButtons() {
+        const checkedCount = document.querySelectorAll('.file-checkbox:checked').length;
+        const disabled = checkedCount === 0;
+
+        const rollbackBtn = /** @type {HTMLButtonElement} */ (document.getElementById('rollback-btn'));
+        const stashBtn = /** @type {HTMLButtonElement} */ (document.getElementById('stash-btn'));
+
+        if (rollbackBtn) rollbackBtn.disabled = disabled;
+        if (stashBtn) stashBtn.disabled = disabled;
+    }
+
     function attachFileListEventListeners() {
-        // Group header click - toggle collapse
-        document.querySelectorAll('.file-group-header').forEach(header => {
-            header.addEventListener('click', (e) => {
-                if ((/** @type {HTMLElement} */ (e.target)).classList.contains('checkbox')) return;
-
-                const groupId = /** @type {HTMLElement} */ (header).dataset.group;
-                if (!groupId) return;
-
-                if (!state.collapsedGroups) state.collapsedGroups = new Set();
-
-                if (state.collapsedGroups.has(groupId)) {
-                    state.collapsedGroups.delete(groupId);
-                } else {
-                    state.collapsedGroups.add(groupId);
-                }
-                saveState();
-                renderFiles();
-            });
-        });
-
-        // Group checkbox - stage/unstage all in group
-        document.querySelectorAll('.group-checkbox').forEach(checkbox => {
-            checkbox.addEventListener('change', (e) => {
-                e.stopPropagation();
-                const cb = /** @type {HTMLInputElement} */ (checkbox);
-                const isStaged = cb.dataset.staged === 'true';
-
-                if (cb.checked && !isStaged) {
-                    vscode.postMessage({ type: 'stage-all' });
-                } else if (!cb.checked && isStaged) {
-                    vscode.postMessage({ type: 'unstage-all' });
-                }
-            });
-        });
+        // ... (previous code) ...
 
         // File checkbox - stage/unstage individual file
         document.querySelectorAll('.file-checkbox').forEach(checkbox => {
             checkbox.addEventListener('change', (e) => {
                 e.stopPropagation();
+                // Update buttons immediately
+                updateFileActionButtons();
+
                 const cb = /** @type {HTMLInputElement} */ (checkbox);
                 const path = cb.dataset.path;
                 if (!path) return;
@@ -409,62 +524,18 @@
             });
         });
 
-        // File item double-click - open file
-        document.querySelectorAll('.file-item').forEach(item => {
-            item.addEventListener('dblclick', () => {
-                const path = /** @type {HTMLElement} */ (item).dataset.path;
-                if (path) {
-                    vscode.postMessage({ type: 'openFile', path });
-                }
-            });
-        });
+        // ... (rest of listeners) ...
     }
 
-    /**
-     * @param {string} text
-     */
-    function escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
+    // ...
 
-    // Event Listeners - Toolbar
-    document.getElementById('refresh-btn')?.addEventListener('click', () => {
-        vscode.postMessage({ type: 'refresh' });
-    });
+    // Update buttons initially and after render
+    const originalRenderFiles = renderFiles;
+    // We can't easily wrap renderFiles due to scope, so we'll just add the call at the end of renderFiles definition if possible, 
+    // or just ensure we call updateFileActionButtons inside renderFiles.
+    // Since I'm replacing attachFileListEventListeners, I can't inject into renderFiles easily without replacing it too.
+    // Let's replace attachFileListEventListeners and renderFiles partially or fully.
 
-    document.getElementById('rollback-btn')?.addEventListener('click', () => {
-        // Get selected files from checkboxes
-        /** @type {string[]} */
-        const selectedFiles = [];
-        document.querySelectorAll('.file-checkbox:checked').forEach(cb => {
-            const path = /** @type {HTMLInputElement} */ (cb).dataset.path;
-            if (path) selectedFiles.push(path);
-        });
-
-        if (selectedFiles.length === 0) {
-            // Use VS Code QuickPick to select files
-            vscode.postMessage({ type: 'rollbackWithPick' });
-        } else {
-            vscode.postMessage({ type: 'rollback', files: selectedFiles });
-        }
-    });
-
-    document.getElementById('stash-btn')?.addEventListener('click', () => {
-        // Get selected files from checkboxes
-        /** @type {string[]} */
-        const selectedFiles = [];
-        document.querySelectorAll('.file-checkbox:checked').forEach(cb => {
-            const path = /** @type {HTMLInputElement} */ (cb).dataset.path;
-            if (path) selectedFiles.push(path);
-        });
-
-        vscode.postMessage({
-            type: 'stash',
-            files: selectedFiles.length > 0 ? selectedFiles : undefined
-        });
-    });
 
     // View options dropdown
     let viewOptionsOpen = false;
@@ -589,4 +660,7 @@
 
     // Request fresh data
     vscode.postMessage({ type: 'refresh' });
+
+    // Initialize button state
+    updateFileActionButtons();
 })();

@@ -15,8 +15,8 @@
     align-items: center;
     padding: 0 8px;
     height: 30px;
+    background: transparent;
     border-bottom: 1px solid var(--vscode-panel-border);
-    background: var(--vscode-tab-activeBackground);
 }
 
 .tabs-left,
@@ -34,15 +34,19 @@
     font-size: 12px;
     cursor: pointer;
     border-radius: 3px;
+    opacity: 0.7;
 }
 
 .tab:hover:not(:disabled) {
     background: var(--vscode-toolbar-hoverBackground);
+    opacity: 1;
 }
 
 .tab.active {
-    background: var(--vscode-button-secondaryBackground);
+    background: var(--vscode-list-activeSelectionBackground);
+    color: var(--vscode-list-activeSelectionForeground);
     font-weight: 500;
+    opacity: 1;
 }
 
 .tab:disabled {
@@ -72,6 +76,8 @@
 .icon-btn:disabled {
     opacity: 0.4;
     cursor: not-allowed;
+    pointer-events: none;
+    color: var(--vscode-disabledForeground);
 }
 
 .icon-btn.ai-icon {
@@ -95,13 +101,11 @@
 }
 
 /* File Toolbar */
-.file-toolbar,
-.stash-toolbar {
+.file-toolbar {
     display: flex;
     justify-content: space-between;
     align-items: center;
     padding: 4px 8px;
-    border-bottom: 1px solid var(--vscode-panel-border);
     flex-shrink: 0;
 }
 

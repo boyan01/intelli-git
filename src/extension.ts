@@ -47,7 +47,39 @@ export function activate(context: vscode.ExtensionContext) {
         })
     );
 
+    context.subscriptions.push(
+        vscode.commands.registerCommand('idea-commit-panel.switchTabCommit', () => {
+             provider.switchTab('commit');
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand('idea-commit-panel.switchTabStash', () => {
+             provider.switchTab('stash');
+        })
+    );
+
     context.subscriptions.push(branchStatusBar);
+
+    // Watch for file changes
+    const watcher = vscode.workspace.createFileSystemWatcher('**/*');
+    let refreshTimeout: NodeJS.Timeout | undefined;
+
+    const triggerRefresh = () => {
+        if (refreshTimeout) {
+            clearTimeout(refreshTimeout);
+        }
+        refreshTimeout = setTimeout(() => {
+            provider.refresh();
+            branchStatusBar.update();
+        }, 200); // Debounce for 2 seconds
+    };
+
+    watcher.onDidChange(triggerRefresh);
+    watcher.onDidCreate(triggerRefresh);
+    watcher.onDidDelete(triggerRefresh);
+
+    context.subscriptions.push(watcher);
 
     // Listen for workspace folder changes
     context.subscriptions.push(

@@ -443,6 +443,15 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
         });
     }
 
+    public switchTab(tab: 'commit' | 'stash') {
+        if (this._view) {
+            this._view.webview.postMessage({
+                type: 'switchTab',
+                tab: tab
+            });
+        }
+    }
+
     private _getHtmlForWebview(webview: vscode.Webview) {
         const scriptUri = webview.asWebviewUri(
             vscode.Uri.joinPath(this._extensionUri, 'media', 'main.js')
@@ -459,6 +468,12 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
         const codiconUri = webview.asWebviewUri(
             vscode.Uri.joinPath(this._extensionUri, 'node_modules', '@vscode', 'codicons', 'dist', 'codicon.css')
         );
+        const menuCssUri = webview.asWebviewUri(
+             vscode.Uri.joinPath(this._extensionUri, 'media', 'menu.css')
+        );
+        const menuJsUri = webview.asWebviewUri(
+             vscode.Uri.joinPath(this._extensionUri, 'media', 'menu.js')
+        );
 
         const nonce = this._getNonce();
 
@@ -471,6 +486,7 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
     <link href="${styleResetUri}" rel="stylesheet">
     <link href="${styleVSCodeUri}" rel="stylesheet">
     <link href="${codiconUri}" rel="stylesheet">
+    <link href="${menuCssUri}" rel="stylesheet">
     <link href="${styleMainUri}" rel="stylesheet">
     <title>Commit</title>
 </head>
@@ -503,7 +519,6 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
                     <button id="stash-btn" class="icon-btn" title="贮藏选中的文件">
                         <i class="codicon codicon-archive"></i>
                     </button>
-                    <div class="toolbar-separator"></div>
                     <button id="view-options-btn" class="icon-btn" title="视图选项">
                         <i class="codicon codicon-list-tree"></i>
                     </button>
@@ -546,15 +561,12 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
 
         <!-- Stash Tab Content -->
         <div id="stash-tab-content" class="tab-content">
-            <div class="stash-toolbar">
-                <button id="stash-refresh-btn" class="icon-btn" title="刷新贮藏列表">
-                    <i class="codicon codicon-sync"></i>
-                </button>
-            </div>
+
             <div id="stash-list" class="stash-list"></div>
         </div>
     </div>
 
+    <script nonce="${nonce}" src="${menuJsUri}"></script>
     <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>
 </html>`;

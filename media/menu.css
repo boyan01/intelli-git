@@ -1,0 +1,90 @@
+/* Popup Menu Styles */
+.popup-menu {
+    position: fixed;
+    z-index: 1000;
+    min-width: 160px;
+    background: var(--vscode-menu-background);
+    color: var(--vscode-menu-foreground);
+    border: 1px solid var(--vscode-menu-border);
+    border-radius: 5px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    padding: 4px 0;
+    font-size: 13px;
+    outline: none;
+}
+
+.popup-menu-item {
+    display: flex;
+    align-items: center;
+    padding: 4px 8px;
+    cursor: pointer;
+    gap: 6px;
+    line-height: 18px;
+}
+
+.popup-menu-item:hover {
+    background: var(--vscode-menu-selectionBackground);
+    color: var(--vscode-menu-selectionForeground);
+}
+
+.popup-menu-item.separator {
+    height: 1px;
+    background: var(--vscode-menu-separatorBackground);
+    margin: 4px 8px;
+    padding: 0;
+    cursor: default;
+}
+
+.popup-menu-item .icon {
+    width: 16px;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+/* Danger Item */
+.popup-menu-item.danger:hover {
+    background: #e51400;
+    color: #fff;
+}
+
+.popup-menu-item.danger .icon {
+    color: #f14c4c;
+}
+
+.popup-menu-item.danger:hover .icon {
+    color: #fff;
+}
+
+.popup-menu-item .label-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.popup-menu-item .label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.popup-menu-item .description {
+    font-size: 11px;
+    opacity: 0.7;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.popup-menu-item:hover .description {
+    opacity: 1;
+}
+
+.popup-menu-item .shortcut {
+    opacity: 0.7;
+    font-size: 11px;
+    margin-left: 8px;
+}

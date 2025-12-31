@@ -35,6 +35,16 @@
     },
     "commands": [
       {
+        "command": "idea-commit-panel.switchTabCommit",
+        "title": "Switch to Commit",
+        "icon": "$(git-commit)"
+      },
+      {
+        "command": "idea-commit-panel.switchTabStash",
+        "title": "Switch to Stash",
+        "icon": "$(archive)"
+      },
+      {
         "command": "idea-commit-panel.refresh",
         "title": "Refresh",
         "icon": "$(refresh)"
@@ -56,14 +66,14 @@
     "menus": {
       "view/title": [
         {
-          "command": "idea-commit-panel.refresh",
+          "command": "idea-commit-panel.switchTabCommit",
           "when": "view == ideaCommitView",
-          "group": "navigation"
+          "group": "navigation@1"
         },
         {
-          "command": "idea-commit-panel.push",
+          "command": "idea-commit-panel.switchTabStash",
           "when": "view == ideaCommitView",
-          "group": "navigation"
+          "group": "navigation@2"
         }
       ]
     }
