@@ -173,7 +173,6 @@
                     {
                         label: '弹出 (Pop)',
                         icon: 'check',
-                        description: '应用并删除',
                         action: () => {
                             vscode.postMessage({ type: 'popStash', index });
                         }
@@ -181,7 +180,6 @@
                     {
                         label: '应用 (Apply)',
                         icon: 'arrow-up',
-                        description: '应用不删除',
                         action: () => {
                             vscode.postMessage({ type: 'applyStash', index });
                         }
@@ -192,7 +190,6 @@
                     {
                         label: '删除 (Drop)',
                         icon: 'trash',
-                        description: '删除贮藏',
                         danger: true,
                         action: () => {
                             vscode.postMessage({ type: 'dropStash', index });

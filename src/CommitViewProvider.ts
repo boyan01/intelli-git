@@ -7,7 +7,12 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
     private _view?: vscode.WebviewView;
     private gitService?: GitService;
 
-    constructor(private readonly _extensionUri: vscode.Uri) { }
+    constructor(
+        private readonly _extensionUri: vscode.Uri,
+        gitService?: GitService
+    ) {
+        this.gitService = gitService;
+    }
 
     public resolveWebviewView(
         webviewView: vscode.WebviewView,
@@ -15,11 +20,6 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
         _token: vscode.CancellationToken,
     ) {
         this._view = webviewView;
-
-        const workspaceFolders = vscode.workspace.workspaceFolders;
-        if (workspaceFolders && workspaceFolders.length > 0) {
-            this.gitService = new GitService(workspaceFolders[0].uri.fsPath);
-        }
 
         webviewView.webview.options = {
             enableScripts: true,
@@ -338,16 +338,20 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
 
     private async _showStashFileDiff(index: number, filePath: string) {
         try {
-            const diff = await this.gitService!.getStashFileDiff(index, filePath);
-            if (diff) {
-                const doc = await vscode.workspace.openTextDocument({
-                    content: diff,
-                    language: 'diff'
-                });
-                await vscode.window.showTextDocument(doc, { preview: true });
-            }
+            // Native Diff View Implementation
+            const leftRef = `stash@{${index}}^1`;
+            const rightRef = `stash@{${index}}`;
+            
+            const fileName = filePath.split('/').pop() || filePath;
+            const title = `${fileName} (Stash Diff)`;
+
+            const leftUri = vscode.Uri.parse(`idea-stash://load/${filePath}?${JSON.stringify({ ref: leftRef, path: filePath })}`);
+            const rightUri = vscode.Uri.parse(`idea-stash://load/${filePath}?${JSON.stringify({ ref: rightRef, path: filePath })}`);
+
+            await vscode.commands.executeCommand('vscode.diff', leftUri, rightUri, title);
         } catch (e) {
-            vscode.window.showErrorMessage(`获取 diff 失败: ${e}`);
+            console.error('Show stash diff error:', e);
+            vscode.window.showErrorMessage('Failed to open diff view.');
         }
     }
 

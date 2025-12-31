@@ -201,8 +201,20 @@ export class GitService {
 
     public async getStashFileDiff(index: number, filePath: string): Promise<string> {
         try {
-            return await this.git.raw(['stash', 'show', '-p', `stash@{${index}}`, '--', filePath]);
-        } catch {
+            // Use git diff stash@{n}^1..stash@{n} -- <path> to get the diff of the stash against its parent
+            // This avoids "Too many revisions specified" error with git stash show
+            return await this.git.raw(['diff', `stash@{${index}}^1..stash@{${index}}`, '--', filePath]);
+        } catch (e) {
+            console.error('getStashFileDiff error:', e);
+            return '';
+        }
+    }
+
+    public async getFileContent(ref: string, relativePath: string): Promise<string> {
+        try {
+            return await this.git.show([`${ref}:${relativePath}`]);
+        } catch (e) {
+            console.error('getFileContent error:', e);
             return '';
         }
     }

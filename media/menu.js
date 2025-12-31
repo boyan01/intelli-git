@@ -8,7 +8,6 @@ class PopupMenu {
      * @typedef {Object} MenuItem
      * @property {string} [label]
      * @property {string} [icon] Codicon name (e.g. 'check', 'trash')
-     * @property {string} [description]
      * @property {string} [shortcut]
      * @property {'separator'|'item'} [type] Default is 'item'
      * @property {boolean} [danger] If true, the item will be styled as destructive
@@ -52,7 +51,7 @@ class PopupMenu {
             }
             el.appendChild(iconContainer);
 
-            // Label Container (Label + Description)
+            // Label Container
             const labelContainer = document.createElement('div');
             labelContainer.className = 'label-container';
 
@@ -61,12 +60,6 @@ class PopupMenu {
             label.textContent = item.label || '';
             labelContainer.appendChild(label);
 
-            if (item.description) {
-                const desc = document.createElement('span');
-                desc.className = 'description';
-                desc.textContent = item.description;
-                labelContainer.appendChild(desc);
-            }
             el.appendChild(labelContainer);
 
             // Shortcut

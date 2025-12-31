@@ -36,12 +36,19 @@
 }
 
 .popup-menu-item .icon {
-    width: 16px;
+    width: 20px;
+    /* Slightly wider container for alignment */
     height: 16px;
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
+    margin-right: 4px;
+}
+
+.popup-menu-item .icon .codicon {
+    font-size: 14px;
+    /* Smaller icon size */
 }
 
 /* Danger Item */
@@ -71,17 +78,7 @@
     white-space: nowrap;
 }
 
-.popup-menu-item .description {
-    font-size: 11px;
-    opacity: 0.7;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.popup-menu-item:hover .description {
-    opacity: 1;
-}
+/* Description styles removed */
 
 .popup-menu-item .shortcut {
     opacity: 0.7;

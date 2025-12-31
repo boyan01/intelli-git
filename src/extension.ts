@@ -3,6 +3,7 @@ import { CommitViewProvider } from './CommitViewProvider';
 import { PushPanel } from './PushPanel';
 import { GitService } from './GitService';
 import { BranchStatusBar } from './BranchStatusBar';
+import { StashContentProvider } from './StashContentProvider';
 
 export function activate(context: vscode.ExtensionContext) {
     console.log('IDEA Commit Panel is now active!');
@@ -15,8 +16,13 @@ export function activate(context: vscode.ExtensionContext) {
     }
 
     const gitService = new GitService(workspaceRoot);
-    const provider = new CommitViewProvider(context.extensionUri);
+    const provider = new CommitViewProvider(context.extensionUri, gitService);
     const branchStatusBar = new BranchStatusBar(gitService);
+    const stashContentProvider = new StashContentProvider(gitService);
+
+    context.subscriptions.push(
+        vscode.workspace.registerTextDocumentContentProvider('idea-stash', stashContentProvider)
+    );
 
     context.subscriptions.push(
         vscode.window.registerWebviewViewProvider(CommitViewProvider.viewType, provider)
