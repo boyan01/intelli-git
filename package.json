@@ -1,0 +1,91 @@
+{
+  "name": "idea-commit-panel",
+  "displayName": "IDEA Style Commit Panel",
+  "description": "A VS Code extension that mimics IntelliJ IDEA's commit panel workflow.",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.100.0"
+  },
+  "categories": [
+    "SCM Providers",
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "idea-commit-container",
+          "title": "Commit",
+          "icon": "resources/git-icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "idea-commit-container": [
+        {
+          "type": "webview",
+          "id": "ideaCommitView",
+          "name": "Commit"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "idea-commit-panel.refresh",
+        "title": "Refresh",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "idea-commit-panel.push",
+        "title": "Push...",
+        "icon": "$(repo-push)"
+      },
+      {
+        "command": "idea-commit-panel.showBranchPicker",
+        "title": "IDEA: Switch Branch"
+      },
+      {
+        "command": "idea-commit-panel.focusCommitView",
+        "title": "IDEA: Focus Commit View"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "idea-commit-panel.refresh",
+          "when": "view == ideaCommitView",
+          "group": "navigation"
+        },
+        {
+          "command": "idea-commit-panel.push",
+          "when": "view == ideaCommitView",
+          "group": "navigation"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src",
+    "test": "node ./out/test/runTest.js"
+  },
+  "devDependencies": {
+    "@types/node": "^22.x",
+    "@types/vscode": "^1.100.0",
+    "@typescript-eslint/eslint-plugin": "^8.21.0",
+    "@typescript-eslint/parser": "^8.21.0",
+    "eslint": "^9.18.0",
+    "typescript": "^5.7.3"
+  },
+  "dependencies": {
+    "@vscode/codicons": "^0.0.44",
+    "simple-git": "^3.30.0"
+  }
+}
