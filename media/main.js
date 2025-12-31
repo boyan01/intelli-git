@@ -17,12 +17,13 @@ function escapeHtml(text) {
 
     // Restore state and convert serialized Sets back to Set objects
     const savedState = vscode.getState();
-    /** @type {{ files: Array<{path: string, status: string, staged: boolean}>, branches: {current: string, all: string[]}, amend: boolean, collapsedGroups: Set<string>, groupByDirectory: boolean, stashList: Array<{index: number, message: string, branch: string}>, activeTab: string, expandedStashes: Set<number>, stashFiles: Object.<number, Array<{path: string, status: string}>>, selectedFiles: Set<string> }} */
+    /** @type {{ files: Array<{path: string, status: string, staged: boolean}>, branches: {current: string, all: string[]}, amend: boolean, collapsedGroups: Set<string>, groupByDirectory: boolean, stashList: Array<{index: number, message: string, branch: string}>, activeTab: string, expandedStashes: Set<number>, stashFiles: Object.<number, Array<{path: string, status: string}>>, selectedFiles: Set<string>, activeFile: string | null }} */
     let state = savedState ? {
         ...savedState,
         collapsedGroups: new Set(Array.isArray(savedState.collapsedGroups) ? savedState.collapsedGroups : []),
         expandedStashes: new Set(Array.isArray(savedState.expandedStashes) ? savedState.expandedStashes : []),
-        selectedFiles: new Set(Array.isArray(savedState.selectedFiles) ? savedState.selectedFiles : [])
+        selectedFiles: new Set(Array.isArray(savedState.selectedFiles) ? savedState.selectedFiles : []),
+        activeFile: savedState.activeFile || null
     } : {
         files: [],
         branches: { current: '', all: [] },
@@ -33,7 +34,8 @@ function escapeHtml(text) {
         activeTab: 'commit',
         expandedStashes: new Set(),
         stashFiles: {},
-        selectedFiles: new Set()
+        selectedFiles: new Set(),
+        activeFile: null
     };
 
     const elements = {
@@ -129,6 +131,12 @@ function escapeHtml(text) {
                 break;
             case 'switchTab':
                 switchTab(message.tab);
+                break;
+            case 'activeFileChange':
+                state.activeFile = message.path;
+                saveState();
+                // Update UI directly without full re-render if possible
+                updateActiveFileHighlight();
                 break;
         }
     });
@@ -244,6 +252,19 @@ function escapeHtml(text) {
         });
     }
 
+    function updateActiveFileHighlight() {
+        document.querySelectorAll('.file-item').forEach(item => {
+            const path = /** @type {HTMLElement} */(item).dataset.path;
+            if (path === state.activeFile) {
+                item.classList.add('active');
+                // Optional: scroll into view if needed
+                // item.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            } else {
+                item.classList.remove('active');
+            }
+        });
+    }
+
     function attachFileListEventListeners() {
         // Group header click - toggle collapse
         document.querySelectorAll('.file-group-header').forEach(header => {
@@ -310,9 +331,13 @@ function escapeHtml(text) {
         });
 
         // File open
-        document.querySelectorAll('.file-item .name').forEach(nameEl => {
-            nameEl.addEventListener('click', (e) => {
-                const path = /** @type {HTMLElement} */(nameEl.parentElement).dataset.path;
+        // File open
+        document.querySelectorAll('.file-item').forEach(item => {
+            item.addEventListener('click', (e) => {
+                // Ignore if clicked on checkbox
+                if (/** @type {HTMLElement} */(e.target).classList.contains('checkbox')) return;
+
+                const path = /** @type {HTMLElement} */(item).dataset.path;
                 vscode.postMessage({ type: 'openFile', path });
             });
         });
@@ -490,7 +515,7 @@ function escapeHtml(text) {
         const selectedCount = files.filter(f => state.selectedFiles.has(f.path)).length;
 
         let html = `
-            <div class="file-group" data-group="${groupId}">
+            <div data-group="${groupId}">
                 <div class="file-group-header ${isCollapsed ? 'collapsed' : ''}" data-group="${groupId}">
                     <input type="checkbox" class="checkbox group-checkbox" ${allChecked ? 'checked' : ''} data-group="${groupId}" data-all-selected="${allChecked}">
                     <span class="arrow codicon codicon-chevron-down"></span>
@@ -505,9 +530,10 @@ function escapeHtml(text) {
                 const statusIcon = getStatusIcon(file.status);
                 const fileName = file.path.split('/').pop();
                 const isSelected = state.selectedFiles.has(file.path);
+                const isActive = file.path === state.activeFile;
 
                 html += `
-                    <div class="file-item" data-path="${escapeHtml(file.path)}">
+                    <div class="file-item ${isActive ? 'active' : ''}" data-path="${escapeHtml(file.path)}">
                         <input type="checkbox" class="checkbox file-checkbox" ${isSelected ? 'checked' : ''} data-path="${escapeHtml(file.path)}">
                         <i class="codicon ${statusIcon} icon"></i>
                         <span class="name ${statusClass}" title="${escapeHtml(file.path)}">${escapeHtml(fileName || file.path)}</span>

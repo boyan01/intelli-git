@@ -328,9 +328,6 @@
 }
 
 /* File Group */
-.file-group {
-    border-bottom: 1px solid var(--vscode-panel-border);
-}
 
 .file-group-header {
     display: flex;
@@ -373,14 +370,28 @@
 .file-item {
     display: flex;
     align-items: center;
-    padding: 3px 8px 3px 24px;
-    gap: 6px;
-    cursor: pointer;
+    padding: 4px 8px;
+    margin-left: 20px;
+    font-size: 13px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
     user-select: none;
+    cursor: pointer;
+    border-radius: 4px;
 }
 
 .file-item:hover {
     background: var(--vscode-list-hoverBackground);
+}
+
+.file-item.active {
+    background: var(--vscode-list-activeSelectionBackground);
+    color: var(--vscode-list-activeSelectionForeground);
+}
+
+.file-item.active .name {
+    color: inherit;
 }
 
 .file-item .checkbox {

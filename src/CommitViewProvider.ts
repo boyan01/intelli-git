@@ -27,6 +27,31 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
         };
 
         webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
+        
+        // Listen to active text editor changes
+        const activeEditorListener = vscode.window.onDidChangeActiveTextEditor(editor => {
+            if (editor && editor.document.uri.scheme === 'file') {
+                 // Convert to relative path to match Git status paths
+                 const relativePath =  vscode.workspace.asRelativePath(editor.document.uri, false);
+                 this._view?.webview.postMessage({
+                     type: 'activeFileChange',
+                     path: relativePath
+                 });
+            }
+        });
+        
+        webviewView.onDidDispose(() => {
+            activeEditorListener.dispose();
+        });
+
+        // Initial update of active file
+        if (vscode.window.activeTextEditor && vscode.window.activeTextEditor.document.uri.scheme === 'file') {
+             const relativePath =  vscode.workspace.asRelativePath(vscode.window.activeTextEditor.document.uri, false);
+             this._view?.webview.postMessage({
+                 type: 'activeFileChange',
+                 path: relativePath
+             });
+        }
 
         webviewView.webview.onDidReceiveMessage(async (data) => {
             if (!this.gitService) {
