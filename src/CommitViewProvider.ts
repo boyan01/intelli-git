@@ -1,6 +1,8 @@
 import * as vscode from 'vscode';
-import { GitService, FileStatus } from './GitService';
+import { GitService } from './GitService';
 import { ChangelistService } from './ChangelistService';
+import type { CommitViewMessage, ChangelistGroup } from '@shared/messages';
+import { getWebviewHtml } from './utils/webviewHtml';
 
 export class CommitViewProvider implements vscode.WebviewViewProvider {
 
@@ -59,137 +61,67 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
              });
         }
 
-        webviewView.webview.onDidReceiveMessage(async (data) => {
+        webviewView.webview.onDidReceiveMessage(async (data: CommitViewMessage & { command?: string }) => {
             if (!this.gitService) {
                 return;
             }
 
-            // Support both 'type' (legacy) and 'command' (new React app)
-            const command = data.command || data.type;
+            const msg = { ...data, type: data.command || data.type } as CommitViewMessage;
 
-            switch (command) {
-                case 'refresh':
-                    this.refresh();
-                    break;
-                case 'commit':
-                    await this._handleCommit(data.message, data.amend, data.files);
-                    break;
-                case 'commitAndPush':
-                    await this._handleCommitAndPush(data.message, data.amend, data.files);
-                    break;
-                case 'stage':
-                    await this.gitService.stageFile(data.path);
-                    this.refresh();
-                    break;
-                case 'unstage':
-                    await this.gitService.unstageFile(data.path);
-                    this.refresh();
-                    break;
-                case 'stage-all':
-                    await this.gitService.stageAll();
-                    this.refresh();
-                    break;
-                case 'unstage-all':
-                    await this.gitService.unstageAll();
-                    this.refresh();
-                    break;
-                case 'switchBranch':
-                    await this._handleSwitchBranch(data.branch);
-                    break;
-                case 'updateProject':
-                    await this._handleUpdateProject();
-                    break;
-                case 'requestPush':
-                    vscode.commands.executeCommand('idea-commit-panel.push');
-                    break;
-                case 'openFile':
-                    this._handleOpenFile(data.path);
-                    break;
-                case 'getLastCommitMessage':
-                    await this._sendLastCommitMessage();
-                    break;
-                case 'generateCommitMessage':
-                    await this._generateCommitMessage();
-                    break;
-                case 'stash':
-                    await this._handleStash(data.files);
-                    break;
-                case 'rollback':
-                    await this._handleRollback(data.files);
-                    break;
-                case 'getChangedFiles':
-                    await this._sendChangedFiles();
-                    break;
-                case 'getStashList':
-                    await this._sendStashList();
-                    break;
-                case 'applyStash':
-                case 'stashApply':
-                    await this._handleApplyStash(data.index);
-                    break;
-                case 'popStash':
-                case 'stashPop':
-                    await this._handlePopStash(data.index);
-                    break;
-                case 'dropStash':
-                case 'stashDrop':
-                    await this._handleDropStash(data.index);
-                    break;
-                case 'getStashFiles':
-                    await this._sendStashFiles(data.index);
-                    break;
-                case 'showStashFileDiff':
-                    await this._showStashFileDiff(data.index, data.filePath);
-                    break;
-                case 'showStashActions':
-                    await this._showStashActions(data.index);
-                    break;
-                case 'rollbackWithPick':
-                    await this._handleRollbackWithPick();
-                    break;
-                case 'createChangelist':
-                    await this.changelistService.createChangelist(data.name);
-                    this.refresh();
-                    break;
-                case 'moveFiles':
-                    await this.changelistService.moveFiles(data.files, data.targetListId);
-                    this.refresh();
-                    break;
-                case 'deleteChangelist':
-                    // Check if empty is handled in frontend or need check here?
-                    // Let's check here to be safe or if frontend requests direct delete
-                    const listToDelete = this.changelistService.getChangelistById(data.id);
-                    if (listToDelete && listToDelete.files.length > 0) {
-                        await this._handleDeleteChangelist(data.id);
+            switch (msg.type) {
+                case 'refresh': this.refresh(); break;
+                case 'commit': await this._handleCommit(msg.message, msg.amend, msg.files); break;
+                case 'commitAndPush': await this._handleCommitAndPush(msg.message, msg.amend, msg.files); break;
+                case 'stage': await this.gitService.stageFile(msg.path); this.refresh(); break;
+                case 'unstage': await this.gitService.unstageFile(msg.path); this.refresh(); break;
+                case 'stage-all': await this.gitService.stageAll(); this.refresh(); break;
+                case 'unstage-all': await this.gitService.unstageAll(); this.refresh(); break;
+                case 'switchBranch': await this._handleSwitchBranch(msg.branch); break;
+                case 'updateProject': await this._handleUpdateProject(); break;
+                case 'requestPush': await vscode.commands.executeCommand('idea-commit-panel.push'); break;
+                case 'openFile': this._handleOpenFile(msg.path); break;
+                case 'getLastCommitMessage': await this._sendLastCommitMessage(); break;
+                case 'generateCommitMessage': await this._generateCommitMessage(); break;
+                case 'stash': await this._handleStash(msg.files); break;
+                case 'rollback': await this._handleRollback(msg.files); break;
+                case 'getChangedFiles': await this._sendChangedFiles(); break;
+                case 'getStashList': await this._sendStashList(); break;
+                case 'stashApply': await this._handleApplyStash(msg.index); break;
+                case 'stashPop': await this._handlePopStash(msg.index); break;
+                case 'stashDrop': await this._handleDropStash(msg.index); break;
+                case 'getStashFiles': await this._sendStashFiles(msg.index); break;
+                case 'showStashFileDiff': await this._showStashFileDiff(msg.index, msg.filePath); break;
+                case 'showStashActions': await this._showStashActions(msg.index); break;
+                case 'rollbackWithPick': await this._handleRollbackWithPick(); break;
+                case 'createChangelist': await this.changelistService.createChangelist(msg.name); this.refresh(); break;
+                case 'moveFiles': await this.changelistService.moveFiles(msg.files, msg.targetListId); this.refresh(); break;
+                case 'deleteChangelist': {
+                    const list = this.changelistService.getChangelistById(msg.id);
+                    if (list && list.files.length > 0) {
+                        await this._handleDeleteChangelist(msg.id);
                     } else {
-                        await this.changelistService.removeChangelist(data.id);
+                        await this.changelistService.removeChangelist(msg.id);
                         this.refresh();
                     }
                     break;
-                case 'renameChangelist':
-                    await this.changelistService.renameChangelist(data.id, data.name);
-                    this.refresh();
-                    break;
-                case 'promptCreateChangelist':
+                }
+                case 'renameChangelist': await this.changelistService.renameChangelist(msg.id, msg.name); this.refresh(); break;
+                case 'promptCreateChangelist': {
                     const newName = await vscode.window.showInputBox({ 
                         prompt: 'Enter new changelist name',
                         placeHolder: 'New Changelist'
                     });
                     if (newName) {
                         const newId = await this.changelistService.createChangelist(newName);
-                        if (data.file) {
-                            await this.changelistService.moveFiles([data.file], newId);
+                        if (msg.file) {
+                            await this.changelistService.moveFiles([msg.file], newId);
                         }
                         this.refresh();
                     }
                     break;
-                case 'deleteFiles':
-                    await this._handleDeleteFiles(data.files);
-                    this.refresh();
-                    break;
-                case 'stashChangelist':
-                    await this._handleStash(data.files); // Re-use stash handler
-                    break;
+                }
+                case 'deleteFiles': await this._handleDeleteFiles(msg.files); this.refresh(); break;
+                case 'stashChangelist': await this._handleStash(msg.files); break;
             }
         });
 
@@ -508,54 +440,10 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
 
 
     private _getHtmlForWebview(webview: vscode.Webview) {
-        // Use the new React build output
-        const scriptUri = webview.asWebviewUri(
-            vscode.Uri.joinPath(this._extensionUri, 'out', 'webview', 'webview.js')
-        );
-        const styleUri = webview.asWebviewUri(
-            vscode.Uri.joinPath(this._extensionUri, 'out', 'webview', 'index.css')
-        );
-
-        // Keep codicons for icons if needed by React or loaded separately? 
-        // The React app might bundle its own or use the one from node_modules.
-        // Let's verify if `webview-ui` uses generic codicons CSS or bundles it.
-        // Based on package.json, `webview-ui` deps include `@vscode/codicons`.
-        // Vite usually bundles imported CSS. If `main.tsx` imports it, it's in index.css.
-        // If not, we might need to include it.
-        // Looking at `package.json` of root, `@vscode/codicons` is there. 
-        // `webview-ui/package.json` (implied) likely has it too.
-        // Let's assume standard Vite bundle handles it for now, typically `index.css` contains all styles.
-        // However, standard VS Code webviews often load codicon.css explicitly if they use the font.
-        // Let's include it just in case to ensure icons work if they rely on the global font class availability.
-        const codiconUri = webview.asWebviewUri(
-            vscode.Uri.joinPath(this._extensionUri, 'node_modules', '@vscode', 'codicons', 'dist', 'codicon.css')
-        );
-
-        const nonce = this._getNonce();
-
-        return `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource}; font-src ${webview.cspSource}; script-src 'nonce-${nonce}';">
-    <link href="${styleUri}" rel="stylesheet">
-    <link href="${codiconUri}" rel="stylesheet">
-    <title>Commit</title>
-</head>
-<body>
-    <div id="root"></div>
-    <script nonce="${nonce}" src="${scriptUri}"></script>
-</body>
-</html>`;
-    }
-
-    private _getNonce() {
-        let text = '';
-        const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-        for (let i = 0; i < 32; i++) {
-            text += possible.charAt(Math.floor(Math.random() * possible.length));
-        }
-        return text;
+        return getWebviewHtml({
+            webview,
+            extensionUri: this._extensionUri,
+            title: 'Commit'
+        });
     }
 }

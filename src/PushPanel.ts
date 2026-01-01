@@ -1,10 +1,7 @@
 import * as vscode from 'vscode';
 import { GitService, CommitInfo } from './GitService';
-
-interface CommitFile {
-    path: string;
-    status: string;
-}
+import type { PushViewMessage, CommitFile } from '@shared/messages';
+import { getWebviewHtml } from './utils/webviewHtml';
 
 export class PushPanel {
     public static currentPanel: PushPanel | undefined;
@@ -33,31 +30,15 @@ export class PushPanel {
         this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
 
         this._panel.webview.onDidReceiveMessage(
-            async (message) => {
+            async (message: PushViewMessage) => {
                 switch (message.type) {
-                    case 'ready':
-                        await this._loadData();
-                        break;
-                    case 'push':
-                        await this._doPush(message.force, message.pushTags);
-                        break;
-                    case 'cancel':
-                        this._panel.dispose();
-                        break;
-                    case 'selectCommit':
-                        await this._loadFilesForCommit(message.index);
-                        break;
-                    case 'openDiff':
-                        this._openDiff(message.path);
-                        break;
-                    case 'changeRemote':
-                        this._remote = message.remote;
-                        await this._refreshCommits();
-                        break;
-                    case 'changeRemoteBranch':
-                        this._remoteBranch = message.branch;
-                        await this._refreshCommits();
-                        break;
+                    case 'ready': await this._loadData(); break;
+                    case 'push': await this._doPush(message.force, message.pushTags); break;
+                    case 'cancel': this._panel.dispose(); break;
+                    case 'selectCommit': await this._loadFilesForCommit(message.index); break;
+                    case 'openDiff': this._openDiff(message.path); break;
+                    case 'changeRemote': this._remote = message.remote; await this._refreshCommits(); break;
+                    case 'changeRemoteBranch': this._remoteBranch = message.branch; await this._refreshCommits(); break;
                 }
             },
             null,
@@ -189,56 +170,12 @@ export class PushPanel {
         vscode.commands.executeCommand('git.openChange', uri);
     }
 
-    private _getNonce() {
-        let text = '';
-        const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-        for (let i = 0; i < 32; i++) {
-            text += possible.charAt(Math.floor(Math.random() * possible.length));
-        }
-        return text;
-    }
-
     private _getHtmlForWebview() {
-        const webview = this._panel.webview;
-        const nonce = this._getNonce();
-
-        // Use the same React bundle as Commit View
-        const scriptUri = webview.asWebviewUri(
-            vscode.Uri.joinPath(this._extensionUri, 'out', 'webview', 'webview.js')
-        );
-        const styleUri = webview.asWebviewUri(
-            vscode.Uri.joinPath(this._extensionUri, 'out', 'webview', 'index.css')
-        );
-        const codiconUri = webview.asWebviewUri(
-            vscode.Uri.joinPath(this._extensionUri, 'node_modules', '@vscode', 'codicons', 'dist', 'codicon.css')
-        );
-
-        return `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; font-src ${webview.cspSource} https:; script-src 'nonce-${nonce}';">
-    <link href="${styleUri}" rel="stylesheet">
-    <link href="${codiconUri}" rel="stylesheet">
-    <title>Push Commits</title>
-</head>
-<body>
-    <div id="root"></div>
-    <script nonce="${nonce}">
-        window.initialRoute = '/push';
-    </script>
-    <script nonce="${nonce}" src="${scriptUri}"></script>
-</body>
-</html>`;
-    }
-
-    private _escapeHtml(text: string): string {
-        return text
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#039;');
+        return getWebviewHtml({
+            webview: this._panel.webview,
+            extensionUri: this._extensionUri,
+            title: 'Push Commits',
+            initialRoute: '/push'
+        });
     }
 }

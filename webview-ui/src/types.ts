@@ -1,9 +1,21 @@
-export interface FileStatus {
-    path: string;
-    status: string;
-    staged: boolean;
-}
+// Re-export shared types
+export type {
+    FileStatus,
+    ChangelistGroup,
+    BranchInfo,
+    CommitInfo,
+    CommitFile,
+    PushConfig,
+    StashItem,
+    CommitViewMessage,
+    PushViewMessage,
+    WebviewMessage,
+    CommitViewExtMessage,
+    PushViewExtMessage,
+    ExtensionMessage,
+} from '@shared/messages';
 
+// Local types for backward compatibility
 export interface Changelist {
     id: string;
     name: string;
@@ -12,50 +24,8 @@ export interface Changelist {
     files: string[];
 }
 
-export interface ChangelistGroup extends Changelist {
-    items: FileStatus[];
-}
-
-export interface BranchInfo {
-    current: string;
-    all: string[];
-}
-
-
-export interface CommitInfo {
-    hash: string;
-    shortHash: string;
-    subject: string;
-    authorName: string;
-    date: string;
-}
-
-export interface CommitFile {
-    path: string;
-    status: string;
-}
-
-export interface PushConfig {
-    currentBranch: string;
-    remote: string;
-    remoteBranch: string;
-    remotes: string[];
-    remoteBranches: string[];
-}
-
 export interface PushState {
-    commits: CommitInfo[];
-    files: CommitFile[];
-    config: PushConfig;
+    commits: import('@shared/messages').CommitInfo[];
+    files: import('@shared/messages').CommitFile[];
+    config: import('@shared/messages').PushConfig;
 }
-
-// Messages derived from VS Code extension
-export type MessageToWebview = 
-    | { type: 'update'; files: ChangelistGroup[]; branches: BranchInfo }
-    | { type: 'stash-update'; list: any[] }
-    // Push View Messages
-    | { type: 'push-update'; commits: CommitInfo[]; files: CommitFile[]; config: PushConfig }
-    | { type: 'push-updateFiles'; files: CommitFile[] }
-    | { type: 'pushComplete' }
-    | { type: 'pushError' };
-

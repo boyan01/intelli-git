@@ -1,50 +1,38 @@
 import { useEffect, useState, useCallback } from 'react';
-import type { ChangelistGroup, BranchInfo } from '../types';
-
-// Type for the VS Code API
-interface VSCodeApi {
-    postMessage: (msg: any) => void;
-    getState: () => any;
-    setState: (state: any) => void;
-}
-
-// Acquire the API once
-const vscode: VSCodeApi = (window as any).acquireVsCodeApi 
-    ? (window as any).acquireVsCodeApi()
-    : {
-        postMessage: (msg: any) => console.log('VS Code Message:', msg),
-        getState: () => ({}),
-        setState: (state: any) => console.log('Set State:', state),
-    };
+import type { 
+    ChangelistGroup, 
+    BranchInfo, 
+    StashItem,
+    WebviewMessage,
+    CommitViewExtMessage,
+} from '@shared/messages';
+import { vscode } from '../lib/vscode';
 
 export const useVSCode = () => {
     const [changelists, setChangelists] = useState<ChangelistGroup[]>([]);
     const [branches, setBranches] = useState<BranchInfo | null>(null);
-    const [stashList, setStashList] = useState<any[]>([]);
+    const [stashList, setStashList] = useState<StashItem[]>([]);
 
     useEffect(() => {
-        const handleMessage = (event: MessageEvent) => {
+        const handleMessage = (event: MessageEvent<CommitViewExtMessage>) => {
             const message = event.data;
             switch (message.type) {
                 case 'update':
                     setChangelists(message.files);
                     setBranches(message.branches);
                     break;
-                case 'stash-update':
-                    setStashList(message.list);
+                case 'stashList':
+                    setStashList(message.stashList);
                     break;
             }
         };
 
         window.addEventListener('message', handleMessage);
-        
-        // Signal ready
-        vscode.postMessage({ command: 'refresh' });
-
+        vscode.postMessage({ type: 'refresh' });
         return () => window.removeEventListener('message', handleMessage);
     }, []);
 
-    const postMessage = useCallback((message: any) => {
+    const postMessage = useCallback((message: WebviewMessage) => {
         vscode.postMessage(message);
     }, []);
 

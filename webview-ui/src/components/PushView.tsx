@@ -1,10 +1,13 @@
-import { useState, useEffect } from 'react';
-import { useVSCode } from '../hooks/useVSCode';
-import type { CommitInfo, CommitFile, PushConfig, FileStatus } from '../types';
+import { useState, useEffect, useCallback } from 'react';
+import type { CommitInfo, CommitFile, PushConfig, PushViewMessage, PushViewExtMessage, FileStatus } from '@shared/messages';
 import { FileTree } from './FileTree';
+import { vscode } from '../lib/vscode';
 
 export function PushView() {
-    const { postMessage } = useVSCode();
+    const postMessage = useCallback((message: PushViewMessage) => {
+        vscode.postMessage(message);
+    }, []);
+    
     const [commits, setCommits] = useState<CommitInfo[]>([]);
     const [files, setFiles] = useState<CommitFile[]>([]);
     const [config, setConfig] = useState<PushConfig | null>(null);
@@ -14,17 +17,15 @@ export function PushView() {
     const [isForcePushExpanded, setIsForcePushExpanded] = useState(false);
 
     useEffect(() => {
-        const handleMessage = (event: MessageEvent) => {
+        const handleMessage = (event: MessageEvent<PushViewExtMessage>) => {
             const message = event.data;
             switch (message.type) {
                 case 'update': 
-                    if (message.commits) {
-                        setCommits(message.commits);
-                        setFiles(message.files);
-                        setConfig(message.config);
-                        if (message.commits.length > 0 && !selectedCommitHash) {
-                            setSelectedCommitHash(message.commits[0].hash);
-                        }
+                    setCommits(message.commits);
+                    setFiles(message.files);
+                    setConfig(message.config);
+                    if (message.commits.length > 0 && !selectedCommitHash) {
+                        setSelectedCommitHash(message.commits[0].hash);
                     }
                     break;
                 case 'updateFiles':
@@ -42,7 +43,7 @@ export function PushView() {
         window.addEventListener('message', handleMessage);
         postMessage({ type: 'ready' });
         return () => window.removeEventListener('message', handleMessage);
-    }, [selectedCommitHash]);
+    }, [selectedCommitHash, postMessage]);
 
     const handlePush = (force: boolean) => {
         setIsPushing(true);

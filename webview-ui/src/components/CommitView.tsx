@@ -38,24 +38,19 @@ export function CommitView() {
     const handleCommit = (push: boolean) => {
         const files = Array.from(selectedFiles);
         if (files.length === 0 && !amend) { 
-            // Allow empty commit if amend? Usually git commit needs changes or --allow-empty. 
-            // Standard check: if files empty and not amend, warn.
-            // If amend, maybe okay.
             return;
         }
         postMessage({
-            command: push ? 'commitAndPush' : 'commit',
+            type: push ? 'commitAndPush' : 'commit',
             message: commitMessage,
             files: files,
             amend: amend
         });
     };
 
-    const handleStashAction = (action: 'apply' | 'pop' | 'drop', index: string) => {
-        postMessage({
-            command: action === 'drop' ? 'stashDrop' : (action === 'pop' ? 'stashPop' : 'stashApply'),
-            index: index
-        });
+    const handleStashAction = (action: 'apply' | 'pop' | 'drop', index: number) => {
+        const typeMap = { apply: 'stashApply', pop: 'stashPop', drop: 'stashDrop' } as const;
+        postMessage({ type: typeMap[action], index });
     };
 
     return (
@@ -87,16 +82,16 @@ export function CommitView() {
                      {/* File Toolbar */}
                      <div className="file-toolbar">
                         <div className="toolbar-left">
-                           <button className="icon-btn" title="刷新" onClick={() => postMessage({ command: 'refresh' })}>
+                           <button className="icon-btn" title="刷新" onClick={() => postMessage({ type: 'refresh' })}>
                                <i className="codicon codicon-sync"></i>
                            </button>
                            <button className="icon-btn" title="回滚" onClick={() => {
-                                postMessage({ command: 'rollback', files: Array.from(selectedFiles) });
+                                postMessage({ type: 'rollback', files: Array.from(selectedFiles) });
                            }}>
                                <i className="codicon codicon-discard"></i>
                            </button>
                            <button className="icon-btn" title="贮藏" onClick={() => {
-                                postMessage({ command: 'stash', files: Array.from(selectedFiles) });
+                                postMessage({ type: 'stash', files: Array.from(selectedFiles) });
                            }}>
                                <i className="codicon codicon-archive"></i>
                            </button>

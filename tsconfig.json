@@ -7,14 +7,24 @@
       "DOM"
     ],
     "sourceMap": true,
-    "rootDir": "src",
+    "rootDir": ".",
     "strict": true,
     "skipLibCheck": true,
-    "outDir": "out"
+    "outDir": "out",
+    "baseUrl": ".",
+    "paths": {
+      "@shared/*": [
+        "shared/*"
+      ]
+    }
   },
+  "include": [
+    "src/**/*"
+  ],
   "exclude": [
     "node_modules",
     ".vscode-test",
-    "webview-ui"
+    "webview-ui",
+    "shared"
   ]
 }
