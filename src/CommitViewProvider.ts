@@ -138,9 +138,13 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
         const files = await this.gitService.getStatus();
         const branches = await this.gitService.getBranches();
         
+        // Separate untracked files from tracked files
+        const untrackedFiles = files.filter(f => f.status === '?');
+        const trackedFiles = files.filter(f => f.status !== '?');
+
         // Use ChangelistService to group files
         // Sync with service first (ensure all files are in some list)
-        this.changelistService.syncWithStatus(files);
+        this.changelistService.syncWithStatus(trackedFiles);
         const rawChangelists = this.changelistService.getChangelists();
 
         // Map to frontend format
@@ -162,6 +166,20 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
                 };
             }).filter((item): item is {path: string, status: string, staged: boolean} => item !== null)
         }));
+
+        // Add Unversioned Files group if needed
+        if (untrackedFiles.length > 0) {
+            changelists.push({
+                id: 'unversioned',
+                name: 'Unversioned Files',
+                isDefault: false,
+                items: untrackedFiles.map(f => ({
+                    path: f.path,
+                    status: f.status,
+                    staged: f.staged
+                }))
+            });
+        }
 
         this._view.webview.postMessage({
             type: 'update',
