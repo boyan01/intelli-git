@@ -153,8 +153,55 @@ export class GitService {
     }
 
     public async rollbackFiles(files: string[]): Promise<void> {
-        if (files.length > 0) {
-            await this.git.checkout(['--', ...files]);
+        if (!files || files.length === 0) {
+            return;
+        }
+
+        try {
+            // We need to know the status of these files to decide how to rollback
+            const allFiles = await this.getStatus();
+            
+            // Group files by action needed
+            const toCheckout: string[] = []; // Modified, Deleted
+            const toClean: string[] = [];    // Untracked
+            const toResetAndClean: string[] = []; // Added (Staged new files)
+
+            for (const filePath of files) {
+                const fileStatus = allFiles.find(f => f.path === filePath);
+                if (!fileStatus) continue;
+
+                if (fileStatus.status === '?') {
+                    // Untracked -> Clean
+                    toClean.push(filePath);
+                } else if (fileStatus.status === 'A') {
+                    // Added -> Reset (unstage) then Clean
+                    toResetAndClean.push(filePath);
+                } else {
+                    // Modified (M) or Deleted (D) -> Checkout HEAD
+                    toCheckout.push(filePath);
+                }
+            }
+
+            // Execute actions
+            if (toCheckout.length > 0) {
+                await this.git.checkout(['HEAD', '--', ...toCheckout]);
+            }
+
+            if (toResetAndClean.length > 0) {
+                // First unstage
+                await this.git.reset(['HEAD', '--', ...toResetAndClean]);
+                // Then clean
+                toClean.push(...toResetAndClean);
+            }
+
+            if (toClean.length > 0) {
+                // Remove untracked files
+                // -f force, -d remove directories if matched
+                await this.git.clean('f', ['-d', '--', ...toClean]);
+            }
+        } catch (e) {
+            console.error('Rollback failed:', e);
+            throw e;
         }
     }
 

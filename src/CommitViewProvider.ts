@@ -1,17 +1,21 @@
 import * as vscode from 'vscode';
 import { GitService, FileStatus } from './GitService';
+import { ChangelistService } from './ChangelistService';
 
 export class CommitViewProvider implements vscode.WebviewViewProvider {
 
     public static readonly viewType = 'ideaCommitView';
     private _view?: vscode.WebviewView;
     private gitService?: GitService;
+    private changelistService: ChangelistService;
 
     constructor(
         private readonly _extensionUri: vscode.Uri,
-        gitService?: GitService
+        gitService: GitService,
+        changelistService: ChangelistService
     ) {
         this.gitService = gitService;
+        this.changelistService = changelistService;
     }
 
     public resolveWebviewView(
@@ -23,7 +27,9 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
 
         webviewView.webview.options = {
             enableScripts: true,
-            localResourceRoots: [this._extensionUri]
+            localResourceRoots: [
+                this._extensionUri
+            ]
         };
 
         webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
@@ -58,7 +64,10 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
                 return;
             }
 
-            switch (data.type) {
+            // Support both 'type' (legacy) and 'command' (new React app)
+            const command = data.command || data.type;
+
+            switch (command) {
                 case 'refresh':
                     this.refresh();
                     break;
@@ -115,12 +124,15 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
                     await this._sendStashList();
                     break;
                 case 'applyStash':
+                case 'stashApply':
                     await this._handleApplyStash(data.index);
                     break;
                 case 'popStash':
+                case 'stashPop':
                     await this._handlePopStash(data.index);
                     break;
                 case 'dropStash':
+                case 'stashDrop':
                     await this._handleDropStash(data.index);
                     break;
                 case 'getStashFiles':
@@ -135,373 +147,388 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
                 case 'rollbackWithPick':
                     await this._handleRollbackWithPick();
                     break;
+                case 'createChangelist':
+                    await this.changelistService.createChangelist(data.name);
+                    this.refresh();
+                    break;
+                case 'moveFiles':
+                    await this.changelistService.moveFiles(data.files, data.targetListId);
+                    this.refresh();
+                    break;
+                case 'deleteChangelist':
+                    // Check if empty is handled in frontend or need check here?
+                    // Let's check here to be safe or if frontend requests direct delete
+                    const listToDelete = this.changelistService.getChangelistById(data.id);
+                    if (listToDelete && listToDelete.files.length > 0) {
+                        await this._handleDeleteChangelist(data.id);
+                    } else {
+                        await this.changelistService.removeChangelist(data.id);
+                        this.refresh();
+                    }
+                    break;
+                case 'renameChangelist':
+                    await this.changelistService.renameChangelist(data.id, data.name);
+                    this.refresh();
+                    break;
+                case 'promptCreateChangelist':
+                    const newName = await vscode.window.showInputBox({ 
+                        prompt: 'Enter new changelist name',
+                        placeHolder: 'New Changelist'
+                    });
+                    if (newName) {
+                        const newId = await this.changelistService.createChangelist(newName);
+                        if (data.file) {
+                            await this.changelistService.moveFiles([data.file], newId);
+                        }
+                        this.refresh();
+                    }
+                    break;
+                case 'deleteFiles':
+                    await this._handleDeleteFiles(data.files);
+                    this.refresh();
+                    break;
+                case 'stashChangelist':
+                    await this._handleStash(data.files); // Re-use stash handler
+                    break;
             }
         });
+
 
         this.refresh();
-    }
-
-    private async _handleCommit(message: string, amend: boolean = false, files?: string[]) {
-        try {
-            if (amend) {
-                await this.gitService!.commitAmend(message, files);
-            } else {
-                await this.gitService!.commit(message, files);
-            }
-            vscode.window.showInformationMessage('提交成功!');
-            this.refresh();
-            this._view?.webview.postMessage({ type: 'clearMessage' });
-        } catch (e) {
-            vscode.window.showErrorMessage(`提交失败: ${e}`);
-        }
-    }
-
-    private async _handleCommitAndPush(message: string, amend: boolean = false, files?: string[]) {
-        try {
-            if (amend) {
-                await this.gitService!.commitAmend(message, files);
-            } else {
-                await this.gitService!.commit(message, files);
-            }
-            vscode.window.showInformationMessage('提交成功!');
-            this.refresh();
-            this._view?.webview.postMessage({ type: 'clearMessage' });
-            // Open push panel
-            vscode.commands.executeCommand('idea-commit-panel.push');
-        } catch (e) {
-            vscode.window.showErrorMessage(`提交失败: ${e}`);
-        }
-    }
-
-    private async _sendLastCommitMessage() {
-        try {
-            const message = await this.gitService!.getLastCommitMessage();
-            this._view?.webview.postMessage({ type: 'lastCommitMessage', message });
-        } catch (e) {
-            console.error('Failed to get last commit message:', e);
-        }
-    }
-
-    private async _generateCommitMessage() {
-        try {
-            // Get diff of staged changes
-            const diff = await this.gitService!.getStagedDiff();
-            if (!diff) {
-                vscode.window.showWarningMessage('没有已暂存的更改');
-                return;
-            }
-
-            // Try to use VS Code Language Model API
-            const models = await vscode.lm.selectChatModels({
-                vendor: 'copilot',
-                family: 'gpt-4o'
-            });
-
-            if (models.length === 0) {
-                vscode.window.showErrorMessage('未找到可用的 AI 模型，请确保已安装 GitHub Copilot');
-                return;
-            }
-
-            const model = models[0];
-            const messages = [
-                vscode.LanguageModelChatMessage.User(
-                    `Based on the following git diff, generate a concise and descriptive commit message in conventional commits format (e.g., feat:, fix:, docs:, etc.). Only output the commit message, nothing else.\n\nDiff:\n${diff.substring(0, 8000)}`
-                )
-            ];
-
-            this._view?.webview.postMessage({ type: 'aiGenerating', generating: true });
-
-            const response = await model.sendRequest(messages, {}, new vscode.CancellationTokenSource().token);
-            
-            let commitMessage = '';
-            for await (const chunk of response.text) {
-                commitMessage += chunk;
-            }
-
-            this._view?.webview.postMessage({ 
-                type: 'generatedCommitMessage', 
-                message: commitMessage.trim() 
-            });
-        } catch (e) {
-            console.error('Failed to generate commit message:', e);
-            vscode.window.showErrorMessage(`AI 生成失败: ${e}`);
-        } finally {
-            this._view?.webview.postMessage({ type: 'aiGenerating', generating: false });
-        }
-    }
-
-    private async _handleSwitchBranch(branch: string) {
-        try {
-            await this.gitService!.switchBranch(branch);
-            this.refresh();
-        } catch (e) {
-            vscode.window.showErrorMessage(`Failed to switch branch: ${e}`);
-        }
-    }
-
-    private async _handleStash(files?: string[]) {
-        try {
-            const hasSelectedFiles = files && files.length > 0;
-            const prompt = hasSelectedFiles 
-                ? `贮藏 ${files.length} 个选中文件的信息（可选）`
-                : '贮藏所有更改的信息（可选）';
-            
-            const message = await vscode.window.showInputBox({
-                prompt,
-                placeHolder: 'Stash message'
-            });
-            
-            // User cancelled
-            if (message === undefined) {
-                return;
-            }
-            
-            await this.gitService!.stash(message || undefined, files);
-            const filesInfo = hasSelectedFiles ? `${files.length} 个文件` : '所有更改';
-            vscode.window.showInformationMessage(`已贮藏 ${filesInfo}`);
-            this.refresh();
-        } catch (e) {
-            vscode.window.showErrorMessage(`贮藏失败: ${e}`);
-        }
-    }
-
-    private async _handleRollback(files: string[]) {
-        if (!files || files.length === 0) {
-            vscode.window.showWarningMessage('没有选择要回滚的文件');
-            return;
-        }
-
-        const confirm = await vscode.window.showWarningMessage(
-            `确定要回滚 ${files.length} 个文件的更改吗？此操作不可撤销！`,
-            { modal: true },
-            '确定'
-        );
-
-        if (confirm !== '确定') {
-            return;
-        }
-
-        try {
-            await this.gitService!.rollbackFiles(files);
-            vscode.window.showInformationMessage(`已回滚 ${files.length} 个文件`);
-            this.refresh();
-        } catch (e) {
-            vscode.window.showErrorMessage(`回滚失败: ${e}`);
-        }
-    }
-
-    private async _sendChangedFiles() {
-        try {
-            const files = await this.gitService!.getStatus();
-            const changedFiles = files.filter(f => !f.staged).map(f => f.path);
-            this._view?.webview.postMessage({ type: 'changedFiles', files: changedFiles });
-        } catch (e) {
-            console.error('Failed to get changed files:', e);
-        }
-    }
-
-    private async _sendStashList() {
-        try {
-            const stashList = await this.gitService!.getStashList();
-            console.log('Stash list:', JSON.stringify(stashList));
-            this._view?.webview.postMessage({ type: 'stashList', stashList });
-        } catch (e) {
-            console.error('Failed to get stash list:', e);
-        }
-    }
-
-    private async _handleApplyStash(index: number) {
-        try {
-            await this.gitService!.applyStash(index);
-            vscode.window.showInformationMessage('已应用贮藏');
-            this.refresh();
-            this._sendStashList();
-        } catch (e) {
-            vscode.window.showErrorMessage(`应用贮藏失败: ${e}`);
-        }
-    }
-
-    private async _handlePopStash(index: number) {
-        try {
-            await this.gitService!.popStash(index);
-            vscode.window.showInformationMessage('已弹出贮藏');
-            this.refresh();
-            this._sendStashList();
-        } catch (e) {
-            vscode.window.showErrorMessage(`弹出贮藏失败: ${e}`);
-        }
-    }
-
-    private async _handleDropStash(index: number) {
-        const confirm = await vscode.window.showWarningMessage(
-            '确定要删除此贮藏吗？此操作不可撤销！',
-            { modal: true },
-            '确定'
-        );
-
-        if (confirm !== '确定') {
-            return;
-        }
-
-        try {
-            await this.gitService!.dropStash(index);
-            vscode.window.showInformationMessage('已删除贮藏');
-            this._sendStashList();
-        } catch (e) {
-            vscode.window.showErrorMessage(`删除贮藏失败: ${e}`);
-        }
-    }
-
-    private async _sendStashFiles(index: number) {
-        try {
-            const files = await this.gitService!.getStashFiles(index);
-            this._view?.webview.postMessage({ type: 'stashFiles', index, files });
-        } catch (e) {
-            console.error('Failed to get stash files:', e);
-        }
-    }
-
-    private async _showStashFileDiff(index: number, filePath: string) {
-        try {
-            // Native Diff View Implementation
-            const leftRef = `stash@{${index}}^1`;
-            const rightRef = `stash@{${index}}`;
-            
-            const fileName = filePath.split('/').pop() || filePath;
-            const title = `${fileName} (Stash Diff)`;
-
-            const leftUri = vscode.Uri.parse(`idea-stash://load/${filePath}?${JSON.stringify({ ref: leftRef, path: filePath })}`);
-            const rightUri = vscode.Uri.parse(`idea-stash://load/${filePath}?${JSON.stringify({ ref: rightRef, path: filePath })}`);
-
-            await vscode.commands.executeCommand('vscode.diff', leftUri, rightUri, title);
-        } catch (e) {
-            console.error('Show stash diff error:', e);
-            vscode.window.showErrorMessage('Failed to open diff view.');
-        }
-    }
-
-    private async _showStashActions(index: number) {
-        const actions = [
-            { label: '$(check) 弹出', description: '应用贮藏并删除', action: 'pop' },
-            { label: '$(arrow-up) 应用', description: '应用贮藏但保留', action: 'apply' },
-            { label: '$(trash) 删除', description: '删除贮藏', action: 'drop' }
-        ];
-
-        const selected = await vscode.window.showQuickPick(actions, {
-            placeHolder: `选择对 stash@{${index}} 的操作`
-        });
-
-        if (!selected) return;
-
-        switch (selected.action) {
-            case 'pop':
-                await this._handlePopStash(index);
-                break;
-            case 'apply':
-                await this._handleApplyStash(index);
-                break;
-            case 'drop':
-                await this._handleDropStash(index);
-                break;
-        }
-    }
-
-    private async _handleRollbackWithPick() {
-        try {
-            const files = await this.gitService!.getStatus();
-            const changedFiles = files.filter(f => !f.staged);
-
-            if (changedFiles.length === 0) {
-                vscode.window.showInformationMessage('没有可回滚的文件');
-                return;
-            }
-
-            const items = changedFiles.map(f => ({
-                label: f.path,
-                description: f.status,
-                picked: false
-            }));
-
-            const selected = await vscode.window.showQuickPick(items, {
-                placeHolder: '选择要回滚的文件',
-                canPickMany: true
-            });
-
-            if (!selected || selected.length === 0) {
-                return;
-            }
-
-            const filePaths = selected.map(s => s.label);
-            await this._handleRollback(filePaths);
-        } catch (e) {
-            vscode.window.showErrorMessage(`获取文件列表失败: ${e}`);
-        }
-    }
-
-    private async _handleUpdateProject() {
-        try {
-            await this.gitService!.pull();
-            vscode.window.showInformationMessage('Project updated.');
-            this.refresh();
-        } catch (e) {
-            vscode.window.showErrorMessage(`Update failed: ${e}`);
-        }
-    }
-
-    private _handleOpenFile(filePath: string) {
-        if (!this.gitService) {
-            return;
-        }
-        const workspaceRoot = this.gitService.getWorkspaceRoot();
-        const uri = vscode.Uri.file(`${workspaceRoot}/${filePath}`);
-        vscode.commands.executeCommand('vscode.open', uri);
-    }
+    } // Close resolveWebviewView
 
     public async refresh() {
-        if (!this._view || !this.gitService) {
+        if (!this.gitService || !this._view) {
             return;
         }
 
         const files = await this.gitService.getStatus();
         const branches = await this.gitService.getBranches();
+        
+        // Use ChangelistService to group files
+        // Sync with service first (ensure all files are in some list)
+        this.changelistService.syncWithStatus(files);
+        const rawChangelists = this.changelistService.getChangelists();
+
+        // Map to frontend format
+        const changelists = rawChangelists.map(list => ({
+            id: list.id,
+            name: list.name,
+            isDefault: list.isDefault,
+            items: list.files.map(path => {
+                const file = files.find(f => f.path === path);
+                // Should always find file after sync, but handle safely
+                if (!file) {
+                    console.warn(`File ${path} in changelist ${list.name} not found in status`);
+                    return null;
+                }
+                return {
+                    path: path,
+                    status: file.status,
+                    staged: file.staged
+                };
+            }).filter((item): item is {path: string, status: string, staged: boolean} => item !== null)
+        }));
 
         this._view.webview.postMessage({
             type: 'update',
-            files,
-            branches
+            files: changelists,
+            branches: branches
         });
     }
 
     public switchTab(tab: 'commit' | 'stash') {
-        if (this._view) {
-            this._view.webview.postMessage({
-                type: 'switchTab',
-                tab: tab
-            });
+        this._view?.webview.postMessage({
+            type: 'switchTab',
+            tab: tab
+        });
+    }
+
+    private async _handleCommit(message: string, amend: boolean, files: string[]) {
+        if (!this.gitService) return;
+        try {
+            if (amend) {
+                await this.gitService.commitAmend(message, files);
+            } else {
+                await this.gitService.commit(message, files);
+            }
+            vscode.window.showInformationMessage('Commit successful');
+            this.commitMessage = ''; // Clear message logic if needed, but frontend handles it
+            this._view?.webview.postMessage({ type: 'clearMessage' });
+            this.refresh();
+        } catch (e) {
+            vscode.window.showErrorMessage(`Commit failed: ${e}`);
         }
     }
 
+    private async _handleCommitAndPush(message: string, amend: boolean, files: string[]) {
+        if (!this.gitService) return;
+        try {
+            await this._handleCommit(message, amend, files);
+            const branches = await this.gitService.getBranches();
+            if (branches.current) {
+                await this.gitService.push('origin', branches.current);
+                vscode.window.showInformationMessage('Push successful');
+            }
+        } catch (e) {
+            vscode.window.showErrorMessage(`Push failed: ${e}`);
+        }
+    }
+
+    private async _handleSwitchBranch(branchName: string) {
+        if (!this.gitService) return;
+        try {
+            await this.gitService.switchBranch(branchName);
+            this.refresh();
+        } catch (e) {
+            vscode.window.showErrorMessage(`Switch branch failed: ${e}`);
+        }
+    }
+
+    private async _handleUpdateProject() {
+        if (!this.gitService) return;
+        try {
+            await this.gitService.pull();
+            this.refresh();
+            vscode.window.showInformationMessage('Project updated');
+        } catch (e) {
+            vscode.window.showErrorMessage(`Update failed: ${e}`);
+        }
+    }
+
+    private _handleOpenFile(path: string) {
+        const workspaceRoot = this.gitService?.getWorkspaceRoot();
+        if (workspaceRoot) {
+            const uri = vscode.Uri.file(`${workspaceRoot}/${path}`);
+            vscode.commands.executeCommand('vscode.open', uri);
+        }
+    }
+
+    private async _sendLastCommitMessage() {
+        if (!this.gitService) return;
+        const message = await this.gitService.getLastCommitMessage();
+        this._view?.webview.postMessage({
+            type: 'lastCommitMessage',
+            message: message
+        });
+    }
+
+    // Placeholder for AI commit message generation
+    private async _generateCommitMessage() {
+        // Implementation pending integration with AI service
+        this._view?.webview.postMessage({
+            type: 'aiGenerating',
+            generating: true
+        });
+        
+        // Simulate delay
+        setTimeout(() => {
+            this._view?.webview.postMessage({
+                type: 'generatedCommitMessage',
+                message: 'feat: AI generated commit message stub'
+            });
+            this._view?.webview.postMessage({
+                type: 'aiGenerating',
+                generating: false
+            });
+        }, 1000);
+    }
+
+    private async _handleStash(files: string[]) {
+        if (!this.gitService) return;
+        try {
+            const message = await vscode.window.showInputBox({ 
+                placeHolder: 'Stash message (optional)' 
+            });
+            await this.gitService.stash(message, files);
+            vscode.window.showInformationMessage('Stash successful');
+            this.refresh();
+        } catch (e) {
+            vscode.window.showErrorMessage(`Stash failed: ${e}`);
+        }
+    }
+
+    private async _handleRollback(files: string[]) {
+         if (!this.gitService) return;
+         const answer = await vscode.window.showWarningMessage(
+             `Are you sure you want to rollback ${files.length} files? This cannot be undone.`,
+             { modal: true },
+             'Rollback'
+         );
+         if (answer === 'Rollback') {
+             try {
+                await this.gitService.rollbackFiles(files);
+                this.refresh();
+             } catch (e) {
+                 vscode.window.showErrorMessage(`Rollback failed: ${e}`);
+             }
+         }
+    }
+
+    private async _sendChangedFiles() {
+        this.refresh();
+    }
+
+    private async _sendStashList() {
+        if (!this.gitService) return;
+        const list = await this.gitService.getStashList();
+        this._view?.webview.postMessage({
+            type: 'stashList',
+            stashList: list
+        });
+    }
+
+    private async _handleApplyStash(index: number) {
+        if (!this.gitService) return;
+        try {
+            await this.gitService.applyStash(index);
+            vscode.window.showInformationMessage('Stash applied');
+            this.refresh();
+        } catch (e) {
+            vscode.window.showErrorMessage(`Apply stash failed: ${e}`);
+        }
+    }
+
+    private async _handlePopStash(index: number) {
+        if (!this.gitService) return;
+        try {
+            await this.gitService.popStash(index);
+            vscode.window.showInformationMessage('Stash popped');
+            this.refresh();
+            await this._sendStashList();
+        } catch (e) {
+            vscode.window.showErrorMessage(`Pop stash failed: ${e}`);
+        }
+    }
+
+    private async _handleDropStash(index: number) {
+        if (!this.gitService) return;
+        const answer = await vscode.window.showWarningMessage(
+            'Are you sure you want to drop this stash?',
+            { modal: true },
+            'Drop'
+        );
+        if (answer === 'Drop') {
+            try {
+                await this.gitService.dropStash(index);
+                this._sendStashList();
+            } catch (e) {
+                vscode.window.showErrorMessage(`Drop stash failed: ${e}`);
+            }
+        }
+    }
+
+    private async _sendStashFiles(index: number) {
+        if (!this.gitService) return;
+        const files = await this.gitService.getStashFiles(index);
+        this._view?.webview.postMessage({
+            type: 'stashFiles',
+            index: index,
+            files: files
+        });
+    }
+
+    private async _showStashFileDiff(index: number, filePath: string) {
+        // Construct URIs for diff
+        // Left: stash@{index}^1 (Parent)
+        // Right: stash@{index} (The stash) or just Read-only content
+        
+        const stashRef = `stash@{${index}}`;
+        const leftRef = `${stashRef}^1`;
+        
+        const leftUri = vscode.Uri.parse(`idea-stash://load/left?${JSON.stringify({ref: leftRef, path: filePath})}`);
+        const rightUri = vscode.Uri.parse(`idea-stash://load/right?${JSON.stringify({ref: stashRef, path: filePath})}`);
+
+        const fileName = filePath.split('/').pop();
+        
+        await vscode.commands.executeCommand('vscode.diff', 
+            leftUri, 
+            rightUri, 
+            `${fileName} (Stash vs Parent)`
+        );
+    }
+
+    private async _showStashActions(index: number) {
+        // Simple QuickPick for fallback if context menu fails
+        const actions = ['Apply', 'Pop', 'Drop'];
+        const choice = await vscode.window.showQuickPick(actions, { placeHolder: `Actions for stash@{${index}}` });
+        if (choice === 'Apply') this._handleApplyStash(index);
+        if (choice === 'Pop') this._handlePopStash(index);
+        if (choice === 'Drop') this._handleDropStash(index);
+    }
+
+    private async _handleRollbackWithPick() {
+        // Not implemented or legacy?
+        // Just refresh for now
+        this.refresh();
+    }
+
+    private async _handleDeleteChangelist(id: string) {
+        const answer = await vscode.window.showWarningMessage(
+            'Changelist is not empty. Delete it and move files to Default?',
+            { modal: true },
+            'Delete'
+        );
+        
+        if (answer === 'Delete') {
+             await this.changelistService.removeChangelist(id); // Service handles moving files to default if deleted
+             this.refresh();
+        }
+    }
+
+    private async _handleDeleteFiles(files: string[]) {
+        // "Delete Files" usually means delete from disk or just revert?
+        // "Delete" in context menu usually means delete from disk.
+        // Be careful.
+        const answer = await vscode.window.showWarningMessage(
+            `Are you sure you want to delete ${files.length} files from disk?`,
+             { modal: true },
+             'Delete'
+        );
+        if (answer === 'Delete') {
+            // Using vscode.workspace.fs to delete
+             const workspaceRoot = this.gitService?.getWorkspaceRoot();
+             if (!workspaceRoot) return;
+
+             try {
+                for (const file of files) {
+                    const uri = vscode.Uri.file(`${workspaceRoot}/${file}`);
+                    await vscode.workspace.fs.delete(uri, { recursive: false, useTrash: true });
+                }
+                this.refresh();
+             } catch (e) {
+                 vscode.window.showErrorMessage(`Delete failed: ${e}`);
+             }
+        }
+    }
+    
+    // Member variable for commit message state if we want to preserve it, 
+    // though frontend usually holds it.
+    private commitMessage = '';
+
+
     private _getHtmlForWebview(webview: vscode.Webview) {
+        // Use the new React build output
         const scriptUri = webview.asWebviewUri(
-            vscode.Uri.joinPath(this._extensionUri, 'media', 'main.js')
+            vscode.Uri.joinPath(this._extensionUri, 'out', 'webview', 'webview.js')
         );
-        const styleResetUri = webview.asWebviewUri(
-            vscode.Uri.joinPath(this._extensionUri, 'media', 'reset.css')
+        const styleUri = webview.asWebviewUri(
+            vscode.Uri.joinPath(this._extensionUri, 'out', 'webview', 'index.css')
         );
-        const styleVSCodeUri = webview.asWebviewUri(
-            vscode.Uri.joinPath(this._extensionUri, 'media', 'vscode.css')
-        );
-        const styleMainUri = webview.asWebviewUri(
-            vscode.Uri.joinPath(this._extensionUri, 'media', 'main.css')
-        );
+
+        // Keep codicons for icons if needed by React or loaded separately? 
+        // The React app might bundle its own or use the one from node_modules.
+        // Let's verify if `webview-ui` uses generic codicons CSS or bundles it.
+        // Based on package.json, `webview-ui` deps include `@vscode/codicons`.
+        // Vite usually bundles imported CSS. If `main.tsx` imports it, it's in index.css.
+        // If not, we might need to include it.
+        // Looking at `package.json` of root, `@vscode/codicons` is there. 
+        // `webview-ui/package.json` (implied) likely has it too.
+        // Let's assume standard Vite bundle handles it for now, typically `index.css` contains all styles.
+        // However, standard VS Code webviews often load codicon.css explicitly if they use the font.
+        // Let's include it just in case to ensure icons work if they rely on the global font class availability.
         const codiconUri = webview.asWebviewUri(
             vscode.Uri.joinPath(this._extensionUri, 'node_modules', '@vscode', 'codicons', 'dist', 'codicon.css')
-        );
-        const menuCssUri = webview.asWebviewUri(
-             vscode.Uri.joinPath(this._extensionUri, 'media', 'menu.css')
-        );
-        const menuJsUri = webview.asWebviewUri(
-             vscode.Uri.joinPath(this._extensionUri, 'media', 'menu.js')
         );
 
         const nonce = this._getNonce();
@@ -511,91 +538,13 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; font-src ${webview.cspSource}; style-src ${webview.cspSource}; script-src 'nonce-${nonce}';">
-    <link href="${styleResetUri}" rel="stylesheet">
-    <link href="${styleVSCodeUri}" rel="stylesheet">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource}; font-src ${webview.cspSource}; script-src 'nonce-${nonce}';">
+    <link href="${styleUri}" rel="stylesheet">
     <link href="${codiconUri}" rel="stylesheet">
-    <link href="${menuCssUri}" rel="stylesheet">
-    <link href="${styleMainUri}" rel="stylesheet">
     <title>Commit</title>
 </head>
 <body>
-    <div class="commit-panel">
-        <!-- Header Tabs -->
-        <div class="header-tabs">
-            <div class="tabs-left">
-                <button class="tab active" data-tab="commit">提交</button>
-                <button class="tab" data-tab="stash">贮藏</button>
-            </div>
-            <div class="tabs-right">
-                <button class="icon-btn" title="More Actions">
-                    <i class="codicon codicon-ellipsis"></i>
-                </button>
-            </div>
-        </div>
-
-        <!-- Commit Tab Content -->
-        <div id="commit-tab-content" class="tab-content active">
-            <!-- File Actions Toolbar -->
-            <div class="file-toolbar">
-                <div class="toolbar-left">
-                    <button id="refresh-btn" class="icon-btn" title="刷新">
-                        <i class="codicon codicon-sync"></i>
-                    </button>
-                    <button id="rollback-btn" class="icon-btn" title="回滚选中的更改">
-                        <i class="codicon codicon-discard"></i>
-                    </button>
-                    <button id="stash-btn" class="icon-btn" title="贮藏选中的文件">
-                        <i class="codicon codicon-archive"></i>
-                    </button>
-                    <button id="view-options-btn" class="icon-btn" title="视图选项">
-                        <i class="codicon codicon-list-tree"></i>
-                    </button>
-                    <button id="expand-all-btn" class="icon-btn" title="全部展开">
-                        <i class="codicon codicon-expand-all"></i>
-                    </button>
-                    <button id="collapse-all-btn" class="icon-btn" title="全部收起">
-                        <i class="codicon codicon-collapse-all"></i>
-                    </button>
-                </div>
-            </div>
-
-            <!-- Change List Tree -->
-            <div id="file-list" class="file-list"></div>
-
-            <!-- Commit Message Area -->
-            <div class="commit-section">
-                <div class="commit-toolbar">
-                    <label class="amend-label">
-                        <input type="checkbox" id="amend-checkbox">
-                        <span>修正(M)</span>
-                    </label>
-                </div>
-                <textarea id="commit-msg" placeholder="提交信息" rows="4"></textarea>
-            </div>
-
-            <!-- Footer Actions -->
-            <div class="footer-actions">
-                <div class="actions-left">
-                    <button id="commit-btn" class="btn btn-primary">提交(I)</button>
-                    <button id="commit-push-btn" class="btn btn-secondary">提交并推送(P)...</button>
-                </div>
-                <div class="actions-right">
-                    <button id="settings-btn" class="icon-btn" title="设置">
-                        <i class="codicon codicon-settings-gear"></i>
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Stash Tab Content -->
-        <div id="stash-tab-content" class="tab-content">
-
-            <div id="stash-list" class="stash-list"></div>
-        </div>
-    </div>
-
-    <script nonce="${nonce}" src="${menuJsUri}"></script>
+    <div id="root"></div>
     <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>
 </html>`;

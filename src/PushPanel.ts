@@ -202,23 +202,16 @@ export class PushPanel {
         const webview = this._panel.webview;
         const nonce = this._getNonce();
 
-        const styleResetUri = webview.asWebviewUri(
-            vscode.Uri.joinPath(this._extensionUri, 'media', 'reset.css')
+        // Use the same React bundle as Commit View
+        const scriptUri = webview.asWebviewUri(
+            vscode.Uri.joinPath(this._extensionUri, 'out', 'webview', 'webview.js')
         );
-        const styleVSCodeUri = webview.asWebviewUri(
-            vscode.Uri.joinPath(this._extensionUri, 'media', 'vscode.css')
-        );
-        const stylePushUri = webview.asWebviewUri(
-            vscode.Uri.joinPath(this._extensionUri, 'media', 'push.css')
+        const styleUri = webview.asWebviewUri(
+            vscode.Uri.joinPath(this._extensionUri, 'out', 'webview', 'index.css')
         );
         const codiconUri = webview.asWebviewUri(
             vscode.Uri.joinPath(this._extensionUri, 'node_modules', '@vscode', 'codicons', 'dist', 'codicon.css')
         );
-        const scriptUri = webview.asWebviewUri(
-            vscode.Uri.joinPath(this._extensionUri, 'media', 'push.js')
-        );
-
-        const workspaceName = vscode.workspace.workspaceFolders?.[0]?.name || 'project';
 
         return `<!DOCTYPE html>
 <html lang="en">
@@ -226,121 +219,15 @@ export class PushPanel {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; font-src ${webview.cspSource} https:; script-src 'nonce-${nonce}';">
-    <link href="${styleResetUri}" rel="stylesheet">
-    <link href="${styleVSCodeUri}" rel="stylesheet">
+    <link href="${styleUri}" rel="stylesheet">
     <link href="${codiconUri}" rel="stylesheet">
-    <link href="${stylePushUri}" rel="stylesheet">
     <title>Push Commits</title>
 </head>
 <body>
-    <div class="push-panel">
-        <!-- Header -->
-        <div class="push-header">
-            <h2>Push commits to ${this._escapeHtml(workspaceName)}</h2>
-            <button class="header-close-btn" onclick="vscode.postMessage({type:'cancel'})" title="Close">
-                <i class="codicon codicon-close"></i>
-            </button>
-        </div>
-
-        <!-- Warning Banner (hidden by default) -->
-        <div id="warning-banner" class="warning-banner">
-            <i class="codicon codicon-error icon"></i>
-            <span class="message">Commit checks failed: 1 warning</span>
-            <a class="action" href="#">Review code analysis</a>
-        </div>
-
-        <!-- Main Content -->
-        <div class="push-main">
-            <!-- Left: Commits -->
-            <div class="commits-panel">
-                <div class="commits-header">
-                    <div class="branch-flow">
-                        <span class="local-branch">${this._escapeHtml(this._currentBranch)}</span>
-                        <span class="arrow">→</span>
-                        <div class="remote-selector">
-                            <select id="remote-select" class="branch-select">
-                                ${this._remotes.map(r => 
-                                    `<option value="${r}" ${r === this._remote ? 'selected' : ''}>${r}</option>`
-                                ).join('')}
-                            </select>
-                            <span class="separator">:</span>
-                            <div class="branch-input-wrapper">
-                                <input type="text" 
-                                       id="remote-branch-input" 
-                                       class="branch-input" 
-                                       value="${this._escapeHtml(this._remoteBranch)}"
-                                       placeholder="branch name">
-                                <div id="branch-suggestions" class="branch-suggestions"></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div id="commits-list" class="commits-list"></div>
-            </div>
-
-            <!-- Resize Handle -->
-            <div class="resize-handle"></div>
-
-            <!-- Right: Files -->
-            <div class="files-panel">
-                <div class="files-toolbar">
-                    <div class="toolbar-left">
-                        <span id="files-count" class="files-count">0 files</span>
-                    </div>
-                    <div class="toolbar-right">
-                        <button id="expand-all" class="toolbar-btn" title="Expand All">
-                            <i class="codicon codicon-expand-all"></i>
-                        </button>
-                        <button id="collapse-all" class="toolbar-btn" title="Collapse All">
-                            <i class="codicon codicon-collapse-all"></i>
-                        </button>
-                    </div>
-                </div>
-                <div id="files-list" class="files-list"></div>
-                <div id="commit-details" class="commit-details">
-                    <div class="commit-details-message"></div>
-                    <div class="commit-details-meta"></div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Footer -->
-        <div class="push-footer">
-            <div class="footer-left">
-                <div class="push-tags-group">
-                    <label>
-                        <input type="checkbox" id="push-tags">
-                        Push tags:
-                    </label>
-                    <select id="tag-option">
-                        <option value="all">All</option>
-                        <option value="current">Current</option>
-                    </select>
-                </div>
-            </div>
-            <div class="footer-right">
-                <button id="cancel-btn" class="btn btn-secondary">Cancel</button>
-                <div class="btn-split" style="position: relative;">
-                    <button id="push-btn" class="btn btn-primary btn-main">Push</button>
-                    <button id="push-dropdown-btn" class="btn btn-primary btn-dropdown">
-                        <i class="codicon codicon-chevron-down"></i>
-                    </button>
-                    <div id="dropdown-menu" class="dropdown-menu">
-                        <div id="force-push" class="dropdown-item">
-                            <i class="codicon codicon-warning icon"></i>
-                            <span>Force Push</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Loading Overlay -->
-        <div id="loading-overlay" class="loading-overlay">
-            <div class="loading-spinner"></div>
-        </div>
-    </div>
-
+    <div id="root"></div>
+    <script nonce="${nonce}">
+        window.initialRoute = '/push';
+    </script>
     <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>
 </html>`;

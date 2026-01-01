@@ -4,6 +4,7 @@ import { PushPanel } from './PushPanel';
 import { GitService } from './GitService';
 import { BranchStatusBar } from './BranchStatusBar';
 import { StashContentProvider } from './StashContentProvider';
+import { ChangelistService } from './ChangelistService';
 
 export function activate(context: vscode.ExtensionContext) {
     console.log('IDEA Commit Panel is now active!');
@@ -16,7 +17,8 @@ export function activate(context: vscode.ExtensionContext) {
     }
 
     const gitService = new GitService(workspaceRoot);
-    const provider = new CommitViewProvider(context.extensionUri, gitService);
+    const changelistService = new ChangelistService(context);
+    const provider = new CommitViewProvider(context.extensionUri, gitService, changelistService);
     const branchStatusBar = new BranchStatusBar(gitService);
     const stashContentProvider = new StashContentProvider(gitService);
 
