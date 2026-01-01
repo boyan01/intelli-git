@@ -5,7 +5,6 @@ import { GitService } from './GitService';
 import { BranchStatusBar } from './BranchStatusBar';
 import { StashContentProvider } from './StashContentProvider';
 import { ChangelistService } from './ChangelistService';
-import { DeletedFileDecorationProvider } from './DeletedFileDecorationProvider';
 
 export function activate(context: vscode.ExtensionContext) {
     console.log('IDEA Commit Panel is now active!');
@@ -25,10 +24,6 @@ export function activate(context: vscode.ExtensionContext) {
 
     context.subscriptions.push(
         vscode.workspace.registerTextDocumentContentProvider('idea-stash', stashContentProvider)
-    );
-
-    context.subscriptions.push(
-        vscode.window.registerFileDecorationProvider(new DeletedFileDecorationProvider())
     );
 
     context.subscriptions.push(

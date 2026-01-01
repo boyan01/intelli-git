@@ -3,6 +3,7 @@ import type { FileStatus, ChangelistGroup } from '@shared/messages';
 import { ContextMenu } from './ContextMenu';
 import type { ContextMenuItem } from './ContextMenu';
 import { vscode } from '../lib/vscode';
+import { getFileIcon } from '../lib/fileIcons';
 
 interface ChangelistTreeProps {
     group: ChangelistGroup;
@@ -264,7 +265,11 @@ export const ChangelistTree: React.FC<ChangelistTreeProps> = ({
                             onChange={(e) => onToggleFile(node.path, e.target.checked)}
                         />
                     )}
-                    <i className="codicon codicon-file icon"></i>
+                    <span
+                        className="file-icon-svg"
+                        style={{ color: getFileIcon(node.name).color }}
+                        dangerouslySetInnerHTML={{ __html: getFileIcon(node.name).svg }}
+                    />
                     <span className={`name status-${node.status}`}>
                         {node.name}
                     </span>

@@ -164,18 +164,18 @@ export class GitService {
             // Group files by action needed
             const toCheckout: string[] = []; // Modified, Deleted
             const toClean: string[] = [];    // Untracked
-            const toResetAndClean: string[] = []; // Added (Staged new files)
+            const toReset: string[] = [];    // Added (Staged new files) -> just unstage
 
             for (const filePath of files) {
                 const fileStatus = allFiles.find(f => f.path === filePath);
                 if (!fileStatus) continue;
 
                 if (fileStatus.status === '?') {
-                    // Untracked -> Clean
+                    // Untracked -> Clean (delete)
                     toClean.push(filePath);
                 } else if (fileStatus.status === 'A') {
-                    // Added -> Reset (unstage) then Clean
-                    toResetAndClean.push(filePath);
+                    // Added -> Reset (unstage) only, keep as untracked
+                    toReset.push(filePath);
                 } else {
                     // Modified (M) or Deleted (D) -> Checkout HEAD
                     toCheckout.push(filePath);
@@ -187,16 +187,13 @@ export class GitService {
                 await this.git.checkout(['HEAD', '--', ...toCheckout]);
             }
 
-            if (toResetAndClean.length > 0) {
-                // First unstage
-                await this.git.reset(['HEAD', '--', ...toResetAndClean]);
-                // Then clean
-                toClean.push(...toResetAndClean);
+            if (toReset.length > 0) {
+                // Just unstage, keep the file as untracked
+                await this.git.reset(['HEAD', '--', ...toReset]);
             }
 
             if (toClean.length > 0) {
                 // Remove untracked files
-                // -f force, -d remove directories if matched
                 await this.git.clean('f', ['-d', '--', ...toClean]);
             }
         } catch (e) {

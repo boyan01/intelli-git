@@ -387,7 +387,7 @@ body {
 .file-item {
   display: flex;
   align-items: center;
-  padding: 4px 8px;
+  padding: 3px 8px;
   margin-left: 20px;
   font-size: 13px;
   white-space: nowrap;
@@ -396,6 +396,7 @@ body {
   user-select: none;
   cursor: pointer;
   border-radius: 4px;
+  gap: 6px;
 }
 
 .file-item:hover {
@@ -411,14 +412,90 @@ body {
   color: inherit;
 }
 
-.file-item .checkbox {
+/* VSCode Style Checkbox */
+.file-item .checkbox,
+.folder-header .checkbox,
+.file-group-header .checkbox {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--vscode-checkbox-border, #6b6b6b);
+  border-radius: 3px;
+  background: var(--vscode-checkbox-background, transparent);
+  cursor: pointer;
+  flex-shrink: 0;
   margin: 0;
+  position: relative;
+}
+
+.file-item .checkbox:checked,
+.folder-header .checkbox:checked,
+.file-group-header .checkbox:checked {
+  background: var(--vscode-checkbox-selectBackground, #007acc);
+  border-color: var(--vscode-checkbox-selectBorder, #007acc);
+}
+
+.file-item .checkbox:checked::after,
+.folder-header .checkbox:checked::after,
+.file-group-header .checkbox:checked::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 1px;
+  width: 4px;
+  height: 8px;
+  border: solid var(--vscode-checkbox-foreground, #fff);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.file-item .checkbox:indeterminate,
+.folder-header .checkbox:indeterminate,
+.file-group-header .checkbox:indeterminate {
+  background: var(--vscode-checkbox-selectBackground, #007acc);
+  border-color: var(--vscode-checkbox-selectBorder, #007acc);
+}
+
+.file-item .checkbox:indeterminate::after,
+.folder-header .checkbox:indeterminate::after,
+.file-group-header .checkbox:indeterminate::after {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 6px;
+  width: 8px;
+  height: 2px;
+  background: var(--vscode-checkbox-foreground, #fff);
+}
+
+.file-item .checkbox:focus {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: 1px;
 }
 
 .file-item .icon {
   width: 16px;
   text-align: center;
   opacity: 0.8;
+}
+
+/* SVG File Icon - seti-icons has internal padding in viewBox 0 0 32 32 */
+.file-icon-svg {
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.file-icon-svg svg {
+  width: 24px;
+  height: 24px;
+  fill: currentColor;
+  margin: -4px;
 }
 
 .file-item .name {

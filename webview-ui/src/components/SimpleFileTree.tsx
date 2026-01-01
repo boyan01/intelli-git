@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import type { FileStatus } from '@shared/messages';
+import { getFileIcon } from '../lib/fileIcons';
 
 interface SimpleFileTreeProps {
     files: FileStatus[];
@@ -28,7 +29,7 @@ const buildTree = (files: FileStatus[]): TreeNode[] => {
     files.forEach(file => {
         const parts = file.path.split('/');
         let currentPath = '';
-        
+
         parts.forEach((part, index) => {
             const isLast = index === parts.length - 1;
             const parentPath = currentPath;
@@ -43,7 +44,7 @@ const buildTree = (files: FileStatus[]): TreeNode[] => {
                     status: isLast ? file.status : undefined,
                     fileCount: 0
                 };
-                
+
                 map.set(currentPath, node);
 
                 if (index === 0) {
@@ -57,7 +58,7 @@ const buildTree = (files: FileStatus[]): TreeNode[] => {
             }
         });
     });
-    
+
     const processNodes = (nodes: TreeNode[]) => {
         nodes.sort((a, b) => {
             if (a.isFile === b.isFile) return a.name.localeCompare(b.name);
@@ -73,8 +74,8 @@ const buildTree = (files: FileStatus[]): TreeNode[] => {
     return root;
 };
 
-export const SimpleFileTree: React.FC<SimpleFileTreeProps> = ({ 
-    files, 
+export const SimpleFileTree: React.FC<SimpleFileTreeProps> = ({
+    files,
     viewMode
 }) => {
     const tree = useMemo(() => viewMode === 'tree' ? buildTree(files) : [], [files, viewMode]);
@@ -106,7 +107,7 @@ export const SimpleFileTree: React.FC<SimpleFileTreeProps> = ({
             <div className="file-tree-list">
                 {files.map(file => (
                     <div key={file.path} className="file-item">
-                        <i className="codicon codicon-file icon"></i>
+                        <span className="file-icon-svg" style={{ color: getFileIcon(file.path.split('/').pop() || file.path).color }} dangerouslySetInnerHTML={{ __html: getFileIcon(file.path.split('/').pop() || file.path).svg }} />
                         <span className={`name status-${file.status}`}>{file.path}</span>
                     </div>
                 ))}
@@ -118,22 +119,22 @@ export const SimpleFileTree: React.FC<SimpleFileTreeProps> = ({
         if (node.isFile) {
             return (
                 <div key={node.path} className="file-item" style={{ paddingLeft: `${depth * 16}px` }}>
-                    <i className="codicon codicon-file icon"></i>
+                    <span className="file-icon-svg" style={{ color: getFileIcon(node.name).color }} dangerouslySetInnerHTML={{ __html: getFileIcon(node.name).svg }} />
                     <span className={`name status-${node.status}`}>{node.name}</span>
                 </div>
             );
         }
 
         const isExpanded = expandedPaths.has(node.path);
-        
+
         return (
             <div key={node.path} className="file-tree-item folder">
-                <div 
-                    className="folder-header" 
+                <div
+                    className="folder-header"
                     style={{ paddingLeft: `${depth * 16}px` }}
                     onClick={() => toggleFolder(node.path)}
                 >
-                    <span 
+                    <span
                         className={`codicon codicon-chevron-right icon arrow`}
                         style={{ transform: isExpanded ? 'rotate(90deg)' : 'none', transition: 'transform 0.1s' }}
                     ></span>
