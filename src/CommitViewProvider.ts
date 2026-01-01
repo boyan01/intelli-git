@@ -79,7 +79,7 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
                 case 'switchBranch': await this._handleSwitchBranch(msg.branch); break;
                 case 'updateProject': await this._handleUpdateProject(); break;
                 case 'requestPush': await vscode.commands.executeCommand('idea-commit-panel.push'); break;
-                case 'openFile': this._handleOpenFile(msg.path); break;
+                case 'openFile': await this._handleOpenFile(msg.path, msg.status); break;
                 case 'getLastCommitMessage': await this._sendLastCommitMessage(); break;
                 case 'generateCommitMessage': await this._generateCommitMessage(); break;
                 case 'stash': await this._handleStash(msg.files); break;
@@ -247,9 +247,17 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
         }
     }
 
-    private _handleOpenFile(path: string) {
+    private async _handleOpenFile(path: string, status?: string) {
         const workspaceRoot = this.gitService?.getWorkspaceRoot();
-        if (workspaceRoot) {
+        if (!workspaceRoot) return;
+
+        console.log('Open file:', path, status);
+
+        if (status === 'D') {
+            // Deleted file: use VSCode's built-in git.openChange command
+            const uri = vscode.Uri.file(`${workspaceRoot}/${path}`);
+            await vscode.commands.executeCommand('git.openChange', uri);
+        } else {
             const uri = vscode.Uri.file(`${workspaceRoot}/${path}`);
             vscode.commands.executeCommand('vscode.open', uri);
         }

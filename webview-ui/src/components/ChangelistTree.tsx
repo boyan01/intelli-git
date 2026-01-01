@@ -1,5 +1,8 @@
 import React, { useMemo, useState, useCallback } from 'react';
 import type { FileStatus, ChangelistGroup } from '@shared/messages';
+import { ContextMenu } from './ContextMenu';
+import type { ContextMenuItem } from './ContextMenu';
+import { vscode } from '../lib/vscode';
 
 interface ChangelistTreeProps {
     group: ChangelistGroup;
@@ -9,6 +12,10 @@ interface ChangelistTreeProps {
     onToggleFile: (path: string, checked: boolean) => void;
     onToggleCollapse: () => void;
     readonly?: boolean;
+    onRollback?: (files: string[]) => void;
+    onStash?: (files: string[]) => void;
+    onDelete?: (files: string[]) => void;
+    onMoveToChangelist?: (files: string[]) => void;
 }
 
 interface TreeNode {
@@ -83,6 +90,13 @@ const getDirPath = (fullPath: string): string => {
     return lastSlash > 0 ? fullPath.substring(0, lastSlash) : '';
 };
 
+interface ContextMenuState {
+    visible: boolean;
+    x: number;
+    y: number;
+    items: ContextMenuItem[];
+}
+
 export const ChangelistTree: React.FC<ChangelistTreeProps> = ({
     group,
     viewMode,
@@ -90,8 +104,18 @@ export const ChangelistTree: React.FC<ChangelistTreeProps> = ({
     isCollapsed,
     onToggleFile,
     onToggleCollapse,
-    readonly = false
+    readonly = false,
+    onRollback,
+    onStash,
+    onDelete,
+    onMoveToChangelist
 }) => {
+    const [contextMenu, setContextMenu] = useState<ContextMenuState>({
+        visible: false,
+        x: 0,
+        y: 0,
+        items: []
+    });
     const tree = useMemo(() =>
         viewMode === 'tree' ? buildTree(group.items) : [],
         [group.items, viewMode]
@@ -136,6 +160,84 @@ export const ChangelistTree: React.FC<ChangelistTreeProps> = ({
         group.items.forEach(f => onToggleFile(f.path, checked));
     }, [readonly, group.items, onToggleFile]);
 
+    const closeContextMenu = useCallback(() => {
+        setContextMenu(prev => ({ ...prev, visible: false }));
+    }, []);
+
+    const handleFileClick = useCallback((path: string, status?: string) => {
+        vscode.postMessage({ type: 'openFile', path, status });
+    }, []);
+
+    const buildFileContextMenu = useCallback((path: string, status?: string): ContextMenuItem[] => {
+        return [
+            {
+                icon: 'go-to-file',
+                label: 'Open File',
+                onClick: () => handleFileClick(path, status)
+            },
+            { separator: true, label: '', onClick: () => { } },
+            {
+                icon: 'discard',
+                label: 'Rollback',
+                onClick: () => onRollback?.([path])
+            },
+            {
+                icon: 'archive',
+                label: 'Stash',
+                onClick: () => onStash?.([path])
+            },
+            { separator: true, label: '', onClick: () => { } },
+            {
+                icon: 'trash',
+                label: 'Delete from Disk',
+                onClick: () => onDelete?.([path])
+            },
+            {
+                icon: 'new-folder',
+                label: 'Move to Changelist...',
+                onClick: () => onMoveToChangelist?.([path])
+            }
+        ];
+    }, [handleFileClick, onRollback, onStash, onDelete, onMoveToChangelist]);
+
+    const buildFolderContextMenu = useCallback((node: TreeNode): ContextMenuItem[] => {
+        const filePaths = getAllFilePaths(node);
+        return [
+            {
+                icon: 'check-all',
+                label: 'Select All',
+                onClick: () => filePaths.forEach(p => onToggleFile(p, true))
+            },
+            {
+                icon: 'close-all',
+                label: 'Deselect All',
+                onClick: () => filePaths.forEach(p => onToggleFile(p, false))
+            },
+            { separator: true, label: '', onClick: () => { } },
+            {
+                icon: 'discard',
+                label: 'Rollback All',
+                onClick: () => onRollback?.(filePaths)
+            },
+            {
+                icon: 'archive',
+                label: 'Stash All',
+                onClick: () => onStash?.(filePaths)
+            }
+        ];
+    }, [getAllFilePaths, onToggleFile, onRollback, onStash]);
+
+    const handleContextMenu = useCallback((e: React.MouseEvent, items: ContextMenuItem[]) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setContextMenu({
+            visible: true,
+            x: e.clientX,
+            y: e.clientY,
+            items
+        });
+    }, []);
+
 
 
     const renderTreeNode = (node: TreeNode, depth: number = 0, isRoot: boolean = false): React.ReactNode => {
@@ -146,12 +248,19 @@ export const ChangelistTree: React.FC<ChangelistTreeProps> = ({
             const showPath = viewMode === 'list';
 
             return (
-                <div key={node.path} className="file-item" style={{ paddingLeft: `${depth * 16}px` }}>
+                <div
+                    key={node.path}
+                    className="file-item"
+                    style={{ paddingLeft: `${depth * 16}px` }}
+                    onClick={() => handleFileClick(node.path, node.status)}
+                    onContextMenu={(e) => handleContextMenu(e, buildFileContextMenu(node.path, node.status))}
+                >
                     {!readonly && (
                         <input
                             type="checkbox"
                             className="checkbox"
                             checked={selectedFiles.has(node.path)}
+                            onClick={(e) => e.stopPropagation()}
                             onChange={(e) => onToggleFile(node.path, e.target.checked)}
                         />
                     )}
@@ -183,6 +292,7 @@ export const ChangelistTree: React.FC<ChangelistTreeProps> = ({
                     className={headerClass}
                     style={isRoot ? undefined : { paddingLeft: `${depth * 16}px` }}
                     onClick={toggleHandler}
+                    onContextMenu={isRoot ? undefined : (e) => handleContextMenu(e, buildFolderContextMenu(node))}
                 >
                     <span
                         className={`codicon codicon-chevron-right icon arrow`}
@@ -214,15 +324,18 @@ export const ChangelistTree: React.FC<ChangelistTreeProps> = ({
     };
 
     // Construct root node to unify rendering
+    // In list view, sort files by name
     const rootChildren = viewMode === 'tree'
         ? tree
-        : group.items.map(f => ({
-            name: f.path.split('/').pop() || f.path,
-            path: f.path,
-            isFile: true,
-            status: f.status,
-            fileCount: 1
-        } as TreeNode));
+        : group.items
+            .map(f => ({
+                name: f.path.split('/').pop() || f.path,
+                path: f.path,
+                isFile: true,
+                status: f.status,
+                fileCount: 1
+            } as TreeNode))
+            .sort((a, b) => a.name.localeCompare(b.name));
 
     const rootNode: TreeNode = {
         name: group.name,
@@ -232,5 +345,16 @@ export const ChangelistTree: React.FC<ChangelistTreeProps> = ({
         children: rootChildren
     };
 
-    return renderTreeNode(rootNode, 0, true);
+    return (
+        <>
+            {renderTreeNode(rootNode, 0, true)}
+            {contextMenu.visible && (
+                <ContextMenu
+                    items={contextMenu.items}
+                    position={{ x: contextMenu.x, y: contextMenu.y }}
+                    onClose={closeContextMenu}
+                />
+            )}
+        </>
+    );
 };

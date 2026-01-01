@@ -18,7 +18,7 @@ export type CommitViewMessage =
     | { type: 'switchBranch'; branch: string }
     | { type: 'updateProject' }
     | { type: 'requestPush' }
-    | { type: 'openFile'; path: string }
+    | { type: 'openFile'; path: string; status?: string }
     | { type: 'getLastCommitMessage' }
     | { type: 'generateCommitMessage' }
     | { type: 'stash'; files: string[] }

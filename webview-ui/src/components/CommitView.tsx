@@ -9,12 +9,12 @@ import { vscode } from '../lib/vscode';
 export function CommitView() {
     const { changelists, stashList } = useVSCode();
     const [activeTab, setActiveTab] = useState<'commit' | 'stash'>('commit');
-    
+
     // UI State
     const [viewMode, setViewMode] = useState<'tree' | 'list'>('tree');
     const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
     const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
-    
+
     // Commit State
     const [commitMessage, setCommitMessage] = useState('');
     const [amend, setAmend] = useState(false);
@@ -39,7 +39,7 @@ export function CommitView() {
 
     const handleCommit = (push: boolean) => {
         const files = Array.from(selectedFiles);
-        if (files.length === 0 && !amend) { 
+        if (files.length === 0 && !amend) {
             return;
         }
         vscode.postMessage({
@@ -59,13 +59,13 @@ export function CommitView() {
         <div className="commit-panel">
             <div className="header-tabs">
                 <div className="tabs-left">
-                    <button 
+                    <button
                         className={`tab ${activeTab === 'commit' ? 'active' : ''}`}
                         onClick={() => setActiveTab('commit')}
                     >
                         提交
                     </button>
-                    <button 
+                    <button
                         className={`tab ${activeTab === 'stash' ? 'active' : ''}`}
                         onClick={() => setActiveTab('stash')}
                     >
@@ -81,39 +81,43 @@ export function CommitView() {
 
             {activeTab === 'commit' && (
                 <div className="tab-content active">
-                     <CommitToolbar
+                    <CommitToolbar
                         viewMode={viewMode}
                         selectedFiles={selectedFiles}
                         onViewModeChange={setViewMode}
                         onExpandAll={() => setCollapsedGroups(new Set())}
                         onCollapseAll={() => setCollapsedGroups(new Set(changelists.map(g => g.id)))}
-                     />
+                    />
 
-                     <div className="file-list-container">
-                         {changelists.length === 0 ? (
-                             <div className="empty-state">没有更改</div>
-                         ) : (
-                             changelists.map(group => (
-                                 <ChangelistTree
-                                     key={group.id}
-                                     group={group}
-                                     viewMode={viewMode}
-                                     selectedFiles={selectedFiles}
-                                     isCollapsed={collapsedGroups.has(group.id)}
-                                     onToggleFile={toggleFile}
-                                     onToggleCollapse={() => toggleGroupCollapse(group.id)}
-                                 />
-                             ))
-                         )}
-                     </div>
+                    <div className="file-list-container">
+                        {changelists.length === 0 ? (
+                            <div className="empty-state">没有更改</div>
+                        ) : (
+                            changelists.map(group => (
+                                <ChangelistTree
+                                    key={group.id}
+                                    group={group}
+                                    viewMode={viewMode}
+                                    selectedFiles={selectedFiles}
+                                    isCollapsed={collapsedGroups.has(group.id)}
+                                    onToggleFile={toggleFile}
+                                    onToggleCollapse={() => toggleGroupCollapse(group.id)}
+                                    onRollback={(files) => vscode.postMessage({ type: 'rollback', files })}
+                                    onStash={(files) => vscode.postMessage({ type: 'stash', files })}
+                                    onDelete={(files) => vscode.postMessage({ type: 'deleteFiles', files })}
+                                    onMoveToChangelist={(files) => vscode.postMessage({ type: 'promptCreateChangelist', file: files[0] })}
+                                />
+                            ))
+                        )}
+                    </div>
 
-                     <CommitForm 
+                    <CommitForm
                         message={commitMessage}
                         amend={amend}
                         onMessageChange={setCommitMessage}
                         onAmendChange={setAmend}
                         onCommit={handleCommit}
-                     />
+                    />
                 </div>
             )}
 
