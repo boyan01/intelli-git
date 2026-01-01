@@ -7,6 +7,15 @@
 // Commit View Messages (Webview → Extension)
 // ============================================
 
+export interface CommitViewState {
+    viewMode: 'tree' | 'list';
+    activeTab: 'commit' | 'stash';
+    commitMessage: string;
+    amend: boolean;
+    selectedFiles: string[];
+    collapsedGroups: string[];
+}
+
 export type CommitViewMessage =
     | { type: 'refresh' }
     | { type: 'commit'; message: string; amend: boolean; files: string[] }

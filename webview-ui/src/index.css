@@ -388,7 +388,6 @@ body {
   display: flex;
   align-items: center;
   padding: 3px 8px;
-  margin-left: 28px;
   font-size: 13px;
   white-space: nowrap;
   overflow: hidden;
@@ -469,9 +468,10 @@ body {
   background: var(--vscode-checkbox-foreground, #fff);
 }
 
-.file-item .checkbox:focus {
-  outline: 1px solid var(--vscode-focusBorder);
-  outline-offset: 1px;
+.file-item .checkbox:focus,
+.folder-header .checkbox:focus,
+.file-group-header .checkbox:focus {
+  outline: none;
 }
 
 .file-item .icon {

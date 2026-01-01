@@ -1,4 +1,5 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
+import type { CommitViewState } from '@shared/messages';
 import { ChangelistTree } from './ChangelistTree';
 import { CommitForm } from './CommitForm';
 import { CommitToolbar } from './CommitToolbar';
@@ -19,6 +20,31 @@ export function CommitView() {
     const [commitMessage, setCommitMessage] = useState('');
     const [amend, setAmend] = useState(false);
 
+    // Initialize state from VSCode storage
+    useEffect(() => {
+        const savedState = vscode.getState<CommitViewState>();
+        if (savedState) {
+            if (savedState.viewMode) setViewMode(savedState.viewMode);
+            if (savedState.activeTab) setActiveTab(savedState.activeTab);
+            if (savedState.commitMessage) setCommitMessage(savedState.commitMessage);
+            if (savedState.amend) setAmend(savedState.amend);
+            if (savedState.selectedFiles) setSelectedFiles(new Set(savedState.selectedFiles));
+            if (savedState.collapsedGroups) setCollapsedGroups(new Set(savedState.collapsedGroups));
+        }
+    }, []);
+
+    // Persist state changes
+    useEffect(() => {
+        vscode.setState<CommitViewState>({
+            viewMode,
+            activeTab,
+            commitMessage,
+            amend,
+            selectedFiles: Array.from(selectedFiles),
+            collapsedGroups: Array.from(collapsedGroups)
+        });
+    }, [viewMode, activeTab, commitMessage, amend, selectedFiles, collapsedGroups]);
+
     const toggleFile = useCallback((path: string, checked: boolean) => {
         setSelectedFiles(prev => {
             const next = new Set(prev);
@@ -36,6 +62,30 @@ export function CommitView() {
             return next;
         });
     }, []);
+
+    const fileStats = useMemo(() => {
+        let added = 0;
+        let modified = 0;
+        let deleted = 0;
+
+        changelists.forEach(group => {
+            group.items.forEach(file => {
+                if (selectedFiles.has(file.path)) {
+                    // Check first char of status, usually sufficient for short status
+                    const status = file.status.trim().toUpperCase();
+                    if (status.startsWith('A') || status === '?' || status === 'U') {
+                        added++;
+                    } else if (status.startsWith('D')) {
+                        deleted++;
+                    } else {
+                        modified++;
+                    }
+                }
+            });
+        });
+
+        return { added, modified, deleted };
+    }, [changelists, selectedFiles]);
 
     const handleCommit = (push: boolean) => {
         const files = Array.from(selectedFiles);
@@ -115,6 +165,9 @@ export function CommitView() {
                     <CommitForm
                         message={commitMessage}
                         amend={amend}
+                        addedCount={fileStats.added}
+                        modifiedCount={fileStats.modified}
+                        deletedCount={fileStats.deleted}
                         onMessageChange={setCommitMessage}
                         onAmendChange={setAmend}
                         onCommit={handleCommit}

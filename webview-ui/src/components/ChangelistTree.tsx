@@ -256,7 +256,7 @@ export const ChangelistTree: React.FC<ChangelistTreeProps> = ({
                 <div
                     key={node.path}
                     className={`file-item ${isActive ? 'active' : ''}`}
-                    style={{ paddingLeft: `${depth * 16}px` }}
+                    style={{ paddingLeft: `${28 + depth * 16}px` }}
                     onClick={() => handleFileClick(node.path, node.status)}
                     onContextMenu={(e) => handleContextMenu(e, buildFileContextMenu(node.path, node.status))}
                 >

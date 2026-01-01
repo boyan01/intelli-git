@@ -29,24 +29,24 @@ export function CommitToolbar({
                     <i className="codicon codicon-archive"></i>
                 </button>
                 <div className="toolbar-separator"></div>
-                <button 
-                    className={`icon-btn`} 
-                    title="全部展开" 
+                <button
+                    className={`icon-btn`}
+                    title="全部展开"
                     onClick={onExpandAll}
                 >
                     <i className="codicon codicon-expand-all"></i>
                 </button>
-                <button 
-                    className={`icon-btn`} 
-                    title="全部收起" 
+                <button
+                    className={`icon-btn`}
+                    title="全部收起"
                     onClick={onCollapseAll}
                 >
                     <i className="codicon codicon-collapse-all"></i>
                 </button>
                 <div className="toolbar-separator"></div>
-                <button 
-                    className={`icon-btn ${viewMode === 'tree' ? 'active' : ''}`} 
-                    title="视图选项" 
+                <button
+                    className={`icon-btn ${viewMode === 'tree' ? 'active' : ''}`}
+                    title="视图选项"
                     onClick={() => onViewModeChange(viewMode === 'tree' ? 'list' : 'tree')}
                 >
                     <i className="codicon codicon-list-tree"></i>
