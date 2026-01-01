@@ -38,13 +38,23 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
         
         // Listen to active text editor changes
         const activeEditorListener = vscode.window.onDidChangeActiveTextEditor(editor => {
-            if (editor && editor.document.uri.scheme === 'file') {
-                 // Convert to relative path to match Git status paths
-                 const relativePath =  vscode.workspace.asRelativePath(editor.document.uri, false);
-                 this._view?.webview.postMessage({
-                     type: 'activeFileChange',
-                     path: relativePath
-                 });
+            if (!editor) return;
+            
+            const uri = editor.document.uri;
+            let relativePath: string | null = null;
+            
+            if (uri.scheme === 'file') {
+                relativePath = vscode.workspace.asRelativePath(uri, false);
+            } else if (uri.scheme === 'git') {
+                // git diff view: path is like /path/to/file.ts
+                relativePath = vscode.workspace.asRelativePath(vscode.Uri.file(uri.path), false);
+            }
+            
+            if (relativePath) {
+                this._view?.webview.postMessage({
+                    type: 'activeFileChange',
+                    path: relativePath
+                });
             }
         });
         
@@ -52,14 +62,6 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
             activeEditorListener.dispose();
         });
 
-        // Initial update of active file
-        if (vscode.window.activeTextEditor && vscode.window.activeTextEditor.document.uri.scheme === 'file') {
-             const relativePath =  vscode.workspace.asRelativePath(vscode.window.activeTextEditor.document.uri, false);
-             this._view?.webview.postMessage({
-                 type: 'activeFileChange',
-                 path: relativePath
-             });
-        }
 
         webviewView.webview.onDidReceiveMessage(async (data: CommitViewMessage & { command?: string }) => {
             if (!this.gitService) {
@@ -186,6 +188,8 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
             files: changelists,
             branches: branches
         });
+
+        this._sendActiveFile();
     }
 
     public switchTab(tab: 'commit' | 'stash') {
@@ -250,9 +254,6 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
     private async _handleOpenFile(path: string, status?: string) {
         const workspaceRoot = this.gitService?.getWorkspaceRoot();
         if (!workspaceRoot) return;
-
-        console.log('Open file:', path, status);
-
         if (status === 'D') {
             // Deleted file: use VSCode's built-in git.openChange command
             const uri = vscode.Uri.file(`${workspaceRoot}/${path}`);
@@ -465,6 +466,28 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
     // though frontend usually holds it.
     private commitMessage = '';
 
+
+    private _sendActiveFile() {
+        if (!this._view) return;
+        const editor = vscode.window.activeTextEditor;
+        if (!editor) return;
+
+        const uri = editor.document.uri;
+        let relativePath: string | null = null;
+
+        if (uri.scheme === 'file') {
+            relativePath = vscode.workspace.asRelativePath(uri, false);
+        } else if (uri.scheme === 'git') {
+            relativePath = vscode.workspace.asRelativePath(vscode.Uri.file(uri.path), false);
+        }
+
+        if (relativePath) {
+            this._view.webview.postMessage({
+                type: 'activeFileChange',
+                path: relativePath
+            });
+        }
+    }
 
     private _getHtmlForWebview(webview: vscode.Webview) {
         return getWebviewHtml({

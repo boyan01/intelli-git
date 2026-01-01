@@ -5,12 +5,14 @@ import type {
     StashItem,
     CommitViewExtMessage,
 } from '@shared/messages';
-import { vscode } from '../lib/vscode';
+import { vscode } from '@/lib/vscode';
+import { logger } from '@/lib/log';
 
 export const useVSCode = () => {
     const [changelists, setChangelists] = useState<ChangelistGroup[]>([]);
     const [branches, setBranches] = useState<BranchInfo | null>(null);
     const [stashList, setStashList] = useState<StashItem[]>([]);
+    const [activeFile, setActiveFile] = useState<string | null>(null);
 
     useEffect(() => {
         const handleMessage = (event: MessageEvent<CommitViewExtMessage>) => {
@@ -22,6 +24,10 @@ export const useVSCode = () => {
                     break;
                 case 'stashList':
                     setStashList(message.stashList);
+                    break;
+                case 'activeFileChange':
+                    logger.log('activeFileChange', message.path);
+                    setActiveFile(message.path);
                     break;
             }
         };
@@ -35,6 +41,7 @@ export const useVSCode = () => {
     return {
         changelists,
         branches,
-        stashList
+        stashList,
+        activeFile
     };
 };

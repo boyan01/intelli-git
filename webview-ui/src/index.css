@@ -388,7 +388,7 @@ body {
   display: flex;
   align-items: center;
   padding: 3px 8px;
-  margin-left: 20px;
+  margin-left: 28px;
   font-size: 13px;
   white-space: nowrap;
   overflow: hidden;
@@ -514,9 +514,9 @@ body {
 }
 
 .file-item .name.status-D {
-  color: var(--vscode-gitDecoration-deletedResourceForeground, #c74e39);
+  color: var(--vscode-foreground);
   text-decoration: line-through;
-  opacity: 0.7;
+  opacity: 0.6;
 }
 
 .file-item .name.status-R {

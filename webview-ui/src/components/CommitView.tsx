@@ -7,7 +7,7 @@ import { useVSCode } from '../hooks/useVSCode';
 import { vscode } from '../lib/vscode';
 
 export function CommitView() {
-    const { changelists, stashList } = useVSCode();
+    const { changelists, stashList, activeFile } = useVSCode();
     const [activeTab, setActiveTab] = useState<'commit' | 'stash'>('commit');
 
     // UI State
@@ -100,6 +100,7 @@ export function CommitView() {
                                     viewMode={viewMode}
                                     selectedFiles={selectedFiles}
                                     isCollapsed={collapsedGroups.has(group.id)}
+                                    activeFile={activeFile}
                                     onToggleFile={toggleFile}
                                     onToggleCollapse={() => toggleGroupCollapse(group.id)}
                                     onRollback={(files) => vscode.postMessage({ type: 'rollback', files })}

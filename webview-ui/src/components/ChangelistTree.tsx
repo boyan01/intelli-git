@@ -10,6 +10,7 @@ interface ChangelistTreeProps {
     viewMode: 'tree' | 'list';
     selectedFiles: Set<string>;
     isCollapsed: boolean;
+    activeFile?: string | null;
     onToggleFile: (path: string, checked: boolean) => void;
     onToggleCollapse: () => void;
     readonly?: boolean;
@@ -103,6 +104,7 @@ export const ChangelistTree: React.FC<ChangelistTreeProps> = ({
     viewMode,
     selectedFiles,
     isCollapsed,
+    activeFile,
     onToggleFile,
     onToggleCollapse,
     readonly = false,
@@ -248,10 +250,12 @@ export const ChangelistTree: React.FC<ChangelistTreeProps> = ({
             // unless we want to support 'list' view features within this function.
             const showPath = viewMode === 'list';
 
+            const isActive = node.path === activeFile;
+
             return (
                 <div
                     key={node.path}
-                    className="file-item"
+                    className={`file-item ${isActive ? 'active' : ''}`}
                     style={{ paddingLeft: `${depth * 16}px` }}
                     onClick={() => handleFileClick(node.path, node.status)}
                     onContextMenu={(e) => handleContextMenu(e, buildFileContextMenu(node.path, node.status))}
@@ -303,7 +307,7 @@ export const ChangelistTree: React.FC<ChangelistTreeProps> = ({
                         className={`codicon codicon-chevron-right icon arrow`}
                         style={{ transform: isExpanded ? 'rotate(90deg)' : 'none', transition: 'transform 0.1s' }}
                     ></span>
-                    {!readonly && (
+                    {!readonly && descendantPaths.length > 0 && (
                         <input
                             type="checkbox"
                             className="checkbox"
