@@ -294,7 +294,7 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
             }
             vscode.window.showInformationMessage('Commit successful');
             this.commitMessage = ''; // Clear message logic if needed, but frontend handles it
-            this._view?.webview.postMessage({ type: 'clearMessage' });
+            this._view?.webview.postMessage({ type: 'setCommitMessage', message: '' });
             this.refresh();
         } catch (e) {
             vscode.window.showErrorMessage(`Commit failed: ${e}`);
@@ -627,6 +627,14 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
         try {
             await this.gitService.continueRebase(message);
             vscode.window.showInformationMessage('Rebase continued.');
+
+            // Clear the message input
+            this._view?.webview.postMessage({ type: 'setCommitMessage', message: '' });
+
+            // Invalidate the last rebase status so the next refresh (which will likely still be 'interactive' 
+            // if there is another conflict) triggers a message update to the new conflict message.
+            this._lastRebaseStatus = undefined;
+
             this.refresh();
         } catch (e) {
             vscode.window.showErrorMessage(`Continue rebase failed: ${e}`);

@@ -130,7 +130,6 @@ export type CommitViewExtMessage =
     | { type: 'update'; files: ChangelistGroup[]; branches: BranchInfo; incomingCommits?: number }
     | { type: 'stashList'; stashList: StashItem[] }
     | { type: 'stashFiles'; index: number; files: FileStatus[] }
-    | { type: 'clearMessage' }
     | { type: 'lastCommitMessage'; message: string }
     | { type: 'generatedCommitMessage'; message: string }
     | { type: 'setCommitMessage'; message: string }
