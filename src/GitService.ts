@@ -346,6 +346,69 @@ export class GitService {
         }
     }
 
+    /**
+     * Get diff for specific files.
+     * Uses `git diff HEAD -- <files>` to get changes relative to HEAD for modified/deleted files.
+     * For untracked files, reads the file content directly.
+     */
+    public async getDiffForFiles(files: string[]): Promise<string> {
+        if (!files || files.length === 0) {
+            return '';
+        }
+
+        try {
+            // we need to distinguish between tracked (modified/deleted/staged) and untracked files
+            const status = await this.getStatus();
+            const trackedFiles: string[] = [];
+            const untrackedFiles: string[] = [];
+
+            for (const file of files) {
+                const fileStatus = status.find(f => f.path === file);
+                if (fileStatus && fileStatus.status === '?') {
+                    untrackedFiles.push(file);
+                } else {
+                    trackedFiles.push(file);
+                }
+            }
+
+            let diffOutput = '';
+
+            // 1. Get diff for tracked files against HEAD
+            if (trackedFiles.length > 0) {
+                // git diff HEAD -- files...
+                // This shows changes in working directory (and index) vs HEAD
+                try {
+                    const trackedDiff = await this.git.diff(['HEAD', '--', ...trackedFiles]);
+                    diffOutput += trackedDiff;
+                } catch (e) {
+                    console.error('Error getting diff for tracked files:', e);
+                }
+            }
+
+            // 2. Read content for untracked files (simulate "new file" diff)
+            if (untrackedFiles.length > 0) {
+                for (const file of untrackedFiles) {
+                    try {
+                        // Use workspace root to read file
+                        const fullPath = path.join(this._workspaceRoot, file);
+                        if (fs.existsSync(fullPath)) {
+                            const content = await fs.promises.readFile(fullPath, 'utf8');
+                            diffOutput += `\ndiff --git a/${file} b/${file}\nnew file mode 100644\n--- /dev/null\n+++ b/${file}\n@@ -0,0 +1,${content.split('\n').length} @@\n+${content.replace(/\n/g, '\n+')}\n`;
+                        }
+                    } catch (e) {
+                        console.error(`Error reading untracked file ${file}:`, e);
+                    }
+                }
+            }
+
+            return diffOutput;
+
+        } catch (e) {
+            console.error('Error getting diff for files:', e);
+            return '';
+        }
+    }
+
     public async getRemotes(): Promise<string[]> {
         try {
             const remotes = await this.git.getRemotes();

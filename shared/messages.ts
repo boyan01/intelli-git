@@ -33,7 +33,7 @@ export type CommitViewMessage =
     | { type: 'continueRebase'; message?: string; files?: string[] }
     | { type: 'abortRebase' }
     | { type: 'getLastCommitMessage' }
-    | { type: 'generateCommitMessage' }
+    | { type: 'generateCommitMessage'; files?: string[] }
     | { type: 'stash'; files: string[] }
     | { type: 'rollback'; files: string[] }
     | { type: 'getChangedFiles' }

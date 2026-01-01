@@ -85,7 +85,7 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
                 case 'requestPush': await vscode.commands.executeCommand('idea-commit-panel.push'); break;
                 case 'openFile': await this._handleOpenFile(msg.path, msg.status); break;
                 case 'getLastCommitMessage': await this._sendLastCommitMessage(); break;
-                case 'generateCommitMessage': await this._generateCommitMessage(); break;
+                case 'generateCommitMessage': await this._generateCommitMessage(msg.files); break;
                 case 'stash': await this._handleStash(msg.files); break;
                 case 'rollback': await this._handleRollback(msg.files); break;
                 case 'getChangedFiles': await this._sendChangedFiles(); break;
@@ -361,24 +361,83 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
     }
 
     // Placeholder for AI commit message generation
-    private async _generateCommitMessage() {
-        // Implementation pending integration with AI service
+    private async _generateCommitMessage(files?: string[]) {
+        if (!this.gitService) {
+            return;
+        }
         this._postMessage({
             type: 'aiGenerating',
             generating: true
         });
 
-        // Simulate delay
-        setTimeout(() => {
+        try {
+            let diff = '';
+            if (files && files.length > 0) {
+                diff = await this.gitService.getDiffForFiles(files);
+            } else {
+                diff = await this.gitService.getStagedDiff();
+            }
+
+            if (!diff) {
+                const message = files && files.length > 0
+                    ? 'No changes found for selected files.'
+                    : 'No staged changes to generate commit message for.';
+                vscode.window.showInformationMessage(message);
+                this._postMessage({
+                    type: 'aiGenerating',
+                    generating: false
+                });
+                return;
+            }
+
+            // Try to find a Copilot model first, but don't restrict to specific family like 'gpt-4o'
+            // as new models (like 'gpt-5-mini') might be available.
+            let [model] = await vscode.lm.selectChatModels({ vendor: 'copilot' });
+
+            // If no Copilot model, try ANY available model
+            if (!model) {
+                const models = await vscode.lm.selectChatModels();
+                if (models.length > 0) {
+                    model = models[0];
+                }
+            }
+
+            console.log('Selected AI Model:', model ? `${model.vendor} - ${model.name} (${model.family})` : 'None');
+
+            if (!model) {
+                vscode.window.showErrorMessage('No suitable AI model found. Please ensure GitHub Copilot Chat is installed and enabled.');
+                this._postMessage({
+                    type: 'aiGenerating',
+                    generating: false
+                });
+                return;
+            }
+
+            const messages = [
+                vscode.LanguageModelChatMessage.User('Generate a concise commit message based on the following diff. Use the conventional commits format (e.g. feat: ..., fix: ...). Only return the commit message, no explanation, no code blocks'),
+                vscode.LanguageModelChatMessage.User(diff)
+            ];
+
+            const response = await model.sendRequest(messages, {}, new vscode.CancellationTokenSource().token);
+            let fullMessage = '';
+
+            for await (const fragment of response.text) {
+                fullMessage += fragment;
+            }
+
             this._postMessage({
                 type: 'generatedCommitMessage',
-                message: 'feat: AI generated commit message stub'
+                message: fullMessage.trim()
             });
+        } catch (e) {
+            console.error('Error generating commit message:', e);
+            vscode.window.showErrorMessage(`Failed to generate commit message: ${e}`);
+        } finally {
             this._postMessage({
                 type: 'aiGenerating',
                 generating: false
             });
-        }, 1000);
+        }
     }
 
     private async _handleStash(files: string[]) {

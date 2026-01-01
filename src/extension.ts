@@ -57,13 +57,13 @@ export function activate(context: vscode.ExtensionContext) {
 
     context.subscriptions.push(
         vscode.commands.registerCommand('idea-commit-panel.switchTabCommit', () => {
-             provider.switchTab('commit');
+            provider.switchTab('commit');
         })
     );
 
     context.subscriptions.push(
         vscode.commands.registerCommand('idea-commit-panel.switchTabStash', () => {
-             provider.switchTab('stash');
+            provider.switchTab('stash');
         })
     );
 
@@ -73,14 +73,18 @@ export function activate(context: vscode.ExtensionContext) {
     const watcher = vscode.workspace.createFileSystemWatcher('**/*');
     let refreshTimeout: NodeJS.Timeout | undefined;
 
-    const triggerRefresh = () => {
+    const triggerRefresh = (uri?: vscode.Uri) => {
+        if (uri && (/\/\.git\//.test(uri.path) || uri.path.endsWith('/.git'))) {
+            return;
+        }
+
         if (refreshTimeout) {
             clearTimeout(refreshTimeout);
         }
         refreshTimeout = setTimeout(() => {
             provider.refresh();
             branchStatusBar.update();
-        }, 200); // Debounce for 2 seconds
+        }, 200);
     };
 
     watcher.onDidChange(triggerRefresh);
@@ -97,4 +101,4 @@ export function activate(context: vscode.ExtensionContext) {
     );
 }
 
-export function deactivate() {}
+export function deactivate() { }

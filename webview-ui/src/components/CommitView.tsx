@@ -22,6 +22,7 @@ export function CommitView() {
     // Commit State
     const [commitMessage, setCommitMessage] = useState('');
     const [amend, setAmend] = useState(false);
+    const [isGenerating, setIsGenerating] = useState(false);
 
     // Initialize state from VSCode storage
     useEffect(() => {
@@ -109,6 +110,12 @@ export function CommitView() {
             const message = event.data;
             switch (message.type) {
                 case 'setCommitMessage':
+                    setCommitMessage(message.message);
+                    break;
+                case 'aiGenerating':
+                    setIsGenerating(message.generating);
+                    break;
+                case 'generatedCommitMessage':
                     setCommitMessage(message.message);
                     break;
             }
@@ -317,6 +324,11 @@ export function CommitView() {
                             onMessageChange={setCommitMessage}
                             onAmendChange={setAmend}
                             onCommit={handleCommit}
+                            isGenerating={isGenerating}
+                            onGenerate={() => vscode.postMessage({
+                                type: 'generateCommitMessage',
+                                files: Array.from(selectedFiles)
+                            })}
                         />
                     )}
                 </div>
