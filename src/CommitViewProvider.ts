@@ -122,6 +122,7 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
                 }
                 case 'deleteFiles': await this._handleDeleteFiles(msg.files); this.refresh(); break;
                 case 'stashChangelist': await this._handleStash(msg.files); break;
+                case 'log': console.log('[Webview]', msg.message); break;
             }
         });
 

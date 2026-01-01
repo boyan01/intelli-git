@@ -38,7 +38,8 @@ export type CommitViewMessage =
     | { type: 'renameChangelist'; id: string; name: string }
     | { type: 'promptCreateChangelist'; file?: string }
     | { type: 'deleteFiles'; files: string[] }
-    | { type: 'stashChangelist'; files: string[] };
+    | { type: 'stashChangelist'; files: string[] }
+    | { type: 'log'; message: string };
 
 // ============================================
 // Push View Messages (Webview → Extension)

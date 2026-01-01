@@ -1,9 +1,8 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import type { 
     ChangelistGroup, 
     BranchInfo, 
     StashItem,
-    WebviewMessage,
     CommitViewExtMessage,
 } from '@shared/messages';
 import { vscode } from '../lib/vscode';
@@ -29,17 +28,13 @@ export const useVSCode = () => {
 
         window.addEventListener('message', handleMessage);
         vscode.postMessage({ type: 'refresh' });
+        vscode.postMessage({ type: 'getStashList' });
         return () => window.removeEventListener('message', handleMessage);
-    }, []);
-
-    const postMessage = useCallback((message: WebviewMessage) => {
-        vscode.postMessage(message);
     }, []);
 
     return {
         changelists,
         branches,
-        stashList,
-        postMessage
+        stashList
     };
 };

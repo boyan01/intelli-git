@@ -83,6 +83,7 @@
     "build:webview": "cd webview-ui && npm run build",
     "compile": "npm run build:webview && tsc -p ./",
     "watch": "tsc -watch -p ./",
+    "watch:webview": "cd webview-ui && npm run watch",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src",
     "test": "node ./out/test/runTest.js"

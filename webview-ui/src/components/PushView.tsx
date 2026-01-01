@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { CommitInfo, CommitFile, PushConfig, PushViewMessage, PushViewExtMessage, FileStatus } from '@shared/messages';
-import { FileTree } from './FileTree';
+import { SimpleFileTree } from './SimpleFileTree';
 import { vscode } from '../lib/vscode';
 
 export function PushView() {
@@ -71,11 +71,10 @@ export function PushView() {
 
     const selectedCommit = commits.find(c => c.hash === selectedCommitHash);
 
-    // Convert CommitFiles to FileStatus for FileTree (ignoring staged/status complexity for now, just path/status)
     const fileStatusList: FileStatus[] = files.map(f => ({
         path: f.path,
         status: f.status,
-        staged: true // irrelevant for readonly tree
+        staged: true
     }));
 
     return (
@@ -147,13 +146,9 @@ export function PushView() {
                             </div>
                         </div>
                         <div className="files-tree-wrapper">
-                            <FileTree 
+                            <SimpleFileTree 
                                 files={fileStatusList} 
-                                viewMode="tree" 
-                                selectedFiles={new Set()} 
-                                onToggleFile={() => {}} 
-                                readonly={true}
-                                initiallyExpanded={true}
+                                viewMode="tree"
                             />
                         </div>
                     </div>

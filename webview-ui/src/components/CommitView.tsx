@@ -1,11 +1,14 @@
 import { useState, useCallback } from 'react';
-import { FileTree } from './FileTree';
+import { ChangelistTree } from './ChangelistTree';
 import { CommitForm } from './CommitForm';
+import { CommitToolbar } from './CommitToolbar';
 import { StashList } from './StashList';
 import { useVSCode } from '../hooks/useVSCode';
+import { vscode } from '../lib/vscode';
+import { logger } from '../lib/log';
 
 export function CommitView() {
-    const { changelists, stashList, postMessage } = useVSCode();
+    const { changelists, stashList } = useVSCode();
     const [activeTab, setActiveTab] = useState<'commit' | 'stash'>('commit');
     
     // UI State
@@ -26,21 +29,21 @@ export function CommitView() {
         });
     }, []);
 
-    const toggleGroupCollapse = (groupId: string) => {
+    const toggleGroupCollapse = useCallback((groupId: string) => {
         setCollapsedGroups(prev => {
             const next = new Set(prev);
             if (next.has(groupId)) next.delete(groupId);
             else next.add(groupId);
             return next;
         });
-    };
+    }, []);
 
     const handleCommit = (push: boolean) => {
         const files = Array.from(selectedFiles);
         if (files.length === 0 && !amend) { 
             return;
         }
-        postMessage({
+        vscode.postMessage({
             type: push ? 'commitAndPush' : 'commit',
             message: commitMessage,
             files: files,
@@ -50,7 +53,7 @@ export function CommitView() {
 
     const handleStashAction = (action: 'apply' | 'pop' | 'drop', index: number) => {
         const typeMap = { apply: 'stashApply', pop: 'stashPop', drop: 'stashDrop' } as const;
-        postMessage({ type: typeMap[action], index });
+        vscode.postMessage({ type: typeMap[action], index });
     };
 
     return (
@@ -79,70 +82,32 @@ export function CommitView() {
 
             {activeTab === 'commit' && (
                 <div className="tab-content active">
-                     {/* File Toolbar */}
-                     <div className="file-toolbar">
-                        <div className="toolbar-left">
-                           <button className="icon-btn" title="刷新" onClick={() => postMessage({ type: 'refresh' })}>
-                               <i className="codicon codicon-sync"></i>
-                           </button>
-                           <button className="icon-btn" title="回滚" onClick={() => {
-                                postMessage({ type: 'rollback', files: Array.from(selectedFiles) });
-                           }}>
-                               <i className="codicon codicon-discard"></i>
-                           </button>
-                           <button className="icon-btn" title="贮藏" onClick={() => {
-                                postMessage({ type: 'stash', files: Array.from(selectedFiles) });
-                           }}>
-                               <i className="codicon codicon-archive"></i>
-                           </button>
-                           <div className="toolbar-separator"></div>
-                           <button 
-                                className={`icon-btn ${viewMode === 'tree' ? 'active' : ''}`} 
-                                title="视图选项" 
-                                onClick={() => setViewMode(v => v === 'tree' ? 'list' : 'tree')}
-                           >
-                               <i className="codicon codicon-list-tree"></i>
-                           </button>
-                        </div>
-                     </div>
+                     <CommitToolbar
+                        viewMode={viewMode}
+                        selectedFiles={selectedFiles}
+                        changelists={changelists}
+                        collapsedGroups={collapsedGroups}
+                        onViewModeChange={setViewMode}
+                        onExpandAll={() => setCollapsedGroups(new Set())}
+                        onCollapseAll={() => setCollapsedGroups(new Set(changelists.map(g => g.id)))}
+                     />
 
-                     {/* File List */}
-                     <div className="file-list">
-                         {changelists.map(group => {
-                             const isCollapsed = collapsedGroups.has(group.id);
-                             const allSelected = group.items.length > 0 && group.items.every(f => selectedFiles.has(f.path));
-                             
-                             return (
-                             <div key={group.id}>
-                                 <div 
-                                    className={`file-group-header ${isCollapsed ? 'collapsed' : ''}`}
-                                    onClick={() => toggleGroupCollapse(group.id)}
-                                 >
-                                     <input 
-                                        type="checkbox" 
-                                        className="checkbox"
-                                        checked={allSelected}
-                                        onClick={(e) => e.stopPropagation()}
-                                        onChange={(e) => {
-                                            const checked = e.target.checked;
-                                            group.items.forEach(f => toggleFile(f.path, checked));
-                                        }}
-                                     />
-                                     <span className="codicon codicon-chevron-down arrow"></span>
-                                     <span className="title">{group.name}</span>
-                                     <span className="count">{group.items.length} 文件</span>
-                                 </div>
-                                 {!isCollapsed && (
-                                     <FileTree 
-                                        files={group.items} 
-                                        viewMode={viewMode} 
-                                        selectedFiles={selectedFiles}
-                                        onToggleFile={toggleFile} 
-                                     />
-                                 )}
-                             </div>
-                         )})}
-                         {changelists.length === 0 && <div className="empty-state">没有更改</div>}
+                     <div className="file-list-container">
+                         {changelists.length === 0 ? (
+                             <div className="empty-state">没有更改</div>
+                         ) : (
+                             changelists.map(group => (
+                                 <ChangelistTree
+                                     key={group.id}
+                                     group={group}
+                                     viewMode={viewMode}
+                                     selectedFiles={selectedFiles}
+                                     isCollapsed={collapsedGroups.has(group.id)}
+                                     onToggleFile={toggleFile}
+                                     onToggleCollapse={() => toggleGroupCollapse(group.id)}
+                                 />
+                             ))
+                         )}
                      </div>
 
                      <CommitForm 

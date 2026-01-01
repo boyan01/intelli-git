@@ -26,6 +26,9 @@
     "paths": {
       "@shared/*": [
         "../shared/*"
+      ],
+      "@/*": [
+        "src/*"
       ]
     },
     /* Linting */

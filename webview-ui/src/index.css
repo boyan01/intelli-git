@@ -308,6 +308,18 @@ body {
   opacity: 0.6;
 }
 
+/* File List Container */
+.file-list-container {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 100px;
+}
+
+/* Changelist Tree */
+.changelist-tree {
+  border-bottom: 1px solid var(--vscode-panel-border);
+}
+
 /* File Group */
 
 .file-group-header {
@@ -453,6 +465,35 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* File Count */
+.file-count {
+  margin-left: 8px;
+  padding: 1px 6px;
+  font-size: 10px;
+  background: var(--vscode-badge-background);
+  color: var(--vscode-badge-foreground);
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+
+/* File Directory Path (for list mode) */
+.file-dir-path {
+  margin-left: auto;
+  padding-left: 16px;
+  color: var(--vscode-descriptionForeground);
+  font-size: 11px;
+  opacity: 0.7;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 50%;
+}
+
+/* Changelist Content */
+.changelist-content {
+  margin-left: 8px;
 }
 
 /* Commit Section */

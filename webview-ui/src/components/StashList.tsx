@@ -1,3 +1,4 @@
+import { logger } from '@/lib/log';
 import type { StashItem } from '@shared/messages';
 
 interface StashListProps {
@@ -6,6 +7,9 @@ interface StashListProps {
 }
 
 export const StashList: React.FC<StashListProps> = ({ stashes, onAction }) => {
+
+    logger.log("stashLis1t", stashes);
+
     if (!stashes || stashes.length === 0) {
         return <div className="empty-state">没有贮藏</div>;
     }
