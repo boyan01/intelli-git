@@ -1,12 +1,8 @@
-import type { ChangelistGroup } from '@shared/messages';
 import { vscode } from '../lib/vscode';
-import { logger } from '../lib/log';
 
 interface CommitToolbarProps {
     viewMode: 'tree' | 'list';
     selectedFiles: Set<string>;
-    changelists: ChangelistGroup[];
-    collapsedGroups: Set<string>;
     onViewModeChange: (mode: 'tree' | 'list') => void;
     onExpandAll: () => void;
     onCollapseAll: () => void;
@@ -15,15 +11,10 @@ interface CommitToolbarProps {
 export function CommitToolbar({
     viewMode,
     selectedFiles,
-    changelists,
-    collapsedGroups,
     onViewModeChange,
     onExpandAll,
     onCollapseAll
 }: CommitToolbarProps) {
-    const allGroupIds = changelists.map(g => g.id);
-    const allCollapsed = allGroupIds.length > 0 && allGroupIds.every(id => collapsedGroups.has(id));
-    const allExpanded = allGroupIds.length > 0 && allGroupIds.every(id => !collapsedGroups.has(id));
 
     return (
         <div className="file-toolbar">
@@ -39,18 +30,16 @@ export function CommitToolbar({
                 </button>
                 <div className="toolbar-separator"></div>
                 <button 
-                    className={`icon-btn ${!allCollapsed ? 'active' : ''}`} 
+                    className={`icon-btn`} 
                     title="全部展开" 
                     onClick={onExpandAll}
-                    disabled={allExpanded}
                 >
                     <i className="codicon codicon-expand-all"></i>
                 </button>
                 <button 
-                    className={`icon-btn ${allCollapsed ? 'active' : ''}`} 
+                    className={`icon-btn`} 
                     title="全部收起" 
                     onClick={onCollapseAll}
-                    disabled={allCollapsed}
                 >
                     <i className="codicon codicon-collapse-all"></i>
                 </button>

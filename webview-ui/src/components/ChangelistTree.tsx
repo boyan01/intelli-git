@@ -33,7 +33,7 @@ const buildTree = (files: FileStatus[]): TreeNode[] => {
     files.forEach(file => {
         const parts = file.path.split('/');
         let currentPath = '';
-        
+
         parts.forEach((part, index) => {
             const isLast = index === parts.length - 1;
             const parentPath = currentPath;
@@ -48,7 +48,7 @@ const buildTree = (files: FileStatus[]): TreeNode[] => {
                     status: isLast ? file.status : undefined,
                     fileCount: 0
                 };
-                
+
                 map.set(currentPath, node);
 
                 if (index === 0) {
@@ -62,7 +62,7 @@ const buildTree = (files: FileStatus[]): TreeNode[] => {
             }
         });
     });
-    
+
     const processNodes = (nodes: TreeNode[]) => {
         nodes.sort((a, b) => {
             if (a.isFile === b.isFile) return a.name.localeCompare(b.name);
@@ -83,17 +83,17 @@ const getDirPath = (fullPath: string): string => {
     return lastSlash > 0 ? fullPath.substring(0, lastSlash) : '';
 };
 
-export const ChangelistTree: React.FC<ChangelistTreeProps> = ({ 
+export const ChangelistTree: React.FC<ChangelistTreeProps> = ({
     group,
-    viewMode, 
+    viewMode,
     selectedFiles,
     isCollapsed,
-    onToggleFile, 
+    onToggleFile,
     onToggleCollapse,
     readonly = false
 }) => {
-    const tree = useMemo(() => 
-        viewMode === 'tree' ? buildTree(group.items) : [], 
+    const tree = useMemo(() =>
+        viewMode === 'tree' ? buildTree(group.items) : [],
         [group.items, viewMode]
     );
 
@@ -136,117 +136,101 @@ export const ChangelistTree: React.FC<ChangelistTreeProps> = ({
         group.items.forEach(f => onToggleFile(f.path, checked));
     }, [readonly, group.items, onToggleFile]);
 
-    const renderFileItem = (file: FileStatus, showPath: boolean) => (
-        <div key={file.path} className="file-item">
-            {!readonly && (
-                <input 
-                    type="checkbox" 
-                    className="checkbox"
-                    checked={selectedFiles.has(file.path)}
-                    onChange={(e) => onToggleFile(file.path, e.target.checked)}
-                />
-            )}
-            <i className="codicon codicon-file icon"></i>
-            <span className={`name status-${file.status}`}>
-                {file.path.split('/').pop()}
-            </span>
-            {showPath && (
-                <span className="file-dir-path">{getDirPath(file.path)}</span>
-            )}
-        </div>
-    );
 
-    const renderTreeNode = (node: TreeNode, depth: number = 0): React.ReactNode => {
+
+    const renderTreeNode = (node: TreeNode, depth: number = 0, isRoot: boolean = false): React.ReactNode => {
         if (node.isFile) {
+            // For list view, we might need to show the directory path
+            // In tree view, depth handles the hierarchy, so no need for explicit dir path usually
+            // unless we want to support 'list' view features within this function.
+            const showPath = viewMode === 'list';
+
             return (
                 <div key={node.path} className="file-item" style={{ paddingLeft: `${depth * 16}px` }}>
                     {!readonly && (
-                        <input 
-                            type="checkbox" 
+                        <input
+                            type="checkbox"
                             className="checkbox"
                             checked={selectedFiles.has(node.path)}
                             onChange={(e) => onToggleFile(node.path, e.target.checked)}
                         />
                     )}
                     <i className="codicon codicon-file icon"></i>
-                    <span className={`name status-${node.status}`}>{node.name}</span>
+                    <span className={`name status-${node.status}`}>
+                        {node.name}
+                    </span>
+                    {showPath && (
+                        <span className="file-dir-path">{getDirPath(node.path)}</span>
+                    )}
                 </div>
             );
         }
 
-        const isExpanded = expandedPaths.has(node.path);
+        // For root node, we use the props controlled state
+        const isExpanded = isRoot ? !isCollapsed : expandedPaths.has(node.path);
+        const toggleHandler = isRoot ? onToggleCollapse : () => toggleFolder(node.path);
+
         const descendantPaths = getAllFilePaths(node);
         const allSelected = descendantPaths.length > 0 && descendantPaths.every(p => selectedFiles.has(p));
         const partialSelected = !allSelected && descendantPaths.some(p => selectedFiles.has(p));
-        
+
+        // Use 'folder-header' for both root and regular folders to ensure consistent styling
+        const headerClass = 'folder-header';
+
         return (
-            <div key={node.path} className="file-tree-item folder">
-                <div 
-                    className="folder-header" 
-                    style={{ paddingLeft: `${depth * 16}px` }}
-                    onClick={() => toggleFolder(node.path)}
+            <div key={node.path} className={isRoot ? "changelist-tree" : "file-tree-item folder"}>
+                <div
+                    className={headerClass}
+                    style={isRoot ? undefined : { paddingLeft: `${depth * 16}px` }}
+                    onClick={toggleHandler}
                 >
+                    <span
+                        className={`codicon codicon-chevron-right icon arrow`}
+                        style={{ transform: isExpanded ? 'rotate(90deg)' : 'none', transition: 'transform 0.1s' }}
+                    ></span>
                     {!readonly && (
-                        <input 
-                            type="checkbox" 
+                        <input
+                            type="checkbox"
                             className="checkbox"
                             checked={allSelected}
                             ref={input => { if (input) input.indeterminate = partialSelected; }}
                             onClick={(e) => e.stopPropagation()}
-                            onChange={(e) => handleFolderToggle(node, e.target.checked)}
+                            onChange={(e) => isRoot ? handleGroupToggle(e.target.checked) : handleFolderToggle(node, e.target.checked)}
                         />
                     )}
-                    <span 
-                        className={`codicon codicon-chevron-right icon arrow`}
-                        style={{ transform: isExpanded ? 'rotate(90deg)' : 'none', transition: 'transform 0.1s' }}
-                    ></span>
-                    <span className="codicon codicon-folder icon"></span>
+                    {!isRoot && (
+                        <span className="codicon codicon-folder icon"></span>
+                    )}
                     <span className="name">{node.name}</span>
                     <span className="file-count">{node.fileCount}</span>
                 </div>
                 {isExpanded && (
-                    <div className="folder-children">
-                        {node.children?.map(child => renderTreeNode(child, depth + 1))}
+                    <div className={isRoot ? "changelist-content" : "folder-children"}>
+                        {node.children?.map(child => renderTreeNode(child, isRoot ? (viewMode === 'tree' ? 1 : 0) : depth + 1))}
                     </div>
                 )}
             </div>
         );
     };
 
-    const allSelected = group.items.length > 0 && group.items.every(f => selectedFiles.has(f.path));
-    const partialSelected = !allSelected && group.items.some(f => selectedFiles.has(f.path));
+    // Construct root node to unify rendering
+    const rootChildren = viewMode === 'tree'
+        ? tree
+        : group.items.map(f => ({
+            name: f.path.split('/').pop() || f.path,
+            path: f.path,
+            isFile: true,
+            status: f.status,
+            fileCount: 1
+        } as TreeNode));
 
-    return (
-        <div className="changelist-tree">
-            <div 
-                className={`file-group-header ${isCollapsed ? 'collapsed' : ''}`}
-                onClick={onToggleCollapse}
-            >
-                {!readonly && (
-                    <input 
-                        type="checkbox" 
-                        className="checkbox"
-                        checked={allSelected}
-                        ref={input => { if (input) input.indeterminate = partialSelected; }}
-                        onClick={(e) => e.stopPropagation()}
-                        onChange={(e) => handleGroupToggle(e.target.checked)}
-                    />
-                )}
-                <span 
-                    className="codicon codicon-chevron-right icon arrow"
-                    style={{ transform: isCollapsed ? 'none' : 'rotate(90deg)', transition: 'transform 0.1s' }}
-                ></span>
-                <span className="title">{group.name}</span>
-                <span className="file-count">{group.items.length}</span>
-            </div>
-            {!isCollapsed && (
-                <div className="changelist-content">
-                    {viewMode === 'tree' 
-                        ? tree.map(node => renderTreeNode(node, 1))
-                        : group.items.map(file => renderFileItem(file, true))
-                    }
-                </div>
-            )}
-        </div>
-    );
+    const rootNode: TreeNode = {
+        name: group.name,
+        path: group.id,
+        isFile: false,
+        fileCount: group.items.length,
+        children: rootChildren
+    };
+
+    return renderTreeNode(rootNode, 0, true);
 };

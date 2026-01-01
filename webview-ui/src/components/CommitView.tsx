@@ -5,7 +5,6 @@ import { CommitToolbar } from './CommitToolbar';
 import { StashList } from './StashList';
 import { useVSCode } from '../hooks/useVSCode';
 import { vscode } from '../lib/vscode';
-import { logger } from '../lib/log';
 
 export function CommitView() {
     const { changelists, stashList } = useVSCode();
@@ -85,8 +84,6 @@ export function CommitView() {
                      <CommitToolbar
                         viewMode={viewMode}
                         selectedFiles={selectedFiles}
-                        changelists={changelists}
-                        collapsedGroups={collapsedGroups}
                         onViewModeChange={setViewMode}
                         onExpandAll={() => setCollapsedGroups(new Set())}
                         onCollapseAll={() => setCollapsedGroups(new Set(changelists.map(g => g.id)))}
