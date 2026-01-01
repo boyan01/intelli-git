@@ -27,9 +27,12 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
         vscode.Uri.joinPath(extensionUri, 'out', 'webview', 'index.css')
     );
 
-    const routeScript = initialRoute
-        ? `<script nonce="${nonce}">window.initialRoute = '${initialRoute}';</script>`
-        : '';
+    const language = vscode.env.language;
+    const routeScript = `
+        <script nonce="${nonce}">
+            window.initialRoute = '${initialRoute || ''}';
+            window.vscodeLanguage = '${language}';
+        </script>`;
 
     return `<!DOCTYPE html>
 <html lang="en">

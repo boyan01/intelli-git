@@ -13,8 +13,10 @@
   "dependencies": {
     "@vscode/codicons": "^0.0.44",
     "@vscode/webview-ui-toolkit": "^1.4.0",
+    "i18next": "^25.7.3",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "react-i18next": "^16.5.1",
     "react-router-dom": "^7.11.0",
     "seti-icons": "^0.0.4"
   },

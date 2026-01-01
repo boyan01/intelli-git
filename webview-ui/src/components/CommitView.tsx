@@ -6,9 +6,11 @@ import { CommitToolbar } from './CommitToolbar';
 import { StashList } from './StashList';
 import { useVSCode } from '../hooks/useVSCode';
 import { vscode } from '../lib/vscode';
+import { useTranslation } from 'react-i18next';
 
 export function CommitView() {
-    const { changelists, stashList, activeFile } = useVSCode();
+    const { t } = useTranslation();
+    const { changelists, stashList, activeFile, branches } = useVSCode();
     const [activeTab, setActiveTab] = useState<'commit' | 'stash'>('commit');
 
     // UI State
@@ -113,16 +115,55 @@ export function CommitView() {
                         className={`tab ${activeTab === 'commit' ? 'active' : ''}`}
                         onClick={() => setActiveTab('commit')}
                     >
-                        提交
+                        {t('commitView.tabs.commit')}
                     </button>
                     <button
                         className={`tab ${activeTab === 'stash' ? 'active' : ''}`}
                         onClick={() => setActiveTab('stash')}
                     >
-                        贮藏
+                        {t('commitView.tabs.stash')}
                     </button>
                 </div>
                 <div className="tabs-right">
+                    <button className="icon-btn" title={t('commitView.toolbar.fetch')} onClick={() => vscode.postMessage({ type: 'fetch' })}>
+                        <i className="codicon codicon-cloud-download"></i>
+                    </button>
+
+                    {branches?.current && (
+                        <div
+                            className="branch-indicator"
+                            onClick={() => vscode.postMessage({ type: 'pickBranch' })}
+                            title="Display: Branch Name (Ahead/Behind) - Click to Switch Branch"
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                cursor: 'pointer',
+                                marginLeft: '4px',
+                                padding: '2px 6px',
+                                borderRadius: '3px',
+                                marginRight: '4px',
+                                height: '20px'
+                            }}
+                        >
+                            <i className="codicon codicon-repo-forked" style={{ marginRight: '4px' }}></i>
+                            <span style={{ fontSize: '11px', marginRight: '4px', maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{branches.current}</span>
+
+                            {(branches.ahead || 0) > 0 && (
+                                <div style={{ display: 'flex', alignItems: 'center', color: 'var(--vscode-gitDecoration-addedResourceForeground)', marginLeft: '2px' }}>
+                                    <i className="codicon codicon-arrow-up" style={{ fontSize: '10px', transform: 'rotate(45deg)' }}></i>
+                                    <span style={{ fontSize: '10px' }}>{branches.ahead}</span>
+                                </div>
+                            )}
+
+                            {(branches.behind || 0) > 0 && (
+                                <div style={{ display: 'flex', alignItems: 'center', color: 'var(--vscode-gitDecoration-deletedResourceForeground)', marginLeft: '2px' }}>
+                                    <i className="codicon codicon-arrow-down" style={{ fontSize: '10px', transform: 'rotate(45deg)' }}></i>
+                                    <span style={{ fontSize: '10px' }}>{branches.behind}</span>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
                     <button className="icon-btn" title="More Actions">
                         <i className="codicon codicon-ellipsis"></i>
                     </button>
@@ -141,7 +182,7 @@ export function CommitView() {
 
                     <div className="file-list-container">
                         {changelists.length === 0 ? (
-                            <div className="empty-state">没有更改</div>
+                            <div className="empty-state">{t('commitView.emptyState')}</div>
                         ) : (
                             changelists.map(group => (
                                 <ChangelistTree

@@ -35,21 +35,21 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
         };
 
         webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
-        
+
         // Listen to active text editor changes
         const activeEditorListener = vscode.window.onDidChangeActiveTextEditor(editor => {
             if (!editor) return;
-            
+
             const uri = editor.document.uri;
             let relativePath: string | null = null;
-            
+
             if (uri.scheme === 'file') {
                 relativePath = vscode.workspace.asRelativePath(uri, false);
             } else if (uri.scheme === 'git') {
                 // git diff view: path is like /path/to/file.ts
                 relativePath = vscode.workspace.asRelativePath(vscode.Uri.file(uri.path), false);
             }
-            
+
             if (relativePath) {
                 this._view?.webview.postMessage({
                     type: 'activeFileChange',
@@ -57,7 +57,7 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
                 });
             }
         });
-        
+
         webviewView.onDidDispose(() => {
             activeEditorListener.dispose();
         });
@@ -109,7 +109,7 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
                 }
                 case 'renameChangelist': await this.changelistService.renameChangelist(msg.id, msg.name); this.refresh(); break;
                 case 'promptCreateChangelist': {
-                    const newName = await vscode.window.showInputBox({ 
+                    const newName = await vscode.window.showInputBox({
                         prompt: 'Enter new changelist name',
                         placeHolder: 'New Changelist'
                     });
@@ -124,6 +124,15 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
                 }
                 case 'deleteFiles': await this._handleDeleteFiles(msg.files); this.refresh(); break;
                 case 'stashChangelist': await this._handleStash(msg.files); break;
+                case 'fetch':
+                    await this._handleFetch();
+                    break;
+                case 'pull':
+                    await this._handlePull();
+                    break;
+                case 'pickBranch':
+                    vscode.commands.executeCommand('git.checkout');
+                    break;
                 case 'log': console.log('[Webview]', msg.message); break;
             }
         });
@@ -139,7 +148,13 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
 
         const files = await this.gitService.getStatus();
         const branches = await this.gitService.getBranches();
-        
+        const branchStatus = await this.gitService.getBranchStatus();
+        branches.ahead = branchStatus.ahead;
+        branches.behind = branchStatus.behind;
+
+        const incomingCommits = await this.gitService.getIncomingCommitsCount();
+        console.log('[CommitViewProvider] Refreshing. Incoming commits:', incomingCommits);
+
         // Separate untracked files from tracked files
         const untrackedFiles = files.filter(f => f.status === '?');
         const trackedFiles = files.filter(f => f.status !== '?');
@@ -166,7 +181,7 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
                     status: file.status,
                     staged: file.staged
                 };
-            }).filter((item): item is {path: string, status: string, staged: boolean} => item !== null)
+            }).filter((item): item is { path: string, status: string, staged: boolean } => item !== null)
         }));
 
         // Add Unversioned Files group if needed
@@ -182,6 +197,9 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
                 }))
             });
         }
+
+        // incomingCommits is already declared and fetched at the top of the function
+        // const incomingCommits = await this.gitService.getIncomingCommitsCount();
 
         this._view.webview.postMessage({
             type: 'update',
@@ -280,7 +298,7 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
             type: 'aiGenerating',
             generating: true
         });
-        
+
         // Simulate delay
         setTimeout(() => {
             this._view?.webview.postMessage({
@@ -297,8 +315,8 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
     private async _handleStash(files: string[]) {
         if (!this.gitService) return;
         try {
-            const message = await vscode.window.showInputBox({ 
-                placeHolder: 'Stash message (optional)' 
+            const message = await vscode.window.showInputBox({
+                placeHolder: 'Stash message (optional)'
             });
             await this.gitService.stash(message, files);
             vscode.window.showInformationMessage('Stash successful');
@@ -309,20 +327,20 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
     }
 
     private async _handleRollback(files: string[]) {
-         if (!this.gitService) return;
-         const answer = await vscode.window.showWarningMessage(
-             `Are you sure you want to rollback ${files.length} files? This cannot be undone.`,
-             { modal: true },
-             'Rollback'
-         );
-         if (answer === 'Rollback') {
-             try {
+        if (!this.gitService) return;
+        const answer = await vscode.window.showWarningMessage(
+            `Are you sure you want to rollback ${files.length} files? This cannot be undone.`,
+            { modal: true },
+            'Rollback'
+        );
+        if (answer === 'Rollback') {
+            try {
                 await this.gitService.rollbackFiles(files);
                 this.refresh();
-             } catch (e) {
-                 vscode.window.showErrorMessage(`Rollback failed: ${e}`);
-             }
-         }
+            } catch (e) {
+                vscode.window.showErrorMessage(`Rollback failed: ${e}`);
+            }
+        }
     }
 
     private async _sendChangedFiles() {
@@ -392,18 +410,18 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
         // Construct URIs for diff
         // Left: stash@{index}^1 (Parent)
         // Right: stash@{index} (The stash) or just Read-only content
-        
+
         const stashRef = `stash@{${index}}`;
         const leftRef = `${stashRef}^1`;
-        
-        const leftUri = vscode.Uri.parse(`idea-stash://load/left?${JSON.stringify({ref: leftRef, path: filePath})}`);
-        const rightUri = vscode.Uri.parse(`idea-stash://load/right?${JSON.stringify({ref: stashRef, path: filePath})}`);
+
+        const leftUri = vscode.Uri.parse(`idea-stash://load/left?${JSON.stringify({ ref: leftRef, path: filePath })}`);
+        const rightUri = vscode.Uri.parse(`idea-stash://load/right?${JSON.stringify({ ref: stashRef, path: filePath })}`);
 
         const fileName = filePath.split('/').pop();
-        
-        await vscode.commands.executeCommand('vscode.diff', 
-            leftUri, 
-            rightUri, 
+
+        await vscode.commands.executeCommand('vscode.diff',
+            leftUri,
+            rightUri,
             `${fileName} (Stash vs Parent)`
         );
     }
@@ -429,10 +447,10 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
             { modal: true },
             'Delete'
         );
-        
+
         if (answer === 'Delete') {
-             await this.changelistService.removeChangelist(id); // Service handles moving files to default if deleted
-             this.refresh();
+            await this.changelistService.removeChangelist(id); // Service handles moving files to default if deleted
+            this.refresh();
         }
     }
 
@@ -442,26 +460,26 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
         // Be careful.
         const answer = await vscode.window.showWarningMessage(
             `Are you sure you want to delete ${files.length} files from disk?`,
-             { modal: true },
-             'Delete'
+            { modal: true },
+            'Delete'
         );
         if (answer === 'Delete') {
             // Using vscode.workspace.fs to delete
-             const workspaceRoot = this.gitService?.getWorkspaceRoot();
-             if (!workspaceRoot) return;
+            const workspaceRoot = this.gitService?.getWorkspaceRoot();
+            if (!workspaceRoot) return;
 
-             try {
+            try {
                 for (const file of files) {
                     const uri = vscode.Uri.file(`${workspaceRoot}/${file}`);
                     await vscode.workspace.fs.delete(uri, { recursive: false, useTrash: true });
                 }
                 this.refresh();
-             } catch (e) {
-                 vscode.window.showErrorMessage(`Delete failed: ${e}`);
-             }
+            } catch (e) {
+                vscode.window.showErrorMessage(`Delete failed: ${e}`);
+            }
         }
     }
-    
+
     // Member variable for commit message state if we want to preserve it, 
     // though frontend usually holds it.
     private commitMessage = '';
@@ -486,6 +504,40 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
                 type: 'activeFileChange',
                 path: relativePath
             });
+        }
+    }
+
+    private async _handleFetch() {
+        if (!this.gitService) return;
+
+        await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: "Fetching...",
+            cancellable: true
+        }, async (progress, token) => {
+            try {
+                await this.gitService!.fetch();
+                if (!token.isCancellationRequested) {
+                    vscode.window.showInformationMessage('Fetch completed');
+                }
+            } catch (e) {
+                if (!token.isCancellationRequested) {
+                    vscode.window.showErrorMessage(`Fetch failed: ${e}`);
+                }
+            } finally {
+                this.refresh();
+            }
+        });
+    }
+
+    private async _handlePull() {
+        if (!this.gitService) return;
+        try {
+            await this.gitService.pull(); // Using pull (git pull) which usually includes rebase if configured or merge
+            this.refresh();
+            vscode.window.showInformationMessage('Pull successful');
+        } catch (e) {
+            vscode.window.showErrorMessage(`Pull failed: ${e}`);
         }
     }
 

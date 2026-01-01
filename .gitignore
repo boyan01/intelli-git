@@ -27,3 +27,4 @@ coverage/
 
 # VS Code test
 .vscode-test/
+.test

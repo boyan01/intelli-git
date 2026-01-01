@@ -332,6 +332,10 @@ body {
   opacity: 0.6;
 }
 
+.branch-indicator:hover {
+  background-color: var(--vscode-toolbar-hoverBackground);
+}
+
 /* File List Container */
 .file-list-container {
   flex: 1;

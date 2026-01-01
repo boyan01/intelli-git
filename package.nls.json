@@ -1,0 +1,12 @@
+{
+  "idea-commit-panel.displayName": "IDEA Style Commit Panel",
+  "idea-commit-panel.description": "A VS Code extension that mimics IntelliJ IDEA's commit panel workflow.",
+  "idea-commit-panel.viewsContainers.activitybar.title": "Commit",
+  "idea-commit-panel.views.idea-commit-container.title": "Commit",
+  "idea-commit-panel.commands.switchTabCommit.title": "Switch to Commit",
+  "idea-commit-panel.commands.switchTabStash.title": "Switch to Stash",
+  "idea-commit-panel.commands.refresh.title": "Refresh",
+  "idea-commit-panel.commands.push.title": "Push...",
+  "idea-commit-panel.commands.showBranchPicker.title": "IDEA: Switch Branch",
+  "idea-commit-panel.commands.focusCommitView.title": "IDEA: Focus Commit View"
+}

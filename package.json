@@ -1,7 +1,7 @@
 {
   "name": "idea-commit-panel",
-  "displayName": "IDEA Style Commit Panel",
-  "description": "A VS Code extension that mimics IntelliJ IDEA's commit panel workflow.",
+  "displayName": "%idea-commit-panel.displayName%",
+  "description": "%idea-commit-panel.description%",
   "version": "0.0.1",
   "engines": {
     "vscode": "^1.100.0"
@@ -19,7 +19,7 @@
       "activitybar": [
         {
           "id": "idea-commit-container",
-          "title": "Commit",
+          "title": "%idea-commit-panel.viewsContainers.activitybar.title%",
           "icon": "resources/git-icon.svg"
         }
       ]
@@ -29,51 +29,46 @@
         {
           "type": "webview",
           "id": "ideaCommitView",
-          "name": "Commit"
+          "name": "%idea-commit-panel.views.idea-commit-container.title%"
         }
       ]
     },
     "commands": [
       {
         "command": "idea-commit-panel.switchTabCommit",
-        "title": "Switch to Commit",
+        "title": "%idea-commit-panel.commands.switchTabCommit.title%",
         "icon": "$(git-commit)"
       },
       {
         "command": "idea-commit-panel.switchTabStash",
-        "title": "Switch to Stash",
+        "title": "%idea-commit-panel.commands.switchTabStash.title%",
         "icon": "$(archive)"
       },
       {
         "command": "idea-commit-panel.refresh",
-        "title": "Refresh",
+        "title": "%idea-commit-panel.commands.refresh.title%",
         "icon": "$(refresh)"
       },
       {
         "command": "idea-commit-panel.push",
-        "title": "Push...",
+        "title": "%idea-commit-panel.commands.push.title%",
         "icon": "$(repo-push)"
       },
       {
         "command": "idea-commit-panel.showBranchPicker",
-        "title": "IDEA: Switch Branch"
+        "title": "%idea-commit-panel.commands.showBranchPicker.title%"
       },
       {
         "command": "idea-commit-panel.focusCommitView",
-        "title": "IDEA: Focus Commit View"
+        "title": "%idea-commit-panel.commands.focusCommitView.title%"
       }
     ],
     "menus": {
-      "view/title": [
+      "view/item/context": [
         {
-          "command": "idea-commit-panel.switchTabCommit",
-          "when": "view == ideaCommitView",
-          "group": "navigation@1"
-        },
-        {
-          "command": "idea-commit-panel.switchTabStash",
-          "when": "view == ideaCommitView",
-          "group": "navigation@2"
+          "command": "idea-commit-panel.showBranchPicker",
+          "when": "viewItem == branchStatusBar",
+          "group": "inline"
         }
       ]
     }

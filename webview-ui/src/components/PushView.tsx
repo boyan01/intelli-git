@@ -2,12 +2,14 @@ import { useState, useEffect, useCallback } from 'react';
 import type { CommitInfo, CommitFile, PushConfig, PushViewMessage, PushViewExtMessage, FileStatus } from '@shared/messages';
 import { SimpleFileTree } from './SimpleFileTree';
 import { vscode } from '../lib/vscode';
+import { useTranslation } from 'react-i18next';
 
 export function PushView() {
+    const { t } = useTranslation();
     const postMessage = useCallback((message: PushViewMessage) => {
         vscode.postMessage(message);
     }, []);
-    
+
     const [commits, setCommits] = useState<CommitInfo[]>([]);
     const [files, setFiles] = useState<CommitFile[]>([]);
     const [config, setConfig] = useState<PushConfig | null>(null);
@@ -20,7 +22,7 @@ export function PushView() {
         const handleMessage = (event: MessageEvent<PushViewExtMessage>) => {
             const message = event.data;
             switch (message.type) {
-                case 'update': 
+                case 'update':
                     setCommits(message.commits);
                     setFiles(message.files);
                     setConfig(message.config);
@@ -80,8 +82,8 @@ export function PushView() {
     return (
         <div className="push-panel">
             <div className="push-header">
-                <h2>Push commits</h2>
-                <button className="header-close-btn" onClick={() => postMessage({ type: 'cancel' })} title="Close">
+                <h2>{t('pushView.title')}</h2>
+                <button className="header-close-btn" onClick={() => postMessage({ type: 'cancel' })} title={t('pushView.close')}>
                     <i className="codicon codicon-close"></i>
                 </button>
             </div>
@@ -94,8 +96,8 @@ export function PushView() {
                             <span className="local-branch">{config.currentBranch}</span>
                             <span className="arrow">→</span>
                             <div className="remote-selector">
-                                <select 
-                                    className="branch-select" 
+                                <select
+                                    className="branch-select"
                                     value={config.remote}
                                     onChange={handleRemoteChange}
                                 >
@@ -105,8 +107,8 @@ export function PushView() {
                                 </select>
                                 <span className="separator">:</span>
                                 <div className="branch-input-wrapper">
-                                    <input 
-                                        type="text" 
+                                    <input
+                                        type="text"
                                         className="branch-input"
                                         defaultValue={config.remoteBranch}
                                         onBlur={handleRemoteBranchChange}
@@ -121,7 +123,7 @@ export function PushView() {
                     </div>
                     <div className="commits-list">
                         {commits.map((commit, index) => (
-                            <div 
+                            <div
                                 key={commit.hash}
                                 className={`commit-item ${selectedCommitHash === commit.hash ? 'selected' : ''}`}
                                 onClick={() => handleSelectCommit(index, commit.hash)}
@@ -142,12 +144,12 @@ export function PushView() {
                     <div className="files-view-container">
                         <div className="files-toolbar">
                             <div className="toolbar-left">
-                                <span className="files-count">{files.length} files</span>
+                                <span className="files-count">{t('pushView.files', { count: files.length })}</span>
                             </div>
                         </div>
                         <div className="files-tree-wrapper">
-                            <SimpleFileTree 
-                                files={fileStatusList} 
+                            <SimpleFileTree
+                                files={fileStatusList}
                                 viewMode="tree"
                             />
                         </div>
@@ -156,18 +158,18 @@ export function PushView() {
                     {/* Bottom: Commit Details */}
                     {selectedCommit && (
                         <div className="commit-details-pane">
-                            <div className="details-header">Commit Details</div>
+                            <div className="details-header">{t('pushView.commitDetails.title')}</div>
                             <div className="details-content">
                                 <div className="detail-row author">
-                                    <span className="label">Author:</span>
+                                    <span className="label">{t('pushView.commitDetails.author')}</span>
                                     <span className="value">{selectedCommit.authorName}</span>
                                 </div>
                                 <div className="detail-row hash">
-                                    <span className="label">Hash:</span>
+                                    <span className="label">{t('pushView.commitDetails.hash')}</span>
                                     <span className="value">{selectedCommit.hash}</span>
                                 </div>
                                 <div className="detail-row date">
-                                    <span className="label">Date:</span>
+                                    <span className="label">{t('pushView.commitDetails.date')}</span>
                                     <span className="value">{selectedCommit.date}</span>
                                 </div>
                                 <div className="detail-message">
@@ -183,20 +185,20 @@ export function PushView() {
                 <div className="footer-left">
                     <div className="push-tags-group">
                         <label>
-                            <input 
-                                type="checkbox" 
+                            <input
+                                type="checkbox"
                                 checked={pushTags}
                                 onChange={e => setPushTags(e.target.checked)}
                             />
-                            Push tags
+                            {t('pushView.pushTags')}
                         </label>
                     </div>
                 </div>
                 <div className="footer-right">
-                    <button className="btn btn-secondary" onClick={() => postMessage({ type: 'cancel' })}>Cancel</button>
+                    <button className="btn btn-secondary" onClick={() => postMessage({ type: 'cancel' })}>{t('pushView.cancel')}</button>
                     <div className="btn-split" style={{ position: 'relative' }}>
-                        <button className="btn btn-primary btn-main" onClick={() => handlePush(false)}>Push</button>
-                        <button 
+                        <button className="btn btn-primary btn-main" onClick={() => handlePush(false)}>{t('pushView.push')}</button>
+                        <button
                             className="btn btn-primary btn-dropdown"
                             onClick={() => setIsForcePushExpanded(!isForcePushExpanded)}
                         >
@@ -209,7 +211,7 @@ export function PushView() {
                                     setIsForcePushExpanded(false);
                                 }}>
                                     <i className="codicon codicon-warning icon"></i>
-                                    <span>Force Push</span>
+                                    <span>{t('pushView.forcePush')}</span>
                                 </div>
                             </div>
                         )}

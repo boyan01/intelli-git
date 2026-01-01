@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
-import { GitService, BranchInfo } from './GitService';
+import { BranchInfo } from '../shared/messages';
+import { GitService } from './GitService';
 
 interface BranchQuickPickItem extends vscode.QuickPickItem {
     action?: 'fetch' | 'update' | 'commit' | 'push' | 'newBranch' | 'checkout';

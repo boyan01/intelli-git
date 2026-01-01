@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 // import { VSCodeButton, VSCodeCheckbox, VSCodeTextArea } from '@vscode/webview-ui-toolkit/react';
 
 interface CommitFormProps {
@@ -22,6 +23,8 @@ export const CommitForm: React.FC<CommitFormProps> = ({
     onAmendChange,
     onCommit
 }) => {
+    const { t } = useTranslation();
+
     return (
         <div className="commit-section">
             <div className="commit-toolbar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -32,13 +35,13 @@ export const CommitForm: React.FC<CommitFormProps> = ({
                         onChange={(e) => onAmendChange(e.target.checked)}
                         style={{ margin: 0, marginRight: '4px' }}
                     />
-                    <span>修正(M)</span>
+                    <span>{t('commitForm.amend')}</span>
                 </label>
                 {(addedCount > 0 || modifiedCount > 0 || deletedCount > 0) && (
                     <div style={{ fontSize: '12px', opacity: 0.9, display: 'flex', gap: '8px' }}>
-                        {addedCount > 0 && <span style={{ color: 'var(--vscode-gitDecoration-addedResourceForeground)' }}>{addedCount} 增加</span>}
-                        {modifiedCount > 0 && <span style={{ color: 'var(--vscode-gitDecoration-modifiedResourceForeground)' }}>{modifiedCount} 修改</span>}
-                        {deletedCount > 0 && <span style={{ color: 'var(--vscode-gitDecoration-deletedResourceForeground)' }}>{deletedCount} 删除</span>}
+                        {addedCount > 0 && <span style={{ color: 'var(--vscode-gitDecoration-addedResourceForeground)' }}>{t('commitForm.stats.added', { count: addedCount })}</span>}
+                        {modifiedCount > 0 && <span style={{ color: 'var(--vscode-gitDecoration-modifiedResourceForeground)' }}>{t('commitForm.stats.modified', { count: modifiedCount })}</span>}
+                        {deletedCount > 0 && <span style={{ color: 'var(--vscode-gitDecoration-deletedResourceForeground)' }}>{t('commitForm.stats.deleted', { count: deletedCount })}</span>}
                     </div>
                 )}
             </div>
@@ -46,7 +49,7 @@ export const CommitForm: React.FC<CommitFormProps> = ({
             <textarea
                 value={message}
                 onChange={(e) => onMessageChange(e.target.value)}
-                placeholder="提交信息"
+                placeholder={t('commitForm.placeholder')}
                 rows={4}
                 style={{
                     width: 'calc(100% - 16px)',
@@ -68,17 +71,17 @@ export const CommitForm: React.FC<CommitFormProps> = ({
                         className="btn btn-primary"
                         onClick={() => onCommit(false)}
                     >
-                        提交(I)
+                        {t('commitForm.actions.commit')}
                     </button>
                     <button
                         className="btn btn-secondary"
                         onClick={() => onCommit(true)}
                     >
-                        提交并推送(P)...
+                        {t('commitForm.actions.commitAndPush')}
                     </button>
                 </div>
                 <div className="actions-right">
-                    <button className="icon-btn" title="设置">
+                    <button className="icon-btn" title={t('commitForm.settings')}>
                         <i className="codicon codicon-settings-gear"></i>
                     </button>
                 </div>

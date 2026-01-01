@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useCallback } from 'react';
 import type { FileStatus, ChangelistGroup } from '@shared/messages';
+import { useTranslation } from 'react-i18next';
 import { ContextMenu } from './ContextMenu';
 import type { ContextMenuItem } from './ContextMenu';
 import { vscode } from '../lib/vscode';
@@ -171,64 +172,66 @@ export const ChangelistTree: React.FC<ChangelistTreeProps> = ({
         vscode.postMessage({ type: 'openFile', path, status });
     }, []);
 
+    const { t } = useTranslation();
+
     const buildFileContextMenu = useCallback((path: string, status?: string): ContextMenuItem[] => {
         return [
             {
                 icon: 'go-to-file',
-                label: 'Open File',
+                label: t('commitView.contextMenu.openFile'),
                 onClick: () => handleFileClick(path, status)
             },
             { separator: true, label: '', onClick: () => { } },
             {
                 icon: 'discard',
-                label: 'Rollback',
+                label: t('commitView.contextMenu.rollback'),
                 onClick: () => onRollback?.([path])
             },
             {
                 icon: 'archive',
-                label: 'Stash',
+                label: t('commitView.contextMenu.stash'),
                 onClick: () => onStash?.([path])
             },
             { separator: true, label: '', onClick: () => { } },
             {
                 icon: 'trash',
-                label: 'Delete from Disk',
+                label: t('commitView.contextMenu.deleteFromDisk'),
                 onClick: () => onDelete?.([path])
             },
             {
                 icon: 'new-folder',
-                label: 'Move to Changelist...',
+                label: t('commitView.contextMenu.moveToChangelist'),
                 onClick: () => onMoveToChangelist?.([path])
             }
         ];
-    }, [handleFileClick, onRollback, onStash, onDelete, onMoveToChangelist]);
+    }, [handleFileClick, onRollback, onStash, onDelete, onMoveToChangelist, t]);
 
     const buildFolderContextMenu = useCallback((node: TreeNode): ContextMenuItem[] => {
         const filePaths = getAllFilePaths(node);
         return [
             {
                 icon: 'check-all',
-                label: 'Select All',
+                label: t('commitView.contextMenu.selectAll'),
                 onClick: () => filePaths.forEach(p => onToggleFile(p, true))
             },
             {
                 icon: 'close-all',
-                label: 'Deselect All',
+                label: t('commitView.contextMenu.deselectAll'),
                 onClick: () => filePaths.forEach(p => onToggleFile(p, false))
             },
             { separator: true, label: '', onClick: () => { } },
             {
                 icon: 'discard',
-                label: 'Rollback All',
+                label: t('commitView.contextMenu.rollbackAll'),
                 onClick: () => onRollback?.(filePaths)
             },
             {
                 icon: 'archive',
-                label: 'Stash All',
+                label: t('commitView.contextMenu.stashAll'),
                 onClick: () => onStash?.(filePaths)
             }
         ];
-    }, [getAllFilePaths, onToggleFile, onRollback, onStash]);
+    }, [getAllFilePaths, onToggleFile, onRollback, onStash, t]);
 
     const handleContextMenu = useCallback((e: React.MouseEvent, items: ContextMenuItem[]) => {
         e.preventDefault();

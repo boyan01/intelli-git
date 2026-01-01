@@ -1,0 +1,75 @@
+{
+  "common": {
+    "commit": "提交",
+    "stash": "贮藏",
+    "refresh": "刷新",
+    "rollback": "回滚",
+    "delete": "删除",
+    "cancel": "取消",
+    "confirm": "确认"
+  },
+  "commitView": {
+    "tabs": {
+      "commit": "提交",
+      "stash": "贮藏"
+    },
+    "emptyState": "没有更改",
+    "toolbar": {
+        "refresh": "刷新",
+        "rollback": "回滚",
+        "stash": "贮藏",
+        "expandAll": "全部展开",
+        "collapseAll": "全部收起",
+        "viewMode": "视图选项",
+        "fetch": "获取(Fetch)",
+        "incomingCommits": "{{count}} 个传入提交\n点击更新项目"
+    },
+    "contextMenu": {
+        "openFile": "打开文件",
+        "rollback": "回滚",
+        "stash": "贮藏",
+        "deleteFromDisk": "从磁盘删除",
+        "moveToChangelist": "移动到变更列表...",
+        "selectAll": "全选",
+        "deselectAll": "取消全选",
+        "rollbackAll": "全部回滚",
+        "stashAll": "全部贮藏"
+    }
+  },
+  "commitForm": {
+    "amend": "修正(M)",
+    "placeholder": "提交信息",
+    "stats": {
+        "added": "{{count}} 增加",
+        "modified": "{{count}} 修改",
+        "deleted": "{{count}} 删除"
+    },
+    "actions": {
+        "commit": "提交(I)",
+        "commitAndPush": "提交并推送(P)..."
+    },
+    "settings": "设置"
+  },
+  "stashList": {
+    "empty": "没有贮藏",
+    "actions": {
+        "pop": "应用并删除(Pop)",
+        "drop": "删除(Drop)"
+    }
+  },
+  "pushView": {
+    "title": "推送提交",
+    "close": "关闭",
+    "files": "{{count}} 个文件",
+    "commitDetails": {
+        "title": "提交详情",
+        "author": "作者:",
+        "hash": "哈希:",
+        "date": "日期:"
+    },
+    "pushTags": "推送标签",
+    "cancel": "取消",
+    "push": "推送",
+    "forcePush": "强制推送"
+  }
+}

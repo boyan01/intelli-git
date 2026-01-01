@@ -25,6 +25,7 @@ export type CommitViewMessage =
     | { type: 'stage-all' }
     | { type: 'unstage-all' }
     | { type: 'switchBranch'; branch: string }
+    | { type: 'pickBranch' } // Request to open branch picker
     | { type: 'updateProject' }
     | { type: 'requestPush' }
     | { type: 'openFile'; path: string; status?: string }
@@ -47,7 +48,10 @@ export type CommitViewMessage =
     | { type: 'renameChangelist'; id: string; name: string }
     | { type: 'promptCreateChangelist'; file?: string }
     | { type: 'deleteFiles'; files: string[] }
+    | { type: 'deleteFiles'; files: string[] }
     | { type: 'stashChangelist'; files: string[] }
+    | { type: 'fetch' }
+    | { type: 'pull' }
     | { type: 'log'; message: string };
 
 // ============================================
@@ -86,6 +90,8 @@ export interface ChangelistGroup {
 export interface BranchInfo {
     current: string;
     all: string[];
+    ahead?: number;
+    behind?: number;
 }
 
 export interface StashItem {
@@ -117,7 +123,7 @@ export interface PushConfig {
 
 // Commit View: Extension → Webview
 export type CommitViewExtMessage =
-    | { type: 'update'; files: ChangelistGroup[]; branches: BranchInfo }
+    | { type: 'update'; files: ChangelistGroup[]; branches: BranchInfo; incomingCommits?: number }
     | { type: 'stashList'; stashList: StashItem[] }
     | { type: 'stashFiles'; index: number; files: FileStatus[] }
     | { type: 'clearMessage' }

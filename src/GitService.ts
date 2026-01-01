@@ -1,14 +1,10 @@
 import simpleGit, { SimpleGit, StatusResult } from 'simple-git';
+import { BranchInfo } from '../shared/messages';
 
 export interface FileStatus {
     path: string;
     status: string;
     staged: boolean;
-}
-
-export interface BranchInfo {
-    current: string;
-    all: string[];
 }
 
 export interface CommitInfo {
@@ -344,6 +340,28 @@ export class GitService {
 
     public async fetch(): Promise<void> {
         await this.git.fetch(['--all', '--prune']);
+    }
+
+    public async getIncomingCommitsCount(): Promise<number> {
+        try {
+            const count = await this.git.raw(['rev-list', '--count', 'HEAD..@{u}']);
+            return parseInt(count.trim(), 10);
+        } catch {
+            return 0;
+        }
+    }
+
+    public async getBranchStatus(): Promise<{ ahead: number; behind: number }> {
+        try {
+            // git rev-list --left-right --count HEAD...@{u}
+            // Returns: "<ahead> <behind>" e.g. "1 0" if ahead by 1
+            const result = await this.git.raw(['rev-list', '--left-right', '--count', `HEAD...@{u}`]);
+            const [ahead, behind] = result.trim().split(/\s+/).map(n => parseInt(n, 10));
+            
+            return { ahead: ahead || 0, behind: behind || 0 };
+        } catch {
+            return { ahead: 0, behind: 0 };
+        }
     }
 
     public async createBranch(branchName: string): Promise<void> {

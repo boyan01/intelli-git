@@ -1,0 +1,75 @@
+{
+  "common": {
+    "commit": "Commit",
+    "stash": "Stash",
+    "refresh": "Refresh",
+    "rollback": "Rollback",
+    "delete": "Delete",
+    "cancel": "Cancel",
+    "confirm": "Confirm"
+  },
+  "commitView": {
+    "tabs": {
+      "commit": "Commit",
+      "stash": "Stash"
+    },
+    "emptyState": "No changes",
+    "toolbar": {
+        "refresh": "Refresh",
+        "rollback": "Rollback",
+        "stash": "Stash",
+        "expandAll": "Expand All",
+        "collapseAll": "Collapse All",
+        "viewMode": "View Mode",
+        "fetch": "Fetch",
+        "incomingCommits": "{{count}} Incoming Commits\nClick to Update Project"
+    },
+    "contextMenu": {
+        "openFile": "Open File",
+        "rollback": "Rollback",
+        "stash": "Stash",
+        "deleteFromDisk": "Delete from Disk",
+        "moveToChangelist": "Move to Changelist...",
+        "selectAll": "Select All",
+        "deselectAll": "Deselect All",
+        "rollbackAll": "Rollback All",
+        "stashAll": "Stash All"
+    }
+  },
+  "commitForm": {
+    "amend": "Amend(M)",
+    "placeholder": "Commit Message",
+    "stats": {
+        "added": "{{count}} Added",
+        "modified": "{{count}} Modified",
+        "deleted": "{{count}} Deleted"
+    },
+    "actions": {
+        "commit": "Commit(I)",
+        "commitAndPush": "Commit & Push(P)..."
+    },
+    "settings": "Settings"
+  },
+  "stashList": {
+    "empty": "No stashes",
+    "actions": {
+        "pop": "Pop",
+        "drop": "Drop"
+    }
+  },
+  "pushView": {
+    "title": "Push commits",
+    "close": "Close",
+    "files": "{{count}} files",
+    "commitDetails": {
+        "title": "Commit Details",
+        "author": "Author:",
+        "hash": "Hash:",
+        "date": "Date:"
+    },
+    "pushTags": "Push tags",
+    "cancel": "Cancel",
+    "push": "Push",
+    "forcePush": "Force Push"
+  }
+}
