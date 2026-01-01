@@ -69,8 +69,8 @@ export class ChangelistService {
 
         const toRemove = this._changelists[index];
         if (toRemove.isDefault) {
-             vscode.window.showErrorMessage('Cannot remove default changelist.');
-             return;
+            vscode.window.showErrorMessage('Cannot remove default changelist.');
+            return;
         }
 
         // Move files to default changelist
@@ -115,6 +115,15 @@ export class ChangelistService {
         // Implementation for active changelist if needed in future
     }
 
+    public getChangelistForFile(filePath: string): string {
+        for (const list of this._changelists) {
+            if (list.files.includes(filePath)) {
+                return list.id;
+            }
+        }
+        return this.getDefaultChangelist().id;
+    }
+
     public syncWithStatus(statusFiles: FileStatus[]) {
         const allStatusPaths = new Set(statusFiles.map(f => f.path));
 
@@ -130,13 +139,13 @@ export class ChangelistService {
         });
 
         const newFiles = statusFiles.filter(f => !allTrackedFiles.has(f.path));
-        
+
         // 3. Add to default changelist
         if (newFiles.length > 0) {
             const defaultList = this.getDefaultChangelist();
             defaultList.files.push(...newFiles.map(f => f.path));
         }
-        
+
         this._saveState();
     }
 

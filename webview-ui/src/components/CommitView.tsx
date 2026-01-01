@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useMemo } from 'react';
 import type { CommitViewState } from '@shared/messages';
 import { ChangelistTree } from './ChangelistTree';
 import { CommitForm } from './CommitForm';
+import { RebaseForm } from './RebaseForm';
 import { CommitToolbar } from './CommitToolbar';
 import { StashList } from './StashList';
 import { useVSCode } from '../hooks/useVSCode';
@@ -10,7 +11,7 @@ import { useTranslation } from 'react-i18next';
 
 export function CommitView() {
     const { t } = useTranslation();
-    const { changelists, stashList, activeFile, branches } = useVSCode();
+    const { changelists, stashList, activeFile, branches, incomingCommits } = useVSCode();
     const [activeTab, setActiveTab] = useState<'commit' | 'stash'>('commit');
 
     // UI State
@@ -102,6 +103,28 @@ export function CommitView() {
         });
     };
 
+    // Listen for messages from extension to set commit message (e.g. during rebase)
+    useEffect(() => {
+        const handler = (event: MessageEvent) => {
+            const message = event.data;
+            switch (message.type) {
+                case 'setCommitMessage':
+                    setCommitMessage(message.message);
+                    break;
+            }
+        };
+        window.addEventListener('message', handler);
+        return () => window.removeEventListener('message', handler);
+    }, []);
+
+    const handleFetch = () => {
+        vscode.postMessage({ type: 'fetch' });
+    };
+
+    const handleBranchClick = () => {
+        vscode.postMessage({ type: 'pickBranch' });
+    };
+
     const handleStashAction = (action: 'apply' | 'pop' | 'drop', index: number) => {
         const typeMap = { apply: 'stashApply', pop: 'stashPop', drop: 'stashDrop' } as const;
         vscode.postMessage({ type: typeMap[action], index });
@@ -125,15 +148,37 @@ export function CommitView() {
                     </button>
                 </div>
                 <div className="tabs-right">
-                    <button className="icon-btn" title={t('commitView.toolbar.fetch')} onClick={() => vscode.postMessage({ type: 'fetch' })}>
+                    <button className="icon-btn" title={t('commitView.toolbar.fetch')} onClick={handleFetch}>
                         <i className="codicon codicon-cloud-download"></i>
                     </button>
 
+                    {incomingCommits > 0 && (
+                        <div
+                            className="incoming-commits hover-effect"
+                            onClick={handleFetch}
+                            title={t('toolbar.incomingTooltip', { count: incomingCommits })}
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                cursor: 'pointer',
+                                padding: '2px 6px',
+                                fontSize: '11px'
+                            }}
+                        >
+                            <span className="codicon codicon-cloud-download"></span>
+                            <span>{incomingCommits}</span>
+                            <span className="incoming-arrow">⬇️</span>
+                        </div>
+                    )}
+
                     {branches?.current && (
                         <div
-                            className="branch-indicator"
-                            onClick={() => vscode.postMessage({ type: 'pickBranch' })}
-                            title="Display: Branch Name (Ahead/Behind) - Click to Switch Branch"
+                            className={`branch-indicator ${branches.rebaseStatus && branches.rebaseStatus !== 'none' ? 'rebase-active' : ''}`}
+                            onClick={handleBranchClick}
+                            title={branches.rebaseStatus && branches.rebaseStatus !== 'none'
+                                ? `Rebase in progress (${branches.rebaseStatus})`
+                                : t('toolbar.branchTooltip')}
                             style={{
                                 display: 'flex',
                                 alignItems: 'center',
@@ -142,24 +187,69 @@ export function CommitView() {
                                 padding: '2px 6px',
                                 borderRadius: '3px',
                                 marginRight: '4px',
-                                height: '20px'
+                                height: '20px',
+                                backgroundColor: branches.rebaseStatus && branches.rebaseStatus !== 'none' ? 'var(--vscode-inputValidation-warningBackground)' : undefined,
+                                border: branches.rebaseStatus && branches.rebaseStatus !== 'none' ? '1px solid var(--vscode-inputValidation-warningBorder)' : undefined
                             }}
                         >
-                            <i className="codicon codicon-repo-forked" style={{ marginRight: '4px' }}></i>
-                            <span style={{ fontSize: '11px', marginRight: '4px', maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{branches.current}</span>
+                            {branches.rebaseStatus && branches.rebaseStatus !== 'none' ? (
+                                <>
+                                    <span className="codicon codicon-git-merge" style={{ color: 'var(--vscode-inputValidation-warningForeground)', marginRight: '4px' }}></span>
+                                    <span style={{ fontWeight: 'bold', fontSize: '11px', marginRight: '4px' }}>
+                                        {branches.rebaseStatus === 'interactive' ? 'Rebasing' : 'Merging'}
+                                    </span>
+                                    <div
+                                        className="continue-btn hover-effect"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            vscode.postMessage({ type: 'continueRebase' });
+                                        }}
+                                        title="Continue Rebase/Merge"
+                                        style={{
+                                            marginLeft: '4px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            color: 'var(--vscode-debugIcon-startForeground)'
+                                        }}
+                                    >
+                                        <span className="codicon codicon-play"></span>
+                                    </div>
+                                    <div
+                                        className="abort-btn hover-effect"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            vscode.postMessage({ type: 'abortRebase' });
+                                        }}
+                                        title="Abort Rebase/Merge"
+                                        style={{
+                                            marginLeft: '4px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            color: 'var(--vscode-errorForeground)'
+                                        }}
+                                    >
+                                        <span className="codicon codicon-close"></span>
+                                    </div>
+                                </>
+                            ) : (
+                                <>
+                                    <i className="codicon codicon-repo-forked" style={{ marginRight: '4px' }}></i>
+                                    <span style={{ fontSize: '11px', marginRight: '4px', maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{branches.current}</span>
 
-                            {(branches.ahead || 0) > 0 && (
-                                <div style={{ display: 'flex', alignItems: 'center', color: 'var(--vscode-gitDecoration-addedResourceForeground)', marginLeft: '2px' }}>
-                                    <i className="codicon codicon-arrow-up" style={{ fontSize: '10px', transform: 'rotate(45deg)' }}></i>
-                                    <span style={{ fontSize: '10px' }}>{branches.ahead}</span>
-                                </div>
-                            )}
+                                    {(branches.ahead || 0) > 0 && (
+                                        <div style={{ display: 'flex', alignItems: 'center', color: 'var(--vscode-gitDecoration-addedResourceForeground)', marginLeft: '2px' }}>
+                                            <i className="codicon codicon-arrow-up" style={{ fontSize: '10px', transform: 'rotate(45deg)' }}></i>
+                                            <span style={{ fontSize: '10px' }}>{branches.ahead}</span>
+                                        </div>
+                                    )}
 
-                            {(branches.behind || 0) > 0 && (
-                                <div style={{ display: 'flex', alignItems: 'center', color: 'var(--vscode-gitDecoration-deletedResourceForeground)', marginLeft: '2px' }}>
-                                    <i className="codicon codicon-arrow-down" style={{ fontSize: '10px', transform: 'rotate(45deg)' }}></i>
-                                    <span style={{ fontSize: '10px' }}>{branches.behind}</span>
-                                </div>
+                                    {(branches.behind || 0) > 0 && (
+                                        <div style={{ display: 'flex', alignItems: 'center', color: 'var(--vscode-gitDecoration-deletedResourceForeground)', marginLeft: '2px' }}>
+                                            <i className="codicon codicon-arrow-down" style={{ fontSize: '10px', transform: 'rotate(45deg)' }}></i>
+                                            <span style={{ fontSize: '10px' }}>{branches.behind}</span>
+                                        </div>
+                                    )}
+                                </>
                             )}
                         </div>
                     )}
@@ -203,16 +293,32 @@ export function CommitView() {
                         )}
                     </div>
 
-                    <CommitForm
-                        message={commitMessage}
-                        amend={amend}
-                        addedCount={fileStats.added}
-                        modifiedCount={fileStats.modified}
-                        deletedCount={fileStats.deleted}
-                        onMessageChange={setCommitMessage}
-                        onAmendChange={setAmend}
-                        onCommit={handleCommit}
-                    />
+                    {branches?.rebaseStatus === 'interactive' ? (
+                        <RebaseForm
+                            message={commitMessage}
+                            addedCount={fileStats.added}
+                            modifiedCount={fileStats.modified}
+                            deletedCount={fileStats.deleted}
+                            disableContinue={changelists.some(g => g.items.some(f => f.status === 'C' || f.status === 'U'))}
+                            onMessageChange={setCommitMessage}
+                            onContinue={() => vscode.postMessage({
+                                type: 'continueRebase',
+                                message: commitMessage,
+                                files: Array.from(selectedFiles)
+                            })}
+                        />
+                    ) : (
+                        <CommitForm
+                            message={commitMessage}
+                            amend={amend}
+                            addedCount={fileStats.added}
+                            modifiedCount={fileStats.modified}
+                            deletedCount={fileStats.deleted}
+                            onMessageChange={setCommitMessage}
+                            onAmendChange={setAmend}
+                            onCommit={handleCommit}
+                        />
+                    )}
                 </div>
             )}
 

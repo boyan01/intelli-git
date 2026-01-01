@@ -131,7 +131,16 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
                     await this._handlePull();
                     break;
                 case 'pickBranch':
-                    vscode.commands.executeCommand('git.checkout');
+                    vscode.commands.executeCommand('idea-commit-panel.showBranchPicker');
+                    break;
+                case 'openMergeEditor':
+                    await this._handleOpenMergeEditor(msg.path);
+                    break;
+                case 'continueRebase':
+                    this._handleContinueRebase(msg.message, msg.files);
+                    break;
+                case 'abortRebase':
+                    await this._handleAbortRebase();
                     break;
                 case 'log': console.log('[Webview]', msg.message); break;
             }
@@ -141,70 +150,128 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
         this.refresh();
     } // Close resolveWebviewView
 
+    // State to track if we have already populated the rebase message for the current session
+    private _lastRebaseStatus: string | undefined;
+
     public async refresh() {
         if (!this.gitService || !this._view) {
             return;
         }
 
         const files = await this.gitService.getStatus();
-        const branches = await this.gitService.getBranches();
-        const branchStatus = await this.gitService.getBranchStatus();
-        branches.ahead = branchStatus.ahead;
-        branches.behind = branchStatus.behind;
+        // Use helper to get all branch info at once
+        const branches = await this._getBranchInfo();
 
         const incomingCommits = await this.gitService.getIncomingCommitsCount();
         console.log('[CommitViewProvider] Refreshing. Incoming commits:', incomingCommits);
 
-        // Separate untracked files from tracked files
+        // Create changelist groups
+        // Conflict Group
+        const conflictedFiles = files.filter(f => f.status === 'C' || f.status === 'U');
+
+        // Tracked Group (staged + modified + deleted, but NOT conflicted)
+        const trackedFiles = files.filter(f => f.status !== '?' && f.status !== 'C' && f.status !== 'U');
+
+        // Untracked Group
         const untrackedFiles = files.filter(f => f.status === '?');
-        const trackedFiles = files.filter(f => f.status !== '?');
 
-        // Use ChangelistService to group files
-        // Sync with service first (ensure all files are in some list)
-        this.changelistService.syncWithStatus(trackedFiles);
-        const rawChangelists = this.changelistService.getChangelists();
+        const changelists: ChangelistGroup[] = [];
 
-        // Map to frontend format
-        const changelists = rawChangelists.map(list => ({
-            id: list.id,
-            name: list.name,
-            isDefault: list.isDefault,
-            items: list.files.map(path => {
-                const file = files.find(f => f.path === path);
-                // Should always find file after sync, but handle safely
-                if (!file) {
-                    console.warn(`File ${path} in changelist ${list.name} not found in status`);
-                    return null;
+        // 1. Merge Conflicts (Highest priority)
+        if (conflictedFiles.length > 0) {
+            changelists.push({
+                id: 'merge-conflicts',
+                name: 'Merge Conflicts',
+                isDefault: false,
+                items: conflictedFiles.map(f => ({ path: f.path, status: f.status, staged: f.staged }))
+            });
+        }
+
+        // 2. Default Changelist (Tracked non-conflicted files)
+        if (trackedFiles.length > 0) {
+            // Check if we have user-defined changelists for these files
+            // For now, simplify logic: All tracked files go to 'Default' or their assigned list by ChangelistService
+            // If using ChangelistService:
+            const defaultId = (await this.changelistService.getChangelists()).find(c => c.isDefault)?.id || 'default';
+            const userChangelists = await this.changelistService.getChangelists();
+
+            // Map files to changelists
+            const filesByChangelist = new Map<string, typeof trackedFiles>();
+
+            for (const file of trackedFiles) {
+                const listId = this.changelistService.getChangelistForFile(file.path);
+                if (!filesByChangelist.has(listId)) {
+                    filesByChangelist.set(listId, []);
                 }
-                return {
-                    path: path,
-                    status: file.status,
-                    staged: file.staged
-                };
-            }).filter((item): item is { path: string, status: string, staged: boolean } => item !== null)
-        }));
+                filesByChangelist.get(listId)!.push(file);
+            }
 
-        // Add Unversioned Files group if needed
+            // Create groups for existing changelists (so empty ones persist if managed by service)
+            for (const cl of userChangelists) {
+                const clFiles = filesByChangelist.get(cl.id) || [];
+                // Only skip if empty AND not default? Or show empty changelists?
+                // Logic: Show if it has files.
+                if (clFiles.length > 0) {
+                    changelists.push({
+                        id: cl.id,
+                        name: cl.name,
+                        isDefault: cl.isDefault,
+                        items: clFiles.map(f => ({ path: f.path, status: f.status, staged: f.staged }))
+                    });
+                } else if (cl.isDefault && trackedFiles.length === 0 && conflictedFiles.length === 0 && untrackedFiles.length === 0) {
+                    // Show default even if empty if no other files exist?? 
+                    // No, usually just hide.
+                }
+            }
+            // Add any files that fell into 'default' bucket implicitly if not covered above?
+            // The service defaults unknown files to default list, so usually covered.
+        }
+
+        // 3. Unversioned Files
         if (untrackedFiles.length > 0) {
             changelists.push({
                 id: 'unversioned',
                 name: 'Unversioned Files',
                 isDefault: false,
-                items: untrackedFiles.map(f => ({
-                    path: f.path,
-                    status: f.status,
-                    staged: f.staged
-                }))
+                items: untrackedFiles.map(f => ({ path: f.path, status: f.status, staged: f.staged }))
             });
         }
 
-        // incomingCommits is already declared and fetched at the top of the function
-        // const incomingCommits = await this.gitService.getIncomingCommitsCount();
+        // Safety: ensure default exists if needed?
+        if (changelists.length === 0) {
+            changelists.push({
+                id: 'default',
+                name: 'Default Changelist',
+                isDefault: true,
+                items: []
+            });
+        }
+
+        // Check if we are rebasing or merging to pre-populate message
+        const rebaseStatus = branches.rebaseStatus;
+
+        // Only trigger message update if we trigger a transition TO meaningful status from non-meaningful
+        // OR if this is the first load (lastRebaseStatus undefined) and it is active.
+        // Prevent overwriting if we are already in the state.
+        const shouldUpdateMessage = (rebaseStatus && rebaseStatus !== 'none') &&
+            (this._lastRebaseStatus !== rebaseStatus);
+
+        if (shouldUpdateMessage) {
+            let existingMessage = await this.gitService.getRebaseCommitMessage();
+            this._view.webview.postMessage({
+                type: 'setCommitMessage',
+                message: existingMessage
+            });
+        }
+
+        // Update state
+        this._lastRebaseStatus = rebaseStatus;
 
         this._view.webview.postMessage({
             type: 'update',
             files: changelists,
-            branches: branches
+            branches: branches, // Use helper result
+            incomingCommits
         });
 
         this._sendActiveFile();
@@ -529,6 +596,70 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
             }
         });
     }
+
+    private async _handleOpenMergeEditor(filePath: string) {
+        const workspaceRoot = this.gitService?.getWorkspaceRoot();
+        if (!workspaceRoot) return;
+        const uri = vscode.Uri.file(`${workspaceRoot}/${filePath}`);
+        await vscode.commands.executeCommand('git.openMergeEditor', uri);
+    }
+
+    private async _handleContinueRebase(message?: string, files?: string[]) {
+        if (!this.gitService) return;
+
+        // If specific files are selected/provided, stage them first
+        // This supports the workflow where user resolves conflict, checks the file in UI, and clicks Continue
+        if (files && files.length > 0) {
+            try {
+                // We stage individually or all at once
+                // simple-git add accepts array or space-separated? verify.
+                // existing stageFile takes single path.
+                for (const file of files) {
+                    await this.gitService.stageFile(file);
+                }
+            } catch (e) {
+                console.error('Failed to stage files before continue:', e);
+                vscode.window.showErrorMessage('Failed to stage selected files.');
+                return;
+            }
+        }
+
+        try {
+            await this.gitService.continueRebase(message);
+            vscode.window.showInformationMessage('Rebase continued.');
+            this.refresh();
+        } catch (e) {
+            vscode.window.showErrorMessage(`Continue rebase failed: ${e}`);
+        }
+    }
+
+    private async _handleAbortRebase() {
+        if (!this.gitService) return;
+        try {
+            await this.gitService.abortRebase();
+            vscode.window.showInformationMessage('Rebase aborted.');
+            this.refresh();
+        } catch (e) {
+            vscode.window.showErrorMessage(`Abort rebase failed: ${e}`);
+        }
+    }
+
+    private async _getBranchInfo() {
+        if (!this.gitService) return { current: '', all: [] };
+
+        const branches = await this.gitService.getBranches();
+        const branchStatus = await this.gitService.getBranchStatus();
+        const rebaseStatus = await this.gitService.getRebaseStatus();
+
+        return {
+            current: branches.current,
+            all: branches.all,
+            ahead: branchStatus.ahead,
+            behind: branchStatus.behind,
+            rebaseStatus
+        };
+    }
+
 
     private async _handlePull() {
         if (!this.gitService) return;

@@ -29,6 +29,9 @@ export type CommitViewMessage =
     | { type: 'updateProject' }
     | { type: 'requestPush' }
     | { type: 'openFile'; path: string; status?: string }
+    | { type: 'openMergeEditor'; path: string }
+    | { type: 'continueRebase'; message?: string; files?: string[] }
+    | { type: 'abortRebase' }
     | { type: 'getLastCommitMessage' }
     | { type: 'generateCommitMessage' }
     | { type: 'stash'; files: string[] }
@@ -92,6 +95,7 @@ export interface BranchInfo {
     all: string[];
     ahead?: number;
     behind?: number;
+    rebaseStatus?: 'none' | 'interactive' | 'merging';
 }
 
 export interface StashItem {
@@ -129,6 +133,7 @@ export type CommitViewExtMessage =
     | { type: 'clearMessage' }
     | { type: 'lastCommitMessage'; message: string }
     | { type: 'generatedCommitMessage'; message: string }
+    | { type: 'setCommitMessage'; message: string }
     | { type: 'aiGenerating'; generating: boolean }
     | { type: 'switchTab'; tab: 'commit' | 'stash' }
     | { type: 'activeFileChange'; path: string };

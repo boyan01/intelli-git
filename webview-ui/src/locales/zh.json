@@ -46,7 +46,8 @@
     },
     "actions": {
         "commit": "提交(I)",
-        "commitAndPush": "提交并推送(P)..."
+        "commitAndPush": "提交并推送(P)...",
+        "continue": "继续(Continue)"
     },
     "settings": "设置"
   },

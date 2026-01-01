@@ -244,7 +244,15 @@ export const ChangelistTree: React.FC<ChangelistTreeProps> = ({
         });
     }, []);
 
-
+    // Status Color Map
+    const getStatusColor = useCallback((status?: string) => {
+        if (status === 'C' || status === 'U') return 'var(--vscode-gitDecoration-conflictingResourceForeground)';
+        if (status === 'A') return 'var(--vscode-gitDecoration-addedResourceForeground)'; // Green
+        if (status === 'M') return 'var(--vscode-gitDecoration-modifiedResourceForeground)'; // Blue/Yellow
+        if (status === 'D') return 'var(--vscode-gitDecoration-deletedResourceForeground)'; // Red
+        if (status === '?') return 'var(--vscode-gitDecoration-untrackedResourceForeground)'; // Green/Grey
+        return 'var(--vscode-foreground)';
+    }, []);
 
     const renderTreeNode = (node: TreeNode, depth: number = 0, isRoot: boolean = false): React.ReactNode => {
         if (node.isFile) {
@@ -254,6 +262,9 @@ export const ChangelistTree: React.FC<ChangelistTreeProps> = ({
             const showPath = viewMode === 'list';
 
             const isActive = node.path === activeFile;
+            const isConflict = node.status === 'C' || node.status === 'U';
+            const isDeleted = node.status === 'D';
+            const statusColor = getStatusColor(node.status);
 
             return (
                 <div
@@ -272,12 +283,23 @@ export const ChangelistTree: React.FC<ChangelistTreeProps> = ({
                             onChange={(e) => onToggleFile(node.path, e.target.checked)}
                         />
                     )}
+                    {isConflict ? (
+                        <span className="codicon codicon-warning icon" style={{ color: statusColor }}></span>
+                    ) : (
+                        <span
+                            className="file-icon-svg"
+                            style={{ color: getFileIcon(node.name).color }}
+                            dangerouslySetInnerHTML={{ __html: getFileIcon(node.name).svg }}
+                        />
+                    )}
                     <span
-                        className="file-icon-svg"
-                        style={{ color: getFileIcon(node.name).color }}
-                        dangerouslySetInnerHTML={{ __html: getFileIcon(node.name).svg }}
-                    />
-                    <span className={`name status-${node.status}`}>
+                        className={`name status-${node.status}`}
+                        style={{
+                            color: statusColor,
+                            textDecoration: isDeleted ? 'line-through' : 'none',
+                            opacity: isDeleted ? 0.7 : 1
+                        }}
+                    >
                         {node.name}
                     </span>
                     {showPath && (

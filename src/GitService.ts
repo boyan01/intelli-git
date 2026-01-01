@@ -1,5 +1,7 @@
 import simpleGit, { SimpleGit, StatusResult } from 'simple-git';
 import { BranchInfo } from '../shared/messages';
+import * as fs from 'fs';
+import * as path from 'path';
 
 export interface FileStatus {
     path: string;
@@ -81,18 +83,44 @@ export class GitService {
                 });
             });
 
+            status.conflicted.forEach(file => {
+                files.push({
+                    path: file,
+                    status: 'C',
+                    staged: true // Conflicts are typically considered staged/in-index
+                });
+            });
+
+            // Also check raw status for 'U' (Unmerged) which simple-git might map differently
+            // We'll rely on simple-git's .conflicted array first, but if indexStatus has 'U', handle it.
             const indexStatus = await this.git.diff(['--cached', '--name-status']);
             indexStatus.split('\n').forEach(line => {
                 if (!line) return;
                 const [statusCode, filePath] = line.split('\t');
-                const existing = files.find(f => f.path === filePath && f.staged);
+                const existing = files.find(f => f.path === filePath);
+
+                // If it's a conflict
+                if ((statusCode === 'U' || statusCode.startsWith('U') || statusCode.endsWith('U'))) {
+                    if (existing) {
+                        existing.status = 'C';
+                        existing.staged = true;
+                    } else if (filePath) {
+                        files.push({
+                            path: filePath,
+                            status: 'C',
+                            staged: true
+                        });
+                    }
+                    return;
+                }
+
                 if (!existing && filePath) {
                     files.push({
                         path: filePath,
                         status: statusCode,
                         staged: true
                     });
-                } else if (existing) {
+                } else if (existing && existing.status !== 'C') { // Don't overwrite conflict status
                     existing.status = statusCode;
                 }
             });
@@ -156,7 +184,7 @@ export class GitService {
         try {
             // We need to know the status of these files to decide how to rollback
             const allFiles = await this.getStatus();
-            
+
             // Group files by action needed
             const toCheckout: string[] = []; // Modified, Deleted
             const toClean: string[] = [];    // Untracked
@@ -198,7 +226,7 @@ export class GitService {
         }
     }
 
-    public async getStashList(): Promise<Array<{index: number, message: string, branch: string}>> {
+    public async getStashList(): Promise<Array<{ index: number, message: string, branch: string }>> {
         try {
             const result = await this.git.stashList();
             console.log('simple-git stashList result:', JSON.stringify(result));
@@ -219,10 +247,10 @@ export class GitService {
         }
     }
 
-    public async getStashFiles(index: number): Promise<Array<{path: string, status: string}>> {
+    public async getStashFiles(index: number): Promise<Array<{ path: string, status: string }>> {
         try {
             const result = await this.git.raw(['stash', 'show', '--name-status', `stash@{${index}}`]);
-            const files: Array<{path: string, status: string}> = [];
+            const files: Array<{ path: string, status: string }> = [];
             for (const line of result.split('\n')) {
                 if (!line.trim()) continue;
                 const parts = line.split('\t');
@@ -283,9 +311,9 @@ export class GitService {
         if (message) {
             options.push('-m', message);
         } else {
-             options.push('--no-edit');
+            options.push('--no-edit');
         }
-        
+
         if (files && files.length > 0) {
             await this.git.commit([...options, ...files]);
         } else {
@@ -357,7 +385,7 @@ export class GitService {
             // Returns: "<ahead> <behind>" e.g. "1 0" if ahead by 1
             const result = await this.git.raw(['rev-list', '--left-right', '--count', `HEAD...@{u}`]);
             const [ahead, behind] = result.trim().split(/\s+/).map(n => parseInt(n, 10));
-            
+
             return { ahead: ahead || 0, behind: behind || 0 };
         } catch {
             return { ahead: 0, behind: 0 };
@@ -371,7 +399,7 @@ export class GitService {
     public async checkoutRemoteBranch(remoteBranch: string): Promise<void> {
         const parts = remoteBranch.split('/');
         const localBranchName = parts.slice(1).join('/');
-        
+
         const localBranches = await this.getBranches();
         if (localBranches.all.includes(localBranchName)) {
             await this.git.checkout(localBranchName);
@@ -436,6 +464,107 @@ export class GitService {
         }
     }
 
+    public async getRebaseStatus(): Promise<'none' | 'interactive' | 'merging'> {
+        try {
+            // Check for rebase/merge directories
+            // .git/rebase-merge exists during interactive rebase
+            // .git/rebase-apply exists during standard rebase
+            // OR use git status
+            const statusSummary = await this.git.status();
+
+            if (statusSummary.current === 'HEAD' && statusSummary.tracking === null) {
+                // Often indicates detached HEAD functionality, possibly rebase
+            }
+
+            // Simple-git doesn't explicitly flag "rebase interactive", but we can infer or use raw
+            try {
+                // Check if rebase directory exists (cannot depend on fs directly easily without path, use git rev-parse --git-dir)
+                // Using raw command to check status text or looking for specific files is safer via git
+                const gitDir = await this.git.revparse(['--git-dir']);
+
+                // We'll rely on fs access via vscode (pass fs or check via hacks? no, we have workspaceRoot)
+                // Let's use `git status` output text as the user showed in the issue
+                // "interactive rebase in progress"
+
+                // Actually simple-git status result might have info?
+                // Unfortunately no standard property.
+                // Let's parse `git status` short output? No, that's what .status() does.
+
+                // Let's use raw git status to check
+                const statusText = await this.git.raw(['status']);
+                if (statusText.includes('interactive rebase in progress')) {
+                    return 'interactive';
+                }
+                if (statusText.includes('rebase in progress')) {
+                    return 'interactive'; // Treat as interactive for UI purposes (show abort)
+                }
+                if (statusText.includes('You have unmerged paths')) {
+                    return 'merging';
+                }
+            } catch {
+                // ignore
+            }
+
+            return 'none';
+        } catch {
+            return 'none';
+        }
+    }
+
+    public async abortRebase(): Promise<void> {
+        await this.git.rebase(['--abort']);
+    }
+
+    public async continueRebase(message?: string): Promise<void> {
+        // If a message is provided, try to update the relevant message file
+        if (message) {
+            try {
+                const gitDir = await this.git.revparse(['--git-dir']);
+                const rebaseMergeMsg = path.join(gitDir.trim(), 'rebase-merge', 'message');
+                const mergeMsg = path.join(gitDir.trim(), 'MERGE_MSG');
+
+                if (fs.existsSync(rebaseMergeMsg)) {
+                    fs.writeFileSync(rebaseMergeMsg, message, 'utf8');
+                } else if (fs.existsSync(mergeMsg)) {
+                    fs.writeFileSync(mergeMsg, message, 'utf8');
+                }
+            } catch (e) {
+                console.error('Failed to update rebase message:', e);
+            }
+        }
+
+        // Use .env() to set GIT_EDITOR for this operation
+        await this.git.env({ ...process.env, GIT_EDITOR: 'true' }).rebase(['--continue']);
+    }
+
+    public async getRebaseCommitMessage(): Promise<string> {
+        try {
+            let gitDir = (await this.git.revparse(['--git-dir'])).trim();
+
+            // Ensure gitDir is absolute
+            if (!path.isAbsolute(gitDir) && this._workspaceRoot) {
+                gitDir = path.join(this._workspaceRoot, gitDir);
+            }
+
+            console.log('rebaseMergeMsg gitDir', gitDir);
+
+            const rebaseMergeMsg = path.join(gitDir, 'rebase-merge', 'message');
+            const rebaseApplyMsg = path.join(gitDir, 'rebase-apply', 'msg');
+            const mergeMsg = path.join(gitDir, 'MERGE_MSG');
+
+            if (fs.existsSync(rebaseMergeMsg)) {
+                return fs.readFileSync(rebaseMergeMsg, 'utf8').trim();
+            } else if (fs.existsSync(rebaseApplyMsg)) {
+                return fs.readFileSync(rebaseApplyMsg, 'utf8').trim();
+            } else if (fs.existsSync(mergeMsg)) {
+                return fs.readFileSync(mergeMsg, 'utf8').trim();
+            }
+        } catch (e) {
+            console.error('Failed to read rebase message:', e);
+        }
+        return '';
+    }
+
     public async getCommitFiles(hash: string): Promise<{ path: string; status: string }[]> {
         try {
             const result = await this.git.show([hash, '--name-status', '--pretty=format:']);
@@ -461,4 +590,3 @@ export class GitService {
         await this.git.pushTags(remote);
     }
 }
-

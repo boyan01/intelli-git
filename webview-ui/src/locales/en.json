@@ -46,7 +46,8 @@
     },
     "actions": {
         "commit": "Commit(I)",
-        "commitAndPush": "Commit & Push(P)..."
+        "commitAndPush": "Commit & Push(P)...",
+        "continue": "Continue"
     },
     "settings": "Settings"
   },
