@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { GitService } from './GitService';
 import { ChangelistService } from './ChangelistService';
-import type { CommitViewMessage, ChangelistGroup } from '@shared/messages';
+import type { CommitViewMessage, ChangelistGroup, CommitViewExtMessage } from '@shared/messages';
 import { getWebviewHtml } from './utils/webviewHtml';
 
 export class CommitViewProvider implements vscode.WebviewViewProvider {
@@ -51,10 +51,12 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
             }
 
             if (relativePath) {
-                this._view?.webview.postMessage({
-                    type: 'activeFileChange',
-                    path: relativePath
-                });
+                if (relativePath) {
+                    this._postMessage({
+                        type: 'activeFileChange',
+                        path: relativePath
+                    });
+                }
             }
         });
 
@@ -258,7 +260,7 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
 
         if (shouldUpdateMessage) {
             let existingMessage = await this.gitService.getRebaseCommitMessage();
-            this._view.webview.postMessage({
+            this._postMessage({
                 type: 'setCommitMessage',
                 message: existingMessage
             });
@@ -267,7 +269,7 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
         // Update state
         this._lastRebaseStatus = rebaseStatus;
 
-        this._view.webview.postMessage({
+        this._postMessage({
             type: 'update',
             files: changelists,
             branches: branches, // Use helper result
@@ -278,7 +280,7 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
     }
 
     public switchTab(tab: 'commit' | 'stash') {
-        this._view?.webview.postMessage({
+        this._postMessage({
             type: 'switchTab',
             tab: tab
         });
@@ -294,7 +296,7 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
             }
             vscode.window.showInformationMessage('Commit successful');
             this.commitMessage = ''; // Clear message logic if needed, but frontend handles it
-            this._view?.webview.postMessage({ type: 'setCommitMessage', message: '' });
+            this._postMessage({ type: 'setCommitMessage', message: '' });
             this.refresh();
         } catch (e) {
             vscode.window.showErrorMessage(`Commit failed: ${e}`);
@@ -352,7 +354,7 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
     private async _sendLastCommitMessage() {
         if (!this.gitService) return;
         const message = await this.gitService.getLastCommitMessage();
-        this._view?.webview.postMessage({
+        this._postMessage({
             type: 'lastCommitMessage',
             message: message
         });
@@ -361,18 +363,18 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
     // Placeholder for AI commit message generation
     private async _generateCommitMessage() {
         // Implementation pending integration with AI service
-        this._view?.webview.postMessage({
+        this._postMessage({
             type: 'aiGenerating',
             generating: true
         });
 
         // Simulate delay
         setTimeout(() => {
-            this._view?.webview.postMessage({
+            this._postMessage({
                 type: 'generatedCommitMessage',
                 message: 'feat: AI generated commit message stub'
             });
-            this._view?.webview.postMessage({
+            this._postMessage({
                 type: 'aiGenerating',
                 generating: false
             });
@@ -417,7 +419,7 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
     private async _sendStashList() {
         if (!this.gitService) return;
         const list = await this.gitService.getStashList();
-        this._view?.webview.postMessage({
+        this._postMessage({
             type: 'stashList',
             stashList: list
         });
@@ -466,10 +468,10 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
     private async _sendStashFiles(index: number) {
         if (!this.gitService) return;
         const files = await this.gitService.getStashFiles(index);
-        this._view?.webview.postMessage({
+        this._postMessage({
             type: 'stashFiles',
             index: index,
-            files: files
+            files: files.map(f => ({ ...f, staged: false }))
         });
     }
 
@@ -567,7 +569,7 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
         }
 
         if (relativePath) {
-            this._view.webview.postMessage({
+            this._postMessage({
                 type: 'activeFileChange',
                 path: relativePath
             });
@@ -629,7 +631,7 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
             vscode.window.showInformationMessage('Rebase continued.');
 
             // Clear the message input
-            this._view?.webview.postMessage({ type: 'setCommitMessage', message: '' });
+            this._postMessage({ type: 'setCommitMessage', message: '' });
 
             // Invalidate the last rebase status so the next refresh (which will likely still be 'interactive' 
             // if there is another conflict) triggers a message update to the new conflict message.
@@ -686,5 +688,9 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
             extensionUri: this._extensionUri,
             title: 'Commit'
         });
+    }
+
+    private _postMessage(message: CommitViewExtMessage) {
+        this._view?.webview.postMessage(message);
     }
 }
