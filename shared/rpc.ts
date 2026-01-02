@@ -116,12 +116,17 @@ export class RpcPeer<TRemote = any, TLocal = any> {
      * Process an incoming message.
      */
     public handleMessage(message: any) {
-        if (!message || typeof message !== 'object') return;
+        if (!message || typeof message !== 'object') {
+            console.error('Invalid message:', message);
+            return;
+        }
 
         if (message.type === 'rpc-request') {
             this.handleRequest(message as RpcRequest);
         } else if (message.type === 'rpc-response') {
             this.handleResponse(message as RpcResponse);
+        } else {
+            console.error('Unknown message type:', message);
         }
     }
 

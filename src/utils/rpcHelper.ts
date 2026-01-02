@@ -14,10 +14,6 @@ export interface ExtensionRpcHandlerOptions {
     gitService: GitService;
     changelistService?: ChangelistService;
     onDispose?: () => void;
-    getCommitState?: () => Promise<CommitState>;
-    getChangelists?: () => Promise<ChangelistGroup[]>;
-    getBranchInfo?: () => Promise<BranchInfo>;
-    generateCommitMessage?: (files?: string[]) => Promise<string>;
 }
 
 /**
@@ -28,19 +24,12 @@ export class ExtensionRpcHandler implements ExtensionMethods {
     private gitService: GitService;
     private changelistService?: ChangelistService;
     private onDispose: () => void;
-    private getCommitStateFn?: () => Promise<CommitState>;
-    private getChangelistsFn?: () => Promise<ChangelistGroup[]>;
-    private getBranchInfoFn?: () => Promise<BranchInfo>;
-    private generateCommitMessageFn?: (files?: string[]) => Promise<string>;
+    private _lastRebaseStatus?: string;
 
     constructor(options: ExtensionRpcHandlerOptions) {
         this.gitService = options.gitService;
         this.changelistService = options.changelistService;
         this.onDispose = options.onDispose || (() => { });
-        this.getCommitStateFn = options.getCommitState;
-        this.getChangelistsFn = options.getChangelists;
-        this.getBranchInfoFn = options.getBranchInfo;
-        this.generateCommitMessageFn = options.generateCommitMessage;
     }
     log(message: string): Promise<void> {
         console.log(message);
@@ -149,29 +138,120 @@ export class ExtensionRpcHandler implements ExtensionMethods {
     // ===========================================
 
     async getCommitState(): Promise<CommitState> {
-        if (this.getCommitStateFn) {
-            return await this.getCommitStateFn();
+        const changelists = await this._buildChangelists();
+        const branches = await this.getBranchInfo();
+        const incomingCommits = await this.gitService.getIncomingCommitsCount();
+        const stashList = await this.gitService.getStashList();
+
+        const rebaseStatus = branches.rebaseStatus;
+        let recentCommitMessage = undefined;
+
+        const shouldUpdateMessage = (rebaseStatus && rebaseStatus !== 'none') &&
+            (this._lastRebaseStatus !== rebaseStatus);
+
+        if (shouldUpdateMessage) {
+            recentCommitMessage = await this.gitService.getRebaseCommitMessage();
         }
+        this._lastRebaseStatus = rebaseStatus;
+
         return {
-            changelists: [],
-            branches: { current: '', all: [] },
-            incomingCommits: 0,
-            stashList: []
+            changelists,
+            branches,
+            incomingCommits,
+            stashList,
+            recentCommitMessage
         };
     }
 
     async getChangelists(): Promise<ChangelistGroup[]> {
-        if (this.getChangelistsFn) {
-            return await this.getChangelistsFn();
-        }
-        return [];
+        return await this._buildChangelists();
     }
 
     async getBranchInfo(): Promise<BranchInfo> {
-        if (this.getBranchInfoFn) {
-            return await this.getBranchInfoFn();
+        const branches = await this.gitService.getBranches();
+        const branchStatus = await this.gitService.getBranchStatus();
+        const rebaseStatus = await this.gitService.getRebaseStatus();
+
+        return {
+            current: branches.current,
+            all: branches.all,
+            ahead: branchStatus.ahead,
+            behind: branchStatus.behind,
+            rebaseStatus
+        };
+    }
+
+    private async _buildChangelists(): Promise<ChangelistGroup[]> {
+        const files = await this.gitService.getStatus();
+
+        const conflictedFiles = files.filter(f => f.status === 'C' || f.status === 'U');
+        const trackedFiles = files.filter(f => f.status !== '?' && f.status !== 'C' && f.status !== 'U');
+        const untrackedFiles = files.filter(f => f.status === '?');
+
+        const changelists: ChangelistGroup[] = [];
+
+        if (conflictedFiles.length > 0) {
+            changelists.push({
+                id: 'merge-conflicts',
+                name: 'Merge Conflicts',
+                isDefault: false,
+                items: conflictedFiles.map(f => ({ path: f.path, status: f.status, staged: f.staged }))
+            });
         }
-        return { current: '', all: [] };
+
+        if (trackedFiles.length > 0) {
+            if (this.changelistService) {
+                const userChangelists = await this.changelistService.getChangelists();
+                const filesByChangelist = new Map<string, typeof trackedFiles>();
+
+                for (const file of trackedFiles) {
+                    const listId = this.changelistService.getChangelistForFile(file.path);
+                    if (!filesByChangelist.has(listId)) {
+                        filesByChangelist.set(listId, []);
+                    }
+                    filesByChangelist.get(listId)!.push(file);
+                }
+
+                for (const cl of userChangelists) {
+                    const clFiles = filesByChangelist.get(cl.id) || [];
+                    if (clFiles.length > 0) {
+                        changelists.push({
+                            id: cl.id,
+                            name: cl.name,
+                            isDefault: cl.isDefault,
+                            items: clFiles.map(f => ({ path: f.path, status: f.status, staged: f.staged }))
+                        });
+                    }
+                }
+            } else {
+                changelists.push({
+                    id: 'default',
+                    name: 'Default Changelist',
+                    isDefault: true,
+                    items: trackedFiles.map(f => ({ path: f.path, status: f.status, staged: f.staged }))
+                });
+            }
+        }
+
+        if (untrackedFiles.length > 0) {
+            changelists.push({
+                id: 'unversioned',
+                name: 'Unversioned Files',
+                isDefault: false,
+                items: untrackedFiles.map(f => ({ path: f.path, status: f.status, staged: f.staged }))
+            });
+        }
+
+        if (changelists.length === 0) {
+            changelists.push({
+                id: 'default',
+                name: 'Default Changelist',
+                isDefault: true,
+                items: []
+            });
+        }
+
+        return changelists;
     }
 
     async getStashList(): Promise<StashItem[]> {
@@ -221,17 +301,6 @@ export class ExtensionRpcHandler implements ExtensionMethods {
     async unstageAll(): Promise<void> {
         await this.gitService.unstageAll();
     }
-
-    async generateCommitMessage(files?: string[]): Promise<string> {
-        if (this.generateCommitMessageFn) {
-            return await this.generateCommitMessageFn(files);
-        }
-        return '';
-    }
-
-    // ===========================================
-    // Stash methods
-    // ===========================================
 
     async stash(params: { message?: string; files: string[] }): Promise<void> {
         try {
@@ -457,6 +526,54 @@ export class ExtensionRpcHandler implements ExtensionMethods {
                 await this.changelistService?.moveFiles([file], newId);
             }
 
+        }
+    }
+
+    async generateCommitMessage(files?: string[]): Promise<string> {
+        if (!this.gitService) return '';
+
+        try {
+            let diff = '';
+            if (files && files.length > 0) {
+                diff = await this.gitService.getDiffForFiles(files);
+            } else {
+                diff = await this.gitService.getStagedDiff();
+            }
+
+            if (!diff) {
+                const message = files && files.length > 0
+                    ? 'No changes found for selected files.'
+                    : 'No staged changes to generate commit message for.';
+                vscode.window.showInformationMessage(message);
+                return '';
+            }
+
+            let [model] = await vscode.lm.selectChatModels({ vendor: 'copilot' });
+            if (!model) {
+                const models = await vscode.lm.selectChatModels();
+                if (models.length > 0) model = models[0];
+            }
+
+            if (!model) {
+                throw new Error('No suitable AI model found. Please ensure GitHub Copilot Chat is installed and enabled.');
+            }
+
+            const messages = [
+                vscode.LanguageModelChatMessage.User('Generate a concise commit message based on the following diff. Use the conventional commits format (e.g. feat: ..., fix: ...). Only return the commit message, no explanation, no code blocks'),
+                vscode.LanguageModelChatMessage.User(diff)
+            ];
+
+            const response = await model.sendRequest(messages, {}, new vscode.CancellationTokenSource().token);
+            let fullMessage = '';
+
+            for await (const fragment of response.text) {
+                fullMessage += fragment;
+            }
+            return fullMessage.trim();
+        } catch (e) {
+            console.error('Error generating commit message:', e);
+            vscode.window.showErrorMessage(`Failed to generate commit message: ${e}`);
+            throw e;
         }
     }
 }
