@@ -109,6 +109,7 @@ export interface CommitInfo {
     shortHash: string;
     subject: string;
     authorName: string;
+    email?: string;
     date: string;
 }
 
@@ -160,3 +161,41 @@ export type CommitViewHandlers = {
 export type PushViewHandlers = {
     [K in PushViewMessage['type']]?: MessageHandler<Extract<PushViewMessage, { type: K }>>;
 };
+
+export interface PushData {
+    commits: CommitInfo[];
+    files: CommitFile[];
+    config: PushConfig;
+}
+
+// ============================================
+// RPC Definitions
+// ============================================
+
+export interface ExtensionMethods {
+    getVersion: () => string;
+    echo: (msg: string) => string;
+    getPushInitState: () => Promise<PushInitState>;
+    getRemoteBranches: (remote: string) => Promise<string[]>;
+    getPushCommits: (params: { remote: string; branch: string }) => Promise<PushCommitsData>;
+    getCommitFiles: (hash: string) => Promise<CommitFile[]>;
+    push: (params: { force: boolean; pushTags: boolean; remote: string; branch: string }) => Promise<void>;
+    openDiff: (path: string) => Promise<void>;
+    cancel: () => Promise<void>;
+    // Add other extension methods here
+}
+
+export interface PushInitState {
+    localBranch: string;
+    remotes: string[];
+}
+
+export interface PushCommitsData {
+    commits: CommitInfo[];
+    files: CommitFile[];
+}
+
+export interface WebviewMethods {
+    // Add webview methods here
+    refreshUI: (data: any) => string;
+}

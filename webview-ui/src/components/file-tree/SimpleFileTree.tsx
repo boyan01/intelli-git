@@ -6,6 +6,7 @@ import styles from './FileTree.module.css';
 interface SimpleFileTreeProps {
     files: FileStatus[];
     viewMode: 'tree' | 'list';
+    onFileClick?: (file: FileStatus) => void;
 }
 
 interface TreeNode {
@@ -77,7 +78,8 @@ const buildTree = (files: FileStatus[]): TreeNode[] => {
 
 export const SimpleFileTree: React.FC<SimpleFileTreeProps> = ({
     files,
-    viewMode
+    viewMode,
+    onFileClick
 }) => {
     const tree = useMemo(() => viewMode === 'tree' ? buildTree(files) : [], [files, viewMode]);
     const [expandedPaths, setExpandedPaths] = useState<Set<string>>(() => {
@@ -107,7 +109,7 @@ export const SimpleFileTree: React.FC<SimpleFileTreeProps> = ({
         return (
             <div className={styles.fileTreeList}>
                 {files.map(file => (
-                    <div key={file.path} className={styles.fileItem}>
+                    <div key={file.path} className={styles.fileItem} onClick={() => onFileClick?.(file)}>
                         <span className={styles.fileIconSvg} style={{ color: getFileIcon(file.path.split('/').pop() || file.path).color }} dangerouslySetInnerHTML={{ __html: getFileIcon(file.path.split('/').pop() || file.path).svg }} />
                         <span className={`${styles.name} ${styles[`status${file.status}`] || ''}`}>{file.path}</span>
                     </div>
@@ -119,7 +121,7 @@ export const SimpleFileTree: React.FC<SimpleFileTreeProps> = ({
     const renderNode = (node: TreeNode, depth: number = 0): React.ReactNode => {
         if (node.isFile) {
             return (
-                <div key={node.path} className={styles.fileItem} style={{ paddingLeft: `${depth * 16}px` }}>
+                <div key={node.path} className={styles.fileItem} style={{ paddingLeft: `${depth * 16}px` }} onClick={() => onFileClick?.({ path: node.path, status: node.status as any, staged: true })}>
                     <span className={styles.fileIconSvg} style={{ color: getFileIcon(node.name).color }} dangerouslySetInnerHTML={{ __html: getFileIcon(node.name).svg }} />
                     <span className={`${styles.name} ${styles[`status${node.status}`] || ''}`}>{node.name}</span>
                 </div>

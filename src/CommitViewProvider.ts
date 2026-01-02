@@ -1,7 +1,8 @@
 import * as vscode from 'vscode';
 import { GitService } from './GitService';
 import { ChangelistService } from './ChangelistService';
-import type { CommitViewMessage, ChangelistGroup, CommitViewExtMessage } from '@shared/messages';
+import type { CommitViewMessage, ChangelistGroup, CommitViewExtMessage, ExtensionMethods, WebviewMethods } from '../shared/messages';
+import { RpcPeer } from '../shared/rpc';
 import { getWebviewHtml } from './utils/webviewHtml';
 
 export class CommitViewProvider implements vscode.WebviewViewProvider {
@@ -10,6 +11,7 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
     private _view?: vscode.WebviewView;
     private gitService?: GitService;
     private changelistService: ChangelistService;
+    private _rpc?: RpcPeer<ExtensionMethods & WebviewMethods>;
 
     constructor(
         private readonly _extensionUri: vscode.Uri,
@@ -35,6 +37,15 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
         };
 
         webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
+
+        // Initialize RPC
+        this._rpc = new RpcPeer<ExtensionMethods & WebviewMethods>({
+            postMessage: (msg: any) => webviewView.webview.postMessage(msg)
+        });
+
+        // Register default handlers
+        this._rpc!.register('getVersion', () => '1.0.0');
+        this._rpc!.register('echo', (msg: string) => msg);
 
         // Listen to active text editor changes
         const activeEditorListener = vscode.window.onDidChangeActiveTextEditor(editor => {
@@ -70,46 +81,56 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
                 return;
             }
 
-            const msg = { ...data, type: data.command || data.type } as CommitViewMessage;
+            const msg = { ...data, type: data.command || data.type } as CommitViewMessage | { type: string };
 
-            switch (msg.type) {
+            // Handle RPC messages
+            if (msg.type === 'rpc-request' || msg.type === 'rpc-response') {
+                this._rpc?.handleMessage(msg);
+                return;
+            }
+
+            // Cast back to CommitViewMessage for existing logic
+            // Note: The existing switch handles string matching, so we just let it flow if not rpc
+            const commitMsg = msg as CommitViewMessage;
+
+            switch (commitMsg.type) {
                 case 'refresh': this.refresh(); break;
-                case 'commit': await this._handleCommit(msg.message, msg.amend, msg.files); break;
-                case 'commitAndPush': await this._handleCommitAndPush(msg.message, msg.amend, msg.files); break;
-                case 'stage': await this.gitService.stageFile(msg.path); this.refresh(); break;
-                case 'unstage': await this.gitService.unstageFile(msg.path); this.refresh(); break;
+                case 'commit': await this._handleCommit(commitMsg.message, commitMsg.amend, commitMsg.files); break;
+                case 'commitAndPush': await this._handleCommitAndPush(commitMsg.message, commitMsg.amend, commitMsg.files); break;
+                case 'stage': await this.gitService.stageFile(commitMsg.path); this.refresh(); break;
+                case 'unstage': await this.gitService.unstageFile(commitMsg.path); this.refresh(); break;
                 case 'stage-all': await this.gitService.stageAll(); this.refresh(); break;
                 case 'unstage-all': await this.gitService.unstageAll(); this.refresh(); break;
-                case 'switchBranch': await this._handleSwitchBranch(msg.branch); break;
+                case 'switchBranch': await this._handleSwitchBranch(commitMsg.branch); break;
                 case 'updateProject': await this._handleUpdateProject(); break;
                 case 'requestPush': await vscode.commands.executeCommand('idea-commit-panel.push'); break;
-                case 'openFile': await this._handleOpenFile(msg.path, msg.status); break;
+                case 'openFile': await this._handleOpenFile(commitMsg.path, commitMsg.status); break;
                 case 'getLastCommitMessage': await this._sendLastCommitMessage(); break;
-                case 'generateCommitMessage': await this._generateCommitMessage(msg.files); break;
-                case 'stash': await this._handleStash(msg.files); break;
-                case 'rollback': await this._handleRollback(msg.files); break;
+                case 'generateCommitMessage': await this._generateCommitMessage(commitMsg.files); break;
+                case 'stash': await this._handleStash(commitMsg.files); break;
+                case 'rollback': await this._handleRollback(commitMsg.files); break;
                 case 'getChangedFiles': await this._sendChangedFiles(); break;
                 case 'getStashList': await this._sendStashList(); break;
-                case 'stashApply': await this._handleApplyStash(msg.index); break;
-                case 'stashPop': await this._handlePopStash(msg.index); break;
-                case 'stashDrop': await this._handleDropStash(msg.index); break;
-                case 'getStashFiles': await this._sendStashFiles(msg.index); break;
-                case 'showStashFileDiff': await this._showStashFileDiff(msg.index, msg.filePath); break;
-                case 'showStashActions': await this._showStashActions(msg.index); break;
+                case 'stashApply': await this._handleApplyStash(commitMsg.index); break;
+                case 'stashPop': await this._handlePopStash(commitMsg.index); break;
+                case 'stashDrop': await this._handleDropStash(commitMsg.index); break;
+                case 'getStashFiles': await this._sendStashFiles(commitMsg.index); break;
+                case 'showStashFileDiff': await this._showStashFileDiff(commitMsg.index, commitMsg.filePath); break;
+                case 'showStashActions': await this._showStashActions(commitMsg.index); break;
                 case 'rollbackWithPick': await this._handleRollbackWithPick(); break;
-                case 'createChangelist': await this.changelistService.createChangelist(msg.name); this.refresh(); break;
-                case 'moveFiles': await this.changelistService.moveFiles(msg.files, msg.targetListId); this.refresh(); break;
+                case 'createChangelist': await this.changelistService.createChangelist(commitMsg.name); this.refresh(); break;
+                case 'moveFiles': await this.changelistService.moveFiles(commitMsg.files, commitMsg.targetListId); this.refresh(); break;
                 case 'deleteChangelist': {
-                    const list = this.changelistService.getChangelistById(msg.id);
+                    const list = this.changelistService.getChangelistById(commitMsg.id);
                     if (list && list.files.length > 0) {
-                        await this._handleDeleteChangelist(msg.id);
+                        await this._handleDeleteChangelist(commitMsg.id);
                     } else {
-                        await this.changelistService.removeChangelist(msg.id);
+                        await this.changelistService.removeChangelist(commitMsg.id);
                         this.refresh();
                     }
                     break;
                 }
-                case 'renameChangelist': await this.changelistService.renameChangelist(msg.id, msg.name); this.refresh(); break;
+                case 'renameChangelist': await this.changelistService.renameChangelist(commitMsg.id, commitMsg.name); this.refresh(); break;
                 case 'promptCreateChangelist': {
                     const newName = await vscode.window.showInputBox({
                         prompt: 'Enter new changelist name',
@@ -117,15 +138,15 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
                     });
                     if (newName) {
                         const newId = await this.changelistService.createChangelist(newName);
-                        if (msg.file) {
-                            await this.changelistService.moveFiles([msg.file], newId);
+                        if (commitMsg.file) {
+                            await this.changelistService.moveFiles([commitMsg.file], newId);
                         }
                         this.refresh();
                     }
                     break;
                 }
-                case 'deleteFiles': await this._handleDeleteFiles(msg.files); this.refresh(); break;
-                case 'stashChangelist': await this._handleStash(msg.files); break;
+                case 'deleteFiles': await this._handleDeleteFiles(commitMsg.files); this.refresh(); break;
+                case 'stashChangelist': await this._handleStash(commitMsg.files); break;
                 case 'fetch':
                     await this._handleFetch();
                     break;
@@ -136,21 +157,30 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
                     vscode.commands.executeCommand('idea-commit-panel.showBranchPicker');
                     break;
                 case 'openMergeEditor':
-                    await this._handleOpenMergeEditor(msg.path);
+                    await this._handleOpenMergeEditor(commitMsg.path);
                     break;
                 case 'continueRebase':
-                    this._handleContinueRebase(msg.message, msg.files);
+                    this._handleContinueRebase(commitMsg.message, commitMsg.files);
                     break;
                 case 'abortRebase':
                     await this._handleAbortRebase();
                     break;
-                case 'log': console.log('[Webview]', msg.message); break;
+                case 'log': console.log('[Webview]', commitMsg.message); break;
             }
         });
 
 
         this.refresh();
     } // Close resolveWebviewView
+
+    // Public RPC helper
+    public async callWebviewMethod<K extends keyof WebviewMethods>(method: K, params?: any): Promise<ReturnType<WebviewMethods[K]>> {
+        if (!this._rpc) {
+            throw new Error('RPC not initialized');
+        }
+        // Force cast to any to allow calling "remote" methods which are part of the union type
+        return (this._rpc as any).call(method, params);
+    }
 
     // State to track if we have already populated the rebase message for the current session
     private _lastRebaseStatus: string | undefined;

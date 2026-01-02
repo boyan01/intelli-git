@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { GitService, CommitInfo } from './GitService';
-import type { PushViewMessage, CommitFile } from '@shared/messages';
+import type { PushViewMessage, CommitFile, ExtensionMethods, WebviewMethods, PushData } from '../shared/messages';
+import { RpcPeer } from '../shared/rpc';
 import { getWebviewHtml } from './utils/webviewHtml';
 
 export class PushPanel {
@@ -8,13 +9,9 @@ export class PushPanel {
     private readonly _panel: vscode.WebviewPanel;
     private readonly _extensionUri: vscode.Uri;
     private readonly _gitService: GitService;
+    private _rpc?: RpcPeer<ExtensionMethods & WebviewMethods>;
     private _disposables: vscode.Disposable[] = [];
 
-    private _currentBranch: string = '';
-    private _remote: string = 'origin';
-    private _remoteBranch: string = '';
-    private _remotes: string[] = [];
-    private _remoteBranches: string[] = [];
     private _commits: CommitInfo[] = [];
     private _files: CommitFile[] = [];
 
@@ -29,16 +26,75 @@ export class PushPanel {
 
         this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
 
+        // Initialize RPC
+        this._rpc = new RpcPeer<ExtensionMethods & WebviewMethods>({
+            postMessage: (msg: any) => this._panel.webview.postMessage(msg)
+        });
+
+        // Register default handlers
+        this._rpc!.register('getVersion', () => '1.0.0');
+        this._rpc!.register('echo', (msg: string) => msg);
+        this._rpc!.register('getPushInitState', async () => {
+            const branches = await this._gitService.getBranches();
+            const remotes = await this._gitService.getRemotes();
+            return {
+                localBranch: branches.current,
+                remotes: remotes.length > 0 ? remotes : ['origin']
+            };
+        });
+
+        this._rpc!.register('getRemoteBranches', async (remote: string) => {
+            const allRemoteBranches = await this._gitService.getRemoteBranches();
+            // Filter branches that start with "remote/" and strip the prefix
+            const prefix = `${remote}/`;
+            return allRemoteBranches
+                .filter(b => b.startsWith(prefix) && !b.includes('HEAD'))
+                .map(b => b.substring(prefix.length));
+        });
+
+        this._rpc!.register('getPushCommits', async ({ remote, branch }) => {
+            const branches = await this._gitService.getBranches();
+            const currentBranch = branches.current;
+
+            this._commits = await this._gitService.getCommitsToPush(
+                currentBranch,
+                remote,
+                branch
+            );
+
+            let files: CommitFile[] = [];
+            if (this._commits.length > 0) {
+                files = await this._getFilesForCommit(this._commits[0].hash);
+            }
+
+            return {
+                commits: this._commits,
+                files: files
+            };
+        });
+
+        this._rpc!.register('getCommitFiles', async (hash: string) => {
+            return await this._getFilesForCommit(hash);
+        });
+        this._rpc!.register('push', async ({ force, pushTags, remote, branch }) => {
+            await this._doPush(force, pushTags, remote, branch);
+        });
+        this._rpc!.register('openDiff', async (path: string) => {
+            this._openDiff(path);
+        });
+        this._rpc!.register('cancel', async () => {
+            this.dispose();
+        });
+
+        // Legacy handler kept for safety but can be removed if frontend is fully updated
         this._panel.webview.onDidReceiveMessage(
-            async (message: PushViewMessage) => {
-                switch (message.type) {
-                    case 'ready': await this._loadData(); break;
-                    case 'push': await this._doPush(message.force, message.pushTags); break;
-                    case 'cancel': this._panel.dispose(); break;
-                    case 'selectCommit': await this._loadFilesForCommit(message.index); break;
-                    case 'openDiff': this._openDiff(message.path); break;
-                    case 'changeRemote': this._remote = message.remote; await this._refreshCommits(); break;
-                    case 'changeRemoteBranch': this._remoteBranch = message.branch; await this._refreshCommits(); break;
+            async (message: PushViewMessage | { type: string }) => {
+                // Handle RPC messages
+                if (message.type === 'rpc-request' || message.type === 'rpc-response') {
+                    this._rpc?.handleMessage(message);
+                    return;
+                } else {
+                    console.log('Received unknown message type:', message.type);
                 }
             },
             null,
@@ -83,45 +139,52 @@ export class PushPanel {
     }
 
     private async _initialize() {
-        const branches = await this._gitService.getBranches();
-        this._currentBranch = branches.current;
-        this._remoteBranch = branches.current;
-        this._remotes = await this._gitService.getRemotes();
-        this._remoteBranches = await this._gitService.getRemoteBranches();
-        
         this._panel.webview.html = this._getHtmlForWebview();
     }
 
-    private async _loadData() {
-        await this._refreshCommits();
-    }
+    private async _loadData(params?: { remote?: string; branch?: string }): Promise<PushData> {
+        const branches = await this._gitService.getBranches();
+        const currentBranch = branches.current;
 
-    private async _refreshCommits() {
-        this._commits = await this._gitService.getCommitsToPush(
-            this._currentBranch,
-            this._remote,
-            this._remoteBranch
-        );
-
-        if (this._commits.length > 0) {
-            this._files = await this._getFilesForCommit(this._commits[0].hash);
-        } else {
-            this._files = [];
+        let remote = params?.remote;
+        if (!remote) {
+            const remotes = await this._gitService.getRemotes();
+            remote = remotes.length > 0 ? remotes[0] : 'origin';
         }
 
-        this._panel.webview.postMessage({
-            type: 'update',
+        let remoteBranch = params?.branch;
+        if (!remoteBranch) {
+            remoteBranch = currentBranch;
+        }
+
+        const remotes = await this._gitService.getRemotes();
+        const remoteBranches = await this._gitService.getRemoteBranches(); // optimization: pass remote to filter
+
+        this._commits = await this._gitService.getCommitsToPush(
+            currentBranch,
+            remote,
+            remoteBranch
+        );
+
+        let files: CommitFile[] = [];
+        if (this._commits.length > 0) {
+            files = await this._getFilesForCommit(this._commits[0].hash);
+        }
+
+        return {
             commits: this._commits,
-            files: this._files,
+            files: files,
             config: {
-                currentBranch: this._currentBranch,
-                remote: this._remote,
-                remoteBranch: this._remoteBranch,
-                remotes: this._remotes,
-                remoteBranches: this._remoteBranches
+                currentBranch: currentBranch,
+                remote: remote,
+                remoteBranch: remoteBranch,
+                remotes: remotes,
+                remoteBranches: remoteBranches
             }
-        });
+        };
     }
+
+    // _refreshCommits removed as logic is now in _loadData
 
     private async _loadFilesForCommit(index: number) {
         if (index >= 0 && index < this._commits.length) {
@@ -141,21 +204,24 @@ export class PushPanel {
         }
     }
 
-    private async _doPush(force: boolean, pushTags: boolean) {
+    private async _doPush(force: boolean, pushTags: boolean, remote: string, branch: string) {
         try {
+            const branches = await this._gitService.getBranches();
+            const currentBranch = branches.current;
+
             if (force) {
-                await this._gitService.forcePush(this._remote, `${this._currentBranch}:${this._remoteBranch}`);
+                await this._gitService.forcePush(remote, `${currentBranch}:${branch}`);
             } else {
-                await this._gitService.push(this._remote, `${this._currentBranch}:${this._remoteBranch}`);
+                await this._gitService.push(remote, `${currentBranch}:${branch}`);
             }
-            
+
             if (pushTags) {
-                await this._gitService.pushTags(this._remote);
+                await this._gitService.pushTags(remote);
             }
 
             this._panel.webview.postMessage({ type: 'pushComplete' });
             vscode.window.showInformationMessage(
-                `Successfully pushed to ${this._remote}/${this._remoteBranch}`
+                `Successfully pushed to ${remote}/${branch}`
             );
             this.dispose();
         } catch (e) {

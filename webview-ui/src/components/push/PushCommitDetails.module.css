@@ -1,0 +1,105 @@
+.filesPanel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    border-left: 1px solid var(--vscode-panel-border);
+    min-width: 0;
+}
+
+.filesViewContainer {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.filesToolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 8px;
+    border-bottom: 1px solid var(--vscode-panel-border);
+    flex-shrink: 0;
+}
+
+.filesCount {
+    font-size: 11px;
+    color: var(--vscode-descriptionForeground);
+}
+
+.filesTreeWrapper {
+    flex: 1;
+    overflow-y: auto;
+}
+
+.commitDetailsPane {
+    flex: 0 0 auto;
+    max-height: 40%;
+    border-top: 1px solid var(--vscode-panel-border);
+    display: flex;
+    flex-direction: column;
+}
+
+
+.detailsContent {
+    padding: 12px;
+    overflow-y: auto;
+}
+
+.detailMessage {
+    white-space: pre-wrap;
+    font-family: var(--vscode-editor-font-family);
+    font-size: 13px;
+    line-height: 1.4;
+    margin-bottom: 8px;
+    font-weight: 600;
+}
+
+.detailMeta {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 12px;
+    color: var(--vscode-descriptionForeground);
+}
+
+.metaRow {
+    line-height: 1.5;
+    word-break: break-word;
+}
+
+.emailLink {
+    color: var(--vscode-textLink-foreground);
+    text-decoration: none;
+}
+
+.emailLink:hover {
+    text-decoration: underline;
+}
+
+.metaHash {
+    font-family: var(--vscode-editor-font-family);
+    opacity: 0.8;
+    font-size: 11px;
+}
+
+.loadingSpinner {
+    width: 24px;
+    height: 24px;
+    border: 2px solid var(--vscode-progressBar-background);
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    display: block;
+    margin: 20px auto;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
