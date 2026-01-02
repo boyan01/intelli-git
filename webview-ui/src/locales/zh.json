@@ -21,6 +21,7 @@
       "expandAll": "全部展开",
       "collapseAll": "全部收起",
       "viewMode": "视图选项",
+      "toggleDetails": "显示/隐藏详情",
       "fetch": "获取(Fetch)",
       "incomingCommits": "{{count}} 个传入提交\n点击更新项目"
     },

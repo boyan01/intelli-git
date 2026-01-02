@@ -101,7 +101,12 @@ interface ContextMenuState {
     items: ContextMenuItem[];
 }
 
-export const ChangelistTree: React.FC<ChangelistTreeProps> = ({
+export interface ChangelistTreeRef {
+    expandAll: () => void;
+    collapseAll: () => void;
+}
+
+export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTreeProps>(({
     group,
     viewMode,
     selectedFiles,
@@ -114,7 +119,7 @@ export const ChangelistTree: React.FC<ChangelistTreeProps> = ({
     onStash,
     onDelete,
     onMoveToChangelist
-}) => {
+}, ref) => {
     const [contextMenu, setContextMenu] = useState<ContextMenuState>({
         visible: false,
         x: 0,
@@ -126,19 +131,43 @@ export const ChangelistTree: React.FC<ChangelistTreeProps> = ({
         [group.items, viewMode]
     );
 
-    const [expandedPaths, setExpandedPaths] = useState<Set<string>>(() => {
-        const allPaths = new Set<string>();
-        const traverse = (nodes: TreeNode[]) => {
-            nodes.forEach(node => {
+    const getAllFolderPaths = useCallback((nodes: TreeNode[]): Set<string> => {
+        const paths = new Set<string>();
+        const traverse = (currentNodes: TreeNode[]) => {
+            currentNodes.forEach(node => {
                 if (!node.isFile) {
-                    allPaths.add(node.path);
+                    paths.add(node.path);
                     if (node.children) traverse(node.children);
                 }
             });
         };
-        traverse(tree);
-        return allPaths;
-    });
+        traverse(nodes);
+        return paths;
+    }, []);
+
+    const [expandedPaths, setExpandedPaths] = useState<Set<string>>(() =>
+        getAllFolderPaths(tree)
+    );
+
+    React.useImperativeHandle(ref, () => ({
+        expandAll: () => {
+            setExpandedPaths(getAllFolderPaths(tree));
+        },
+        collapseAll: () => {
+            setExpandedPaths(new Set());
+        }
+    }));
+
+    // Update expanded paths when tree structure changes (e.g. viewMode change or data update)
+    // to maintain "expanded by default" behavior if desired, or persist/reset.
+    // For now we keep existing behavior: initialize state only on mount, but let's
+    // check if we should re-expand on tree change. 
+    // The previous code only initialized state. 
+    // If 'tree' changes, 'expandedPaths' state is NOT reset automatically with useState initializer.
+    // However, if viewMode changes, tree changes. We probably want to expand all by default on viewMode change?
+    // Let's stick to the previous behavior for initializing, but since 'tree' is a dependency for 'getAllFolderPaths' (implicitly via useMemo of tree), 
+    // maybe we should ensure consistency.
+    // Actually, let's keep it simple. The ref methods allow manual control.
 
     const toggleFolder = useCallback((path: string) => {
         setExpandedPaths(prev => {
@@ -396,4 +425,4 @@ export const ChangelistTree: React.FC<ChangelistTreeProps> = ({
             )}
         </>
     );
-};
+});

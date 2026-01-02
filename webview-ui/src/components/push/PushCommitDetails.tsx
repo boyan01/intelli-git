@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { CommitInfo, CommitFile, FileStatus } from '@shared/messages';
 import { rpc } from '@/lib/rpc_client';
-import { SimpleFileTree } from '../file-tree/SimpleFileTree';
+import { ChangelistTree } from '../file-tree/ChangelistTree';
+import type { ChangelistTreeRef } from '../file-tree/ChangelistTree';
 import { useTranslation } from 'react-i18next';
 import styles from './PushCommitDetails.module.css';
 
@@ -13,6 +14,9 @@ export interface PushCommitDetailsProps {
 export function PushCommitDetails({ commit }: PushCommitDetailsProps) {
     const { t } = useTranslation();
     const [files, setFiles] = useState<CommitFile[]>([]);
+    const [viewMode, setViewMode] = useState<'tree' | 'list'>('tree');
+    const [showDetails, setShowDetails] = useState(true);
+    const treeRef = useRef<ChangelistTreeRef>(null);
 
     useEffect(() => {
         const fetchFiles = async () => {
@@ -38,6 +42,13 @@ export function PushCommitDetails({ commit }: PushCommitDetailsProps) {
         staged: true
     }));
 
+    const changelistGroup = {
+        id: 'commit-files',
+        name: t('pushView.files', { count: files.length }),
+        items: fileStatusList,
+        isDefault: false
+    };
+
     return (
         <div className={styles.filesPanel}>
             {/* Top: File List */}
@@ -48,19 +59,54 @@ export function PushCommitDetails({ commit }: PushCommitDetailsProps) {
                             {t('pushView.files', { count: files.length })}
                         </span>
                     </div>
+                    <div className={styles.toolbarActions}>
+                        <button
+                            className={`${styles.iconBtn} ${viewMode === 'list' ? styles.active : ''}`}
+                            title={t('toolbar.viewMode')}
+                            onClick={() => setViewMode(v => v === 'tree' ? 'list' : 'tree')}
+                        >
+                            <i className={`codicon codicon-${viewMode === 'tree' ? 'list-tree' : 'list-flat'}`} />
+                        </button>
+                        <button
+                            className={`${styles.iconBtn} ${showDetails ? styles.active : ''}`}
+                            title={t('toolbar.toggleDetails')}
+                            onClick={() => setShowDetails(prev => !prev)}
+                        >
+                            <i className={`codicon codicon-${showDetails ? 'layout-panel' : 'layout-panel-off'}`} />
+                        </button>
+                        <button
+                            className={styles.iconBtn}
+                            title={t('toolbar.expandAll')}
+                            onClick={() => treeRef.current?.expandAll()}
+                        >
+                            <i className="codicon codicon-expand-all" />
+                        </button>
+                        <button
+                            className={styles.iconBtn}
+                            title={t('toolbar.collapseAll')}
+                            onClick={() => treeRef.current?.collapseAll()}
+                        >
+                            <i className="codicon codicon-collapse-all" />
+                        </button>
+                    </div>
                 </div>
                 <div className={styles.filesTreeWrapper}>
-                    <SimpleFileTree
-                        files={fileStatusList}
-                        viewMode="tree"
-                        onFileClick={(file) => rpc.call('openDiff', file.path)}
+                    <ChangelistTree
+                        ref={treeRef}
+                        group={changelistGroup}
+                        viewMode={viewMode}
+                        selectedFiles={new Set()}
+                        isCollapsed={false}
+                        onToggleFile={() => { }}
+                        onToggleCollapse={() => { }}
+                        readonly={true}
                     />
                 </div>
             </div>
 
             {/* Bottom: Commit Details */}
             {
-                commit && (
+                commit && showDetails && (
 
                     <div className={styles.commitDetailsPane}>
                         <div className={styles.detailsContent}>

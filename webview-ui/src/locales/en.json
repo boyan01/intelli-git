@@ -21,6 +21,7 @@
       "expandAll": "Expand All",
       "collapseAll": "Collapse All",
       "viewMode": "View Mode",
+      "toggleDetails": "Toggle Details",
       "fetch": "Fetch",
       "incomingCommits": "{{count}} Incoming Commits\nClick to Update Project"
     },
