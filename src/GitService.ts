@@ -652,4 +652,13 @@ export class GitService {
     public async pushTags(remote: string): Promise<void> {
         await this.git.pushTags(remote);
     }
+
+    public async renameBranch(oldName: string, newName: string): Promise<void> {
+        await this.git.branch(['-m', oldName, newName]);
+    }
+
+    public async deleteBranches(branches: string[], force: boolean = false): Promise<void> {
+        const args = force ? ['-D'] : ['-d'];
+        await this.git.branch([...args, ...branches]);
+    }
 }

@@ -13,6 +13,7 @@
   "activationEvents": [
     "onStartupFinished"
   ],
+  "l10n": "./l10n",
   "main": "./out/src/extension.js",
   "contributes": {
     "viewsContainers": {
