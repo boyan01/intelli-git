@@ -241,6 +241,7 @@ export function CommitsPanel({
                     <div
                         key={commit.hash}
                         className={`${styles.commitItem} ${selectedCommitHashes.includes(commit.hash) ? styles.selected : ''}`}
+                        data-vscode-context={JSON.stringify({ webviewSection: 'commitItem', hash: commit.hash })}
                         onClick={(e) => handleCommitClick(e, commit.hash)}
                     >
                         <div className={styles.commitMessage} title={commit.subject}>{commit.subject}</div>

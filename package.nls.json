@@ -8,5 +8,6 @@
   "idea-commit-panel.commands.refresh.title": "Refresh",
   "idea-commit-panel.commands.push.title": "Push...",
   "idea-commit-panel.commands.showBranchPicker.title": "IDEA: Switch Branch",
-  "idea-commit-panel.commands.focusCommitView.title": "IDEA: Focus Commit View"
+  "idea-commit-panel.commands.focusCommitView.title": "IDEA: Focus Commit View",
+  "idea-commit-panel.commands.copyCommitHash.title": "Copy Commit Hash"
 }

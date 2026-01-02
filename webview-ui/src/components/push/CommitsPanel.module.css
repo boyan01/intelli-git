@@ -175,6 +175,7 @@
 .commitItem {
     padding: 4px 20px;
     cursor: pointer;
+    user-select: none;
     display: flex;
     align-items: center;
     gap: 8px;

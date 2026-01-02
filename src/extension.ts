@@ -73,6 +73,14 @@ export function activate(context: vscode.ExtensionContext) {
         })
     );
 
+    context.subscriptions.push(
+        vscode.commands.registerCommand('idea-commit-panel.copyCommitHash', async (args: any) => {
+            if (args && args.hash) {
+                await vscode.env.clipboard.writeText(args.hash);
+            }
+        })
+    );
+
     context.subscriptions.push(branchStatusBar);
 
     // Watch for file changes

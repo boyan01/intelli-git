@@ -8,5 +8,6 @@
   "idea-commit-panel.commands.refresh.title": "刷新",
   "idea-commit-panel.commands.push.title": "推送...",
   "idea-commit-panel.commands.showBranchPicker.title": "IDEA: 切换分支",
-  "idea-commit-panel.commands.focusCommitView.title": "IDEA: 聚焦提交视图"
+  "idea-commit-panel.commands.focusCommitView.title": "IDEA: 聚焦提交视图",
+  "idea-commit-panel.commands.copyCommitHash.title": "复制提交哈希"
 }

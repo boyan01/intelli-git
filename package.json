@@ -63,6 +63,10 @@
       {
         "command": "idea-commit-panel.focusCommitView",
         "title": "%idea-commit-panel.commands.focusCommitView.title%"
+      },
+      {
+        "command": "idea-commit-panel.copyCommitHash",
+        "title": "%idea-commit-panel.commands.copyCommitHash.title%"
       }
     ],
     "menus": {
@@ -71,6 +75,13 @@
           "command": "idea-commit-panel.showBranchPicker",
           "when": "viewItem == branchStatusBar",
           "group": "inline"
+        }
+      ],
+      "webview/context": [
+        {
+          "command": "idea-commit-panel.copyCommitHash",
+          "when": "webviewSection == 'commitItem'",
+          "group": "1_cutcopypaste"
         }
       ]
     }
