@@ -480,26 +480,52 @@ export class GitService {
     ): Promise<CommitInfo[]> {
         try {
             const hasRemoteBranch = await this._remoteBranchExists(remote, remoteBranch);
-            if (!hasRemoteBranch) {
-                return this._getRecentCommits(5);
+
+            if (hasRemoteBranch) {
+                const log = await this.git.log({
+                    from: `${remote}/${remoteBranch}`,
+                    to: localBranch
+                });
+
+                return log.all.map(commit => ({
+                    hash: commit.hash,
+                    shortHash: commit.hash.substring(0, 8),
+                    subject: commit.message,
+                    authorName: commit.author_name,
+                    date: commit.date,
+                    email: commit.author_email,
+                    fullHash: commit.hash
+                }));
+            } else {
+                // New remote branch: get commits not reachable from any remote
+                return this._getCommitsNotInRemote(localBranch, 20);
             }
-
-            const log = await this.git.log({
-                from: `${remote}/${remoteBranch}`,
-                to: localBranch
-            });
-
-            return log.all.map(commit => ({
-                hash: commit.hash,
-                shortHash: commit.hash.substring(0, 8),
-                subject: commit.message,
-                authorName: commit.author_name,
-                date: commit.date,
-                email: commit.author_email,
-                fullHash: commit.hash
-            }));
         } catch (e) {
             console.error('Error getting commits to push:', e);
+            return [];
+        }
+    }
+
+    private async _getCommitsNotInRemote(branch: string, maxCount: number): Promise<CommitInfo[]> {
+        try {
+            const result = await this.git.raw([
+                'log',
+                branch,
+                '--not',
+                '--remotes',
+                `--max-count=${maxCount}`,
+                '--format=%H|%h|%s|%an|%aI|%ae'
+            ]);
+
+            if (!result.trim()) {
+                return [];
+            }
+
+            return result.trim().split('\n').map(line => {
+                const [hash, shortHash, subject, authorName, date, email] = line.split('|');
+                return { hash, shortHash, subject, authorName, date, email, fullHash: hash };
+            });
+        } catch {
             return [];
         }
     }
