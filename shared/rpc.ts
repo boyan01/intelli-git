@@ -23,22 +23,50 @@ interface PendingRequest {
     reject: (reason: any) => void;
 }
 
-export type RpcSchema = any; // Allow interfaces to be used as schema
+export type RpcSchema = { [key: string]: (...args: any[]) => any };
 
-export class RpcPeer<T extends RpcSchema = any> {
+/**
+ * Bidirectional RPC peer.
+ * @template TRemote - Methods that can be called on the remote side
+ * @template TLocal - Methods that can be registered locally
+ */
+export class RpcPeer<TRemote = any, TLocal = any> {
     private pendingRequests = new Map<string, PendingRequest>();
     private handlers = new Map<string, (params: any) => Promise<any> | any>();
     private postMessageTarget: PostMessageImpl;
+    private _proxy: TRemote | null = null;
 
     constructor(postMessageTarget: PostMessageImpl) {
         this.postMessageTarget = postMessageTarget;
     }
 
     /**
+     * Get a proxy object for direct remote method calls.
+     */
+    public get proxy(): TRemote {
+        if (!this._proxy) {
+            this._proxy = new Proxy({}, {
+                get: (_target, prop: string) => {
+                    return (...args: any[]) => this.call(prop as any, ...args as any);
+                }
+            }) as TRemote;
+        }
+        return this._proxy!;
+    }
+
+    /**
      * Call a remote method.
      */
-    public call<K extends keyof T & string>(method: K, params?: T[K] extends (...args: infer P) => any ? P[0] : never): Promise<T[K] extends (...args: any) => infer R ? Awaited<R> : never> {
+    public call<K extends keyof TRemote & string>(
+        method: K,
+        ...args: TRemote[K] extends () => any
+            ? []
+            : TRemote[K] extends (arg: infer P) => any
+            ? [params: P]
+            : never
+    ): Promise<TRemote[K] extends (...args: any) => infer R ? Awaited<R> : never> {
         const id = Math.random().toString(36).substring(7);
+        const params = args[0];
 
         return new Promise((resolve, reject) => {
             this.pendingRequests.set(id, { resolve, reject });
@@ -50,7 +78,6 @@ export class RpcPeer<T extends RpcSchema = any> {
                 params
             });
 
-            // Optional: Timeout
             setTimeout(() => {
                 if (this.pendingRequests.has(id)) {
                     this.pendingRequests.delete(id);
@@ -63,8 +90,19 @@ export class RpcPeer<T extends RpcSchema = any> {
     /**
      * Register a local method implementation.
      */
-    public register<K extends keyof T & string>(method: K, handler: T[K]) {
+    public register<K extends keyof TLocal & string>(method: K, handler: TLocal[K]) {
         this.handlers.set(method, handler as any);
+    }
+
+    /**
+     * Register multiple local method implementations at once.
+     */
+    public registerAll(handlers: Partial<TLocal>) {
+        for (const [method, handler] of Object.entries(handlers)) {
+            if (handler) {
+                this.handlers.set(method, handler as any);
+            }
+        }
     }
 
     /**

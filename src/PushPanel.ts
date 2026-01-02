@@ -9,7 +9,7 @@ export class PushPanel {
     private readonly _panel: vscode.WebviewPanel;
     private readonly _extensionUri: vscode.Uri;
     private readonly _gitService: GitService;
-    private _rpc?: RpcPeer<ExtensionMethods & WebviewMethods>;
+    private _rpc?: RpcPeer<WebviewMethods, ExtensionMethods>;
     private _disposables: vscode.Disposable[] = [];
 
     private _commits: CommitInfo[] = [];
@@ -26,67 +26,65 @@ export class PushPanel {
 
         this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
 
-        // Initialize RPC
-        this._rpc = new RpcPeer<ExtensionMethods & WebviewMethods>({
+        // Initialize RPC: call WebviewMethods, register ExtensionMethods
+        this._rpc = new RpcPeer<WebviewMethods, ExtensionMethods>({
             postMessage: (msg: any) => this._panel.webview.postMessage(msg)
         });
 
-        // Register default handlers
-        this._rpc!.register('getVersion', () => '1.0.0');
-        this._rpc!.register('echo', (msg: string) => msg);
-        this._rpc!.register('getPushInitState', async () => {
-            const branches = await this._gitService.getBranches();
-            const remotes = await this._gitService.getRemotes();
-            return {
-                localBranch: branches.current,
-                remotes: remotes.length > 0 ? remotes : ['origin']
-            };
-        });
+        // Register handlers
+        this._rpc!.registerAll({
+            getVersion: () => '1.0.0',
+            echo: (msg: string) => msg,
+            getPushInitState: async () => {
+                const branches = await this._gitService.getBranches();
+                const remotes = await this._gitService.getRemotes();
+                return {
+                    localBranch: branches.current,
+                    remotes: remotes.length > 0 ? remotes : ['origin']
+                };
+            },
+            getRemoteBranches: async (remote: string) => {
+                const allRemoteBranches = await this._gitService.getRemoteBranches();
+                const prefix = `${remote}/`;
+                return allRemoteBranches
+                    .filter(b => b.startsWith(prefix) && !b.includes('HEAD'))
+                    .map(b => b.substring(prefix.length));
+            },
+            getPushCommits: async ({ remote, branch }: { remote: string; branch: string }) => {
+                const branches = await this._gitService.getBranches();
+                const currentBranch = branches.current;
 
-        this._rpc!.register('getRemoteBranches', async (remote: string) => {
-            const allRemoteBranches = await this._gitService.getRemoteBranches();
-            // Filter branches that start with "remote/" and strip the prefix
-            const prefix = `${remote}/`;
-            return allRemoteBranches
-                .filter(b => b.startsWith(prefix) && !b.includes('HEAD'))
-                .map(b => b.substring(prefix.length));
-        });
+                this._commits = await this._gitService.getCommitsToPush(
+                    currentBranch,
+                    remote,
+                    branch
+                );
 
-        this._rpc!.register('getPushCommits', async ({ remote, branch }) => {
-            const branches = await this._gitService.getBranches();
-            const currentBranch = branches.current;
+                let files: CommitFile[] = [];
+                if (this._commits.length > 0) {
+                    files = await this._getFilesForCommit(this._commits[0].hash);
+                }
 
-            this._commits = await this._gitService.getCommitsToPush(
-                currentBranch,
-                remote,
-                branch
-            );
-
-            let files: CommitFile[] = [];
-            if (this._commits.length > 0) {
-                files = await this._getFilesForCommit(this._commits[0].hash);
+                return {
+                    commits: this._commits,
+                    files: files
+                };
+            },
+            getCommitFiles: async (hash: string) => {
+                return await this._getFilesForCommit(hash);
+            },
+            getMultiCommitFiles: async (hashes: string[]) => {
+                return await this._getFilesForMultiCommits(hashes);
+            },
+            push: async ({ force, pushTags, remote, branch }: { force: boolean; pushTags: boolean; remote: string; branch: string }) => {
+                await this._doPush(force, pushTags, remote, branch);
+            },
+            openDiff: async (path: string) => {
+                this._openDiff(path);
+            },
+            cancel: async () => {
+                this.dispose();
             }
-
-            return {
-                commits: this._commits,
-                files: files
-            };
-        });
-
-        this._rpc!.register('getCommitFiles', async (hash: string) => {
-            return await this._getFilesForCommit(hash);
-        });
-        this._rpc!.register('getMultiCommitFiles', async (hashes: string[]) => {
-            return await this._getFilesForMultiCommits(hashes);
-        });
-        this._rpc!.register('push', async ({ force, pushTags, remote, branch }) => {
-            await this._doPush(force, pushTags, remote, branch);
-        });
-        this._rpc!.register('openDiff', async (path: string) => {
-            this._openDiff(path);
-        });
-        this._rpc!.register('cancel', async () => {
-            this.dispose();
         });
 
         // Legacy handler kept for safety but can be removed if frontend is fully updated

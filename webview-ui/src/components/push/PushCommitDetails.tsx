@@ -27,7 +27,7 @@ export function PushCommitDetails({ selectedHashes, commit }: PushCommitDetailsP
                 return;
             }
             try {
-                const fetchedFiles = await rpc.call('getMultiCommitFiles', selectedHashes);
+                const fetchedFiles = await rpc.getMultiCommitFiles(selectedHashes);
                 setFiles(fetchedFiles);
             } catch (error) {
                 console.error('Failed to fetch commit files:', error);

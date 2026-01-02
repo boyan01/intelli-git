@@ -27,7 +27,7 @@ export function PushView() {
     useEffect(() => {
         const loadInitData = async () => {
             try {
-                const data = await rpc.call('getPushInitState');
+                const data = await rpc.getPushInitState();
                 setLocalBranch(data.localBranch);
                 setRemotes(data.remotes);
 
@@ -50,7 +50,7 @@ export function PushView() {
 
         const loadRemoteBranches = async () => {
             try {
-                const branches = await rpc.call('getRemoteBranches', selectedRemote);
+                const branches = await rpc.getRemoteBranches(selectedRemote);
                 setRemoteBranches(branches);
 
                 // Auto-select branch logic
@@ -75,7 +75,7 @@ export function PushView() {
 
         const loadCommits = async () => {
             try {
-                const data = await rpc.call('getPushCommits', {
+                const data = await rpc.getPushCommits({
                     remote: selectedRemote,
                     branch: selectedRemoteBranch
                 });
@@ -92,14 +92,14 @@ export function PushView() {
     const handlePush = async (force: boolean) => {
         setIsPushing(true);
         try {
-            await rpc.call('push', {
+            await rpc.push({
                 force,
                 pushTags,
                 remote: selectedRemote,
                 branch: selectedRemoteBranch
             });
             // Refresh logic: just re-fetch commits for current selection
-            const data = await rpc.call('getPushCommits', {
+            const data = await rpc.getPushCommits({
                 remote: selectedRemote,
                 branch: selectedRemoteBranch
             });
@@ -116,7 +116,7 @@ export function PushView() {
     };
 
     const handleCancel = () => {
-        rpc.call('cancel');
+        rpc.cancel();
     };
 
     if (isLoading) {
