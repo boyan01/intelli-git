@@ -148,6 +148,7 @@
     justify-content: center;
     flex-shrink: 0;
     overflow: hidden;
+    margin-right: 4px;
 }
 
 .fileIconSvg svg {
