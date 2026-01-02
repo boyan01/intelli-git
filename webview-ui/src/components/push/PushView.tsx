@@ -99,25 +99,11 @@ export function PushView() {
                 remote: selectedRemote,
                 branch: selectedRemoteBranch
             });
-            // Refresh logic: just re-fetch commits for current selection
-            const data = await rpc.getPushCommits({
-                remote: selectedRemote,
-                branch: selectedRemoteBranch
-            });
-            setCommits(data.commits);
-            setIsPushing(false);
+            await rpc.closeWebView()
         } catch (e) {
             console.error('Push failed', e);
             setIsPushing(false);
         }
-    };
-
-    const handleSelectCommits = (hashes: string[]) => {
-        setSelectedCommitHashes(hashes);
-    };
-
-    const handleCancel = () => {
-        rpc.cancel();
     };
 
     if (isLoading) {
@@ -126,12 +112,6 @@ export function PushView() {
 
     return (
         <div className={styles.pushPanel}>
-            <div className={styles.pushHeader}>
-                <h2>{t('pushView.title')}</h2>
-                <button className={styles.headerCloseBtn} onClick={handleCancel} title={t('pushView.close')}>
-                    <i className="codicon codicon-close"></i>
-                </button>
-            </div>
 
             <SplitPane
                 direction="horizontal"
@@ -147,7 +127,7 @@ export function PushView() {
                         remotes={remotes}
                         remoteBranches={remoteBranches}
                         selectedCommitHashes={selectedCommitHashes}
-                        onSelectCommits={handleSelectCommits}
+                        onSelectCommits={setSelectedCommitHashes}
                         onRemoteChange={setSelectedRemote}
                         onRemoteBranchChange={setSelectedRemoteBranch}
                     />
@@ -175,7 +155,7 @@ export function PushView() {
                     </div>
                 </div>
                 <div className={styles.footerRight}>
-                    <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={handleCancel}>{t('pushView.cancel')}</button>
+                    <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={() => rpc.closeWebView()}>{t('pushView.cancel')}</button>
                     <div className={styles.btnSplit} style={{ position: 'relative' }}>
                         <button className={`${styles.btn} ${styles.btnPrimary} ${styles.btnMain}`} onClick={() => handlePush(false)}>{t('pushView.push')}</button>
                         <button

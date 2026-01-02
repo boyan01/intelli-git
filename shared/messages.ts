@@ -182,7 +182,7 @@ export interface ExtensionMethods {
     getMultiCommitFiles: (hashes: string[]) => Promise<CommitFile[]>;
     push: (params: { force: boolean; pushTags: boolean; remote: string; branch: string }) => Promise<void>;
     openDiff: (path: string) => Promise<void>;
-    cancel: () => Promise<void>;
+    closeWebView: () => Promise<void>;
     openCommitDiff: (params: { path: string; leftRef: string; rightRef: string }) => Promise<void>;
     // Add other extension methods here
 }

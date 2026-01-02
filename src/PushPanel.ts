@@ -12,6 +12,7 @@ export class PushPanel {
     private readonly _gitService: GitService;
     private _rpc?: RpcPeer<WebviewMethods, ExtensionMethods>;
     private _disposables: vscode.Disposable[] = [];
+    private _disposed: boolean = false;
 
     private _commits: CommitInfo[] = [];
     private _files: CommitFile[] = [];
@@ -29,7 +30,19 @@ export class PushPanel {
 
         // Initialize RPC: call WebviewMethods, register ExtensionMethods
         this._rpc = new RpcPeer<WebviewMethods, ExtensionMethods>({
-            postMessage: (msg: any) => this._panel.webview.postMessage(msg)
+            postMessage: (msg: any) => {
+                if (this._disposed) {
+                    return;
+                }
+                try {
+                    this._panel.webview.postMessage(msg);
+                } catch (error) {
+                    // Ignore errors when webview is disposed
+                    if (!this._disposed) {
+                        console.error('Failed to post message to webview:', error);
+                    }
+                }
+            }
         });
 
         // Register handlers
@@ -83,7 +96,8 @@ export class PushPanel {
             openDiff: async (path: string) => {
                 this._openDiff(path);
             },
-            cancel: async () => {
+            closeWebView: async () => {
+                this._disposed = true;
                 this.dispose();
             },
             openCommitDiff: async ({ path, leftRef, rightRef }: { path: string; leftRef: string; rightRef: string }) => {
@@ -133,6 +147,7 @@ export class PushPanel {
     }
 
     public dispose() {
+        this._disposed = true;
         PushPanel.currentPanel = undefined;
         this._panel.dispose();
         while (this._disposables.length) {

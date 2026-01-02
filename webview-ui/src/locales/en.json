@@ -60,7 +60,6 @@
     }
   },
   "pushView": {
-    "title": "Push commits",
     "close": "Close",
     "files": "{{count}} files",
     "pushTags": "Push tags",

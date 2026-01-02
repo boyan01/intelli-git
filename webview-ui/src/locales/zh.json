@@ -60,7 +60,6 @@
     }
   },
   "pushView": {
-    "title": "推送提交",
     "close": "关闭",
     "files": "{{count}} 个文件",
     "pushTags": "推送标签",

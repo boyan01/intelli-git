@@ -5,32 +5,6 @@
     background: var(--vscode-sideBar-background);
 }
 
-.pushHeader {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0 16px;
-    height: 35px;
-    background: var(--vscode-sideBarSectionHeader-background);
-    border-bottom: 1px solid var(--vscode-panel-border);
-}
-
-.pushHeader h2 {
-    margin: 0;
-    font-size: 11px;
-    font-weight: bold;
-    text-transform: uppercase;
-    color: var(--vscode-sideBarSectionHeader-foreground);
-}
-
-.headerCloseBtn {
-    background: transparent;
-    border: none;
-    color: var(--vscode-foreground);
-    cursor: pointer;
-    padding: 4px;
-}
-
 .pushMain {
     display: flex;
     flex: 1;
