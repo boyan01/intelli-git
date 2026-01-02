@@ -1,5 +1,4 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
-import type { CommitViewState } from '@shared/messages';
 import { ChangelistTree } from '../file-tree/ChangelistTree';
 import { CommitForm } from './CommitForm';
 import { RebaseForm } from './RebaseForm';
@@ -8,47 +7,23 @@ import { StashList } from '../stash/StashList';
 import { useVSCode } from '../../hooks/useVSCode';
 import { vscode } from '../../lib/vscode';
 import { useTranslation } from 'react-i18next';
+import { usePersistedState } from '../../hooks/usePersistedState';
 import styles from './CommitView.module.css';
 
 export function CommitView() {
     const { t } = useTranslation();
     const { changelists, stashList, activeFile, branches, incomingCommits } = useVSCode();
-    const [activeTab, setActiveTab] = useState<'commit' | 'stash'>('commit');
 
-    // UI State
-    const [viewMode, setViewMode] = useState<'tree' | 'list'>('tree');
-    const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
-    const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+    // Persisted UI State
+    const [activeTab, setActiveTab] = usePersistedState('commit.activeTab');
+    const [viewMode, setViewMode] = usePersistedState('commit.viewMode');
+    const [selectedFiles, setSelectedFiles] = usePersistedState('commit.selectedFiles');
+    const [collapsedGroups, setCollapsedGroups] = usePersistedState('commit.collapsedGroups');
+    const [commitMessage, setCommitMessage] = usePersistedState('commit.message');
+    const [amend, setAmend] = usePersistedState('commit.amend');
 
-    // Commit State
-    const [commitMessage, setCommitMessage] = useState('');
-    const [amend, setAmend] = useState(false);
+    // Non-persisted state
     const [isGenerating, setIsGenerating] = useState(false);
-
-    // Initialize state from VSCode storage
-    useEffect(() => {
-        const savedState = vscode.getState<CommitViewState>();
-        if (savedState) {
-            if (savedState.viewMode) setViewMode(savedState.viewMode);
-            if (savedState.activeTab) setActiveTab(savedState.activeTab);
-            if (savedState.commitMessage) setCommitMessage(savedState.commitMessage);
-            if (savedState.amend) setAmend(savedState.amend);
-            if (savedState.selectedFiles) setSelectedFiles(new Set(savedState.selectedFiles));
-            if (savedState.collapsedGroups) setCollapsedGroups(new Set(savedState.collapsedGroups));
-        }
-    }, []);
-
-    // Persist state changes
-    useEffect(() => {
-        vscode.setState<CommitViewState>({
-            viewMode,
-            activeTab,
-            commitMessage,
-            amend,
-            selectedFiles: Array.from(selectedFiles),
-            collapsedGroups: Array.from(collapsedGroups)
-        });
-    }, [viewMode, activeTab, commitMessage, amend, selectedFiles, collapsedGroups]);
 
     const toggleFile = useCallback((path: string, checked: boolean) => {
         setSelectedFiles(prev => {
