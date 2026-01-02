@@ -6,6 +6,10 @@ export interface SplitPaneProps {
     first: ReactNode;
     second: ReactNode;
     defaultSize?: number;
+    /** Default size for second pane, will calculate first pane size from container */
+    secondDefaultSize?: number;
+    /** 0-1 ratio, takes precedence over defaultSize */
+    defaultRatio?: number;
     minSize?: number;
     maxSize?: number;
     className?: string;
@@ -16,20 +20,38 @@ export function SplitPane({
     first,
     second,
     defaultSize = 200,
+    secondDefaultSize,
+    defaultRatio,
     minSize = 50,
     maxSize,
     className = ''
 }: SplitPaneProps) {
     const containerRef = useRef<HTMLDivElement>(null);
-    const [size, setSize] = useState(defaultSize);
+    const needsCalculation = defaultRatio !== undefined || secondDefaultSize !== undefined;
+    const [size, setSize] = useState<number | null>(needsCalculation ? null : defaultSize);
     const isDragging = useRef(false);
     const startPos = useRef(0);
     const startSize = useRef(0);
 
+    useEffect(() => {
+        if (size === null && containerRef.current) {
+            const containerSize = direction === 'horizontal'
+                ? containerRef.current.clientWidth
+                : containerRef.current.clientHeight;
+
+            if (defaultRatio !== undefined) {
+                setSize(Math.round(containerSize * defaultRatio));
+            } else if (secondDefaultSize !== undefined) {
+                // Subtract resizer width (4px) and second pane size from container
+                setSize(Math.max(minSize, containerSize - secondDefaultSize - 4));
+            }
+        }
+    }, [defaultRatio, secondDefaultSize, direction, size, minSize]);
+
     const handleMouseDown = useCallback((e: React.MouseEvent) => {
         isDragging.current = true;
         startPos.current = direction === 'horizontal' ? e.clientX : e.clientY;
-        startSize.current = size;
+        startSize.current = size ?? 0;
         document.body.style.cursor = direction === 'horizontal' ? 'col-resize' : 'row-resize';
         document.body.style.userSelect = 'none';
     }, [size, direction]);
@@ -72,7 +94,10 @@ export function SplitPane({
         >
             <div
                 className={styles.pane}
-                style={isHorizontal ? { width: size } : { height: size }}
+                style={size !== null
+                    ? (isHorizontal ? { width: size } : { height: size })
+                    : { flex: 1 }
+                }
             >
                 {first}
             </div>

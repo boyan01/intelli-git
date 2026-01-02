@@ -135,7 +135,7 @@ export function PushView() {
 
             <SplitPane
                 direction="horizontal"
-                defaultSize={300}
+                defaultRatio={0.5}
                 minSize={150}
                 className={styles.pushMain}
                 first={

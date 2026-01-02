@@ -130,7 +130,7 @@ export function PushCommitDetails({ selectedHashes, commit }: PushCommitDetailsP
             direction="vertical"
             first={filesView}
             second={detailsView}
-            defaultSize={150}
+            secondDefaultSize={200}
             minSize={80}
             className={styles.filesPanel}
         />
