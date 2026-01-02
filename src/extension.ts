@@ -1,10 +1,10 @@
 import * as vscode from 'vscode';
 import { CommitViewProvider } from './CommitViewProvider';
 import { PushPanel } from './PushPanel';
-import { GitService } from './GitService';
+import { GitService } from './services/GitService';
 import { BranchStatusBar } from './BranchStatusBar';
 import { StashContentProvider } from './StashContentProvider';
-import { ChangelistService } from './ChangelistService';
+import { ChangelistService } from './services/ChangelistService';
 import { RevisionContentProvider } from './RevisionContentProvider';
 
 export function activate(context: vscode.ExtensionContext) {
@@ -38,7 +38,6 @@ export function activate(context: vscode.ExtensionContext) {
 
     context.subscriptions.push(
         vscode.commands.registerCommand('idea-commit-panel.refresh', () => {
-            provider.refresh();
             branchStatusBar.update();
         })
     );
@@ -58,18 +57,6 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(
         vscode.commands.registerCommand('idea-commit-panel.focusCommitView', () => {
             vscode.commands.executeCommand('ideaCommitView.focus');
-        })
-    );
-
-    context.subscriptions.push(
-        vscode.commands.registerCommand('idea-commit-panel.switchTabCommit', () => {
-            provider.switchTab('commit');
-        })
-    );
-
-    context.subscriptions.push(
-        vscode.commands.registerCommand('idea-commit-panel.switchTabStash', () => {
-            provider.switchTab('stash');
         })
     );
 

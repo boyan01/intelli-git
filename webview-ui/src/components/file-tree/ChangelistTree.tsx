@@ -7,6 +7,7 @@ import { vscode } from '../../lib/vscode';
 import { BaseFileTree } from './BaseFileTree';
 import type { BaseFileTreeRef } from './BaseFileTree';
 import styles from './FileTree.module.css';
+import { rpc } from '@/lib/rpc_client';
 
 export interface ChangelistTreeProps {
     group: ChangelistGroup;
@@ -67,16 +68,16 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
         setContextMenu(prev => ({ ...prev, visible: false }));
     }, []);
 
-    const handleFileClick = useCallback((path: string, status?: string) => {
-        vscode.postMessage({ type: 'openFile', path, status });
+    const handleFileClick = useCallback((path: string) => {
+        rpc.openFile({ path });
     }, []);
 
-    const buildFileContextMenu = useCallback((path: string, status?: string): ContextMenuItem[] => {
+    const buildFileContextMenu = useCallback((path: string): ContextMenuItem[] => {
         return [
             {
                 icon: 'go-to-file',
                 label: t('commitView.contextMenu.openFile'),
-                onClick: () => handleFileClick(path, status)
+                onClick: () => handleFileClick(path)
             },
             { separator: true, label: '', onClick: () => { } },
             {
@@ -129,14 +130,14 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
         ];
     }, [onToggleFile, onRollback, onStash, t]);
 
-    const handleFileContextMenu = useCallback((e: React.MouseEvent, path: string, status?: string) => {
+    const handleFileContextMenu = useCallback((e: React.MouseEvent, path: string) => {
         e.preventDefault();
         e.stopPropagation();
         setContextMenu({
             visible: true,
             x: e.clientX,
             y: e.clientY,
-            items: buildFileContextMenu(path, status)
+            items: buildFileContextMenu(path)
         });
     }, [buildFileContextMenu]);
 

@@ -1,17 +1,38 @@
+import { useState, useEffect, useCallback } from 'react';
 import { logger } from '@/lib/log';
 import type { StashItem } from '@shared/messages';
 import { useTranslation } from 'react-i18next';
+import { rpc } from '../../lib/rpc_client';
 import styles from './StashList.module.css';
 
-interface StashListProps {
-    stashes: StashItem[];
-    onAction: (action: 'apply' | 'pop' | 'drop', stashIndex: number) => void;
-}
-
-export const StashList: React.FC<StashListProps> = ({ stashes, onAction }) => {
+export function StashList() {
     const { t } = useTranslation();
+    const [stashes, setStashes] = useState<StashItem[]>([]);
 
-    logger.log("stashLis1t", stashes);
+    const loadStashes = useCallback(async () => {
+        try {
+            const data = await rpc.getStashList();
+            setStashes(data);
+        } catch (e) {
+            logger.log('Failed to load stashes:', e);
+        }
+    }, []);
+
+    useEffect(() => {
+        loadStashes();
+    }, [loadStashes]);
+
+    const handleAction = async (action: 'apply' | 'pop' | 'drop', stashIndex: number) => {
+        try {
+            if (action === 'apply') await rpc.applyStash(stashIndex);
+            if (action === 'pop') await rpc.popStash(stashIndex);
+            if (action === 'drop') await rpc.dropStash(stashIndex);
+        } catch (e) {
+            logger.log(`Stash ${action} failed:`, e);
+        }
+    };
+
+    logger.log('stashList', stashes);
 
     if (!stashes || stashes.length === 0) {
         return <div className={styles.emptyState}>{t('stashList.empty')}</div>;
@@ -31,10 +52,10 @@ export const StashList: React.FC<StashListProps> = ({ stashes, onAction }) => {
                             </div>
                         </div>
                         <div className={styles.stashActions}>
-                            <button className={styles.iconBtn} title={t('stashList.actions.pop')} onClick={() => onAction('pop', stash.index)}>
+                            <button className={styles.iconBtn} title={t('stashList.actions.pop')} onClick={() => handleAction('pop', stash.index)}>
                                 <i className="codicon codicon-reply"></i>
                             </button>
-                            <button className={styles.iconBtn} title={t('stashList.actions.drop')} onClick={() => onAction('drop', stash.index)}>
+                            <button className={styles.iconBtn} title={t('stashList.actions.drop')} onClick={() => handleAction('drop', stash.index)}>
                                 <i className="codicon codicon-trash"></i>
                             </button>
                         </div>
@@ -43,4 +64,4 @@ export const StashList: React.FC<StashListProps> = ({ stashes, onAction }) => {
             ))}
         </div>
     );
-};
+}

@@ -1,5 +1,5 @@
 import simpleGit, { SimpleGit, StatusResult } from 'simple-git';
-import { BranchInfo } from '../shared/messages';
+import { BranchInfo } from '../../shared/messages';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -237,6 +237,7 @@ export class GitService {
     public async getStashList(): Promise<Array<{ index: number, message: string, branch: string }>> {
         try {
             const result = await this.git.stashList();
+            console.log('simple-git stashList result:', JSON.stringify(result));
             return result.all.map((item, index) => {
                 // Parse branch from message: "On <branch>: <message>" or "WIP on <branch>: ..."
                 const match = item.message?.match(/^(?:WIP )?[oO]n ([^:]+):/);

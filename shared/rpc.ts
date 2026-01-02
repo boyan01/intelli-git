@@ -57,7 +57,7 @@ export class RpcPeer<TRemote = any, TLocal = any> {
     /**
      * Call a remote method.
      */
-    public call<K extends keyof TRemote & string>(
+    private call<K extends keyof TRemote & string>(
         method: K,
         ...args: TRemote[K] extends () => any
             ? []
@@ -88,19 +88,26 @@ export class RpcPeer<TRemote = any, TLocal = any> {
     }
 
     /**
-     * Register a local method implementation.
-     */
-    public register<K extends keyof TLocal & string>(method: K, handler: TLocal[K]) {
-        this.handlers.set(method, handler as any);
-    }
-
-    /**
      * Register multiple local method implementations at once.
+     * Supports both plain objects and class instances (methods on prototype).
      */
-    public registerAll(handlers: Partial<TLocal>) {
+    public registerAll(handlers: Required<TLocal>) {
+        // Handle instance own properties (arrow function fields)
         for (const [method, handler] of Object.entries(handlers)) {
-            if (handler) {
-                this.handlers.set(method, handler as any);
+            if (typeof handler === 'function') {
+                this.handlers.set(method, (handler as Function).bind(handlers));
+            }
+        }
+
+        // Handle prototype methods (regular class methods)
+        const proto = Object.getPrototypeOf(handlers);
+        if (proto && proto !== Object.prototype) {
+            for (const method of Object.getOwnPropertyNames(proto)) {
+                if (method === 'constructor') continue;
+                const handler = (handlers as any)[method];
+                if (typeof handler === 'function') {
+                    this.handlers.set(method, handler.bind(handlers));
+                }
             }
         }
     }

@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useCallback } from 'react';
 import type { FileStatus } from '@shared/messages';
-import { vscode } from '../../lib/vscode';
+import { rpc } from '../../lib/rpc_client';
 import { getFileIcon } from '../../lib/fileIcons';
 import styles from './FileTree.module.css';
 
@@ -169,7 +169,7 @@ export const BaseFileTree = React.forwardRef<BaseFileTreeRef, BaseFileTreeProps>
         if (onFileClick) {
             onFileClick(path, status);
         } else {
-            vscode.postMessage({ type: 'openFile', path, status });
+            rpc.openFile({ path });
         }
     }, [onFileClick]);
 

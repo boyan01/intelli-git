@@ -7,12 +7,6 @@ export type {
     CommitFile,
     PushConfig,
     StashItem,
-    CommitViewMessage,
-    PushViewMessage,
-    WebviewMessage,
-    CommitViewExtMessage,
-    PushViewExtMessage,
-    ExtensionMessage,
 } from '@shared/messages';
 
 // Local types for backward compatibility

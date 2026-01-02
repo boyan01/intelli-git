@@ -1,9 +1,9 @@
 import * as vscode from 'vscode';
-import * as path from 'path';
-import { GitService, CommitInfo } from './GitService';
-import type { PushViewMessage, CommitFile, ExtensionMethods, WebviewMethods, PushData } from '../shared/messages';
+import { GitService } from './services/GitService';
+import type { ExtensionMethods, WebviewMethods } from '../shared/messages';
 import { RpcPeer } from '../shared/rpc';
 import { getWebviewHtml } from './utils/webviewHtml';
+import { createRpc, ExtensionRpcHandler } from './utils/rpcHelper';
 
 export class PushPanel {
     public static currentPanel: PushPanel | undefined;
@@ -13,9 +13,6 @@ export class PushPanel {
     private _rpc?: RpcPeer<WebviewMethods, ExtensionMethods>;
     private _disposables: vscode.Disposable[] = [];
     private _disposed: boolean = false;
-
-    private _commits: CommitInfo[] = [];
-    private _files: CommitFile[] = [];
 
     private constructor(
         panel: vscode.WebviewPanel,
@@ -28,87 +25,22 @@ export class PushPanel {
 
         this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
 
-        // Initialize RPC: call WebviewMethods, register ExtensionMethods
-        this._rpc = new RpcPeer<WebviewMethods, ExtensionMethods>({
-            postMessage: (msg: any) => {
-                if (this._disposed) {
-                    return;
-                }
-                try {
-                    this._panel.webview.postMessage(msg);
-                } catch (error) {
-                    // Ignore errors when webview is disposed
-                    if (!this._disposed) {
-                        console.error('Failed to post message to webview:', error);
-                    }
-                }
-            }
+        // Initialize RPC
+        this._rpc = createRpc({
+            webview: this._panel.webview,
+            onDisposed: () => this._disposed
         });
 
-        // Register handlers
-        this._rpc!.registerAll({
-            getVersion: () => '1.0.0',
-            echo: (msg: string) => msg,
-            getPushInitState: async () => {
-                const branches = await this._gitService.getBranches();
-                const remotes = await this._gitService.getRemotes();
-                return {
-                    localBranch: branches.current,
-                    remotes: remotes.length > 0 ? remotes : ['origin']
-                };
-            },
-            getRemoteBranches: async (remote: string) => {
-                const allRemoteBranches = await this._gitService.getRemoteBranches();
-                const prefix = `${remote}/`;
-                return allRemoteBranches
-                    .filter(b => b.startsWith(prefix) && !b.includes('HEAD'))
-                    .map(b => b.substring(prefix.length));
-            },
-            getPushCommits: async ({ remote, branch }: { remote: string; branch: string }) => {
-                const branches = await this._gitService.getBranches();
-                const currentBranch = branches.current;
-
-                this._commits = await this._gitService.getCommitsToPush(
-                    currentBranch,
-                    remote,
-                    branch
-                );
-
-                let files: CommitFile[] = [];
-                if (this._commits.length > 0) {
-                    files = await this._getFilesForCommit(this._commits[0].hash);
-                }
-
-                return {
-                    commits: this._commits,
-                    files: files
-                };
-            },
-            getCommitFiles: async (hash: string) => {
-                return await this._getFilesForCommit(hash);
-            },
-            getMultiCommitFiles: async (hashes: string[]) => {
-                return await this._getFilesForMultiCommits(hashes);
-            },
-            push: async ({ force, pushTags, remote, branch }: { force: boolean; pushTags: boolean; remote: string; branch: string }) => {
-                await this._doPush(force, pushTags, remote, branch);
-            },
-            openDiff: async (path: string) => {
-                this._openDiff(path);
-            },
-            closeWebView: async () => {
-                this._disposed = true;
-                this.dispose();
-            },
-            openCommitDiff: async ({ path, leftRef, rightRef }: { path: string; leftRef: string; rightRef: string }) => {
-                this._openCommitDiff(path, leftRef, rightRef);
-            }
+        // Register all RPC handlers
+        const handler = new ExtensionRpcHandler({
+            gitService: this._gitService,
+            onDispose: () => this.dispose()
         });
+        handler.registerAll(this._rpc);
 
-        // Legacy handler kept for safety but can be removed if frontend is fully updated
+        // Forward messages from webview to RPC
         this._panel.webview.onDidReceiveMessage(
-            async (message: PushViewMessage | { type: string }) => {
-                // Handle RPC messages
+            async (message: { type: string;[key: string]: any }) => {
                 if (message.type === 'rpc-request' || message.type === 'rpc-response') {
                     this._rpc?.handleMessage(message);
                     return;
@@ -160,124 +92,6 @@ export class PushPanel {
 
     private async _initialize() {
         this._panel.webview.html = this._getHtmlForWebview();
-    }
-
-    private async _loadData(params?: { remote?: string; branch?: string }): Promise<PushData> {
-        const branches = await this._gitService.getBranches();
-        const currentBranch = branches.current;
-
-        let remote = params?.remote;
-        if (!remote) {
-            const remotes = await this._gitService.getRemotes();
-            remote = remotes.length > 0 ? remotes[0] : 'origin';
-        }
-
-        let remoteBranch = params?.branch;
-        if (!remoteBranch) {
-            remoteBranch = currentBranch;
-        }
-
-        const remotes = await this._gitService.getRemotes();
-        const remoteBranches = await this._gitService.getRemoteBranches(); // optimization: pass remote to filter
-
-        this._commits = await this._gitService.getCommitsToPush(
-            currentBranch,
-            remote,
-            remoteBranch
-        );
-
-        let files: CommitFile[] = [];
-        if (this._commits.length > 0) {
-            files = await this._getFilesForCommit(this._commits[0].hash);
-        }
-
-        return {
-            commits: this._commits,
-            files: files,
-            config: {
-                currentBranch: currentBranch,
-                remote: remote,
-                remoteBranch: remoteBranch,
-                remotes: remotes,
-                remoteBranches: remoteBranches
-            }
-        };
-    }
-
-    // _refreshCommits removed as logic is now in _loadData
-
-    private async _loadFilesForCommit(index: number) {
-        if (index >= 0 && index < this._commits.length) {
-            this._files = await this._getFilesForCommit(this._commits[index].hash);
-            this._panel.webview.postMessage({
-                type: 'updateFiles',
-                files: this._files
-            });
-        }
-    }
-
-    private async _getFilesForCommit(hash: string): Promise<CommitFile[]> {
-        try {
-            return await this._gitService.getCommitFiles(hash);
-        } catch {
-            return [];
-        }
-    }
-
-    private async _getFilesForMultiCommits(hashes: string[]): Promise<CommitFile[]> {
-        const fileMap = new Map<string, CommitFile>();
-        for (const hash of hashes) {
-            try {
-                const files = await this._gitService.getCommitFiles(hash);
-                for (const file of files) {
-                    fileMap.set(file.path, file);
-                }
-            } catch {
-                // ignore
-            }
-        }
-        return Array.from(fileMap.values());
-    }
-
-    private async _doPush(force: boolean, pushTags: boolean, remote: string, branch: string) {
-        try {
-            const branches = await this._gitService.getBranches();
-            const currentBranch = branches.current;
-
-            if (force) {
-                await this._gitService.forcePush(remote, `${currentBranch}:${branch}`);
-            } else {
-                await this._gitService.push(remote, `${currentBranch}:${branch}`);
-            }
-
-            if (pushTags) {
-                await this._gitService.pushTags(remote);
-            }
-
-            this._panel.webview.postMessage({ type: 'pushComplete' });
-            vscode.window.showInformationMessage(
-                `Successfully pushed to ${remote}/${branch}`
-            );
-            this.dispose();
-        } catch (e) {
-            this._panel.webview.postMessage({ type: 'pushError' });
-            vscode.window.showErrorMessage(`Push failed: ${e}`);
-        }
-    }
-
-    private _openDiff(filePath: string) {
-        const workspaceRoot = this._gitService.getWorkspaceRoot();
-        const uri = vscode.Uri.file(`${workspaceRoot}/${filePath}`);
-        vscode.commands.executeCommand('git.openChange', uri);
-    }
-
-    private _openCommitDiff(filePath: string, leftRef: string, rightRef: string) {
-        // Left: Parent ref
-        const leftUri = vscode.Uri.parse(`idea-revision://load/${filePath}?${JSON.stringify({ ref: leftRef })}`);
-        // Right: Current ref
-        const rightUri = vscode.Uri.parse(`idea-revision://load/${filePath}?${JSON.stringify({ ref: rightRef })}`);
-        const title = `${path.basename(filePath)} (${leftRef.substring(0, 7)} ↔ ${rightRef.substring(0, 7)})`;
-        vscode.commands.executeCommand('vscode.diff', leftUri, rightUri, title);
     }
 
     private _getHtmlForWebview() {

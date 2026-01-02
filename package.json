@@ -37,16 +37,6 @@
     },
     "commands": [
       {
-        "command": "idea-commit-panel.switchTabCommit",
-        "title": "%idea-commit-panel.commands.switchTabCommit.title%",
-        "icon": "$(git-commit)"
-      },
-      {
-        "command": "idea-commit-panel.switchTabStash",
-        "title": "%idea-commit-panel.commands.switchTabStash.title%",
-        "icon": "$(archive)"
-      },
-      {
         "command": "idea-commit-panel.refresh",
         "title": "%idea-commit-panel.commands.refresh.title%",
         "icon": "$(refresh)"

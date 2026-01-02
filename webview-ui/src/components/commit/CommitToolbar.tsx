@@ -1,4 +1,4 @@
-import { vscode } from '../../lib/vscode';
+import { rpc, rpcEvents } from '../../lib/rpc_client';
 import { useTranslation } from 'react-i18next';
 import styles from './CommitToolbar.module.css';
 
@@ -22,16 +22,16 @@ export function CommitToolbar({
     return (
         <div className={styles.commitToolbar}>
             <div className={styles.toolbarLeft}>
-                <button className={styles.iconBtn} title={t('commitView.toolbar.refresh')} onClick={() => vscode.postMessage({ type: 'refresh' })}>
+                <button className={styles.iconBtn} title={t('commitView.toolbar.refresh')} onClick={() => rpcEvents.refresh.emit()}>
                     <i className="codicon codicon-sync"></i>
                 </button>
 
                 <div className={styles.toolbarSeparator} style={{ margin: '0 8px' }}></div>
 
-                <button className={styles.iconBtn} title={t('commitView.toolbar.rollback')} onClick={() => vscode.postMessage({ type: 'rollback', files: Array.from(selectedFiles) })} disabled={selectedFiles.size === 0}>
+                <button className={styles.iconBtn} title={t('commitView.toolbar.rollback')} onClick={() => rpc.rollback(Array.from(selectedFiles))} disabled={selectedFiles.size === 0}>
                     <i className="codicon codicon-discard"></i>
                 </button>
-                <button className={styles.iconBtn} title={t('commitView.toolbar.stash')} onClick={() => vscode.postMessage({ type: 'stash', files: Array.from(selectedFiles) })} disabled={selectedFiles.size === 0}>
+                <button className={styles.iconBtn} title={t('commitView.toolbar.stash')} onClick={() => rpc.stash({ files: Array.from(selectedFiles) })} disabled={selectedFiles.size === 0}>
                     <i className="codicon codicon-archive"></i>
                 </button>
                 <div className={styles.toolbarSeparator}></div>

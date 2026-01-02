@@ -4,15 +4,20 @@ import { CommitForm } from './CommitForm';
 import { RebaseForm } from './RebaseForm';
 import { CommitToolbar } from './CommitToolbar';
 import { StashList } from '../stash/StashList';
-import { useVSCode } from '../../hooks/useVSCode';
-import { vscode } from '../../lib/vscode';
 import { useTranslation } from 'react-i18next';
 import { usePersistedState } from '../../hooks/usePersistedState';
 import styles from './CommitView.module.css';
+import { rpc, rpcEvents } from '../../lib/rpc_client';
+import type { ChangelistGroup, BranchInfo } from '@shared/messages';
 
 export function CommitView() {
     const { t } = useTranslation();
-    const { changelists, stashList, activeFile, branches, incomingCommits } = useVSCode();
+
+    // Data State
+    const [changelists, setChangelists] = useState<ChangelistGroup[]>([]);
+    const [branches, setBranches] = useState<BranchInfo>({ current: '', all: [], ahead: 0, behind: 0, rebaseStatus: 'none' });
+    const [incomingCommits, setIncomingCommits] = useState(0);
+    const [activeFile, setActiveFile] = useState<string | null>(null);
 
     // Persisted UI State
     const [activeTab, setActiveTab] = usePersistedState('commit.activeTab');
@@ -25,6 +30,56 @@ export function CommitView() {
     // Non-persisted state
     const [isGenerating, setIsGenerating] = useState(false);
 
+    // Data loading functions
+    const loadChangelists = useCallback(async () => {
+        try {
+            const data = await rpc.getChangelists();
+            setChangelists(data);
+        } catch (e) {
+            console.error('Failed to load changelists:', e);
+        }
+    }, []);
+
+    const loadBranchInfo = useCallback(async () => {
+        try {
+            const data = await rpc.getBranchInfo();
+            setBranches(data);
+        } catch (e) {
+            console.error('Failed to load branch info:', e);
+        }
+    }, []);
+
+    const loadIncomingCommits = useCallback(async () => {
+        try {
+            const count = await rpc.getIncomingCommits();
+            setIncomingCommits(count);
+        } catch (e) {
+            console.error('Failed to load incoming commits:', e);
+        }
+    }, []);
+
+    // Initial Load & Event Subscriptions
+    useEffect(() => {
+        loadChangelists();
+        loadBranchInfo();
+        loadIncomingCommits();
+
+        const unsubRefresh = rpcEvents.refresh.subscribe(() => {
+            loadChangelists();
+            loadBranchInfo();
+            loadIncomingCommits();
+        });
+
+        const unsubActiveFile = rpcEvents.activeFileChange.subscribe(({ path }) => {
+            setActiveFile(path);
+        });
+
+        return () => {
+            unsubRefresh();
+            unsubActiveFile();
+        };
+    }, [loadChangelists, loadBranchInfo, loadIncomingCommits]);
+
     const toggleFile = useCallback((path: string, checked: boolean) => {
         setSelectedFiles(prev => {
             const next = new Set(prev);
@@ -32,7 +87,7 @@ export function CommitView() {
             else next.delete(path);
             return next;
         });
-    }, []);
+    }, [setSelectedFiles]);
 
     const toggleGroupCollapse = useCallback((groupId: string) => {
         setCollapsedGroups(prev => {
@@ -41,7 +96,7 @@ export function CommitView() {
             else next.add(groupId);
             return next;
         });
-    }, []);
+    }, [setCollapsedGroups]);
 
     const fileStats = useMemo(() => {
         let added = 0;
@@ -51,7 +106,6 @@ export function CommitView() {
         changelists.forEach(group => {
             group.items.forEach(file => {
                 if (selectedFiles.has(file.path)) {
-                    // Check first char of status, usually sufficient for short status
                     const status = file.status.trim().toUpperCase();
                     if (status.startsWith('A') || status === '?' || status === 'U') {
                         added++;
@@ -67,51 +121,38 @@ export function CommitView() {
         return { added, modified, deleted };
     }, [changelists, selectedFiles]);
 
-    const handleCommit = (push: boolean) => {
+    const handleCommit = async (push: boolean) => {
         const files = Array.from(selectedFiles);
         if (files.length === 0 && !amend) {
             return;
         }
-        vscode.postMessage({
-            type: push ? 'commitAndPush' : 'commit',
-            message: commitMessage,
-            files: files,
-            amend: amend
-        });
+        try {
+            await rpc.commit({
+                message: commitMessage,
+                files: files,
+                amend: amend,
+                push: push
+            });
+            setCommitMessage('');
+        } catch (e) {
+            console.error('Commit failed:', e);
+        }
     };
 
-    // Listen for messages from extension to set commit message (e.g. during rebase)
-    useEffect(() => {
-        const handler = (event: MessageEvent) => {
-            const message = event.data;
-            switch (message.type) {
-                case 'setCommitMessage':
-                    setCommitMessage(message.message);
-                    break;
-                case 'aiGenerating':
-                    setIsGenerating(message.generating);
-                    break;
-                case 'generatedCommitMessage':
-                    setCommitMessage(message.message);
-                    break;
-            }
-        };
-        window.addEventListener('message', handler);
-        return () => window.removeEventListener('message', handler);
-    }, []);
-
-    const handleFetch = () => {
-        vscode.postMessage({ type: 'fetch' });
+    const handleGenerateMessage = async () => {
+        setIsGenerating(true);
+        try {
+            const message = await rpc.generateCommitMessage(Array.from(selectedFiles));
+            setCommitMessage(message);
+        } catch (e) {
+            console.error('Failed to generate message', e);
+        } finally {
+            setIsGenerating(false);
+        }
     };
 
-    const handleBranchClick = () => {
-        vscode.postMessage({ type: 'pickBranch' });
-    };
-
-    const handleStashAction = (action: 'apply' | 'pop' | 'drop', index: number) => {
-        const typeMap = { apply: 'stashApply', pop: 'stashPop', drop: 'stashDrop' } as const;
-        vscode.postMessage({ type: typeMap[action], index });
-    };
+    const handleFetch = () => rpc.fetch();
+    const handleBranchClick = () => rpc.pickBranch();
 
     return (
         <div className={styles.commitPanel}>
@@ -165,7 +206,7 @@ export function CommitView() {
                                         className={styles.continueBtn}
                                         onClick={(e) => {
                                             e.stopPropagation();
-                                            vscode.postMessage({ type: 'continueRebase' });
+                                            rpc.continueRebase({});
                                         }}
                                         title="Continue Rebase/Merge"
                                     >
@@ -175,7 +216,7 @@ export function CommitView() {
                                         className={styles.abortBtn}
                                         onClick={(e) => {
                                             e.stopPropagation();
-                                            vscode.postMessage({ type: 'abortRebase' });
+                                            rpc.abortRebase();
                                         }}
                                         title="Abort Rebase/Merge"
                                     >
@@ -235,10 +276,10 @@ export function CommitView() {
                                     activeFile={activeFile}
                                     onToggleFile={toggleFile}
                                     onToggleCollapse={() => toggleGroupCollapse(group.id)}
-                                    onRollback={(files) => vscode.postMessage({ type: 'rollback', files })}
-                                    onStash={(files) => vscode.postMessage({ type: 'stash', files })}
-                                    onDelete={(files) => vscode.postMessage({ type: 'deleteFiles', files })}
-                                    onMoveToChangelist={(files) => vscode.postMessage({ type: 'promptCreateChangelist', file: files[0] })}
+                                    onRollback={(files) => rpc.rollback(files)}
+                                    onStash={(files) => rpc.stash({ files })}
+                                    onDelete={(files) => rpc.deleteFiles(files)}
+                                    onMoveToChangelist={(files) => rpc.promptCreateChangelist(files[0])}
                                 />
                             ))
                         )}
@@ -252,8 +293,7 @@ export function CommitView() {
                             deletedCount={fileStats.deleted}
                             disableContinue={changelists.some(g => g.items.some(f => f.status === 'C' || f.status === 'U'))}
                             onMessageChange={setCommitMessage}
-                            onContinue={() => vscode.postMessage({
-                                type: 'continueRebase',
+                            onContinue={() => rpc.continueRebase({
                                 message: commitMessage,
                                 files: Array.from(selectedFiles)
                             })}
@@ -269,10 +309,7 @@ export function CommitView() {
                             onAmendChange={setAmend}
                             onCommit={handleCommit}
                             isGenerating={isGenerating}
-                            onGenerate={() => vscode.postMessage({
-                                type: 'generateCommitMessage',
-                                files: Array.from(selectedFiles)
-                            })}
+                            onGenerate={handleGenerateMessage}
                         />
                     )}
                 </div>
@@ -280,7 +317,7 @@ export function CommitView() {
 
             {activeTab === 'stash' && (
                 <div className={`${styles.tabContent} ${activeTab === 'stash' ? styles.active : ''}`}>
-                    <StashList stashes={stashList} onAction={handleStashAction} />
+                    <StashList />
                 </div>
             )}
         </div>

@@ -1,7 +1,5 @@
-import type { WebviewMessage } from '@shared/messages';
-
 interface TypedVSCodeApi {
-    postMessage(message: WebviewMessage): void;
+    postMessage(message: any): void;
     getState<T>(): T | undefined;
     setState<T>(state: T): T;
 }

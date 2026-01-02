@@ -1,15 +1,38 @@
 import { RpcPeer } from '@shared/rpc';
 import { vscode } from './vscode';
-import type { ExtensionMethods } from '@shared/messages';
+import type { ExtensionMethods, WebviewMethods } from '@shared/messages';
 
-// Create RpcPeer instance for Webview: call ExtensionMethods, register nothing
-const _rpc = new RpcPeer<ExtensionMethods, object>({
+type Listener<T> = (data: T) => void;
+
+class EventStream<T> {
+    private listeners: Set<Listener<T>> = new Set();
+
+    subscribe(listener: Listener<T>): () => void {
+        this.listeners.add(listener);
+        return () => this.listeners.delete(listener);
+    }
+
+    emit(data: T) {
+        this.listeners.forEach(listener => listener(data));
+    }
+}
+
+export const rpcEvents = {
+    activeFileChange: new EventStream<{ path: string }>(),
+    refresh: new EventStream<void>(),
+};
+
+const _rpc = new RpcPeer<ExtensionMethods, WebviewMethods>({
     postMessage: (message) => vscode.postMessage(message)
 });
 
 export const rpc = _rpc.proxy;
 
-// Listen for incoming messages from Extension
+_rpc.registerAll({
+    activeFileChange: (params) => rpcEvents.activeFileChange.emit(params),
+    refresh: () => rpcEvents.refresh.emit(),
+});
+
 window.addEventListener('message', (event) => {
     const message = event.data;
     _rpc.handleMessage(message);

@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { GitService } from './GitService';
+import { GitService } from './services/GitService';
 import { BranchPicker } from './BranchPicker';
 
 export class BranchStatusBar {

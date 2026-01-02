@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { GitService } from './GitService';
+import { GitService } from './services/GitService';
 
 interface BranchQuickPickItem extends vscode.QuickPickItem {
     action?: 'fetch' | 'update' | 'commit' | 'push' | 'newBranch' | 'checkout';

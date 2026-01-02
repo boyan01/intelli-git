@@ -1,6 +1,6 @@
 
 import * as vscode from 'vscode';
-import { GitService } from './GitService';
+import { GitService } from './services/GitService';
 
 export class RevisionContentProvider implements vscode.TextDocumentContentProvider {
     private gitService: GitService;

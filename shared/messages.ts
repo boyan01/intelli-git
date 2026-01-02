@@ -3,80 +3,6 @@
  * Both extension host and webview-ui should import from this file.
  */
 
-// ============================================
-// Commit View Messages (Webview → Extension)
-// ============================================
-
-export interface CommitViewState {
-    viewMode: 'tree' | 'list';
-    activeTab: 'commit' | 'stash';
-    commitMessage: string;
-    amend: boolean;
-    selectedFiles: string[];
-    collapsedGroups: string[];
-}
-
-export type CommitViewMessage =
-    | { type: 'refresh' }
-    | { type: 'commit'; message: string; amend: boolean; files: string[] }
-    | { type: 'commitAndPush'; message: string; amend: boolean; files: string[] }
-    | { type: 'stage'; path: string }
-    | { type: 'unstage'; path: string }
-    | { type: 'stage-all' }
-    | { type: 'unstage-all' }
-    | { type: 'switchBranch'; branch: string }
-    | { type: 'pickBranch' } // Request to open branch picker
-    | { type: 'updateProject' }
-    | { type: 'requestPush' }
-    | { type: 'openFile'; path: string; status?: string }
-    | { type: 'openMergeEditor'; path: string }
-    | { type: 'continueRebase'; message?: string; files?: string[] }
-    | { type: 'abortRebase' }
-    | { type: 'getLastCommitMessage' }
-    | { type: 'generateCommitMessage'; files?: string[] }
-    | { type: 'stash'; files: string[] }
-    | { type: 'rollback'; files: string[] }
-    | { type: 'getChangedFiles' }
-    | { type: 'getStashList' }
-    | { type: 'stashApply'; index: number }
-    | { type: 'stashPop'; index: number }
-    | { type: 'stashDrop'; index: number }
-    | { type: 'getStashFiles'; index: number }
-    | { type: 'showStashFileDiff'; index: number; filePath: string }
-    | { type: 'showStashActions'; index: number }
-    | { type: 'rollbackWithPick' }
-    | { type: 'createChangelist'; name: string }
-    | { type: 'moveFiles'; files: string[]; targetListId: string }
-    | { type: 'deleteChangelist'; id: string }
-    | { type: 'renameChangelist'; id: string; name: string }
-    | { type: 'promptCreateChangelist'; file?: string }
-    | { type: 'deleteFiles'; files: string[] }
-    | { type: 'deleteFiles'; files: string[] }
-    | { type: 'stashChangelist'; files: string[] }
-    | { type: 'fetch' }
-    | { type: 'pull' }
-    | { type: 'log'; message: string };
-
-// ============================================
-// Push View Messages (Webview → Extension)
-// ============================================
-
-export type PushViewMessage =
-    | { type: 'ready' }
-    | { type: 'push'; force: boolean; pushTags: boolean }
-    | { type: 'cancel' }
-    | { type: 'selectCommit'; index: number }
-    | { type: 'openDiff'; path: string }
-    | { type: 'changeRemote'; remote: string }
-    | { type: 'changeRemoteBranch'; branch: string };
-
-// Combined: All messages from Webview → Extension
-export type WebviewMessage = CommitViewMessage | PushViewMessage;
-
-// ============================================
-// Extension → Webview Messages
-// ============================================
-
 export interface FileStatus {
     path: string;
     status: string;
@@ -126,41 +52,7 @@ export interface PushConfig {
     remoteBranches: string[];
 }
 
-// Commit View: Extension → Webview
-export type CommitViewExtMessage =
-    | { type: 'update'; files: ChangelistGroup[]; branches: BranchInfo; incomingCommits?: number }
-    | { type: 'stashList'; stashList: StashItem[] }
-    | { type: 'stashFiles'; index: number; files: FileStatus[] }
-    | { type: 'lastCommitMessage'; message: string }
-    | { type: 'generatedCommitMessage'; message: string }
-    | { type: 'setCommitMessage'; message: string }
-    | { type: 'aiGenerating'; generating: boolean }
-    | { type: 'switchTab'; tab: 'commit' | 'stash' }
-    | { type: 'activeFileChange'; path: string };
 
-// Push View: Extension → Webview
-export type PushViewExtMessage =
-    | { type: 'update'; commits: CommitInfo[]; files: CommitFile[]; config: PushConfig }
-    | { type: 'updateFiles'; files: CommitFile[] }
-    | { type: 'pushComplete' }
-    | { type: 'pushError' };
-
-// Combined: All messages from Extension → Webview
-export type ExtensionMessage = CommitViewExtMessage | PushViewExtMessage;
-
-// ============================================
-// Handler Types
-// ============================================
-
-export type MessageHandler<T> = (data: T) => void | Promise<void>;
-
-export type CommitViewHandlers = {
-    [K in CommitViewMessage['type']]?: MessageHandler<Extract<CommitViewMessage, { type: K }>>;
-};
-
-export type PushViewHandlers = {
-    [K in PushViewMessage['type']]?: MessageHandler<Extract<PushViewMessage, { type: K }>>;
-};
 
 export interface PushData {
     commits: CommitInfo[];
@@ -168,13 +60,8 @@ export interface PushData {
     config: PushConfig;
 }
 
-// ============================================
-// RPC Definitions
-// ============================================
-
 export interface ExtensionMethods {
-    getVersion: () => string;
-    echo: (msg: string) => string;
+    log(message: string): Promise<void>;
     getPushInitState: () => Promise<PushInitState>;
     getRemoteBranches: (remote: string) => Promise<string[]>;
     getPushCommits: (params: { remote: string; branch: string }) => Promise<PushCommitsData>;
@@ -184,7 +71,43 @@ export interface ExtensionMethods {
     openDiff: (path: string) => Promise<void>;
     closeWebView: () => Promise<void>;
     openCommitDiff: (params: { path: string; leftRef: string; rightRef: string }) => Promise<void>;
-    // Add other extension methods here
+    getCommitState: () => Promise<CommitState>;
+    getChangelists: () => Promise<ChangelistGroup[]>;
+    getBranchInfo: () => Promise<BranchInfo>;
+    getStashList: () => Promise<StashItem[]>;
+    getIncomingCommits: () => Promise<number>;
+    commit: (params: { message: string; amend: boolean; files: string[]; push?: boolean }) => Promise<void>;
+    stage: (path: string) => Promise<void>;
+    unstage: (path: string) => Promise<void>;
+    stageAll: () => Promise<void>;
+    unstageAll: () => Promise<void>;
+    generateCommitMessage: (files?: string[]) => Promise<string>;
+    stash: (params: { message?: string; files: string[] }) => Promise<void>;
+    popStash: (index: number) => Promise<void>;
+    applyStash: (index: number) => Promise<void>;
+    dropStash: (index: number) => Promise<void>;
+    deleteFiles: (files: string[]) => Promise<void>;
+    rollback: (files: string[]) => Promise<void>;
+    switchBranch: (branch: string) => Promise<void>;
+    pull: () => Promise<void>;
+    fetch: () => Promise<void>;
+    createChangelist: (name: string) => Promise<void>;
+    pickBranch: () => Promise<void>;
+    continueRebase: (params: { message?: string; files?: string[] }) => Promise<void>;
+    abortRebase: () => Promise<void>;
+    moveFiles: (params: { files: string[]; targetListId: string }) => Promise<void>;
+    deleteChangelist: (id: string) => Promise<void>;
+    renameChangelist: (params: { id: string; name: string }) => Promise<void>;
+    promptCreateChangelist: (file?: string) => Promise<void>;
+    openFile: (params: { path: string }) => Promise<void>;
+}
+
+export interface CommitState {
+    changelists: ChangelistGroup[];
+    branches: BranchInfo;
+    incomingCommits: number;
+    stashList: StashItem[];
+    recentCommitMessage?: string;
 }
 
 export interface PushInitState {
@@ -198,6 +121,6 @@ export interface PushCommitsData {
 }
 
 export interface WebviewMethods {
-    // Add webview methods here
-    refreshUI: (data: any) => string;
+    activeFileChange: (params: { path: string }) => void;
+    refresh: () => void;
 }
