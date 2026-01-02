@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import type { FileStatus } from '@shared/messages';
-import { getFileIcon } from '../lib/fileIcons';
+import { getFileIcon } from '../../lib/fileIcons';
 
 interface SimpleFileTreeProps {
     files: FileStatus[];

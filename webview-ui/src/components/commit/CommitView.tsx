@@ -1,12 +1,12 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import type { CommitViewState } from '@shared/messages';
-import { ChangelistTree } from './ChangelistTree';
+import { ChangelistTree } from '../file-tree/ChangelistTree';
 import { CommitForm } from './CommitForm';
 import { RebaseForm } from './RebaseForm';
 import { CommitToolbar } from './CommitToolbar';
-import { StashList } from './StashList';
-import { useVSCode } from '../hooks/useVSCode';
-import { vscode } from '../lib/vscode';
+import { StashList } from '../stash/StashList';
+import { useVSCode } from '../../hooks/useVSCode';
+import { vscode } from '../../lib/vscode';
 import { useTranslation } from 'react-i18next';
 
 export function CommitView() {

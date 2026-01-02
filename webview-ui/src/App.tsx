@@ -1,6 +1,6 @@
 import { HashRouter, Routes, Route } from 'react-router-dom';
-import { CommitView } from './components/CommitView';
-import { PushView } from './components/PushView';
+import { CommitView } from './components/commit/CommitView';
+import { PushView } from './components/push/PushView';
 import './index.css';
 
 import { useNavigate, useLocation } from 'react-router-dom';

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { CommitInfo, CommitFile, PushConfig, PushViewMessage, PushViewExtMessage, FileStatus } from '@shared/messages';
-import { SimpleFileTree } from './SimpleFileTree';
-import { vscode } from '../lib/vscode';
+import { SimpleFileTree } from '../file-tree/SimpleFileTree';
+import { vscode } from '../../lib/vscode';
 import { useTranslation } from 'react-i18next';
 
 export function PushView() {

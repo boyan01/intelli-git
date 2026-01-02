@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useCallback } from 'react';
 import type { FileStatus, ChangelistGroup } from '@shared/messages';
-import { getFileIcon } from '../lib/fileIcons';
+import { getFileIcon } from '../../lib/fileIcons';
 
 interface FileTreeProps {
     changelists: ChangelistGroup[];

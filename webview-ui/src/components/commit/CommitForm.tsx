@@ -1,6 +1,5 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-// import { VSCodeButton, VSCodeCheckbox, VSCodeTextArea } from '@vscode/webview-ui-toolkit/react';
 
 interface CommitFormProps {
     message: string;

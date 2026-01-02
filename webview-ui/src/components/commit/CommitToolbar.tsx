@@ -1,4 +1,4 @@
-import { vscode } from '../lib/vscode';
+import { vscode } from '../../lib/vscode';
 import { useTranslation } from 'react-i18next';
 
 

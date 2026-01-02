@@ -1,10 +1,10 @@
 import React, { useMemo, useState, useCallback } from 'react';
 import type { FileStatus, ChangelistGroup } from '@shared/messages';
 import { useTranslation } from 'react-i18next';
-import { ContextMenu } from './ContextMenu';
-import type { ContextMenuItem } from './ContextMenu';
-import { vscode } from '../lib/vscode';
-import { getFileIcon } from '../lib/fileIcons';
+import { ContextMenu } from '../common/ContextMenu';
+import type { ContextMenuItem } from '../common/ContextMenu';
+import { vscode } from '../../lib/vscode';
+import { getFileIcon } from '../../lib/fileIcons';
 
 interface ChangelistTreeProps {
     group: ChangelistGroup;
