@@ -6,14 +6,16 @@ import type { BaseFileTreeRef } from '../file-tree/BaseFileTree';
 import { SplitPane } from '../common/SplitPane';
 import { useTranslation } from 'react-i18next';
 import styles from './PushCommitDetails.module.css';
+import { logger } from '@/lib/log';
 
 
 export interface PushCommitDetailsProps {
     selectedHashes: string[];
     commit?: CommitInfo | null;
+    allCommits: CommitInfo[];
 }
 
-export function PushCommitDetails({ selectedHashes, commit }: PushCommitDetailsProps) {
+export function PushCommitDetails({ selectedHashes, commit, allCommits }: PushCommitDetailsProps) {
     const { t } = useTranslation();
     const [files, setFiles] = useState<CommitFile[]>([]);
     const [viewMode, setViewMode] = useState<'tree' | 'list'>('tree');
@@ -37,6 +39,31 @@ export function PushCommitDetails({ selectedHashes, commit }: PushCommitDetailsP
 
         fetchFiles();
     }, [selectedHashes]);
+
+    const handleFileClick = (path: string, status?: string) => {
+        logger.log('handleFileClick', path, status);
+        if (!selectedHashes || selectedHashes.length === 0) return;
+
+        // Find selected commits objects from allCommits to respect order/date
+        const selectedCommits = allCommits.filter(c => selectedHashes.includes(c.hash));
+
+        if (selectedCommits.length === 0) return;
+
+        // Sort by date (oldest first)
+        // Note: Git timestamps can be tricky, but usually date is enough.
+        selectedCommits.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+        // Oldest commit
+        const oldest = selectedCommits[0];
+        // Newest commit
+        const newest = selectedCommits[selectedCommits.length - 1];
+
+        // Diff: Oldest^ .. Newest
+        const leftRef = `${oldest.hash}^`;
+        const rightRef = newest.hash;
+
+        rpc.openCommitDiff({ path, leftRef, rightRef });
+    };
 
     const fileStatusList: FileStatus[] = files.map(f => ({
         path: f.path,
@@ -89,6 +116,7 @@ export function PushCommitDetails({ selectedHashes, commit }: PushCommitDetailsP
                     items={fileStatusList}
                     viewMode={viewMode}
                     readonly={true}
+                    onFileClick={handleFileClick}
                 />
             </div>
         </div>

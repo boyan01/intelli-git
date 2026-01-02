@@ -282,7 +282,11 @@ export class GitService {
     public async getFileContent(ref: string, relativePath: string): Promise<string> {
         try {
             return await this.git.show([`${ref}:${relativePath}`]);
-        } catch (e) {
+        } catch (e: any) {
+            // If file doesn't exist in the revision (e.g. Added file), return empty string
+            if (e.message && (e.message.includes('does not exist') || e.message.includes('exists on disk'))) {
+                return '';
+            }
             console.error('getFileContent error:', e);
             return '';
         }

@@ -183,6 +183,7 @@ export interface ExtensionMethods {
     push: (params: { force: boolean; pushTags: boolean; remote: string; branch: string }) => Promise<void>;
     openDiff: (path: string) => Promise<void>;
     cancel: () => Promise<void>;
+    openCommitDiff: (params: { path: string; leftRef: string; rightRef: string }) => Promise<void>;
     // Add other extension methods here
 }
 

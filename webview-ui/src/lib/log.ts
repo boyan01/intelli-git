@@ -6,7 +6,7 @@ export const logger = {
         console.log(...args);
         vscode.postMessage({
             type: 'log',
-            message: args.map(arg => 
+            message: args.map(arg =>
                 typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
             ).join(' ')
         });
@@ -16,7 +16,7 @@ export const logger = {
         console.info(...args);
         vscode.postMessage({
             type: 'log',
-            message: args.map(arg => 
+            message: args.map(arg =>
                 typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
             ).join(' ')
         });

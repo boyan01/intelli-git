@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import * as path from 'path';
 import { GitService, CommitInfo } from './GitService';
 import type { PushViewMessage, CommitFile, ExtensionMethods, WebviewMethods, PushData } from '../shared/messages';
 import { RpcPeer } from '../shared/rpc';
@@ -84,6 +85,9 @@ export class PushPanel {
             },
             cancel: async () => {
                 this.dispose();
+            },
+            openCommitDiff: async ({ path, leftRef, rightRef }: { path: string; leftRef: string; rightRef: string }) => {
+                this._openCommitDiff(path, leftRef, rightRef);
             }
         });
 
@@ -250,6 +254,15 @@ export class PushPanel {
         const workspaceRoot = this._gitService.getWorkspaceRoot();
         const uri = vscode.Uri.file(`${workspaceRoot}/${filePath}`);
         vscode.commands.executeCommand('git.openChange', uri);
+    }
+
+    private _openCommitDiff(filePath: string, leftRef: string, rightRef: string) {
+        // Left: Parent ref
+        const leftUri = vscode.Uri.parse(`idea-revision://load/${filePath}?${JSON.stringify({ ref: leftRef })}`);
+        // Right: Current ref
+        const rightUri = vscode.Uri.parse(`idea-revision://load/${filePath}?${JSON.stringify({ ref: rightRef })}`);
+        const title = `${path.basename(filePath)} (${leftRef.substring(0, 7)} ↔ ${rightRef.substring(0, 7)})`;
+        vscode.commands.executeCommand('vscode.diff', leftUri, rightUri, title);
     }
 
     private _getHtmlForWebview() {
