@@ -343,16 +343,101 @@ export class BranchPicker {
                     cancellable: false
                 },
                 async () => {
-                    if (isRemote) {
-                        await this.gitService.checkoutRemoteBranch(branch);
-                    } else {
-                        await this.gitService.switchBranch(branch);
-                    }
+                    await this._performCheckout(branch, isRemote);
                 }
             );
             vscode.commands.executeCommand('idea-commit-panel.refresh');
-        } catch (e) {
-            vscode.window.showErrorMessage(vscode.l10n.t('Failed to switch branch: {0}', String(e)));
+        } catch (e: any) {
+            if (this._isLocalChangesError(e)) {
+                await this._handleSmartCheckout(branch, isRemote);
+            } else {
+                vscode.window.showErrorMessage(vscode.l10n.t('Failed to switch branch: {0}', String(e)));
+            }
+        }
+    }
+
+    private async _performCheckout(branch: string, isRemote?: boolean, force: boolean = false) {
+        if (isRemote) {
+            await this.gitService.checkoutRemoteBranch(branch, force);
+        } else {
+            await this.gitService.switchBranch(branch, force);
+        }
+    }
+
+    private _isLocalChangesError(e: any): boolean {
+        const msg = String(e);
+        return msg.includes('Your local changes to the following files would be overwritten by checkout') ||
+            msg.includes('The following untracked working tree files would be overwritten by checkout') ||
+            msg.includes('Please commit your changes or stash them before you switch branches');
+    }
+
+    private async _handleSmartCheckout(branch: string, isRemote?: boolean) {
+        const action = await vscode.window.showWarningMessage(
+            vscode.l10n.t('Checkout Conflict'),
+            { modal: true, detail: vscode.l10n.t('Your local changes would be overwritten by checkout.\nGit suggests committing or stashing them.') },
+            vscode.l10n.t('Smart Checkout'),
+            vscode.l10n.t('Force Checkout'),
+            vscode.l10n.t('Cancel')
+        );
+
+        if (action === vscode.l10n.t('Cancel') || !action) {
+            return;
+        }
+
+        if (action === vscode.l10n.t('Smart Checkout')) {
+            await vscode.window.withProgress(
+                {
+                    location: vscode.ProgressLocation.Notification,
+                    title: vscode.l10n.t('Smart Checkout: Stashing & Switching...'),
+                    cancellable: false
+                },
+                async () => {
+                    try {
+                        // 1. Stash with untracked files
+                        // Using a distinct message to identify it later if needed, but for now just push/pop
+                        await this.gitService.stash(`Smart Checkout: ${branch} at ${new Date().toISOString()}`, undefined, true);
+
+                        // 2. Checkout
+                        await this._performCheckout(branch, isRemote);
+
+                        // 3. Pop
+                        try {
+                            await this.gitService.popLatestStash();
+                            vscode.commands.executeCommand('idea-commit-panel.refresh');
+                        } catch (popError: any) {
+                            const errorMsg = String(popError);
+                            if (errorMsg.includes('could not restore untracked files')) {
+                                vscode.window.showWarningMessage(
+                                    vscode.l10n.t('Checkout successful, but could not restore untracked files because they exist in the current branch. Your changes are saved in the Stash list.')
+                                );
+                            } else {
+                                vscode.window.showWarningMessage(
+                                    vscode.l10n.t('Checkout successful, but conflicts occurred while restoring changes. Stash is kept for safety. Please resolve manually.')
+                                );
+                            }
+                            vscode.commands.executeCommand('idea-commit-panel.refresh');
+                        }
+                    } catch (e) {
+                        vscode.window.showErrorMessage(vscode.l10n.t('Smart Checkout failed: {0}', String(e)));
+                    }
+                }
+            );
+        } else if (action === vscode.l10n.t('Force Checkout')) {
+            await vscode.window.withProgress(
+                {
+                    location: vscode.ProgressLocation.Notification,
+                    title: vscode.l10n.t('Force Switching to {0}...', branch),
+                    cancellable: false
+                },
+                async () => {
+                    try {
+                        await this._performCheckout(branch, isRemote, true);
+                        vscode.commands.executeCommand('idea-commit-panel.refresh');
+                    } catch (e) {
+                        vscode.window.showErrorMessage(vscode.l10n.t('Force Checkout failed: {0}', String(e)));
+                    }
+                }
+            );
         }
     }
 

@@ -146,8 +146,12 @@ export class GitService {
         }
     }
 
-    public async switchBranch(branchName: string): Promise<void> {
-        await this.git.checkout(branchName);
+    public async switchBranch(branchName: string, force: boolean = false): Promise<void> {
+        if (force) {
+            await this.git.checkout(['-f', branchName]);
+        } else {
+            await this.git.checkout(branchName);
+        }
     }
 
     public async stageFile(filePath: string): Promise<void> {
@@ -166,8 +170,11 @@ export class GitService {
         await this.git.reset(['HEAD']);
     }
 
-    public async stash(message?: string, files?: string[]): Promise<void> {
+    public async stash(message?: string, files?: string[], includeUntracked: boolean = false): Promise<void> {
         const args = ['push'];
+        if (includeUntracked) {
+            args.push('-u');
+        }
         if (message) {
             args.push('-m', message);
         }
@@ -301,6 +308,15 @@ export class GitService {
     }
     public async dropStash(index: number): Promise<void> {
         await this.git.stash(['drop', `stash@{${index}}`]);
+    }
+
+    public async popLatestStash(): Promise<void> {
+        await this.git.stash(['pop']);
+    }
+
+    public async discardAllChanges(): Promise<void> {
+        await this.git.reset(['--hard']);
+        await this.git.clean('f', ['-d']);
     }
 
     public async commit(message: string, files?: string[]): Promise<void> {
@@ -464,15 +480,30 @@ export class GitService {
         await this.git.checkoutLocalBranch(branchName);
     }
 
-    public async checkoutRemoteBranch(remoteBranch: string): Promise<void> {
+    public async checkoutRemoteBranch(remoteBranch: string, force: boolean = false): Promise<void> {
         const parts = remoteBranch.split('/');
         const localBranchName = parts.slice(1).join('/');
 
         const localBranches = await this.getBranches();
         if (localBranches.all.includes(localBranchName)) {
-            await this.git.checkout(localBranchName);
+            if (force) {
+                await this.git.checkout(['-f', localBranchName]);
+            } else {
+                await this.git.checkout(localBranchName);
+            }
         } else {
-            await this.git.checkout(['-b', localBranchName, '--track', remoteBranch]);
+            // New branch from remote, force doesn't apply to creation usually unless overwrite, 
+            // but here we are checking out. If force is true, we might want to start clean?
+            // But if untracked files conflict with new files from remote, `checkout -b ...` might fail.
+            // `-f` with `-b` implies force creating branch (resetting if exists), but we checked existence.
+            // `git checkout -f -b` isn't standard for "ignore local changes".
+            // Actually `git checkout --track origin/b` will fail if local changes conflict.
+            // So we pass force to the checkout command.
+            const args = ['-b', localBranchName, '--track', remoteBranch];
+            if (force) {
+                args.unshift('-f'); // checkout -f -b ...
+            }
+            await this.git.checkout(args);
         }
     }
 
