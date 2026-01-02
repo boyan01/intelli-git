@@ -1,5 +1,6 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
+import styles from './RebaseForm.module.css';
 
 interface RebaseFormProps {
     message: string;
@@ -23,51 +24,38 @@ export const RebaseForm: React.FC<RebaseFormProps> = ({
     const { t } = useTranslation();
 
     return (
-        <div className="commit-section">
-            <div className="commit-toolbar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ display: 'flex', alignItems: 'center', opacity: 0.7 }}>
-                    <span className="codicon codicon-git-merge" style={{ marginRight: '4px' }}></span>
-                    <span style={{ fontSize: '12px', fontWeight: 'bold' }}>Rebase in progress</span>
+        <div className={styles.commitSection}>
+            <div className={styles.commitToolbar}>
+                <div className={styles.rebaseLabel}>
+                    <span className="codicon codicon-git-merge"></span>
+                    <span>Rebase in progress</span>
                 </div>
                 {(addedCount > 0 || modifiedCount > 0 || deletedCount > 0) && (
-                    <div style={{ fontSize: '12px', opacity: 0.9, display: 'flex', gap: '8px' }}>
-                        {addedCount > 0 && <span style={{ color: 'var(--vscode-gitDecoration-addedResourceForeground)' }}>{t('commitForm.stats.added', { count: addedCount })}</span>}
-                        {modifiedCount > 0 && <span style={{ color: 'var(--vscode-gitDecoration-modifiedResourceForeground)' }}>{t('commitForm.stats.modified', { count: modifiedCount })}</span>}
-                        {deletedCount > 0 && <span style={{ color: 'var(--vscode-gitDecoration-deletedResourceForeground)' }}>{t('commitForm.stats.deleted', { count: deletedCount })}</span>}
+                    <div className={styles.stats}>
+                        {addedCount > 0 && <span className={styles.statAdded}>{t('commitForm.stats.added', { count: addedCount })}</span>}
+                        {modifiedCount > 0 && <span className={styles.statModified}>{t('commitForm.stats.modified', { count: modifiedCount })}</span>}
+                        {deletedCount > 0 && <span className={styles.statDeleted}>{t('commitForm.stats.deleted', { count: deletedCount })}</span>}
                     </div>
                 )}
             </div>
 
             <textarea
+                className={styles.textarea}
                 value={message}
                 onChange={(e) => onMessageChange(e.target.value)}
                 placeholder={t('commitForm.placeholder')}
                 rows={4}
-                style={{
-                    width: 'calc(100% - 16px)',
-                    minHeight: '80px',
-                    padding: '8px',
-                    margin: '8px',
-                    resize: 'vertical',
-                    background: 'var(--vscode-input-background)',
-                    color: 'var(--vscode-input-foreground)',
-                    border: '1px solid var(--vscode-input-border)',
-                    borderRadius: '4px',
-                    fontFamily: 'var(--vscode-font-family)',
-                    opacity: 0.9
-                }}
             />
 
-            <div className="footer-actions">
-                <div className="actions-left">
+            <div className={styles.footerActions}>
+                <div className={styles.actionsLeft}>
                     <button
-                        className="btn btn-primary"
+                        className={`${styles.btn} ${styles.btnPrimary} ${styles.continueBtn}`}
                         onClick={onContinue}
                         disabled={disableContinue}
                         title={disableContinue ? 'Resolve conflicts before continuing' : ''}
-                        style={{ backgroundColor: 'var(--vscode-debugIcon-startForeground)', color: '#fff', width: '100%', opacity: disableContinue ? 0.5 : 1 }}
                     >
-                        <span className="codicon codicon-play" style={{ marginRight: '4px' }}></span>
+                        <span className={`codicon codicon-play ${styles.icon}`}></span>
                         {t('commitForm.actions.continue')}
                     </button>
                 </div>

@@ -1,0 +1,253 @@
+.changelistTree {
+    border-bottom: 1px solid transparent;
+}
+
+.fileGroupHeader {
+    display: flex;
+    align-items: center;
+    padding: 4px 8px;
+    gap: 6px;
+    font-size: 12px;
+    background: var(--vscode-sideBarSectionHeader-background);
+    cursor: pointer;
+    user-select: none;
+}
+
+.fileGroupHeader:hover {
+    background: var(--vscode-list-hoverBackground);
+}
+
+.fileGroupHeader .checkbox {
+    margin: 0;
+}
+
+.arrow {
+    font-size: 10px;
+    transition: transform 0.15s;
+}
+
+/* Note: rotation helps to be inline style often, but we can do class based too */
+.arrowCollapsed {
+    transform: rotate(-90deg);
+}
+
+.title {
+    flex: 1;
+}
+
+.fileCount {
+    margin-left: 8px;
+    padding: 1px 6px;
+    font-size: 10px;
+    background: var(--vscode-badge-background);
+    color: var(--vscode-badge-foreground);
+    border-radius: 10px;
+    flex-shrink: 0;
+}
+
+.changelistContent {
+    margin-left: 8px;
+}
+
+.fileItem {
+    display: flex;
+    align-items: center;
+    padding: 3px 8px;
+    font-size: 13px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    user-select: none;
+    cursor: pointer;
+    border-radius: 4px;
+    gap: 6px;
+}
+
+.fileItem:hover {
+    background: var(--vscode-list-hoverBackground);
+}
+
+.fileItem.active {
+    background: var(--vscode-list-activeSelectionBackground);
+    color: var(--vscode-list-activeSelectionForeground);
+}
+
+.fileItem.active .name {
+    color: inherit;
+}
+
+.checkbox {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    border: 1px solid var(--vscode-checkbox-border, #6b6b6b);
+    border-radius: 3px;
+    background: var(--vscode-checkbox-background, transparent);
+    cursor: pointer;
+    flex-shrink: 0;
+    margin: 0;
+    position: relative;
+}
+
+.checkbox:checked {
+    background: var(--vscode-checkbox-selectBackground, #007acc);
+    border-color: var(--vscode-checkbox-selectBorder, #007acc);
+}
+
+.checkbox:checked::after {
+    content: '';
+    position: absolute;
+    left: 4px;
+    top: 1px;
+    width: 4px;
+    height: 8px;
+    border: solid var(--vscode-checkbox-foreground, #fff);
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+}
+
+.checkbox:indeterminate {
+    background: var(--vscode-checkbox-selectBackground, #007acc);
+    border-color: var(--vscode-checkbox-selectBorder, #007acc);
+}
+
+.checkbox:indeterminate::after {
+    content: '';
+    position: absolute;
+    left: 3px;
+    top: 6px;
+    width: 8px;
+    height: 2px;
+    background: var(--vscode-checkbox-foreground, #fff);
+}
+
+.checkbox:focus {
+    outline: none;
+}
+
+.icon {
+    width: 16px;
+    text-align: center;
+    opacity: 0.8;
+}
+
+.folderHeader .icon {
+    width: 16px;
+    text-align: center;
+    opacity: 0.8;
+    margin-right: 4px;
+    color: var(--vscode-icon-foreground);
+}
+
+.fileIconSvg {
+    width: 16px;
+    height: 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    overflow: hidden;
+}
+
+.fileIconSvg svg {
+    width: 24px;
+    height: 24px;
+    fill: currentColor;
+    margin: -4px;
+}
+
+.name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.statusM {
+    color: var(--vscode-gitDecoration-modifiedResourceForeground, #e2c08d);
+}
+
+.statusA {
+    color: var(--vscode-gitDecoration-addedResourceForeground, #81b88b);
+}
+
+.statusD {
+    color: var(--vscode-foreground);
+    text-decoration: line-through;
+    opacity: 0.6;
+}
+
+.statusR {
+    color: var(--vscode-gitDecoration-renamedResourceForeground, #e2c08d);
+}
+
+.statusUntracked {
+    color: #E98F89;
+}
+
+.statusIgnored {
+    color: var(--vscode-gitDecoration-ignoredResourceForeground, #808080);
+    opacity: 0.7;
+}
+
+.folderItem {
+    display: flex;
+    flex-direction: column;
+}
+
+.folderHeader {
+    display: flex;
+    align-items: center;
+    padding: 4px 8px;
+    cursor: pointer;
+    user-select: none;
+    font-weight: 500;
+}
+
+.folderHeader:hover {
+    background: var(--vscode-list-hoverBackground);
+}
+
+.folderHeader .checkbox {
+    margin: 0;
+    margin-right: 4px;
+}
+
+.folderChildren {
+    /* Consistent indenting for folder children */
+}
+
+.fileDirPath {
+    margin-left: auto;
+    padding-left: 16px;
+    color: var(--vscode-descriptionForeground);
+    font-size: 11px;
+    opacity: 0.7;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 50%;
+}
+
+.emptyState {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+    color: var(--vscode-descriptionForeground);
+    font-size: 13px;
+    opacity: 0.7;
+    text-align: center;
+}
+
+.fileTreeRoot {
+    display: flex;
+    flex-direction: column;
+}
+
+.fileTreeList {
+    flex: 1;
+    overflow-y: auto;
+    min-height: 100px;
+}

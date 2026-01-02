@@ -1,0 +1,110 @@
+.commitSection {
+    border-top: 1px solid var(--vscode-panel-border);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    padding-bottom: 8px;
+}
+
+.commitToolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 8px;
+}
+
+.rebaseLabel {
+    display: flex;
+    align-items: center;
+    opacity: 0.7;
+    font-size: 12px;
+    font-weight: bold;
+    gap: 4px;
+}
+
+.stats {
+    font-size: 12px;
+    opacity: 0.9;
+    display: flex;
+    gap: 8px;
+}
+
+.statAdded {
+    color: var(--vscode-gitDecoration-addedResourceForeground);
+}
+
+.statModified {
+    color: var(--vscode-gitDecoration-modifiedResourceForeground);
+}
+
+.statDeleted {
+    color: var(--vscode-gitDecoration-deletedResourceForeground);
+}
+
+.textarea {
+    width: calc(100% - 16px);
+    min-height: 80px;
+    padding: 8px;
+    margin: 8px;
+    resize: vertical;
+    background: var(--vscode-input-background);
+    color: var(--vscode-input-foreground);
+    border: 1px solid var(--vscode-input-border);
+    border-radius: 4px;
+    font-family: var(--vscode-editor-font-family);
+    opacity: 0.9;
+}
+
+.textarea:focus {
+    outline: none;
+    border-color: var(--vscode-focusBorder);
+}
+
+.footerActions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px;
+    gap: 8px;
+    flex-shrink: 0;
+    border-top: 1px solid var(--vscode-panel-border);
+}
+
+.actionsLeft {
+    flex: 1;
+}
+
+.btn {
+    padding: 4px 12px;
+    font-size: 12px;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btnPrimary {
+    background: var(--vscode-button-background);
+    color: var(--vscode-button-foreground);
+}
+
+.btnPrimary:hover {
+    background: var(--vscode-button-hoverBackground);
+}
+
+.continueBtn {
+    background-color: var(--vscode-debugIcon-startForeground);
+    color: #fff;
+    width: 100%;
+}
+
+.continueBtn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.continueBtn .icon {
+    margin-right: 4px;
+}

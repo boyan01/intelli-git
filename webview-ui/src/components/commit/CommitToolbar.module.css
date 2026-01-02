@@ -1,0 +1,50 @@
+.commitToolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 8px;
+    flex-shrink: 0;
+}
+
+.toolbarLeft {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.toolbarSeparator {
+    width: 1px;
+    height: 16px;
+    background: var(--vscode-panel-border);
+    margin: 0 6px;
+}
+
+.iconBtn {
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    background: transparent;
+    border: none;
+    color: var(--vscode-foreground);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 3px;
+}
+
+.iconBtn:hover {
+    background: var(--vscode-toolbar-hoverBackground);
+}
+
+.iconBtn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    pointer-events: none;
+    color: var(--vscode-disabledForeground);
+}
+
+.iconBtn.active {
+    background: var(--vscode-list-activeSelectionBackground);
+    color: var(--vscode-list-activeSelectionForeground);
+}

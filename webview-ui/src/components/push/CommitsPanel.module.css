@@ -1,0 +1,119 @@
+.commitsPanel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid var(--vscode-panel-border);
+    min-width: 200px;
+}
+
+.commitsHeader {
+    padding: 8px;
+    border-bottom: 1px solid var(--vscode-panel-border);
+    background-color: var(--vscode-sideBarSectionHeader-background);
+}
+
+.branchFlow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+}
+
+.localBranch {
+    font-weight: 500;
+    color: var(--vscode-gitDecoration-addedResourceForeground);
+}
+
+.arrow {
+    color: var(--vscode-descriptionForeground);
+}
+
+.remoteSelector {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.branchSelect {
+    background: var(--vscode-dropdown-background);
+    color: var(--vscode-dropdown-foreground);
+    border: 1px solid var(--vscode-dropdown-border);
+    padding: 2px 4px;
+    border-radius: 2px;
+}
+
+.separator {
+    color: var(--vscode-descriptionForeground);
+}
+
+.branchInputWrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.branchInput {
+    background: var(--vscode-input-background);
+    color: var(--vscode-input-foreground);
+    border: 1px solid var(--vscode-input-border);
+    padding: 2px 4px;
+    border-radius: 2px;
+    width: 120px;
+}
+
+.commitsList {
+    flex: 1;
+    overflow-y: auto;
+}
+
+.commitItem {
+    padding: 8px 12px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--vscode-panel-border);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.commitItem:hover {
+    background-color: var(--vscode-list-hoverBackground);
+}
+
+.selected {
+    background-color: var(--vscode-list-activeSelectionBackground);
+    color: var(--vscode-list-activeSelectionForeground);
+}
+
+.commitHash {
+    font-family: var(--vscode-editor-font-family, monospace);
+    font-size: 11px;
+    color: var(--vscode-descriptionForeground);
+    flex-shrink: 0;
+}
+
+.commitMessage {
+    flex: 1;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.commitMeta {
+    display: flex;
+    gap: 8px;
+    font-size: 11px;
+    opacity: 0.8;
+    flex-shrink: 0;
+}
+
+.commitDate {
+    white-space: nowrap;
+}
+
+.commitAuthor {
+    max-width: 100px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}

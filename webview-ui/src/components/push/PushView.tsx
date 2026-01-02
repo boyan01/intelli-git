@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { CommitInfo, CommitFile, PushConfig, PushViewMessage, PushViewExtMessage, FileStatus } from '@shared/messages';
 import { SimpleFileTree } from '../file-tree/SimpleFileTree';
+import { CommitsPanel } from './CommitsPanel';
 import { vscode } from '../../lib/vscode';
 import { useTranslation } from 'react-i18next';
+import styles from './PushView.module.css';
 
 export function PushView() {
     const { t } = useTranslation();
@@ -57,18 +59,16 @@ export function PushView() {
         postMessage({ type: 'selectCommit', index });
     };
 
-    const handleRemoteChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-        if (!config) return;
-        postMessage({ type: 'changeRemote', remote: e.target.value });
+    const handleRemoteChange = (remote: string) => {
+        postMessage({ type: 'changeRemote', remote });
     };
 
-    const handleRemoteBranchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (!config) return;
-        postMessage({ type: 'changeRemoteBranch', branch: e.target.value });
+    const handleRemoteBranchChange = (branch: string) => {
+        postMessage({ type: 'changeRemoteBranch', branch });
     };
 
     if (!config) {
-        return <div className="loading-overlay"><div className="loading-spinner"></div></div>;
+        return <div className={styles.loadingOverlay}><div className={styles.loadingSpinner}></div></div>;
     }
 
     const selectedCommit = commits.find(c => c.hash === selectedCommitHash);
@@ -80,74 +80,35 @@ export function PushView() {
     }));
 
     return (
-        <div className="push-panel">
-            <div className="push-header">
+        <div className={styles.pushPanel}>
+            <div className={styles.pushHeader}>
                 <h2>{t('pushView.title')}</h2>
-                <button className="header-close-btn" onClick={() => postMessage({ type: 'cancel' })} title={t('pushView.close')}>
+                <button className={styles.headerCloseBtn} onClick={() => postMessage({ type: 'cancel' })} title={t('pushView.close')}>
                     <i className="codicon codicon-close"></i>
                 </button>
             </div>
 
-            <div className="push-main">
+            <div className={styles.pushMain}>
                 {/* Left: Commits Panel */}
-                <div className="commits-panel">
-                    <div className="commits-header">
-                        <div className="branch-flow">
-                            <span className="local-branch">{config.currentBranch}</span>
-                            <span className="arrow">→</span>
-                            <div className="remote-selector">
-                                <select
-                                    className="branch-select"
-                                    value={config.remote}
-                                    onChange={handleRemoteChange}
-                                >
-                                    {config.remotes.map(r => (
-                                        <option key={r} value={r}>{r}</option>
-                                    ))}
-                                </select>
-                                <span className="separator">:</span>
-                                <div className="branch-input-wrapper">
-                                    <input
-                                        type="text"
-                                        className="branch-input"
-                                        defaultValue={config.remoteBranch}
-                                        onBlur={handleRemoteBranchChange}
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Enter') handleRemoteBranchChange(e as any);
-                                        }}
-                                        placeholder="branch name"
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="commits-list">
-                        {commits.map((commit, index) => (
-                            <div
-                                key={commit.hash}
-                                className={`commit-item ${selectedCommitHash === commit.hash ? 'selected' : ''}`}
-                                onClick={() => handleSelectCommit(index, commit.hash)}
-                            >
-                                <div className="commit-message" title={commit.subject}>{commit.subject}</div>
-                                <div className="commit-meta">
-                                    <span className="commit-hash">{commit.shortHash}</span>
-                                    <span className="commit-date">{commit.date}</span>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
+                <CommitsPanel
+                    commits={commits}
+                    config={config}
+                    selectedCommitHash={selectedCommitHash}
+                    onSelectCommit={handleSelectCommit}
+                    onRemoteChange={handleRemoteChange}
+                    onRemoteBranchChange={handleRemoteBranchChange}
+                />
 
                 {/* Right: Files + Details */}
-                <div className="files-panel">
+                <div className={styles.filesPanel}>
                     {/* Top: File List */}
-                    <div className="files-view-container">
-                        <div className="files-toolbar">
+                    <div className={styles.filesViewContainer}>
+                        <div className={styles.filesToolbar}>
                             <div className="toolbar-left">
-                                <span className="files-count">{t('pushView.files', { count: files.length })}</span>
+                                <span className={styles.filesCount}>{t('pushView.files', { count: files.length })}</span>
                             </div>
                         </div>
-                        <div className="files-tree-wrapper">
+                        <div className={styles.filesTreeWrapper}>
                             <SimpleFileTree
                                 files={fileStatusList}
                                 viewMode="tree"
@@ -157,22 +118,22 @@ export function PushView() {
 
                     {/* Bottom: Commit Details */}
                     {selectedCommit && (
-                        <div className="commit-details-pane">
-                            <div className="details-header">{t('pushView.commitDetails.title')}</div>
-                            <div className="details-content">
-                                <div className="detail-row author">
-                                    <span className="label">{t('pushView.commitDetails.author')}</span>
-                                    <span className="value">{selectedCommit.authorName}</span>
+                        <div className={styles.commitDetailsPane}>
+                            <div className={styles.detailsHeader}>{t('pushView.commitDetails.title')}</div>
+                            <div className={styles.detailsContent}>
+                                <div className={styles.detailRow}>
+                                    <span className={styles.label}>{t('pushView.commitDetails.author')}</span>
+                                    <span className={styles.value}>{selectedCommit.authorName}</span>
                                 </div>
-                                <div className="detail-row hash">
-                                    <span className="label">{t('pushView.commitDetails.hash')}</span>
-                                    <span className="value">{selectedCommit.hash}</span>
+                                <div className={styles.detailRow}>
+                                    <span className={styles.label}>{t('pushView.commitDetails.hash')}</span>
+                                    <span className={styles.value}>{selectedCommit.hash}</span>
                                 </div>
-                                <div className="detail-row date">
-                                    <span className="label">{t('pushView.commitDetails.date')}</span>
-                                    <span className="value">{selectedCommit.date}</span>
+                                <div className={styles.detailRow}>
+                                    <span className={styles.label}>{t('pushView.commitDetails.date')}</span>
+                                    <span className={styles.value}>{selectedCommit.date}</span>
                                 </div>
-                                <div className="detail-message">
+                                <div className={styles.detailMessage}>
                                     {selectedCommit.subject}
                                 </div>
                             </div>
@@ -181,9 +142,9 @@ export function PushView() {
                 </div>
             </div>
 
-            <div className="push-footer">
-                <div className="footer-left">
-                    <div className="push-tags-group">
+            <div className={styles.pushFooter}>
+                <div className={styles.footerLeft}>
+                    <div className={styles.pushTagsGroup}>
                         <label>
                             <input
                                 type="checkbox"
@@ -194,19 +155,19 @@ export function PushView() {
                         </label>
                     </div>
                 </div>
-                <div className="footer-right">
-                    <button className="btn btn-secondary" onClick={() => postMessage({ type: 'cancel' })}>{t('pushView.cancel')}</button>
-                    <div className="btn-split" style={{ position: 'relative' }}>
-                        <button className="btn btn-primary btn-main" onClick={() => handlePush(false)}>{t('pushView.push')}</button>
+                <div className={styles.footerRight}>
+                    <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={() => postMessage({ type: 'cancel' })}>{t('pushView.cancel')}</button>
+                    <div className={styles.btnSplit} style={{ position: 'relative' }}>
+                        <button className={`${styles.btn} ${styles.btnPrimary} ${styles.btnMain}`} onClick={() => handlePush(false)}>{t('pushView.push')}</button>
                         <button
-                            className="btn btn-primary btn-dropdown"
+                            className={`${styles.btn} ${styles.btnPrimary} ${styles.btnDropdown}`}
                             onClick={() => setIsForcePushExpanded(!isForcePushExpanded)}
                         >
                             <i className="codicon codicon-chevron-down"></i>
                         </button>
                         {isForcePushExpanded && (
-                            <div className="dropdown-menu" style={{ display: 'block', bottom: '100%', top: 'auto' }}>
-                                <div className="dropdown-item" onClick={() => {
+                            <div className={styles.dropdownMenu} style={{ display: 'block', bottom: '100%', top: 'auto' }}>
+                                <div className={styles.dropdownItem} onClick={() => {
                                     handlePush(true);
                                     setIsForcePushExpanded(false);
                                 }}>
@@ -220,8 +181,8 @@ export function PushView() {
             </div>
 
             {isPushing && (
-                <div className="loading-overlay">
-                    <div className="loading-spinner"></div>
+                <div className={styles.loadingOverlay}>
+                    <div className={styles.loadingSpinner}></div>
                 </div>
             )}
         </div>

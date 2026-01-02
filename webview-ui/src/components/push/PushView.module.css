@@ -1,0 +1,254 @@
+.pushPanel {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    background: var(--vscode-sideBar-background);
+}
+
+.pushHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 16px;
+    height: 35px;
+    background: var(--vscode-sideBarSectionHeader-background);
+    border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.pushHeader h2 {
+    margin: 0;
+    font-size: 11px;
+    font-weight: bold;
+    text-transform: uppercase;
+    color: var(--vscode-sideBarSectionHeader-foreground);
+}
+
+.headerCloseBtn {
+    background: transparent;
+    border: none;
+    color: var(--vscode-foreground);
+    cursor: pointer;
+    padding: 4px;
+}
+
+.pushMain {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+.filesPanel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    border-left: 1px solid var(--vscode-panel-border);
+    min-width: 0;
+}
+
+.filesViewContainer {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.filesToolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 8px;
+    border-bottom: 1px solid var(--vscode-panel-border);
+    flex-shrink: 0;
+}
+
+.filesCount {
+    font-size: 11px;
+    color: var(--vscode-descriptionForeground);
+}
+
+.filesTreeWrapper {
+    flex: 1;
+    overflow-y: auto;
+}
+
+.commitDetailsPane {
+    flex: 0 0 auto;
+    max-height: 40%;
+    border-top: 1px solid var(--vscode-panel-border);
+    display: flex;
+    flex-direction: column;
+}
+
+.detailsHeader {
+    padding: 4px 8px;
+    font-size: 11px;
+    font-weight: bold;
+    background: var(--vscode-sideBarSectionHeader-background);
+    border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.detailsContent {
+    padding: 12px;
+    overflow-y: auto;
+}
+
+.detailRow {
+    display: flex;
+    margin-bottom: 8px;
+    font-size: 12px;
+}
+
+.detailRow .label {
+    width: 60px;
+    color: var(--vscode-descriptionForeground);
+    flex-shrink: 0;
+}
+
+.detailRow .value {
+    flex: 1;
+    word-break: break-all;
+}
+
+.detailMessage {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--vscode-panel-border);
+    white-space: pre-wrap;
+    font-family: var(--vscode-editor-font-family);
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.pushFooter {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px;
+    border-top: 1px solid var(--vscode-panel-border);
+    background: var(--vscode-sideBar-background);
+    gap: 12px;
+}
+
+.footerLeft {
+    flex: 1;
+}
+
+.footerRight {
+    display: flex;
+    gap: 8px;
+}
+
+.pushTagsGroup label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.btn {
+    padding: 4px 12px;
+    font-size: 12px;
+    border: none;
+    border-radius: 2px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 24px;
+}
+
+.btnPrimary {
+    background: var(--vscode-button-background);
+    color: var(--vscode-button-foreground);
+}
+
+.btnPrimary:hover {
+    background: var(--vscode-button-hoverBackground);
+}
+
+.btnSecondary {
+    background: var(--vscode-button-secondaryBackground);
+    color: var(--vscode-button-secondaryForeground);
+}
+
+.btnSecondary:hover {
+    background: var(--vscode-button-secondaryHoverBackground);
+}
+
+.btnSplit {
+    display: flex;
+    position: relative;
+}
+
+.btnMain {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.btnDropdown {
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    padding: 0 4px;
+}
+
+.dropdownMenu {
+    position: absolute;
+    bottom: 100%;
+    right: 0;
+    margin-bottom: 4px;
+    background: var(--vscode-dropdown-background);
+    border: 1px solid var(--vscode-dropdown-border);
+    border-radius: 3px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    z-index: 100;
+    min-width: 150px;
+}
+
+.dropdownItem {
+    padding: 6px 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--vscode-dropdown-foreground);
+}
+
+.dropdownItem:hover {
+    background: var(--vscode-list-hoverBackground);
+}
+
+.loadingOverlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.loadingSpinner {
+    width: 24px;
+    height: 24px;
+    border: 2px solid var(--vscode-progressBar-background);
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}

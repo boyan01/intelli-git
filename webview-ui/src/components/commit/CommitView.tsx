@@ -8,6 +8,7 @@ import { StashList } from '../stash/StashList';
 import { useVSCode } from '../../hooks/useVSCode';
 import { vscode } from '../../lib/vscode';
 import { useTranslation } from 'react-i18next';
+import styles from './CommitView.module.css';
 
 export function CommitView() {
     const { t } = useTranslation();
@@ -138,40 +139,32 @@ export function CommitView() {
     };
 
     return (
-        <div className="commit-panel">
-            <div className="header-tabs">
-                <div className="tabs-left">
+        <div className={styles.commitPanel}>
+            <div className={styles.headerTabs}>
+                <div className={styles.tabsLeft}>
                     <button
-                        className={`tab ${activeTab === 'commit' ? 'active' : ''}`}
+                        className={`${styles.tab} ${activeTab === 'commit' ? styles.active : ''}`}
                         onClick={() => setActiveTab('commit')}
                     >
                         {t('commitView.tabs.commit')}
                     </button>
                     <button
-                        className={`tab ${activeTab === 'stash' ? 'active' : ''}`}
+                        className={`${styles.tab} ${activeTab === 'stash' ? styles.active : ''}`}
                         onClick={() => setActiveTab('stash')}
                     >
                         {t('commitView.tabs.stash')}
                     </button>
                 </div>
-                <div className="tabs-right">
-                    <button className="icon-btn" title={t('commitView.toolbar.fetch')} onClick={handleFetch}>
+                <div className={styles.tabsRight}>
+                    <button className={styles.iconBtn} title={t('commitView.toolbar.fetch')} onClick={handleFetch}>
                         <i className="codicon codicon-cloud-download"></i>
                     </button>
 
                     {incomingCommits > 0 && (
                         <div
-                            className="incoming-commits hover-effect"
+                            className={styles.incomingCommits}
                             onClick={handleFetch}
                             title={t('toolbar.incomingTooltip', { count: incomingCommits })}
-                            style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                cursor: 'pointer',
-                                padding: '2px 6px',
-                                fontSize: '11px'
-                            }}
                         >
                             <span className="codicon codicon-cloud-download"></span>
                             <span>{incomingCommits}</span>
@@ -181,23 +174,11 @@ export function CommitView() {
 
                     {branches?.current && (
                         <div
-                            className={`branch-indicator ${branches.rebaseStatus && branches.rebaseStatus !== 'none' ? 'rebase-active' : ''}`}
+                            className={`${styles.branchIndicator} ${branches.rebaseStatus && branches.rebaseStatus !== 'none' ? styles.rebaseActive : ''}`}
                             onClick={handleBranchClick}
                             title={branches.rebaseStatus && branches.rebaseStatus !== 'none'
                                 ? `Rebase in progress (${branches.rebaseStatus})`
                                 : t('toolbar.branchTooltip')}
-                            style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                cursor: 'pointer',
-                                marginLeft: '4px',
-                                padding: '2px 6px',
-                                borderRadius: '3px',
-                                marginRight: '4px',
-                                height: '20px',
-                                backgroundColor: branches.rebaseStatus && branches.rebaseStatus !== 'none' ? 'var(--vscode-inputValidation-warningBackground)' : undefined,
-                                border: branches.rebaseStatus && branches.rebaseStatus !== 'none' ? '1px solid var(--vscode-inputValidation-warningBorder)' : undefined
-                            }}
                         >
                             {branches.rebaseStatus && branches.rebaseStatus !== 'none' ? (
                                 <>
@@ -206,34 +187,22 @@ export function CommitView() {
                                         {branches.rebaseStatus === 'interactive' ? 'Rebasing' : 'Merging'}
                                     </span>
                                     <div
-                                        className="continue-btn hover-effect"
+                                        className={styles.continueBtn}
                                         onClick={(e) => {
                                             e.stopPropagation();
                                             vscode.postMessage({ type: 'continueRebase' });
                                         }}
                                         title="Continue Rebase/Merge"
-                                        style={{
-                                            marginLeft: '4px',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            color: 'var(--vscode-debugIcon-startForeground)'
-                                        }}
                                     >
                                         <span className="codicon codicon-play"></span>
                                     </div>
                                     <div
-                                        className="abort-btn hover-effect"
+                                        className={styles.abortBtn}
                                         onClick={(e) => {
                                             e.stopPropagation();
                                             vscode.postMessage({ type: 'abortRebase' });
                                         }}
                                         title="Abort Rebase/Merge"
-                                        style={{
-                                            marginLeft: '4px',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            color: 'var(--vscode-errorForeground)'
-                                        }}
                                     >
                                         <span className="codicon codicon-close"></span>
                                     </div>
@@ -261,14 +230,14 @@ export function CommitView() {
                         </div>
                     )}
 
-                    <button className="icon-btn" title="More Actions">
+                    <button className={styles.iconBtn} title="More Actions">
                         <i className="codicon codicon-ellipsis"></i>
                     </button>
                 </div>
             </div>
 
             {activeTab === 'commit' && (
-                <div className="tab-content active">
+                <div className={`${styles.tabContent} ${activeTab === 'commit' ? styles.active : ''}`}>
                     <CommitToolbar
                         viewMode={viewMode}
                         selectedFiles={selectedFiles}
@@ -277,9 +246,9 @@ export function CommitView() {
                         onCollapseAll={() => setCollapsedGroups(new Set(changelists.map(g => g.id)))}
                     />
 
-                    <div className="file-list-container">
+                    <div className={styles.fileListContainer}>
                         {changelists.length === 0 ? (
-                            <div className="empty-state">{t('commitView.emptyState')}</div>
+                            <div className={styles.emptyState}>{t('commitView.emptyState')}</div>
                         ) : (
                             changelists.map(group => (
                                 <ChangelistTree
@@ -335,7 +304,7 @@ export function CommitView() {
             )}
 
             {activeTab === 'stash' && (
-                <div className="tab-content active">
+                <div className={`${styles.tabContent} ${activeTab === 'stash' ? styles.active : ''}`}>
                     <StashList stashes={stashList} onAction={handleStashAction} />
                 </div>
             )}

@@ -11,11 +11,12 @@ export interface FileStatus {
 
 export interface CommitInfo {
     hash: string;
-    fullHash: string;
-    message: string;
-    author: string;
-    email: string;
+    shortHash: string;
+    subject: string;
+    authorName: string;
     date: string;
+    email?: string;
+    fullHash?: string;
 }
 
 export class GitService {
@@ -489,12 +490,13 @@ export class GitService {
             });
 
             return log.all.map(commit => ({
-                hash: commit.hash.substring(0, 8),
-                fullHash: commit.hash,
-                message: commit.message,
-                author: commit.author_name,
+                hash: commit.hash,
+                shortHash: commit.hash.substring(0, 8),
+                subject: commit.message,
+                authorName: commit.author_name,
+                date: commit.date,
                 email: commit.author_email,
-                date: commit.date
+                fullHash: commit.hash
             }));
         } catch (e) {
             console.error('Error getting commits to push:', e);
@@ -515,12 +517,13 @@ export class GitService {
         try {
             const log = await this.git.log({ maxCount: count });
             return log.all.map(commit => ({
-                hash: commit.hash.substring(0, 8),
-                fullHash: commit.hash,
-                message: commit.message,
-                author: commit.author_name,
+                hash: commit.hash,
+                shortHash: commit.hash.substring(0, 8),
+                subject: commit.message,
+                authorName: commit.author_name,
+                date: commit.date,
                 email: commit.author_email,
-                date: commit.date
+                fullHash: commit.hash
             }));
         } catch {
             return [];

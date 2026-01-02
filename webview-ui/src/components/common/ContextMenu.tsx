@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import styles from './ContextMenu.module.css';
 
 export interface ContextMenuItem {
     icon?: string;
@@ -58,18 +59,18 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({ items, position, onClo
     return (
         <div
             ref={menuRef}
-            className="context-menu"
+            className={styles.contextMenu}
             style={{ left: position.x, top: position.y }}
         >
             {items.map((item, index) => {
                 if (item.separator) {
-                    return <div key={index} className="context-menu-separator" />;
+                    return <div key={index} className={styles.contextMenuSeparator} />;
                 }
 
                 return (
                     <div
                         key={index}
-                        className={`context-menu-item ${item.disabled ? 'disabled' : ''}`}
+                        className={`${styles.contextMenuItem} ${item.disabled ? styles.disabled : ''}`}
                         onClick={() => {
                             if (!item.disabled) {
                                 item.onClick();
@@ -77,10 +78,10 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({ items, position, onClo
                             }
                         }}
                     >
-                        <span className="context-menu-item-icon">
+                        <span className={styles.contextMenuItemIcon}>
                             {item.icon && <i className={`codicon codicon-${item.icon}`} />}
                         </span>
-                        <span className="context-menu-item-label">{item.label}</span>
+                        <span className={styles.contextMenuItemLabel}>{item.label}</span>
                     </div>
                 );
             })}

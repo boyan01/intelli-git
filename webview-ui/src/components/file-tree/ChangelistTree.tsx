@@ -5,6 +5,7 @@ import { ContextMenu } from '../common/ContextMenu';
 import type { ContextMenuItem } from '../common/ContextMenu';
 import { vscode } from '../../lib/vscode';
 import { getFileIcon } from '../../lib/fileIcons';
+import styles from './FileTree.module.css';
 
 interface ChangelistTreeProps {
     group: ChangelistGroup;
@@ -266,10 +267,17 @@ export const ChangelistTree: React.FC<ChangelistTreeProps> = ({
             const isDeleted = node.status === 'D';
             const statusColor = getStatusColor(node.status);
 
+            const statusClass = node.status === 'M' ? styles.statusM :
+                node.status === 'A' ? styles.statusA :
+                    node.status === 'D' ? styles.statusD :
+                        node.status === 'R' ? styles.statusR :
+                            node.status === '?' ? styles.statusUntracked :
+                                node.status === '!' ? styles.statusIgnored : '';
+
             return (
                 <div
                     key={node.path}
-                    className={`file-item ${isActive ? 'active' : ''}`}
+                    className={`${styles.fileItem} ${isActive ? styles.active : ''}`}
                     style={{ paddingLeft: `${28 + depth * 16}px` }}
                     onClick={() => handleFileClick(node.path, node.status)}
                     onContextMenu={(e) => handleContextMenu(e, buildFileContextMenu(node.path, node.status))}
@@ -277,33 +285,30 @@ export const ChangelistTree: React.FC<ChangelistTreeProps> = ({
                     {!readonly && (
                         <input
                             type="checkbox"
-                            className="checkbox"
+                            className={styles.checkbox}
                             checked={selectedFiles.has(node.path)}
                             onClick={(e) => e.stopPropagation()}
                             onChange={(e) => onToggleFile(node.path, e.target.checked)}
                         />
                     )}
                     {isConflict ? (
-                        <span className="codicon codicon-warning icon" style={{ color: statusColor }}></span>
+                        <span className={`codicon codicon-warning ${styles.icon}`} style={{ color: statusColor }}></span>
                     ) : (
                         <span
-                            className="file-icon-svg"
+                            className={styles.fileIconSvg}
                             style={{ color: getFileIcon(node.name).color }}
                             dangerouslySetInnerHTML={{ __html: getFileIcon(node.name).svg }}
                         />
                     )}
                     <span
-                        className={`name status-${node.status}`}
-                        style={{
-                            color: statusColor,
-                            textDecoration: isDeleted ? 'line-through' : 'none',
-                            opacity: isDeleted ? 0.7 : 1
-                        }}
+                        className={`${styles.name} ${statusClass}`}
+                        style={isDeleted ? undefined : { color: statusColor }} // Keep inline color for ones not covered by class or overrides
+                    // Note: statusD has line-through in CSS
                     >
                         {node.name}
                     </span>
                     {showPath && (
-                        <span className="file-dir-path">{getDirPath(node.path)}</span>
+                        <span className={styles.fileDirPath}>{getDirPath(node.path)}</span>
                     )}
                 </div>
             );
@@ -318,24 +323,24 @@ export const ChangelistTree: React.FC<ChangelistTreeProps> = ({
         const partialSelected = !allSelected && descendantPaths.some(p => selectedFiles.has(p));
 
         // Use 'folder-header' for both root and regular folders to ensure consistent styling
-        const headerClass = 'folder-header';
+        // const headerClass = 'folder-header'; -> styles.folderHeader
 
         return (
-            <div key={node.path} className={isRoot ? "changelist-tree" : "file-tree-item folder"}>
+            <div key={node.path} className={isRoot ? styles.changelistTree : `${styles.folderItem} ${styles.folder}`}>
                 <div
-                    className={headerClass}
+                    className={styles.folderHeader}
                     style={isRoot ? undefined : { paddingLeft: `${depth * 16}px` }}
                     onClick={toggleHandler}
                     onContextMenu={isRoot ? undefined : (e) => handleContextMenu(e, buildFolderContextMenu(node))}
                 >
                     <span
-                        className={`codicon codicon-chevron-right icon arrow`}
+                        className={`codicon codicon-chevron-right ${styles.icon} ${styles.arrow}`}
                         style={{ transform: isExpanded ? 'rotate(90deg)' : 'none', transition: 'transform 0.1s' }}
                     ></span>
                     {!readonly && descendantPaths.length > 0 && (
                         <input
                             type="checkbox"
-                            className="checkbox"
+                            className={styles.checkbox}
                             checked={allSelected}
                             ref={input => { if (input) input.indeterminate = partialSelected; }}
                             onClick={(e) => e.stopPropagation()}
@@ -343,13 +348,13 @@ export const ChangelistTree: React.FC<ChangelistTreeProps> = ({
                         />
                     )}
                     {!isRoot && (
-                        <span className="codicon codicon-folder icon"></span>
+                        <span className={`codicon codicon-folder ${styles.icon}`}></span>
                     )}
-                    <span className="name">{node.name}</span>
-                    <span className="file-count">{node.fileCount}</span>
+                    <span className={styles.name}>{node.name}</span>
+                    <span className={styles.fileCount}>{node.fileCount}</span>
                 </div>
                 {isExpanded && (
-                    <div className={isRoot ? "changelist-content" : "folder-children"}>
+                    <div className={isRoot ? styles.changelistContent : styles.folderChildren}>
                         {node.children?.map(child => renderTreeNode(child, isRoot ? (viewMode === 'tree' ? 1 : 0) : depth + 1))}
                     </div>
                 )}

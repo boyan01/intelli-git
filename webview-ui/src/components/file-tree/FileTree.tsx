@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useCallback } from 'react';
 import type { FileStatus, ChangelistGroup } from '@shared/messages';
 import { getFileIcon } from '../../lib/fileIcons';
+import styles from './FileTree.module.css';
 
 interface FileTreeProps {
     changelists: ChangelistGroup[];
@@ -153,40 +154,55 @@ export const FileTree: React.FC<FileTreeProps> = ({
         files.forEach(f => onToggleFile(f.path, checked));
     }, [readonly, onToggleFile]);
 
-    const renderFileItem = (file: FileStatus, showPath: boolean) => (
-        <div key={file.path} className="file-item">
-            {!readonly && (
-                <input
-                    type="checkbox"
-                    className="checkbox"
-                    checked={selectedFiles.has(file.path)}
-                    onChange={(e) => onToggleFile(file.path, e.target.checked)}
-                />
-            )}
-            <span className="file-icon-svg" style={{ color: getFileIcon(file.path.split('/').pop() || file.path).color }} dangerouslySetInnerHTML={{ __html: getFileIcon(file.path.split('/').pop() || file.path).svg }} />
-            <span className={`name status-${file.status}`}>
-                {file.path.split('/').pop()}
-            </span>
-            {showPath && (
-                <span className="file-dir-path">{getDirPath(file.path)}</span>
-            )}
-        </div>
-    );
+    const renderFileItem = (file: FileStatus, showPath: boolean) => {
+        const statusClass = file.status === 'M' ? styles.statusM :
+            file.status === 'A' ? styles.statusA :
+                file.status === 'D' ? styles.statusD :
+                    file.status === 'R' ? styles.statusR :
+                        file.status === '?' ? styles.statusUntracked :
+                            file.status === '!' ? styles.statusIgnored : '';
+
+        return (
+            <div key={file.path} className={styles.fileItem}>
+                {!readonly && (
+                    <input
+                        type="checkbox"
+                        className={styles.checkbox}
+                        checked={selectedFiles.has(file.path)}
+                        onChange={(e) => onToggleFile(file.path, e.target.checked)}
+                    />
+                )}
+                <span className={styles.fileIconSvg} style={{ color: getFileIcon(file.path.split('/').pop() || file.path).color }} dangerouslySetInnerHTML={{ __html: getFileIcon(file.path.split('/').pop() || file.path).svg }} />
+                <span className={`${styles.name} ${statusClass}`}>
+                    {file.path.split('/').pop()}
+                </span>
+                {showPath && (
+                    <span className={styles.fileDirPath}>{getDirPath(file.path)}</span>
+                )}
+            </div>
+        );
+    };
 
     const renderTreeNode = (node: TreeNode, depth: number = 0): React.ReactNode => {
         if (node.isFile) {
+            const statusClass = node.status === 'M' ? styles.statusM :
+                node.status === 'A' ? styles.statusA :
+                    node.status === 'D' ? styles.statusD :
+                        node.status === 'R' ? styles.statusR :
+                            node.status === '?' ? styles.statusUntracked :
+                                node.status === '!' ? styles.statusIgnored : '';
             return (
-                <div key={node.path} className="file-item" style={{ paddingLeft: `${depth * 16}px` }}>
+                <div key={node.path} className={styles.fileItem} style={{ paddingLeft: `${depth * 16}px` }}>
                     {!readonly && (
                         <input
                             type="checkbox"
-                            className="checkbox"
+                            className={styles.checkbox}
                             checked={selectedFiles.has(node.path)}
                             onChange={(e) => onToggleFile(node.path, e.target.checked)}
                         />
                     )}
-                    <span className="file-icon-svg" style={{ color: getFileIcon(node.name).color }} dangerouslySetInnerHTML={{ __html: getFileIcon(node.name).svg }} />
-                    <span className={`name status-${node.status}`}>{node.name}</span>
+                    <span className={styles.fileIconSvg} style={{ color: getFileIcon(node.name).color }} dangerouslySetInnerHTML={{ __html: getFileIcon(node.name).svg }} />
+                    <span className={`${styles.name} ${statusClass}`}>{node.name}</span>
                 </div>
             );
         }
@@ -197,16 +213,16 @@ export const FileTree: React.FC<FileTreeProps> = ({
         const partialSelected = !allSelected && descendantPaths.some(p => selectedFiles.has(p));
 
         return (
-            <div key={node.path} className="file-tree-item folder">
+            <div key={node.path} className={`${styles.fileItem} ${styles.folderItem}`}>
                 <div
-                    className="folder-header"
+                    className={styles.folderHeader}
                     style={{ paddingLeft: `${depth * 16}px` }}
                     onClick={() => toggleFolder(node.path)}
                 >
                     {!readonly && (
                         <input
                             type="checkbox"
-                            className="checkbox"
+                            className={styles.checkbox}
                             checked={allSelected}
                             ref={input => { if (input) input.indeterminate = partialSelected; }}
                             onClick={(e) => e.stopPropagation()}
@@ -214,15 +230,15 @@ export const FileTree: React.FC<FileTreeProps> = ({
                         />
                     )}
                     <span
-                        className={`codicon codicon-chevron-right icon arrow ${isExpanded ? 'expanded' : ''}`}
+                        className={`codicon codicon-chevron-right ${styles.icon} ${styles.arrow}`}
                         style={{ transform: isExpanded ? 'rotate(90deg)' : 'none', transition: 'transform 0.1s' }}
                     ></span>
-                    <span className="codicon codicon-folder icon"></span>
-                    <span className="name">{node.name}</span>
-                    <span className="file-count">{node.fileCount}</span>
+                    <span className={`codicon codicon-folder ${styles.icon}`}></span>
+                    <span className={styles.name}>{node.name}</span>
+                    <span className={styles.fileCount}>{node.fileCount}</span>
                 </div>
                 {isExpanded && (
-                    <div className="folder-children">
+                    <div className={styles.folderChildren}>
                         {node.children?.map(child => renderTreeNode(child, depth + 1))}
                     </div>
                 )}
@@ -236,15 +252,15 @@ export const FileTree: React.FC<FileTreeProps> = ({
         const partialSelected = !allSelected && group.items.some(f => selectedFiles.has(f.path));
 
         return (
-            <div key={group.id} className="file-tree-item changelist">
+            <div key={group.id} className={styles.changelistTree}>
                 <div
-                    className={`file-group-header ${isCollapsed ? 'collapsed' : ''}`}
+                    className={`${styles.fileGroupHeader} ${isCollapsed ? styles.collapsed : ''}`}
                     onClick={() => onToggleGroup(group.id)}
                 >
                     {!readonly && (
                         <input
                             type="checkbox"
-                            className="checkbox"
+                            className={styles.checkbox}
                             checked={allSelected}
                             ref={input => { if (input) input.indeterminate = partialSelected; }}
                             onClick={(e) => e.stopPropagation()}
@@ -252,14 +268,14 @@ export const FileTree: React.FC<FileTreeProps> = ({
                         />
                     )}
                     <span
-                        className={`codicon codicon-chevron-right icon arrow`}
+                        className={`codicon codicon-chevron-right ${styles.icon} ${styles.arrow}`}
                         style={{ transform: isCollapsed ? 'none' : 'rotate(90deg)', transition: 'transform 0.1s' }}
                     ></span>
-                    <span className="title">{group.name}</span>
-                    <span className="file-count">{group.items.length}</span>
+                    <span className={styles.title}>{group.name}</span>
+                    <span className={styles.fileCount}>{group.items.length}</span>
                 </div>
                 {!isCollapsed && (
-                    <div className="changelist-content">
+                    <div className={styles.changelistContent}>
                         {viewMode === 'tree'
                             ? tree.map(node => renderTreeNode(node, 1))
                             : group.items.map(file => renderFileItem(file, true))
@@ -271,7 +287,7 @@ export const FileTree: React.FC<FileTreeProps> = ({
     };
 
     if (changelists.length === 0) {
-        return <div className="empty-state">没有更改</div>;
+        return <div className={styles.emptyState}>没有更改</div>;
     }
 
     return (

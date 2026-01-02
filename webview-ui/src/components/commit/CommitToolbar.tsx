@@ -1,6 +1,6 @@
 import { vscode } from '../../lib/vscode';
 import { useTranslation } from 'react-i18next';
-
+import styles from './CommitToolbar.module.css';
 
 interface CommitToolbarProps {
     viewMode: 'tree' | 'list';
@@ -20,38 +20,38 @@ export function CommitToolbar({
     const { t } = useTranslation();
 
     return (
-        <div className="file-toolbar">
-            <div className="toolbar-left">
-                <button className="icon-btn" title={t('commitView.toolbar.refresh')} onClick={() => vscode.postMessage({ type: 'refresh' })}>
+        <div className={styles.commitToolbar}>
+            <div className={styles.toolbarLeft}>
+                <button className={styles.iconBtn} title={t('commitView.toolbar.refresh')} onClick={() => vscode.postMessage({ type: 'refresh' })}>
                     <i className="codicon codicon-sync"></i>
                 </button>
 
-                <div className="toolbar-separator" style={{ margin: '0 8px' }}></div>
+                <div className={styles.toolbarSeparator} style={{ margin: '0 8px' }}></div>
 
-                <button className="icon-btn" title={t('commitView.toolbar.rollback')} onClick={() => vscode.postMessage({ type: 'rollback', files: Array.from(selectedFiles) })} disabled={selectedFiles.size === 0}>
+                <button className={styles.iconBtn} title={t('commitView.toolbar.rollback')} onClick={() => vscode.postMessage({ type: 'rollback', files: Array.from(selectedFiles) })} disabled={selectedFiles.size === 0}>
                     <i className="codicon codicon-discard"></i>
                 </button>
-                <button className="icon-btn" title={t('commitView.toolbar.stash')} onClick={() => vscode.postMessage({ type: 'stash', files: Array.from(selectedFiles) })} disabled={selectedFiles.size === 0}>
+                <button className={styles.iconBtn} title={t('commitView.toolbar.stash')} onClick={() => vscode.postMessage({ type: 'stash', files: Array.from(selectedFiles) })} disabled={selectedFiles.size === 0}>
                     <i className="codicon codicon-archive"></i>
                 </button>
-                <div className="toolbar-separator"></div>
+                <div className={styles.toolbarSeparator}></div>
                 <button
-                    className={`icon-btn`}
+                    className={styles.iconBtn}
                     title={t('commitView.toolbar.expandAll')}
                     onClick={onExpandAll}
                 >
                     <i className="codicon codicon-expand-all"></i>
                 </button>
                 <button
-                    className={`icon-btn`}
+                    className={styles.iconBtn}
                     title={t('commitView.toolbar.collapseAll')}
                     onClick={onCollapseAll}
                 >
                     <i className="codicon codicon-collapse-all"></i>
                 </button>
-                <div className="toolbar-separator"></div>
+                <div className={styles.toolbarSeparator}></div>
                 <button
-                    className={`icon-btn ${viewMode === 'tree' ? 'active' : ''}`}
+                    className={`${styles.iconBtn} ${viewMode === 'tree' ? styles.active : ''}`}
                     title={t('commitView.toolbar.viewMode')}
                     onClick={() => onViewModeChange(viewMode === 'tree' ? 'list' : 'tree')}
                 >
