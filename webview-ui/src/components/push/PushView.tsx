@@ -3,6 +3,7 @@ import type { CommitInfo } from '@shared/messages';
 import { rpc } from '@/lib/rpc_client';
 import { CommitsPanel } from './CommitsPanel';
 import { PushCommitDetails } from './PushCommitDetails';
+import { SplitPane } from '../common/SplitPane';
 import { useTranslation } from 'react-i18next';
 import styles from './PushView.module.css';
 
@@ -132,27 +133,32 @@ export function PushView() {
                 </button>
             </div>
 
-            <div className={styles.pushMain}>
-                {/* Left: Commits Panel */}
-                <CommitsPanel
-                    commits={commits}
-                    localBranch={localBranch}
-                    currentRemote={selectedRemote}
-                    currentRemoteBranch={selectedRemoteBranch}
-                    remotes={remotes}
-                    remoteBranches={remoteBranches}
-                    selectedCommitHashes={selectedCommitHashes}
-                    onSelectCommits={handleSelectCommits}
-                    onRemoteChange={setSelectedRemote}
-                    onRemoteBranchChange={setSelectedRemoteBranch}
-                />
-
-                {/* Right: Files + Details */}
-                <PushCommitDetails
-                    selectedHashes={selectedCommitHashes.length === 0 ? commits.map(c => c.hash) : selectedCommitHashes}
-                    commit={selectedCommitHashes.length === 1 ? commits.find(c => c.hash === selectedCommitHashes[0]) : undefined}
-                />
-            </div>
+            <SplitPane
+                direction="horizontal"
+                defaultSize={300}
+                minSize={150}
+                className={styles.pushMain}
+                first={
+                    <CommitsPanel
+                        commits={commits}
+                        localBranch={localBranch}
+                        currentRemote={selectedRemote}
+                        currentRemoteBranch={selectedRemoteBranch}
+                        remotes={remotes}
+                        remoteBranches={remoteBranches}
+                        selectedCommitHashes={selectedCommitHashes}
+                        onSelectCommits={handleSelectCommits}
+                        onRemoteChange={setSelectedRemote}
+                        onRemoteBranchChange={setSelectedRemoteBranch}
+                    />
+                }
+                second={
+                    <PushCommitDetails
+                        selectedHashes={selectedCommitHashes.length === 0 ? commits.map(c => c.hash) : selectedCommitHashes}
+                        commit={selectedCommitHashes.length === 1 ? commits.find(c => c.hash === selectedCommitHashes[0]) : undefined}
+                    />
+                }
+            />
 
             <div className={styles.pushFooter}>
                 <div className={styles.footerLeft}>
