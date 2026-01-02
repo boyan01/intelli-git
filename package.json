@@ -28,6 +28,7 @@
     "views": {
       "idea-commit-container": [
         {
+          "icon": "$(git-commit)",
           "type": "webview",
           "id": "ideaCommitView",
           "name": "%idea-commit-panel.views.idea-commit-container.title%"
