@@ -179,6 +179,7 @@ export interface ExtensionMethods {
     getRemoteBranches: (remote: string) => Promise<string[]>;
     getPushCommits: (params: { remote: string; branch: string }) => Promise<PushCommitsData>;
     getCommitFiles: (hash: string) => Promise<CommitFile[]>;
+    getMultiCommitFiles: (hashes: string[]) => Promise<CommitFile[]>;
     push: (params: { force: boolean; pushTags: boolean; remote: string; branch: string }) => Promise<void>;
     openDiff: (path: string) => Promise<void>;
     cancel: () => Promise<void>;

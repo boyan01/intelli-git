@@ -9,10 +9,11 @@ import styles from './PushCommitDetails.module.css';
 
 
 export interface PushCommitDetailsProps {
-    commit: CommitInfo | null;
+    selectedHashes: string[];
+    commit?: CommitInfo | null;
 }
 
-export function PushCommitDetails({ commit }: PushCommitDetailsProps) {
+export function PushCommitDetails({ selectedHashes, commit }: PushCommitDetailsProps) {
     const { t } = useTranslation();
     const [files, setFiles] = useState<CommitFile[]>([]);
     const [viewMode, setViewMode] = useState<'tree' | 'list'>('tree');
@@ -21,12 +22,12 @@ export function PushCommitDetails({ commit }: PushCommitDetailsProps) {
 
     useEffect(() => {
         const fetchFiles = async () => {
-            if (!commit) {
+            if (selectedHashes.length === 0) {
                 setFiles([]);
                 return;
             }
             try {
-                const fetchedFiles = await rpc.call('getCommitFiles', commit.hash);
+                const fetchedFiles = await rpc.call('getMultiCommitFiles', selectedHashes);
                 setFiles(fetchedFiles);
             } catch (error) {
                 console.error('Failed to fetch commit files:', error);
@@ -35,7 +36,7 @@ export function PushCommitDetails({ commit }: PushCommitDetailsProps) {
         };
 
         fetchFiles();
-    }, [commit?.hash]);
+    }, [selectedHashes]);
 
     const fileStatusList: FileStatus[] = files.map(f => ({
         path: f.path,

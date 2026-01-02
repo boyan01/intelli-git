@@ -11,6 +11,19 @@
     background-color: var(--vscode-sideBarSectionHeader-background);
 }
 
+.commitsHeaderClickable {
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+.commitsHeaderClickable:hover {
+    background-color: var(--vscode-list-hoverBackground);
+}
+
+.headerSelected {
+    background-color: var(--vscode-list-activeSelectionBackground);
+}
+
 .branchFlow {
     display: flex;
     align-items: center;

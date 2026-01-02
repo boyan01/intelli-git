@@ -10,7 +10,7 @@ export function PushView() {
     const { t } = useTranslation();
 
     const [commits, setCommits] = useState<CommitInfo[]>([]);
-    const [selectedCommitHash, setSelectedCommitHash] = useState<string | null>(null);
+    const [selectedCommitHashes, setSelectedCommitHashes] = useState<string[]>([]);
     const [pushTags, setPushTags] = useState(false);
     const [isPushing, setIsPushing] = useState(false);
     const [isForcePushExpanded, setIsForcePushExpanded] = useState(false);
@@ -80,15 +80,7 @@ export function PushView() {
                     branch: selectedRemoteBranch
                 });
                 setCommits(data.commits);
-
-                if (data.commits.length > 0) {
-                    // Check if previously selected commit is still valid
-                    if (!selectedCommitHash || !data.commits.find(c => c.hash === selectedCommitHash)) {
-                        setSelectedCommitHash(data.commits[0].hash);
-                    }
-                } else {
-                    setSelectedCommitHash(null);
-                }
+                setSelectedCommitHashes([]);
             } catch (error) {
                 console.error('Failed to load push commits:', error);
             }
@@ -119,8 +111,8 @@ export function PushView() {
         }
     };
 
-    const handleSelectCommit = async (_: number, hash: string) => {
-        setSelectedCommitHash(hash);
+    const handleSelectCommits = (hashes: string[]) => {
+        setSelectedCommitHashes(hashes);
     };
 
     const handleCancel = () => {
@@ -130,8 +122,6 @@ export function PushView() {
     if (isLoading) {
         return <div className={styles.loadingOverlay}><div className={styles.loadingSpinner}></div></div>;
     }
-
-    const selectedCommit = commits.find(c => c.hash === selectedCommitHash) || null;
 
     return (
         <div className={styles.pushPanel}>
@@ -151,14 +141,17 @@ export function PushView() {
                     currentRemoteBranch={selectedRemoteBranch}
                     remotes={remotes}
                     remoteBranches={remoteBranches}
-                    selectedCommitHash={selectedCommitHash}
-                    onSelectCommit={handleSelectCommit}
+                    selectedCommitHashes={selectedCommitHashes}
+                    onSelectCommits={handleSelectCommits}
                     onRemoteChange={setSelectedRemote}
                     onRemoteBranchChange={setSelectedRemoteBranch}
                 />
 
                 {/* Right: Files + Details */}
-                <PushCommitDetails commit={selectedCommit} />
+                <PushCommitDetails
+                    selectedHashes={selectedCommitHashes.length === 0 ? commits.map(c => c.hash) : selectedCommitHashes}
+                    commit={selectedCommitHashes.length === 1 ? commits.find(c => c.hash === selectedCommitHashes[0]) : undefined}
+                />
             </div>
 
             <div className={styles.pushFooter}>

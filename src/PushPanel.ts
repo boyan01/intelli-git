@@ -76,6 +76,9 @@ export class PushPanel {
         this._rpc!.register('getCommitFiles', async (hash: string) => {
             return await this._getFilesForCommit(hash);
         });
+        this._rpc!.register('getMultiCommitFiles', async (hashes: string[]) => {
+            return await this._getFilesForMultiCommits(hashes);
+        });
         this._rpc!.register('push', async ({ force, pushTags, remote, branch }) => {
             await this._doPush(force, pushTags, remote, branch);
         });
@@ -202,6 +205,21 @@ export class PushPanel {
         } catch {
             return [];
         }
+    }
+
+    private async _getFilesForMultiCommits(hashes: string[]): Promise<CommitFile[]> {
+        const fileMap = new Map<string, CommitFile>();
+        for (const hash of hashes) {
+            try {
+                const files = await this._gitService.getCommitFiles(hash);
+                for (const file of files) {
+                    fileMap.set(file.path, file);
+                }
+            } catch {
+                // ignore
+            }
+        }
+        return Array.from(fileMap.values());
     }
 
     private async _doPush(force: boolean, pushTags: boolean, remote: string, branch: string) {

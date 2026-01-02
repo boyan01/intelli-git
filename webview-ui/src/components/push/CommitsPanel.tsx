@@ -9,8 +9,8 @@ interface CommitsPanelProps {
     currentRemoteBranch: string;
     remotes: string[];
     remoteBranches: string[];
-    selectedCommitHash: string | null;
-    onSelectCommit: (index: number, hash: string) => void;
+    selectedCommitHashes: string[];
+    onSelectCommits: (hashes: string[]) => void;
     onRemoteChange: (remote: string) => void;
     onRemoteBranchChange: (branch: string) => void;
 }
@@ -22,8 +22,8 @@ export function CommitsPanel({
     currentRemoteBranch,
     remotes,
     remoteBranches,
-    selectedCommitHash,
-    onSelectCommit,
+    selectedCommitHashes,
+    onSelectCommits,
     onRemoteChange,
     onRemoteBranchChange
 }: CommitsPanelProps) {
@@ -121,9 +121,30 @@ export function CommitsPanel({
         ? localBranch.slice(0, 20) + '…'
         : localBranch;
 
+    const isAllSelected = selectedCommitHashes.length === 0;
+
+    const handleHeaderClick = () => {
+        onSelectCommits([]);
+    };
+
+    const handleCommitClick = (e: React.MouseEvent, hash: string) => {
+        if (e.metaKey || e.ctrlKey) {
+            if (selectedCommitHashes.includes(hash)) {
+                onSelectCommits(selectedCommitHashes.filter(h => h !== hash));
+            } else {
+                onSelectCommits([...selectedCommitHashes, hash]);
+            }
+        } else {
+            onSelectCommits([hash]);
+        }
+    };
+
     return (
         <div className={styles.commitsPanel}>
-            <div className={styles.commitsHeader}>
+            <div
+                className={`${styles.commitsHeader} ${styles.commitsHeaderClickable} ${isAllSelected ? styles.headerSelected : ''}`}
+                onClick={handleHeaderClick}
+            >
                 <div className={styles.branchFlow}>
                     {!isBranchEditing && (
                         <>
@@ -137,7 +158,7 @@ export function CommitsPanel({
                             <div className={styles.remoteDropdown} ref={remoteRef}>
                                 <span
                                     className={styles.inlineHighlight}
-                                    onClick={() => setIsRemoteDropdownOpen(!isRemoteDropdownOpen)}
+                                    onClick={(e) => { e.stopPropagation(); setIsRemoteDropdownOpen(!isRemoteDropdownOpen); }}
                                 >
                                     {currentRemote}
                                 </span>
@@ -161,7 +182,7 @@ export function CommitsPanel({
                             {/* Branch Display (click to edit) */}
                             <span
                                 className={styles.inlineHighlight}
-                                onClick={() => setIsBranchEditing(true)}
+                                onClick={(e) => { e.stopPropagation(); setIsBranchEditing(true); }}
                             >
                                 {currentRemoteBranch}
                             </span>
@@ -174,7 +195,7 @@ export function CommitsPanel({
 
                     {/* Branch Edit Mode */}
                     {isBranchEditing && (
-                        <div className={styles.branchEditWrapper} ref={dropdownRef}>
+                        <div className={styles.branchEditWrapper} ref={dropdownRef} onClick={e => e.stopPropagation()}>
                             <input
                                 ref={branchInputRef}
                                 type="text"
@@ -216,11 +237,11 @@ export function CommitsPanel({
                 </div>
             </div>
             <div className={styles.commitsList}>
-                {commits.map((commit, index) => (
+                {commits.map((commit) => (
                     <div
                         key={commit.hash}
-                        className={`${styles.commitItem} ${selectedCommitHash === commit.hash ? styles.selected : ''}`}
-                        onClick={() => onSelectCommit(index, commit.hash)}
+                        className={`${styles.commitItem} ${selectedCommitHashes.includes(commit.hash) ? styles.selected : ''}`}
+                        onClick={(e) => handleCommitClick(e, commit.hash)}
                     >
                         <div className={styles.commitMessage} title={commit.subject}>{commit.subject}</div>
                     </div>
