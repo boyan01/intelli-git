@@ -1,10 +1,10 @@
 import * as vscode from 'vscode';
-import { GitService } from './services/GitService';
-import { ChangelistService } from './services/ChangelistService';
-import type { ExtensionMethods, WebviewMethods } from '../shared/messages';
-import { RpcPeer } from '../shared/rpc';
-import { getWebviewHtml } from './utils/webviewHtml';
-import { createRpc, ExtensionRpcHandler } from './utils/rpcHelper';
+import { GitService } from '../services/GitService';
+import { ChangelistService } from '../services/ChangelistService';
+import type { ExtensionMethods, WebviewMethods } from '../../shared/messages';
+import { RpcPeer } from '../../shared/rpc';
+import { getWebviewHtml } from '../utils/webviewHtml';
+import { createRpc, ExtensionRpcHandler } from '../rpc';
 
 export class CommitViewProvider implements vscode.WebviewViewProvider {
 
@@ -39,7 +39,6 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
 
         webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
 
-        // Initialize RPC
         this._rpc = createRpc({
             webview: webviewView.webview,
             onDisposed: () => !this._view
@@ -51,7 +50,6 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
         });
         handler.registerAll(this._rpc);
 
-        // Listen to active text editor changes
         const activeEditorListener = vscode.window.onDidChangeActiveTextEditor(editor => {
             if (!editor) return;
 
@@ -61,7 +59,6 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
             if (uri.scheme === 'file') {
                 relativePath = vscode.workspace.asRelativePath(uri, false);
             } else if (uri.scheme === 'git') {
-                // git diff view: path is like /path/to/file.ts
                 relativePath = vscode.workspace.asRelativePath(vscode.Uri.file(uri.path), false);
             }
 
@@ -82,16 +79,12 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
 
             const msg = { ...data, type: data.command || data.type };
 
-            // Handle RPC messages
             if (msg.type === 'rpc-request' || msg.type === 'rpc-response') {
                 this._rpc?.handleMessage(msg);
                 return;
             }
-
-            // Legacy message handling removed/reduced. 
-            // Most logic is now in RPC handlers.
         });
-    } // Close resolveWebviewView
+    }
 
     private _getHtmlForWebview(webview: vscode.Webview) {
         return getWebviewHtml({

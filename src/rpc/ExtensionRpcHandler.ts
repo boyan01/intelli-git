@@ -5,11 +5,6 @@ import type { WebviewMethods, ExtensionMethods, CommitFile, CommitState, PushCom
 import { GitService } from '../services/GitService';
 import { ChangelistService } from '../services/ChangelistService';
 
-export interface RpcHelperOptions {
-    webview: vscode.Webview;
-    onDisposed?: () => boolean;
-}
-
 export interface ExtensionRpcHandlerOptions {
     gitService: GitService;
     changelistService?: ChangelistService;
@@ -31,6 +26,7 @@ export class ExtensionRpcHandler implements ExtensionMethods {
         this.changelistService = options.changelistService;
         this.onDispose = options.onDispose || (() => { });
     }
+
     log(message: string): Promise<void> {
         console.log(message);
         return Promise.resolve();
@@ -132,10 +128,6 @@ export class ExtensionRpcHandler implements ExtensionMethods {
         const title = `${path.basename(params.path)} (${params.leftRef.substring(0, 7)} ↔ ${params.rightRef.substring(0, 7)})`;
         vscode.commands.executeCommand('vscode.diff', leftUri, rightUri, title);
     }
-
-    // ===========================================
-    // Commit methods
-    // ===========================================
 
     async getCommitState(): Promise<CommitState> {
         const changelists = await this._buildChangelists();
@@ -318,10 +310,6 @@ export class ExtensionRpcHandler implements ExtensionMethods {
         }
     }
 
-    // ===========================================
-    // File operations
-    // ===========================================
-
     async deleteFiles(files: string[]): Promise<void> {
         const answer = await vscode.window.showWarningMessage(
             `Are you sure you want to delete ${files.length} files from disk?`,
@@ -390,10 +378,6 @@ export class ExtensionRpcHandler implements ExtensionMethods {
         });
     }
 
-    // ===========================================
-    // Branch operations
-    // ===========================================
-
     async switchBranch(branch: string): Promise<void> {
         try {
             await this.gitService.switchBranch(branch);
@@ -438,10 +422,6 @@ export class ExtensionRpcHandler implements ExtensionMethods {
         await vscode.commands.executeCommand('intelli-git.showBranchPicker');
     }
 
-    // ===========================================
-    // Rebase operations
-    // ===========================================
-
     async continueRebase(params: { message?: string; files?: string[] }): Promise<void> {
         try {
             await this.gitService.continueRebase(params.message);
@@ -461,10 +441,6 @@ export class ExtensionRpcHandler implements ExtensionMethods {
             vscode.window.showErrorMessage(`Abort rebase failed: ${e}`);
         }
     }
-
-    // ===========================================
-    // Changelist operations
-    // ===========================================
 
     async createChangelist(name: string): Promise<void> {
         await this.changelistService?.createChangelist(name);
@@ -560,43 +536,4 @@ export class ExtensionRpcHandler implements ExtensionMethods {
             throw e;
         }
     }
-}
-
-/**
- * Creates and initializes an RpcPeer for a VS Code webview.
- * Handles duplicate logic for postMessage safety on disposed webviews.
- */
-export function createRpc(options: RpcHelperOptions): RpcPeer<WebviewMethods, ExtensionMethods> {
-    const { webview, onDisposed } = options;
-
-    const rpc = new RpcPeer<WebviewMethods, ExtensionMethods>({
-        postMessage: (msg: any) => {
-            if (onDisposed && onDisposed()) {
-                return;
-            }
-            try {
-                webview.postMessage(msg);
-            } catch (error) {
-                if (!onDisposed || !onDisposed()) {
-                    console.error('Failed to post message to webview:', error);
-                }
-            }
-        }
-    });
-
-    return rpc;
-}
-
-/**
- * Helper to handle incoming webview messages for RPC.
- * Returns a function suitable for webview.onDidReceiveMessage
- */
-export function createRpcMessageHandler(rpc: RpcPeer<any, any>) {
-    return (message: any) => {
-        if (message.type === 'rpc-request' || message.type === 'rpc-response') {
-            rpc.handleMessage(message);
-            return true;
-        }
-        return false;
-    };
 }

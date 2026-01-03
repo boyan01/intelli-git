@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { GitService } from './services/GitService';
+import { GitService } from '../services/GitService';
 
 interface BranchQuickPickItem extends vscode.QuickPickItem {
     action?: 'fetch' | 'update' | 'commit' | 'push' | 'newBranch' | 'checkout';
@@ -49,11 +49,10 @@ export class BranchPicker {
 
             const items = await this._buildQuickPickItems();
             quickPick.items = items;
-            quickPick.selectedItems = []; // Clear selection on mode switch
+            quickPick.selectedItems = [];
             quickPick.busy = false;
         };
 
-        // Initial build
         await updatePickerState();
 
         quickPick.onDidTriggerButton(async (button) => {
@@ -96,15 +95,6 @@ export class BranchPicker {
                 if (answer === vscode.l10n.t('Delete')) {
                     quickPick.busy = true;
                     try {
-                        await this.gitService.deleteBranches(branchesToDelete, true); // Using force delete for convenience? Or check merged? Let's use force for now as UI delete usually implies intent, or we can catch error.
-                        // Actually standard git delete check is safer. Let's try standard delete first.
-                        // Change: modify GitService to try standard, if fail, ask force? 
-                        // For simplicity in this step, let's use force=true as it's often frustrating otherwise in UI, BUT it's dangerous.
-                        // Let's stick to force=false first (GitService default) and catch error?
-                        // But I defined deleteBranches to take force. 
-                        // Let's try force=true carefully. The user asked for "Delete", context implies explicit intent.
-                        // vscode git extension usually asks confirmation then does force delete if needed or just deletes.
-                        // I will use force=true for now to ensure it works for the user, assuming they know what they picked.
                         await this.gitService.deleteBranches(branchesToDelete, true);
                         vscode.window.showInformationMessage(vscode.l10n.t('Deleted {0} branches.', branchesToDelete.length));
                         await updatePickerState();
@@ -129,7 +119,6 @@ export class BranchPicker {
 
         quickPick.onDidChangeSelection(async (selection) => {
             if (this.isDeleteMode) {
-                // In delete mode, selection is just toggling checks, do nothing immediately
                 return;
             }
 
@@ -171,10 +160,9 @@ export class BranchPicker {
         const branches = await this.gitService.getBranches();
 
         if (this.isDeleteMode) {
-            // In delete mode, only show local branches (remote deletion is too dangerous for bulk usually, keeping simple)
             branches.all.forEach(branch => {
                 const isCurrent = branch === branches.current;
-                if (isCurrent) return; // Cannot delete current branch
+                if (isCurrent) return;
 
                 items.push({
                     label: `$(git-branch) ${branch}`,
@@ -189,7 +177,6 @@ export class BranchPicker {
         const remoteBranches = await this.gitService.getRemoteBranches();
         const remotes = await this.gitService.getRemotes();
 
-        // Actions section
         items.push({
             label: '$(cloud-download) ' + vscode.l10n.t('Fetch'),
             description: vscode.l10n.t('Fetch latest changes from remote'),
@@ -220,7 +207,6 @@ export class BranchPicker {
             action: 'newBranch'
         });
 
-        // Local branches section
         items.push({
             label: vscode.l10n.t('Local'),
             kind: vscode.QuickPickItemKind.Separator
@@ -243,7 +229,6 @@ export class BranchPicker {
             });
         });
 
-        // Remote branches section (grouped by remote)
         for (const remote of remotes) {
             const remoteBranchesForRemote = remoteBranches
                 .filter(b => b.startsWith(`${remote}/`))
@@ -303,9 +288,6 @@ export class BranchPicker {
                 }
             );
             vscode.window.showInformationMessage(vscode.l10n.t('Project updated.'));
-            // Note: Update not needed here as this class doesn't hold state, 
-            // but the caller might want to know or the status bar might need update.
-            // BranchStatusBar refreshes on file/git changes anyway.
             vscode.commands.executeCommand('intelli-git.refresh');
         } catch (e) {
             vscode.window.showErrorMessage(vscode.l10n.t('Update failed: {0}', String(e)));
@@ -393,14 +375,10 @@ export class BranchPicker {
                 },
                 async () => {
                     try {
-                        // 1. Stash with untracked files
-                        // Using a distinct message to identify it later if needed, but for now just push/pop
                         await this.gitService.stash(`Smart Checkout: ${branch} at ${new Date().toISOString()}`, undefined, true);
 
-                        // 2. Checkout
                         await this._performCheckout(branch, isRemote);
 
-                        // 3. Pop
                         try {
                             await this.gitService.popLatestStash();
                             vscode.commands.executeCommand('intelli-git.refresh');

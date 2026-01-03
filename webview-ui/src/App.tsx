@@ -1,6 +1,7 @@
 import { HashRouter, Routes, Route } from 'react-router-dom';
 import { LocalChangesView } from './components/commit/LocalChangesView';
 import { PushView } from './components/push/PushView';
+import { GitLogView } from './components/git-log/GitLogView';
 import './index.css';
 
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -21,6 +22,7 @@ function AppContent() {
         <Routes>
             <Route path="/" element={<LocalChangesView />} />
             <Route path="/push" element={<PushView />} />
+            <Route path="/git-log" element={<GitLogView />} />
         </Routes>
     );
 }

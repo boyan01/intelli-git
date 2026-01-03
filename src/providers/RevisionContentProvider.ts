@@ -1,11 +1,9 @@
-
 import * as vscode from 'vscode';
-import { GitService } from './services/GitService';
+import { GitService } from '../services/GitService';
 
 export class RevisionContentProvider implements vscode.TextDocumentContentProvider {
     private gitService: GitService;
 
-    // Trigger an event to update the content
     onDidChange?: vscode.Event<vscode.Uri> | undefined;
 
     constructor(gitService: GitService) {

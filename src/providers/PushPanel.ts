@@ -1,9 +1,9 @@
 import * as vscode from 'vscode';
-import { GitService } from './services/GitService';
-import type { ExtensionMethods, WebviewMethods } from '../shared/messages';
-import { RpcPeer } from '../shared/rpc';
-import { getWebviewHtml } from './utils/webviewHtml';
-import { createRpc, ExtensionRpcHandler } from './utils/rpcHelper';
+import { GitService } from '../services/GitService';
+import type { ExtensionMethods, WebviewMethods } from '../../shared/messages';
+import { RpcPeer } from '../../shared/rpc';
+import { getWebviewHtml } from '../utils/webviewHtml';
+import { createRpc, ExtensionRpcHandler } from '../rpc';
 
 export class PushPanel {
     public static currentPanel: PushPanel | undefined;
@@ -25,20 +25,17 @@ export class PushPanel {
 
         this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
 
-        // Initialize RPC
         this._rpc = createRpc({
             webview: this._panel.webview,
             onDisposed: () => this._disposed
         });
 
-        // Register all RPC handlers
         const handler = new ExtensionRpcHandler({
             gitService: this._gitService,
             onDispose: () => this.dispose()
         });
         handler.registerAll(this._rpc);
 
-        // Forward messages from webview to RPC
         this._panel.webview.onDidReceiveMessage(
             async (message: { type: string;[key: string]: any }) => {
                 if (message.type === 'rpc-request' || message.type === 'rpc-response') {

@@ -23,6 +23,13 @@
           "title": "%intelli-git.viewsContainers.activitybar.title%",
           "icon": "resources/git-icon.svg"
         }
+      ],
+      "panel": [
+        {
+          "id": "intelli-git-panel",
+          "title": "Git Log",
+          "icon": "$(git-branch)"
+        }
       ]
     },
     "views": {
@@ -32,6 +39,14 @@
           "type": "webview",
           "id": "intelliGitView",
           "name": "%intelli-git.views.intelli-git-container.title%"
+        }
+      ],
+      "intelli-git-panel": [
+        {
+          "icon": "$(git-branch)",
+          "type": "webview",
+          "id": "intelli-git.logView",
+          "name": "Git Log"
         }
       ]
     },
@@ -73,6 +88,10 @@
       {
         "command": "intelli-git.stashShowDiff",
         "title": "%intelli-git.commands.stashShowDiff.title%"
+      },
+      {
+        "command": "intelli-git.focusGitLog",
+        "title": "Focus Git Log"
       }
     ],
     "menus": {
