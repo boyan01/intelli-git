@@ -75,7 +75,6 @@ export interface ExtensionMethods {
     getChangelists: () => Promise<ChangelistGroup[]>;
     getBranchInfo: () => Promise<BranchInfo>;
     getStashList: () => Promise<StashItem[]>;
-    getIncomingCommits: () => Promise<number>;
     commit: (params: { message: string; amend: boolean; files: string[]; push?: boolean }) => Promise<void>;
     stage: (path: string) => Promise<void>;
     unstage: (path: string) => Promise<void>;

@@ -3,7 +3,6 @@ import type { ChangelistGroup } from '@shared/messages';
 import { useTranslation } from 'react-i18next';
 import { ContextMenu } from '../common/ContextMenu';
 import type { ContextMenuItem } from '../common/ContextMenu';
-import { vscode } from '../../lib/vscode';
 import { BaseFileTree } from './BaseFileTree';
 import type { BaseFileTreeRef } from './BaseFileTree';
 import styles from './FileTree.module.css';

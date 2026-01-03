@@ -258,10 +258,6 @@ export class ExtensionRpcHandler implements ExtensionMethods {
         return await this.gitService.getStashList();
     }
 
-    async getIncomingCommits(): Promise<number> {
-        return await this.gitService.getIncomingCommitsCount();
-    }
-
     async commit(params: { message: string; amend: boolean; files: string[]; push?: boolean }): Promise<void> {
         try {
             if (params.amend) {

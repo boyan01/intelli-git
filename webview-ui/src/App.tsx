@@ -1,5 +1,5 @@
 import { HashRouter, Routes, Route } from 'react-router-dom';
-import { CommitView } from './components/commit/CommitView';
+import { LocalChangesView } from './components/commit/LocalChangesView';
 import { PushView } from './components/push/PushView';
 import './index.css';
 
@@ -19,7 +19,7 @@ function AppContent() {
 
     return (
         <Routes>
-            <Route path="/" element={<CommitView />} />
+            <Route path="/" element={<LocalChangesView />} />
             <Route path="/push" element={<PushView />} />
         </Routes>
     );
