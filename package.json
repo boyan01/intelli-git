@@ -1,7 +1,7 @@
 {
-  "name": "idea-commit-panel",
-  "displayName": "%idea-commit-panel.displayName%",
-  "description": "%idea-commit-panel.description%",
+  "name": "intelli-git",
+  "displayName": "%intelli-git.displayName%",
+  "description": "%intelli-git.description%",
   "version": "0.0.1",
   "engines": {
     "vscode": "^1.100.0"
@@ -19,93 +19,93 @@
     "viewsContainers": {
       "activitybar": [
         {
-          "id": "idea-commit-container",
-          "title": "%idea-commit-panel.viewsContainers.activitybar.title%",
+          "id": "intelli-git-container",
+          "title": "%intelli-git.viewsContainers.activitybar.title%",
           "icon": "resources/git-icon.svg"
         }
       ]
     },
     "views": {
-      "idea-commit-container": [
+      "intelli-git-container": [
         {
           "icon": "$(git-commit)",
           "type": "webview",
-          "id": "ideaCommitView",
-          "name": "%idea-commit-panel.views.idea-commit-container.title%"
+          "id": "intelliGitView",
+          "name": "%intelli-git.views.intelli-git-container.title%"
         }
       ]
     },
     "commands": [
       {
-        "command": "idea-commit-panel.refresh",
-        "title": "%idea-commit-panel.commands.refresh.title%",
+        "command": "intelli-git.refresh",
+        "title": "%intelli-git.commands.refresh.title%",
         "icon": "$(refresh)"
       },
       {
-        "command": "idea-commit-panel.push",
-        "title": "%idea-commit-panel.commands.push.title%",
+        "command": "intelli-git.push",
+        "title": "%intelli-git.commands.push.title%",
         "icon": "$(repo-push)"
       },
       {
-        "command": "idea-commit-panel.showBranchPicker",
-        "title": "%idea-commit-panel.commands.showBranchPicker.title%"
+        "command": "intelli-git.showBranchPicker",
+        "title": "%intelli-git.commands.showBranchPicker.title%"
       },
       {
-        "command": "idea-commit-panel.focusCommitView",
-        "title": "%idea-commit-panel.commands.focusCommitView.title%"
+        "command": "intelli-git.focusCommitView",
+        "title": "%intelli-git.commands.focusCommitView.title%"
       },
       {
-        "command": "idea-commit-panel.copyCommitHash",
-        "title": "%idea-commit-panel.commands.copyCommitHash.title%"
+        "command": "intelli-git.copyCommitHash",
+        "title": "%intelli-git.commands.copyCommitHash.title%"
       },
       {
-        "command": "idea-commit-panel.stashPop",
-        "title": "%idea-commit-panel.commands.stashPop.title%"
+        "command": "intelli-git.stashPop",
+        "title": "%intelli-git.commands.stashPop.title%"
       },
       {
-        "command": "idea-commit-panel.stashApply",
-        "title": "%idea-commit-panel.commands.stashApply.title%"
+        "command": "intelli-git.stashApply",
+        "title": "%intelli-git.commands.stashApply.title%"
       },
       {
-        "command": "idea-commit-panel.stashDrop",
-        "title": "%idea-commit-panel.commands.stashDrop.title%"
+        "command": "intelli-git.stashDrop",
+        "title": "%intelli-git.commands.stashDrop.title%"
       },
       {
-        "command": "idea-commit-panel.stashShowDiff",
-        "title": "%idea-commit-panel.commands.stashShowDiff.title%"
+        "command": "intelli-git.stashShowDiff",
+        "title": "%intelli-git.commands.stashShowDiff.title%"
       }
     ],
     "menus": {
       "view/item/context": [
         {
-          "command": "idea-commit-panel.showBranchPicker",
+          "command": "intelli-git.showBranchPicker",
           "when": "viewItem == branchStatusBar",
           "group": "inline"
         }
       ],
       "webview/context": [
         {
-          "command": "idea-commit-panel.copyCommitHash",
+          "command": "intelli-git.copyCommitHash",
           "when": "webviewSection == 'commitItem'",
           "group": "1_cutcopypaste"
         },
         {
-          "command": "idea-commit-panel.stashPop",
+          "command": "intelli-git.stashPop",
           "when": "webviewSection == 'stashItem'",
           "group": "1_modification@1"
         },
         {
-          "command": "idea-commit-panel.stashApply",
+          "command": "intelli-git.stashApply",
           "when": "webviewSection == 'stashItem'",
           "group": "1_modification@2"
         },
         {
-          "command": "idea-commit-panel.stashDrop",
+          "command": "intelli-git.stashDrop",
           "when": "webviewSection == 'stashItem'",
           "group": "1_modification@3"
         },
         {
-          "command": "idea-commit-panel.stashShowDiff",
+          "command": "intelli-git.stashShowDiff",
           "when": "webviewSection == 'stashItem'",
           "group": "2_view"
         }

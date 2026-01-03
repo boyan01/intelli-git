@@ -13,7 +13,7 @@ export class RevisionContentProvider implements vscode.TextDocumentContentProvid
     }
 
     async provideTextDocumentContent(uri: vscode.Uri): Promise<string> {
-        // URI format: idea-revision://load/<file-path>?{"ref":"<commit-hash>"}
+        // URI format: intelli-git-revision://load/<file-path>?{"ref":"<commit-hash>"}
 
         try {
             const query = JSON.parse(uri.query);

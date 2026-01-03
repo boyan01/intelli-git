@@ -62,7 +62,7 @@ export class PushPanel {
         }
 
         const panel = vscode.window.createWebviewPanel(
-            'ideaPushPanel',
+            'intelliGitPushPanel',
             'Push Commits',
             {
                 viewColumn: vscode.ViewColumn.Active,

@@ -146,10 +146,10 @@ export class BranchPicker {
                     await this._handleUpdate();
                     break;
                 case 'commit':
-                    vscode.commands.executeCommand('idea-commit-panel.focusCommitView');
+                    vscode.commands.executeCommand('intelli-git.focusCommitView');
                     break;
                 case 'push':
-                    vscode.commands.executeCommand('idea-commit-panel.push');
+                    vscode.commands.executeCommand('intelli-git.push');
                     break;
                 case 'newBranch':
                     await this._handleNewBranch();
@@ -306,7 +306,7 @@ export class BranchPicker {
             // Note: Update not needed here as this class doesn't hold state, 
             // but the caller might want to know or the status bar might need update.
             // BranchStatusBar refreshes on file/git changes anyway.
-            vscode.commands.executeCommand('idea-commit-panel.refresh');
+            vscode.commands.executeCommand('intelli-git.refresh');
         } catch (e) {
             vscode.window.showErrorMessage(vscode.l10n.t('Update failed: {0}', String(e)));
         }
@@ -328,7 +328,7 @@ export class BranchPicker {
         try {
             await this.gitService.createBranch(branchName);
             vscode.window.showInformationMessage(vscode.l10n.t('Created and switched to branch: {0}', branchName));
-            vscode.commands.executeCommand('idea-commit-panel.refresh');
+            vscode.commands.executeCommand('intelli-git.refresh');
         } catch (e) {
             vscode.window.showErrorMessage(vscode.l10n.t('Failed to create branch: {0}', String(e)));
         }
@@ -346,7 +346,7 @@ export class BranchPicker {
                     await this._performCheckout(branch, isRemote);
                 }
             );
-            vscode.commands.executeCommand('idea-commit-panel.refresh');
+            vscode.commands.executeCommand('intelli-git.refresh');
         } catch (e: any) {
             if (this._isLocalChangesError(e)) {
                 await this._handleSmartCheckout(branch, isRemote);
@@ -403,7 +403,7 @@ export class BranchPicker {
                         // 3. Pop
                         try {
                             await this.gitService.popLatestStash();
-                            vscode.commands.executeCommand('idea-commit-panel.refresh');
+                            vscode.commands.executeCommand('intelli-git.refresh');
                         } catch (popError: any) {
                             const errorMsg = String(popError);
                             if (errorMsg.includes('could not restore untracked files')) {
@@ -415,7 +415,7 @@ export class BranchPicker {
                                     vscode.l10n.t('Checkout successful, but conflicts occurred while restoring changes. Stash is kept for safety. Please resolve manually.')
                                 );
                             }
-                            vscode.commands.executeCommand('idea-commit-panel.refresh');
+                            vscode.commands.executeCommand('intelli-git.refresh');
                         }
                     } catch (e) {
                         vscode.window.showErrorMessage(vscode.l10n.t('Smart Checkout failed: {0}', String(e)));
@@ -432,7 +432,7 @@ export class BranchPicker {
                 async () => {
                     try {
                         await this._performCheckout(branch, isRemote, true);
-                        vscode.commands.executeCommand('idea-commit-panel.refresh');
+                        vscode.commands.executeCommand('intelli-git.refresh');
                     } catch (e) {
                         vscode.window.showErrorMessage(vscode.l10n.t('Force Checkout failed: {0}', String(e)));
                     }
@@ -458,7 +458,7 @@ export class BranchPicker {
         try {
             await this.gitService.renameBranch(branch, newName);
             vscode.window.showInformationMessage(vscode.l10n.t('Renamed branch {0} to {1}', branch, newName));
-            vscode.commands.executeCommand('idea-commit-panel.refresh');
+            vscode.commands.executeCommand('intelli-git.refresh');
         } catch (e) {
             vscode.window.showErrorMessage(vscode.l10n.t('Failed to rename branch: {0}', String(e)));
         }

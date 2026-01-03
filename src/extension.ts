@@ -8,12 +8,12 @@ import { ChangelistService } from './services/ChangelistService';
 import { RevisionContentProvider } from './RevisionContentProvider';
 
 export function activate(context: vscode.ExtensionContext) {
-    console.log('IDEA Commit Panel is now active!');
+    console.log('Intelli Git is now active!');
 
     const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
 
     if (!workspaceRoot) {
-        vscode.window.showWarningMessage('IDEA Commit Panel: No workspace opened.');
+        vscode.window.showWarningMessage('Intelli Git: No workspace opened.');
         return;
     }
 
@@ -24,12 +24,12 @@ export function activate(context: vscode.ExtensionContext) {
     const stashContentProvider = new StashContentProvider(gitService);
 
     context.subscriptions.push(
-        vscode.workspace.registerTextDocumentContentProvider('idea-stash', stashContentProvider)
+        vscode.workspace.registerTextDocumentContentProvider('intelli-git-stash', stashContentProvider)
     );
 
     const revisionContentProvider = new RevisionContentProvider(gitService);
     context.subscriptions.push(
-        vscode.workspace.registerTextDocumentContentProvider('idea-revision', revisionContentProvider)
+        vscode.workspace.registerTextDocumentContentProvider('intelli-git-revision', revisionContentProvider)
     );
 
     context.subscriptions.push(
@@ -37,31 +37,31 @@ export function activate(context: vscode.ExtensionContext) {
     );
 
     context.subscriptions.push(
-        vscode.commands.registerCommand('idea-commit-panel.refresh', () => {
+        vscode.commands.registerCommand('intelli-git.refresh', () => {
             branchStatusBar.update();
         })
     );
 
     context.subscriptions.push(
-        vscode.commands.registerCommand('idea-commit-panel.push', () => {
+        vscode.commands.registerCommand('intelli-git.push', () => {
             PushPanel.createOrShow(context.extensionUri, gitService);
         })
     );
 
     context.subscriptions.push(
-        vscode.commands.registerCommand('idea-commit-panel.showBranchPicker', () => {
+        vscode.commands.registerCommand('intelli-git.showBranchPicker', () => {
             branchStatusBar.showBranchPicker();
         })
     );
 
     context.subscriptions.push(
-        vscode.commands.registerCommand('idea-commit-panel.focusCommitView', () => {
-            vscode.commands.executeCommand('ideaCommitView.focus');
+        vscode.commands.registerCommand('intelli-git.focusCommitView', () => {
+            vscode.commands.executeCommand('intelliGitView.focus');
         })
     );
 
     context.subscriptions.push(
-        vscode.commands.registerCommand('idea-commit-panel.copyCommitHash', async (args: any) => {
+        vscode.commands.registerCommand('intelli-git.copyCommitHash', async (args: any) => {
             if (args && args.hash) {
                 await vscode.env.clipboard.writeText(args.hash);
             }
@@ -69,7 +69,7 @@ export function activate(context: vscode.ExtensionContext) {
     );
 
     context.subscriptions.push(
-        vscode.commands.registerCommand('idea-commit-panel.stashPop', async (args: any) => {
+        vscode.commands.registerCommand('intelli-git.stashPop', async (args: any) => {
             if (args && typeof args.stashIndex === 'number') {
                 await gitService.popStash(args.stashIndex);
                 provider.refresh();
@@ -78,7 +78,7 @@ export function activate(context: vscode.ExtensionContext) {
     );
 
     context.subscriptions.push(
-        vscode.commands.registerCommand('idea-commit-panel.stashApply', async (args: any) => {
+        vscode.commands.registerCommand('intelli-git.stashApply', async (args: any) => {
             if (args && typeof args.stashIndex === 'number') {
                 await gitService.applyStash(args.stashIndex);
                 provider.refresh();
@@ -87,7 +87,7 @@ export function activate(context: vscode.ExtensionContext) {
     );
 
     context.subscriptions.push(
-        vscode.commands.registerCommand('idea-commit-panel.stashDrop', async (args: any) => {
+        vscode.commands.registerCommand('intelli-git.stashDrop', async (args: any) => {
             if (args && typeof args.stashIndex === 'number') {
                 const confirm = await vscode.window.showWarningMessage(
                     vscode.l10n.t('Drop stash@{{{0}}}?', args.stashIndex),
@@ -103,7 +103,7 @@ export function activate(context: vscode.ExtensionContext) {
     );
 
     context.subscriptions.push(
-        vscode.commands.registerCommand('idea-commit-panel.stashShowDiff', async (args: any) => {
+        vscode.commands.registerCommand('intelli-git.stashShowDiff', async (args: any) => {
             if (args && typeof args.stashIndex === 'number') {
                 const files = await gitService.getStashFiles(args.stashIndex);
                 if (files.length === 0) {
@@ -116,10 +116,10 @@ export function activate(context: vscode.ExtensionContext) {
 
                 const stashRef = `stash@{${args.stashIndex}}`;
                 const parentRef = `${stashRef}^`;
-                const leftUri = vscode.Uri.parse(`idea-stash://stash/${encodeURIComponent(parentRef)}/${filePath}`).with({
+                const leftUri = vscode.Uri.parse(`intelli-git-stash://stash/${encodeURIComponent(parentRef)}/${filePath}`).with({
                     query: JSON.stringify({ ref: parentRef, path: filePath })
                 });
-                const rightUri = vscode.Uri.parse(`idea-stash://stash/${encodeURIComponent(stashRef)}/${filePath}`).with({
+                const rightUri = vscode.Uri.parse(`intelli-git-stash://stash/${encodeURIComponent(stashRef)}/${filePath}`).with({
                     query: JSON.stringify({ ref: stashRef, path: filePath })
                 });
 

@@ -127,8 +127,8 @@ export class ExtensionRpcHandler implements ExtensionMethods {
     }
 
     async openCommitDiff(params: { path: string; leftRef: string; rightRef: string }): Promise<void> {
-        const leftUri = vscode.Uri.parse(`idea-revision://load/${params.path}?${JSON.stringify({ ref: params.leftRef })}`);
-        const rightUri = vscode.Uri.parse(`idea-revision://load/${params.path}?${JSON.stringify({ ref: params.rightRef })}`);
+        const leftUri = vscode.Uri.parse(`intelli-git-revision://load/${params.path}?${JSON.stringify({ ref: params.leftRef })}`);
+        const rightUri = vscode.Uri.parse(`intelli-git-revision://load/${params.path}?${JSON.stringify({ ref: params.rightRef })}`);
         const title = `${path.basename(params.path)} (${params.leftRef.substring(0, 7)} ↔ ${params.rightRef.substring(0, 7)})`;
         vscode.commands.executeCommand('vscode.diff', leftUri, rightUri, title);
     }
@@ -376,10 +376,10 @@ export class ExtensionRpcHandler implements ExtensionMethods {
         const parentRef = `${stashRef}^`;
         const filePath = params.path;
 
-        const leftUri = vscode.Uri.parse(`idea-stash://stash/${encodeURIComponent(parentRef)}/${filePath}`).with({
+        const leftUri = vscode.Uri.parse(`intelli-git-stash://stash/${encodeURIComponent(parentRef)}/${filePath}`).with({
             query: JSON.stringify({ ref: parentRef, path: filePath })
         });
-        const rightUri = vscode.Uri.parse(`idea-stash://stash/${encodeURIComponent(stashRef)}/${filePath}`).with({
+        const rightUri = vscode.Uri.parse(`intelli-git-stash://stash/${encodeURIComponent(stashRef)}/${filePath}`).with({
             query: JSON.stringify({ ref: stashRef, path: filePath })
         });
 
@@ -435,7 +435,7 @@ export class ExtensionRpcHandler implements ExtensionMethods {
     }
 
     async pickBranch(): Promise<void> {
-        await vscode.commands.executeCommand('idea-commit-panel.showBranchPicker');
+        await vscode.commands.executeCommand('intelli-git.showBranchPicker');
     }
 
     // ===========================================

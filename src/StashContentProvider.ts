@@ -13,8 +13,8 @@ export class StashContentProvider implements vscode.TextDocumentContentProvider 
     }
 
     async provideTextDocumentContent(uri: vscode.Uri): Promise<string> {
-        // URI format: idea-stash://load/<stash-ref>/<file-path>
-        // Example: idea-stash://load/stash@{0}/src/main.ts
+        // URI format: intelli-git-stash://load/<stash-ref>/<file-path>
+        // Example: intelli-git-stash://load/stash@{0}/src/main.ts
 
         // We can extract params from path or query.
         // Let's use path convention: /<stash-ref>/<file-path>

@@ -8,7 +8,7 @@ import { createRpc, ExtensionRpcHandler } from './utils/rpcHelper';
 
 export class CommitViewProvider implements vscode.WebviewViewProvider {
 
-    public static readonly viewType = 'ideaCommitView';
+    public static readonly viewType = 'intelliGitView';
     private _view?: vscode.WebviewView;
     private gitService: GitService;
     private changelistService: ChangelistService;

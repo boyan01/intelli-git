@@ -13,7 +13,7 @@ export class BranchStatusBar {
             vscode.StatusBarAlignment.Left,
             100
         );
-        this.statusBarItem.command = 'idea-commit-panel.showBranchPicker';
+        this.statusBarItem.command = 'intelli-git.showBranchPicker';
         this.statusBarItem.tooltip = 'Switch Branch';
         this.update();
     }
