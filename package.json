@@ -120,6 +120,34 @@
       {
         "command": "intelli-git.branch.pull",
         "title": "%intelli-git.commands.branch.pull.title%"
+      },
+      {
+        "command": "intelli-git.log.resetSoft",
+        "title": "Reset Current Branch to Here (Soft)"
+      },
+      {
+        "command": "intelli-git.log.resetMixed",
+        "title": "Reset Current Branch to Here (Mixed)"
+      },
+      {
+        "command": "intelli-git.log.resetHard",
+        "title": "Reset Current Branch to Here (Hard)"
+      },
+      {
+        "command": "intelli-git.log.checkout",
+        "title": "Checkout Commit"
+      },
+      {
+        "command": "intelli-git.log.createBranch",
+        "title": "Create Branch..."
+      },
+      {
+        "command": "intelli-git.log.cherryPick",
+        "title": "Cherry-pick"
+      },
+      {
+        "command": "intelli-git.log.revert",
+        "title": "Revert Commit"
       }
     ],
     "menus": {
@@ -190,6 +218,46 @@
           "command": "intelli-git.branch.delete",
           "when": "webviewSection == 'localBranch'",
           "group": "3_danger"
+        },
+        {
+          "command": "intelli-git.log.checkout",
+          "when": "webviewSection == 'gitLogCommit'",
+          "group": "1_actions@1"
+        },
+        {
+          "command": "intelli-git.log.createBranch",
+          "when": "webviewSection == 'gitLogCommit'",
+          "group": "1_actions@2"
+        },
+        {
+          "command": "intelli-git.log.resetMixed",
+          "when": "webviewSection == 'gitLogCommit'",
+          "group": "2_modify@1"
+        },
+        {
+          "command": "intelli-git.log.resetSoft",
+          "when": "webviewSection == 'gitLogCommit'",
+          "group": "2_modify@2"
+        },
+        {
+          "command": "intelli-git.log.resetHard",
+          "when": "webviewSection == 'gitLogCommit'",
+          "group": "2_modify@3"
+        },
+        {
+          "command": "intelli-git.log.cherryPick",
+          "when": "webviewSection == 'gitLogCommit'",
+          "group": "3_danger@1"
+        },
+        {
+          "command": "intelli-git.log.revert",
+          "when": "webviewSection == 'gitLogCommit'",
+          "group": "3_danger@2"
+        },
+        {
+          "command": "intelli-git.copyCommitHash",
+          "when": "webviewSection == 'gitLogCommit'",
+          "group": "1_cutcopypaste"
         }
       ]
     }

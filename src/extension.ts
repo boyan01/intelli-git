@@ -3,7 +3,7 @@ import { CommitViewProvider, GitLogViewProvider, PushPanel, StashContentProvider
 import { GitService } from './services/GitService';
 import { ChangelistService } from './services/ChangelistService';
 import { BranchStatusBar } from './ui';
-import { registerStashCommands, registerNavigationCommands, registerBranchCommands } from './commands';
+import { registerStashCommands, registerNavigationCommands, registerBranchCommands, registerLogCommands } from './commands';
 
 export function activate(context: vscode.ExtensionContext) {
     console.log('Intelli Git is now active!');
@@ -46,6 +46,7 @@ export function activate(context: vscode.ExtensionContext) {
     registerStashCommands(context, gitService, provider);
     registerNavigationCommands(context, gitService, branchStatusBar, gitLogProvider);
     registerBranchCommands(context, gitService, provider);
+    registerLogCommands(context, gitService);
 
     context.subscriptions.push(branchStatusBar);
 

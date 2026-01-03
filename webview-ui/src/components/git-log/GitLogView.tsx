@@ -1,28 +1,17 @@
 import { SplitPane } from '../common/SplitPane';
 import { BranchListPanel } from './BranchListPanel';
 
-const LogListPanel = () => {
-    return (
-        <div style={{ height: '100%', padding: '10px', boxSizing: 'border-box' }}>
-            <h3>Git Log</h3>
-            {/* TODO: Implement Log List */}
-            <div>Commit 1</div>
-            <div>Commit 2</div>
-        </div>
-    );
-};
+import { LogListPanel } from './LogListPanel';
 
-const CommitDetailsPanel = () => {
-    return (
-        <div style={{ height: '100%', padding: '10px', boxSizing: 'border-box' }}>
-            <h3>Details</h3>
-            {/* TODO: Implement Commit Details */}
-            <div>File Changes...</div>
-        </div>
-    );
-};
+import { useState } from 'react';
+import { CommitDetailsPanel } from './CommitDetailsPanel';
+
+// ... (remove old dummy component)
 
 export function GitLogView() {
+    const [selectedCommits, setSelectedCommits] = useState<string[]>([]);
+    const selectedHash = selectedCommits.length > 0 ? selectedCommits[0] : null;
+
     return (
         <div style={{ height: '100vh', width: '100vw', display: 'flex', flexDirection: 'column' }}>
             <SplitPane
@@ -35,8 +24,8 @@ export function GitLogView() {
                         direction="horizontal"
                         defaultRatio={0.6}
                         minSize={200}
-                        first={<LogListPanel />}
-                        second={<CommitDetailsPanel />}
+                        first={<LogListPanel onSelectionChange={setSelectedCommits} />}
+                        second={<CommitDetailsPanel commitHash={selectedHash} />}
                     />
                 }
             />

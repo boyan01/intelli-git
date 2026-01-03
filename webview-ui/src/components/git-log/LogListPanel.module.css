@@ -1,0 +1,93 @@
+.container {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background-color: var(--vscode-editor-background);
+    color: var(--vscode-editor-foreground);
+    font-size: 13px;
+}
+
+.header {
+    padding: 8px;
+    border-bottom: 1px solid var(--vscode-widget-border);
+    font-weight: bold;
+}
+
+.list {
+    flex: 1;
+    overflow-y: auto;
+}
+
+.row {
+    display: flex;
+    height: 24px;
+    align-items: center;
+    padding: 0 8px;
+    box-sizing: border-box;
+    border-bottom: 1px solid var(--vscode-tree-inputValidationBorder);
+    cursor: pointer;
+}
+
+.row:hover {
+    background-color: var(--vscode-list-hoverBackground);
+}
+
+.selected {
+    background-color: var(--vscode-list-activeSelectionBackground) !important;
+    color: var(--vscode-list-activeSelectionForeground) !important;
+}
+
+.selected:hover {
+    background-color: var(--vscode-list-activeSelectionBackground) !important;
+}
+
+.selected .hash {
+    color: inherit;
+}
+
+.file-row:hover {
+    background-color: var(--vscode-list-hoverBackground);
+}
+
+.graphCol {
+    width: 120px;
+    /* Fixed width for graph column area, but content can overflow */
+    flex-shrink: 0;
+    overflow: hidden;
+    /* Or visible if we want lines to extend? Usually hidden to respect layout */
+    /* If we use overflow: visible in SVG, we might want visible here too, but it might overlap text. */
+    /* Let's try hidden first, and if lines are cut off (e.g. branch going far right), we might need scroll or wider panel.*/
+    position: relative;
+    margin-right: 8px;
+}
+
+.hash {
+    font-family: monospace;
+    color: var(--vscode-textPreformat-foreground);
+    margin-right: 8px;
+    min-width: 60px;
+    flex-shrink: 0;
+}
+
+.subject {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-right: 8px;
+}
+
+.author {
+    color: var(--vscode-descriptionForeground);
+    margin-right: 8px;
+    max-width: 100px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.date {
+    color: var(--vscode-descriptionForeground);
+    min-width: 80px;
+    text-align: right;
+}

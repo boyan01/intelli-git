@@ -1,23 +1,7 @@
 import simpleGit, { SimpleGit, StatusResult } from 'simple-git';
-import { BranchInfo } from '../../shared/messages';
-import * as fs from 'fs';
+import { BranchInfo, LogCommit, LogOptions, CommitDetails, RefInfo, FileStatus, CommitInfo, CommitFile } from '../../shared/messages'; import * as fs from 'fs';
 import * as path from 'path';
 
-export interface FileStatus {
-    path: string;
-    status: string;
-    staged: boolean;
-}
-
-export interface CommitInfo {
-    hash: string;
-    shortHash: string;
-    subject: string;
-    authorName: string;
-    date: string;
-    email?: string;
-    fullHash?: string;
-}
 
 export class GitService {
     private git: SimpleGit;
@@ -529,7 +513,6 @@ export class GitService {
                     authorName: commit.author_name,
                     date: commit.date,
                     email: commit.author_email,
-                    fullHash: commit.hash
                 }));
             } else {
                 // New remote branch: get commits not reachable from any remote
@@ -558,7 +541,7 @@ export class GitService {
 
             return result.trim().split('\n').map(line => {
                 const [hash, shortHash, subject, authorName, date, email] = line.split('|');
-                return { hash, shortHash, subject, authorName, date, email, fullHash: hash };
+                return { hash, shortHash, subject, authorName, date, email };
             });
         } catch {
             return [];
@@ -584,7 +567,6 @@ export class GitService {
                 authorName: commit.author_name,
                 date: commit.date,
                 email: commit.author_email,
-                fullHash: commit.hash
             }));
         } catch {
             return [];
@@ -776,4 +758,211 @@ export class GitService {
     public async createBranchFrom(newBranch: string, fromBranch: string): Promise<void> {
         await this.git.checkout(['-b', newBranch, fromBranch]);
     }
+
+    public async reset(mode: 'soft' | 'mixed' | 'hard', commit: string): Promise<void> {
+        await this.git.reset([`--${mode}`, commit]);
+    }
+
+    public async cherryPick(commit: string): Promise<void> {
+        try {
+            await this.git.raw(['cherry-pick', commit]);
+        } catch (e: any) {
+            // handle conflict or error
+            throw e;
+        }
+    }
+
+    public async revert(commit: string): Promise<void> {
+        try {
+            // --no-edit to avoid launching editor
+            await this.git.revert(commit, ['--no-edit']);
+        } catch (e: any) {
+            throw e;
+        }
+    }
+
+    public async checkoutCommit(commit: string): Promise<void> {
+        await this.git.checkout(commit);
+    }
+
+    public async getLog(options: LogOptions): Promise<LogCommit[]> {
+
+        try {
+            const args = ['log', '--date=iso'];
+
+            // Format: Hash, ShortHash, Subject, Author, Email, Date, Parents, Refs
+            // Separator: %x00 (null char) to avoid collision
+            const format = '%H%x00%h%x00%s%x00%an%x00%ae%x00%aI%x00%P%x00%D';
+            args.push(`--format=${format}`);
+
+            if (options.maxCount) {
+                args.push(`-n`, options.maxCount.toString());
+            }
+
+            if (options.skip) {
+                args.push(`--skip=${options.skip}`);
+            }
+
+            if (options.fileFilter) {
+                // If filtering by file, we stick to the file path
+                // Note: git log -- <file>
+                // We add it at the end
+            }
+
+            if (options.author) {
+                args.push(`--author=${options.author}`);
+            }
+
+            if (options.search) {
+                args.push(`--grep=${options.search}`, '-i');
+            }
+
+            // Branch filtering
+            if (options.branch) {
+                if (options.branch === 'all') {
+                    args.push('--all');
+                } else if (options.branch === 'HEAD') {
+                    // Default behavior (HEAD and ancestry)
+                } else {
+                    args.push(options.branch);
+                }
+            } else {
+                // Default to --all if not specified, to show full graph?
+                // Requirement says "The Git Log view... displaying the commit history of the repository".
+                // Usually implies --all or at least HEAD.
+                // Let's default to HEAD if undefined, but maybe we want --all by default for graph.
+                // Let's assume options.branch is passed explicitly or we default to '--all' in UI or here.
+                // For now, if undefined, standard git log (HEAD).
+                args.push('--all');
+            }
+
+            // Graph order matters. --topo-order is good for graphs.
+            args.push('--topo-order');
+
+            if (options.fileFilter) {
+                args.push('--', options.fileFilter);
+            }
+
+            const result = await this.git.raw(args);
+
+            if (!result) return [];
+
+            return result.split('\n')
+                .filter(line => line.trim())
+                .map(line => {
+                    const [hash, shortHash, subject, authorName, authorEmail, date, parentsStr, refsStr] = line.split('\0');
+
+                    return {
+                        hash,
+                        shortHash,
+                        subject,
+                        authorName,
+                        authorEmail,
+                        date,
+                        parentHashes: parentsStr ? parentsStr.split(' ') : [],
+                        refs: this._parseRefs(refsStr)
+                    };
+                });
+        } catch (e) {
+            console.error('getLog error:', e);
+            return [];
+        }
+    }
+
+    public async getLogCount(options: LogOptions): Promise<number> {
+        try {
+            const args = ['rev-list', '--count'];
+
+            if (options.branch) {
+                if (options.branch === 'all') {
+                    args.push('--all');
+                } else if (options.branch !== 'HEAD') {
+                    args.push(options.branch);
+                }
+            } else {
+                args.push('--all');
+            }
+
+            if (options.author) {
+                args.push(`--author=${options.author}`);
+            }
+
+            if (options.search) {
+                args.push(`--grep=${options.search}`, '-i');
+            }
+
+            if (options.fileFilter) {
+                args.push('--', options.fileFilter);
+            }
+
+            const result = await this.git.raw(args);
+            return parseInt(result.trim(), 10) || 0;
+        } catch (e) {
+            console.error('getLogCount error:', e);
+            return 0;
+        }
+    }
+
+    public async getCommitDetails(hash: string): Promise<CommitDetails> {
+        try {
+            // Get message and parents
+            const showMsg = await this.git.show([hash, '--format=%B%x00%P', '--no-patch']);
+            const [fullMessage, parentsStr] = showMsg.split('\0');
+
+            // Get stats and files
+            // --numstat gives: added deleted path
+            // --name-status gives: status path
+            // We want both? 
+            // Actually, we need list of changed files with status (A, M, D) for the list
+            // And maybe total additions/deletions.
+
+            // Let's use getCommitFiles which we already have, or improved version.
+            // Existing getCommitFiles uses --name-status.
+            const files = await this.getCommitFiles(hash) as CommitFile[];
+
+            // Get stats
+            const shortstat = await this.git.show([hash, '--format=', '--shortstat']);
+            // " 1 file changed, 1 insertion(+), 1 deletion(-)"
+            let additions = 0;
+            let deletions = 0;
+            if (shortstat) {
+                const addMatch = shortstat.match(/(\d+) insertion/);
+                const delMatch = shortstat.match(/(\d+) deletion/);
+                if (addMatch) additions = parseInt(addMatch[1], 10);
+                if (delMatch) deletions = parseInt(delMatch[1], 10);
+            }
+
+            return {
+                hash,
+                fullMessage: fullMessage?.trim() || '',
+                files,
+                stats: { additions, deletions },
+                parentHashes: parentsStr ? parentsStr.trim().split(' ') : []
+            };
+        } catch (e) {
+            console.error('getCommitDetails error:', e);
+            throw e;
+        }
+    }
+
+    private _parseRefs(refsStr: string): RefInfo[] {
+        if (!refsStr) return [];
+        // Example: "HEAD -> master, origin/master, tag: v1.0"
+
+        return refsStr.split(', ').filter(Boolean).map(ref => {
+            ref = ref.trim();
+            if (ref.startsWith('HEAD -> ')) {
+                return { name: ref.replace('HEAD -> ', ''), type: 'head' };
+            }
+            if (ref.startsWith('tag: ')) {
+                return { name: ref.replace('tag: ', ''), type: 'tag' };
+            }
+            if (ref.includes('/')) {
+                return { name: ref, type: 'remote' };
+            }
+            return { name: ref, type: 'local' };
+        });
+    }
 }
+export { FileStatus };
+

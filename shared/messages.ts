@@ -60,6 +60,39 @@ export interface PushData {
     config: PushConfig;
 }
 
+export interface RefInfo {
+    name: string;
+    type: 'local' | 'remote' | 'tag' | 'head';
+}
+
+export interface LogCommit {
+    hash: string;
+    shortHash: string;
+    subject: string;
+    authorName: string;
+    authorEmail: string;
+    date: string;
+    parentHashes: string[];
+    refs: RefInfo[];
+}
+
+export interface LogOptions {
+    branch?: string;
+    author?: string;
+    search?: string;
+    maxCount?: number;
+    skip?: number;
+    fileFilter?: string;
+}
+
+export interface CommitDetails {
+    hash: string;
+    fullMessage: string;
+    files: CommitFile[];
+    stats: { additions: number; deletions: number };
+    parentHashes: string[];
+}
+
 export interface ExtensionMethods {
     log(message: string): Promise<void>;
     getPushInitState: () => Promise<PushInitState>;
@@ -99,6 +132,9 @@ export interface ExtensionMethods {
     openFile: (params: { path: string }) => Promise<void>;
     openStashDiff: (params: { index: number; path: string }) => Promise<void>;
     getBranchListData: () => Promise<BranchListData>;
+    getLog: (options: LogOptions) => Promise<LogCommit[]>;
+    getLogCount: (options: LogOptions) => Promise<number>;
+    getCommitDetails: (hash: string) => Promise<CommitDetails>;
 }
 
 export interface CommitState {
