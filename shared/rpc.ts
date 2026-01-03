@@ -47,7 +47,7 @@ export class RpcPeer<TRemote = any, TLocal = any> {
         if (!this._proxy) {
             this._proxy = new Proxy({}, {
                 get: (_target, prop: string) => {
-                    return (...args: any[]) => this.call(prop as any, ...args as any);
+                    return (...args: any[]) => this.call(prop, args);
                 }
             }) as TRemote;
         }
@@ -57,16 +57,8 @@ export class RpcPeer<TRemote = any, TLocal = any> {
     /**
      * Call a remote method.
      */
-    private call<K extends keyof TRemote & string>(
-        method: K,
-        ...args: TRemote[K] extends () => any
-            ? []
-            : TRemote[K] extends (arg: infer P) => any
-            ? [params: P]
-            : never
-    ): Promise<TRemote[K] extends (...args: any) => infer R ? Awaited<R> : never> {
+    private call(method: string, params?: any): Promise<any> {
         const id = Math.random().toString(36).substring(7);
-        const params = args[0];
 
         return new Promise((resolve, reject) => {
             this.pendingRequests.set(id, { resolve, reject });
