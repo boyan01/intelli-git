@@ -40,5 +40,7 @@
   "Are you sure you want to delete {0} branches?": "确定要删除这 {0} 个分支吗？",
   "Delete": "删除",
   "Deleted {0} branches.": "已删除 {0} 个分支。",
-  "Failed to delete branches: {0}": "删除分支失败: {0}"
+  "Failed to delete branches: {0}": "删除分支失败: {0}",
+  "Drop stash@{{{0}}}?": "删除 stash@{{{0}}}？",
+  "Drop": "删除"
 }

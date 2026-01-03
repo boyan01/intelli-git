@@ -9,5 +9,9 @@
   "idea-commit-panel.commands.push.title": "Push...",
   "idea-commit-panel.commands.showBranchPicker.title": "IDEA: Switch Branch",
   "idea-commit-panel.commands.focusCommitView.title": "IDEA: Focus Commit View",
-  "idea-commit-panel.commands.copyCommitHash.title": "Copy Commit Hash"
+  "idea-commit-panel.commands.copyCommitHash.title": "Copy Commit Hash",
+  "idea-commit-panel.commands.stashPop.title": "Pop",
+  "idea-commit-panel.commands.stashApply.title": "Apply",
+  "idea-commit-panel.commands.stashDrop.title": "Drop",
+  "idea-commit-panel.commands.stashShowDiff.title": "Show Diff"
 }

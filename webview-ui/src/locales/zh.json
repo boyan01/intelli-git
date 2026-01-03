@@ -57,6 +57,15 @@
     "actions": {
       "pop": "应用并删除(Pop)",
       "drop": "删除(Drop)"
+    },
+    "preview": {
+      "title": "文件",
+      "expandAll": "全部展开",
+      "collapseAll": "全部收起",
+      "treeView": "树形视图",
+      "listView": "列表视图",
+      "noFiles": "此贮藏中没有文件",
+      "selectStash": "选择一个贮藏以预览"
     }
   },
   "pushView": {

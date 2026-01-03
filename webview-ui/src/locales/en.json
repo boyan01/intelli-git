@@ -57,6 +57,15 @@
     "actions": {
       "pop": "Pop",
       "drop": "Drop"
+    },
+    "preview": {
+      "title": "Files",
+      "expandAll": "Expand All",
+      "collapseAll": "Collapse All",
+      "treeView": "Tree View",
+      "listView": "List View",
+      "noFiles": "No files in this stash",
+      "selectStash": "Select a stash to preview"
     }
   },
   "pushView": {

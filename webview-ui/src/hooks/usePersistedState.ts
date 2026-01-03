@@ -21,6 +21,11 @@ export interface PersistedStateSchema {
     'push.details.viewMode': 'tree' | 'list';
     'push.details.showDetails': boolean;
     'push.details.splitSize': number;
+
+    // Stash View
+    'stash.viewMode': 'tree' | 'list';
+    'stash.splitSize': number;
+    'stash.selectedIndex': number | null;
 }
 
 export const stateDefaults: PersistedStateSchema = {
@@ -39,6 +44,11 @@ export const stateDefaults: PersistedStateSchema = {
     'push.details.viewMode': 'tree',
     'push.details.showDetails': true,
     'push.details.splitSize': 150,
+
+    // Stash View
+    'stash.viewMode': 'tree',
+    'stash.splitSize': 150,
+    'stash.selectedIndex': null,
 };
 
 type StoredState = Record<string, unknown>;

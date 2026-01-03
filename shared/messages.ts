@@ -75,6 +75,7 @@ export interface ExtensionMethods {
     getChangelists: () => Promise<ChangelistGroup[]>;
     getBranchInfo: () => Promise<BranchInfo>;
     getStashList: () => Promise<StashItem[]>;
+    getStashFiles: (index: number) => Promise<CommitFile[]>;
     commit: (params: { message: string; amend: boolean; files: string[]; push?: boolean }) => Promise<void>;
     stage: (path: string) => Promise<void>;
     unstage: (path: string) => Promise<void>;
@@ -82,9 +83,6 @@ export interface ExtensionMethods {
     unstageAll: () => Promise<void>;
     generateCommitMessage: (files?: string[]) => Promise<string>;
     stash: (params: { message?: string; files: string[] }) => Promise<void>;
-    popStash: (index: number) => Promise<void>;
-    applyStash: (index: number) => Promise<void>;
-    dropStash: (index: number) => Promise<void>;
     deleteFiles: (files: string[]) => Promise<void>;
     rollback: (files: string[]) => Promise<void>;
     switchBranch: (branch: string) => Promise<void>;

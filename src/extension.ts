@@ -68,6 +68,65 @@ export function activate(context: vscode.ExtensionContext) {
         })
     );
 
+    context.subscriptions.push(
+        vscode.commands.registerCommand('idea-commit-panel.stashPop', async (args: any) => {
+            if (args && typeof args.stashIndex === 'number') {
+                await gitService.popStash(args.stashIndex);
+                provider.refresh();
+            }
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand('idea-commit-panel.stashApply', async (args: any) => {
+            if (args && typeof args.stashIndex === 'number') {
+                await gitService.applyStash(args.stashIndex);
+                provider.refresh();
+            }
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand('idea-commit-panel.stashDrop', async (args: any) => {
+            if (args && typeof args.stashIndex === 'number') {
+                const confirm = await vscode.window.showWarningMessage(
+                    vscode.l10n.t('Drop stash@{{{0}}}?', args.stashIndex),
+                    { modal: true },
+                    vscode.l10n.t('Drop')
+                );
+                if (confirm) {
+                    await gitService.dropStash(args.stashIndex);
+                    provider.refresh();
+                }
+            }
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand('idea-commit-panel.stashShowDiff', async (args: any) => {
+            if (args && typeof args.stashIndex === 'number') {
+                const stashRef = `stash@{${args.stashIndex}}`;
+                const parentRef = `${stashRef}^`;
+
+                const files = await gitService.getStashFiles(args.stashIndex);
+                if (files.length === 0) {
+                    vscode.window.showInformationMessage('No files in this stash.');
+                    return;
+                }
+
+                const filePath = files[0].path;
+                const leftUri = vscode.Uri.parse(`idea-stash://stash/${encodeURIComponent(parentRef)}/${filePath}`).with({
+                    query: JSON.stringify({ ref: parentRef, path: filePath })
+                });
+                const rightUri = vscode.Uri.parse(`idea-stash://stash/${encodeURIComponent(stashRef)}/${filePath}`).with({
+                    query: JSON.stringify({ ref: stashRef, path: filePath })
+                });
+
+                await vscode.commands.executeCommand('vscode.diff', leftUri, rightUri, `${filePath} (Stash@{${args.stashIndex}})`);
+            }
+        })
+    );
+
     context.subscriptions.push(branchStatusBar);
 
     // Watch for file changes

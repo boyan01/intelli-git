@@ -9,5 +9,9 @@
   "idea-commit-panel.commands.push.title": "推送...",
   "idea-commit-panel.commands.showBranchPicker.title": "IDEA: 切换分支",
   "idea-commit-panel.commands.focusCommitView.title": "IDEA: 聚焦提交视图",
-  "idea-commit-panel.commands.copyCommitHash.title": "复制提交哈希"
+  "idea-commit-panel.commands.copyCommitHash.title": "复制提交哈希",
+  "idea-commit-panel.commands.stashPop.title": "弹出",
+  "idea-commit-panel.commands.stashApply.title": "应用",
+  "idea-commit-panel.commands.stashDrop.title": "删除",
+  "idea-commit-panel.commands.stashShowDiff.title": "显示差异"
 }

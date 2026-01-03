@@ -1,0 +1,124 @@
+.stashList {
+    flex: 1;
+    overflow-y: auto;
+    padding: 4px 0;
+}
+
+.stashList:empty::after {
+    content: '没有贮藏';
+    display: block;
+    padding: 20px;
+    text-align: center;
+    opacity: 0.6;
+}
+
+.stashItem {
+    display: flex;
+    align-items: center;
+    padding: 4px 8px;
+    cursor: pointer;
+    gap: 8px;
+}
+
+.stashItem:hover {
+    background: var(--vscode-list-hoverBackground);
+}
+
+.stashItemName {
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 12px;
+}
+
+.stashItemBranch {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    color: var(--vscode-descriptionForeground);
+    flex-shrink: 0;
+}
+
+.stashItem.selected {
+    background: var(--vscode-list-activeSelectionBackground);
+    color: var(--vscode-list-activeSelectionForeground);
+}
+
+.stashItem.selected .stashItemBranch {
+    color: var(--vscode-list-activeSelectionForeground);
+    opacity: 0.8;
+}
+
+.emptyState {
+    padding: 20px;
+    text-align: center;
+    opacity: 0.6;
+}
+
+.previewSection {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+}
+
+.previewHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 8px;
+    border-bottom: 1px solid var(--vscode-panel-border);
+    flex-shrink: 0;
+}
+
+.previewTitle {
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+    color: var(--vscode-descriptionForeground);
+}
+
+.previewActions {
+    display: flex;
+    gap: 2px;
+}
+
+.previewContent {
+    flex: 1;
+    overflow-y: auto;
+}
+
+.emptyPreview {
+    padding: 20px;
+    text-align: center;
+    opacity: 0.6;
+    font-size: 12px;
+}
+
+.iconBtn {
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    background: transparent;
+    border: none;
+    color: var(--vscode-foreground);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 3px;
+    opacity: 0.7;
+}
+
+.iconBtn:hover {
+    background: var(--vscode-toolbar-hoverBackground);
+    opacity: 1;
+}
+
+.iconBtn.active {
+    background: var(--vscode-toolbar-activeBackground);
+    opacity: 1;
+}

@@ -258,6 +258,11 @@ export class ExtensionRpcHandler implements ExtensionMethods {
         return await this.gitService.getStashList();
     }
 
+    async getStashFiles(index: number): Promise<CommitFile[]> {
+        const files = await this.gitService.getStashFiles(index);
+        return files.map(f => ({ path: f.path, status: f.status }));
+    }
+
     async commit(params: { message: string; amend: boolean; files: string[]; push?: boolean }): Promise<void> {
         try {
             if (params.amend) {
@@ -310,42 +315,6 @@ export class ExtensionRpcHandler implements ExtensionMethods {
             vscode.window.showInformationMessage('Stash successful');
         } catch (e) {
             vscode.window.showErrorMessage(`Stash failed: ${e}`);
-        }
-    }
-
-    async popStash(index: number): Promise<void> {
-        try {
-            await this.gitService.popStash(index);
-            vscode.window.showInformationMessage('Stash popped');
-
-        } catch (e) {
-            vscode.window.showErrorMessage(`Pop stash failed: ${e}`);
-        }
-    }
-
-    async applyStash(index: number): Promise<void> {
-        try {
-            await this.gitService.applyStash(index);
-            vscode.window.showInformationMessage('Stash applied');
-
-        } catch (e) {
-            vscode.window.showErrorMessage(`Apply stash failed: ${e}`);
-        }
-    }
-
-    async dropStash(index: number): Promise<void> {
-        const answer = await vscode.window.showWarningMessage(
-            'Are you sure you want to drop this stash?',
-            { modal: true },
-            'Drop'
-        );
-        if (answer === 'Drop') {
-            try {
-                await this.gitService.dropStash(index);
-
-            } catch (e) {
-                vscode.window.showErrorMessage(`Drop stash failed: ${e}`);
-            }
         }
     }
 

@@ -1,5 +1,5 @@
 import { CommitView } from './CommitView';
-import { StashList } from '../stash/StashList';
+import { StashView } from '../stash/StashView';
 import { useTranslation } from 'react-i18next';
 import { usePersistedState } from '../../hooks/usePersistedState';
 import { useRpcData } from '../../hooks/useRpcData';
@@ -114,15 +114,12 @@ export function LocalChangesView() {
                         </div>
                     )}
 
-                    <button className={styles.iconBtn} title="More Actions">
-                        <i className="codicon codicon-ellipsis"></i>
-                    </button>
                 </div>
             </div>
 
             <div className={styles.content}>
                 {activeTab === 'commit' && <CommitView rebaseStatus={branches?.rebaseStatus} />}
-                {activeTab === 'stash' && <StashList />}
+                {activeTab === 'stash' && <StashView />}
             </div>
         </div>
     );

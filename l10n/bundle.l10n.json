@@ -40,5 +40,7 @@
   "Are you sure you want to delete {0} branches?": "Are you sure you want to delete {0} branches?",
   "Delete": "Delete",
   "Deleted {0} branches.": "Deleted {0} branches.",
-  "Failed to delete branches: {0}": "Failed to delete branches: {0}"
+  "Failed to delete branches: {0}": "Failed to delete branches: {0}",
+  "Drop stash@{{{0}}}?": "Drop stash@{{{0}}}?",
+  "Drop": "Drop"
 }

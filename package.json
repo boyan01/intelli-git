@@ -57,6 +57,22 @@
       {
         "command": "idea-commit-panel.copyCommitHash",
         "title": "%idea-commit-panel.commands.copyCommitHash.title%"
+      },
+      {
+        "command": "idea-commit-panel.stashPop",
+        "title": "%idea-commit-panel.commands.stashPop.title%"
+      },
+      {
+        "command": "idea-commit-panel.stashApply",
+        "title": "%idea-commit-panel.commands.stashApply.title%"
+      },
+      {
+        "command": "idea-commit-panel.stashDrop",
+        "title": "%idea-commit-panel.commands.stashDrop.title%"
+      },
+      {
+        "command": "idea-commit-panel.stashShowDiff",
+        "title": "%idea-commit-panel.commands.stashShowDiff.title%"
       }
     ],
     "menus": {
@@ -72,6 +88,26 @@
           "command": "idea-commit-panel.copyCommitHash",
           "when": "webviewSection == 'commitItem'",
           "group": "1_cutcopypaste"
+        },
+        {
+          "command": "idea-commit-panel.stashPop",
+          "when": "webviewSection == 'stashItem'",
+          "group": "1_modification@1"
+        },
+        {
+          "command": "idea-commit-panel.stashApply",
+          "when": "webviewSection == 'stashItem'",
+          "group": "1_modification@2"
+        },
+        {
+          "command": "idea-commit-panel.stashDrop",
+          "when": "webviewSection == 'stashItem'",
+          "group": "1_modification@3"
+        },
+        {
+          "command": "idea-commit-panel.stashShowDiff",
+          "when": "webviewSection == 'stashItem'",
+          "group": "2_view"
         }
       ]
     }
