@@ -13,5 +13,12 @@
   "intelli-git.commands.stashPop.title": "Pop",
   "intelli-git.commands.stashApply.title": "Apply",
   "intelli-git.commands.stashDrop.title": "Drop",
-  "intelli-git.commands.stashShowDiff.title": "Show Diff"
+  "intelli-git.commands.stashShowDiff.title": "Show Diff",
+  "intelli-git.commands.branch.checkout.title": "Checkout",
+  "intelli-git.commands.branch.create.title": "Create Branch...",
+  "intelli-git.commands.branch.rebase.title": "Rebase onto Current",
+  "intelli-git.commands.branch.merge.title": "Merge into Current",
+  "intelli-git.commands.branch.rename.title": "Rename...",
+  "intelli-git.commands.branch.delete.title": "Delete...",
+  "intelli-git.commands.branch.pull.title": "Pull"
 }

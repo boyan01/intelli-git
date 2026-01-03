@@ -75,5 +75,12 @@
     "cancel": "Cancel",
     "push": "Push",
     "forcePush": "Force Push"
+  },
+  "branchList": {
+    "head": "HEAD",
+    "localBranches": "Local Branches",
+    "remoteBranches": "Remote Branches",
+    "tags": "Tags",
+    "filterPlaceholder": "Filter branches..."
   }
 }

@@ -725,4 +725,55 @@ export class GitService {
         const args = force ? ['-D'] : ['-d'];
         await this.git.branch([...args, ...branches]);
     }
+
+    public async getTags(): Promise<string[]> {
+        const tags = await this.git.tags();
+        return tags.all;
+    }
+
+    public async getGroupedRemoteBranches(): Promise<Record<string, string[]>> {
+        const branches = await this.git.branch(['-r']);
+        const grouped: Record<string, string[]> = {};
+
+        branches.all.forEach(fullBranchName => {
+            // origin/HEAD -> origin/master
+            if (fullBranchName.includes('->')) return;
+
+            const parts = fullBranchName.split('/');
+            const remote = parts[0];
+            const branch = parts.slice(1).join('/');
+
+            if (!grouped[remote]) {
+                grouped[remote] = [];
+            }
+            grouped[remote].push(branch);
+        });
+
+        return grouped;
+    }
+
+    public async rebaseOnto(targetBranch: string): Promise<void> {
+        await this.git.rebase([targetBranch]);
+    }
+
+    public async merge(branchName: string): Promise<void> {
+        await this.git.merge([branchName]);
+    }
+
+    public async checkoutAndRebase(branch: string, targetBranch: string): Promise<void> {
+        await this.switchBranch(branch);
+        await this.rebaseOnto(targetBranch);
+    }
+
+    public async pullWithRebase(remote: string, branch: string): Promise<void> {
+        await this.git.pull(remote, branch, { '--rebase': 'true' });
+    }
+
+    public async pullWithMerge(remote: string, branch: string): Promise<void> {
+        await this.git.pull(remote, branch);
+    }
+
+    public async createBranchFrom(newBranch: string, fromBranch: string): Promise<void> {
+        await this.git.checkout(['-b', newBranch, fromBranch]);
+    }
 }

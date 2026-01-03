@@ -1,16 +1,5 @@
-
 import { SplitPane } from '../common/SplitPane';
-
-const BranchListPanel = () => {
-    return (
-        <div style={{ height: '100%', padding: '10px', boxSizing: 'border-box' }}>
-            <h3>Branches</h3>
-            {/* TODO: Implement Branch List */}
-            <div>Main</div>
-            <div>Develop</div>
-        </div>
-    );
-};
+import { BranchListPanel } from './BranchListPanel';
 
 const LogListPanel = () => {
     return (

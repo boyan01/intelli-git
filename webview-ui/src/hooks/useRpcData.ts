@@ -9,10 +9,6 @@ interface UseRpcDataOptions<T> {
 /**
  * Generic hook for loading data via RPC with automatic refresh on rpcEvents.refresh.
  *
- * @param fetcher - Async function that fetches the data
- * @param options - Configuration options
- * @returns { data, loading, error, reload }
- *
  * @example
  * const { data: branches } = useRpcData(() => rpc.getBranchInfo(), {
  *     initialValue: { current: '', all: [] }

@@ -98,6 +98,7 @@ export interface ExtensionMethods {
     promptCreateChangelist: (file?: string) => Promise<void>;
     openFile: (params: { path: string }) => Promise<void>;
     openStashDiff: (params: { index: number; path: string }) => Promise<void>;
+    getBranchListData: () => Promise<BranchListData>;
 }
 
 export interface CommitState {
@@ -121,4 +122,11 @@ export interface PushCommitsData {
 export interface WebviewMethods {
     activeFileChange: (params: { path: string }) => void;
     refresh: () => void;
+}
+
+export interface BranchListData {
+    currentBranch: string;
+    localBranches: string[];
+    remoteBranches: Record<string, string[]>;
+    tags: string[];
 }

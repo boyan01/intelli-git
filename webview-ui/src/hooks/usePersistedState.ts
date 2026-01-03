@@ -26,6 +26,11 @@ export interface PersistedStateSchema {
     'stash.viewMode': 'tree' | 'list';
     'stash.splitSize': number;
     'stash.selectedIndex': number | null;
+
+    // Branch List Panel
+    'branchList.expandedGroups': Set<string>;
+    'branchList.selectedBranch': string | null;
+    'branchList.filterText': string;
 }
 
 export const stateDefaults: PersistedStateSchema = {
@@ -49,6 +54,11 @@ export const stateDefaults: PersistedStateSchema = {
     'stash.viewMode': 'tree',
     'stash.splitSize': 150,
     'stash.selectedIndex': null,
+
+    // Branch List Panel
+    'branchList.expandedGroups': new Set(['local']), // Default expand local branches
+    'branchList.selectedBranch': null,
+    'branchList.filterText': '',
 };
 
 type StoredState = Record<string, unknown>;

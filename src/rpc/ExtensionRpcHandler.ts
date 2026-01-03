@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { RpcPeer } from '../../shared/rpc';
-import type { WebviewMethods, ExtensionMethods, CommitFile, CommitState, PushCommitsData, PushInitState, ChangelistGroup, BranchInfo, StashItem } from '../../shared/messages';
+import type { WebviewMethods, ExtensionMethods, CommitFile, CommitState, PushCommitsData, PushInitState, ChangelistGroup, BranchInfo, StashItem, BranchListData } from '../../shared/messages';
 import { GitService } from '../services/GitService';
 import { ChangelistService } from '../services/ChangelistService';
 
@@ -157,6 +157,19 @@ export class ExtensionRpcHandler implements ExtensionMethods {
 
     async getChangelists(): Promise<ChangelistGroup[]> {
         return await this._buildChangelists();
+    }
+
+    async getBranchListData(): Promise<BranchListData> {
+        const branches = await this.gitService.getBranches();
+        const groupedRemote = await this.gitService.getGroupedRemoteBranches();
+        const tags = await this.gitService.getTags();
+
+        return {
+            currentBranch: branches.current,
+            localBranches: branches.all,
+            remoteBranches: groupedRemote,
+            tags: tags
+        };
     }
 
     async getBranchInfo(): Promise<BranchInfo> {

@@ -75,5 +75,12 @@
     "cancel": "取消",
     "push": "推送",
     "forcePush": "强制推送"
+  },
+  "branchList": {
+    "head": "HEAD",
+    "localBranches": "本地分支",
+    "remoteBranches": "远程分支",
+    "tags": "标签",
+    "filterPlaceholder": "过滤分支..."
   }
 }

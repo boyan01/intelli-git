@@ -92,6 +92,34 @@
       {
         "command": "intelli-git.focusGitLog",
         "title": "Focus Git Log"
+      },
+      {
+        "command": "intelli-git.branch.checkout",
+        "title": "%intelli-git.commands.branch.checkout.title%"
+      },
+      {
+        "command": "intelli-git.branch.create",
+        "title": "%intelli-git.commands.branch.create.title%"
+      },
+      {
+        "command": "intelli-git.branch.rebase",
+        "title": "%intelli-git.commands.branch.rebase.title%"
+      },
+      {
+        "command": "intelli-git.branch.merge",
+        "title": "%intelli-git.commands.branch.merge.title%"
+      },
+      {
+        "command": "intelli-git.branch.rename",
+        "title": "%intelli-git.commands.branch.rename.title%"
+      },
+      {
+        "command": "intelli-git.branch.delete",
+        "title": "%intelli-git.commands.branch.delete.title%"
+      },
+      {
+        "command": "intelli-git.branch.pull",
+        "title": "%intelli-git.commands.branch.pull.title%"
       }
     ],
     "menus": {
@@ -127,6 +155,41 @@
           "command": "intelli-git.stashShowDiff",
           "when": "webviewSection == 'stashItem'",
           "group": "2_view"
+        },
+        {
+          "command": "intelli-git.branch.checkout",
+          "when": "webviewSection == 'localBranch' || webviewSection == 'remoteBranch' || webviewSection == 'tag'",
+          "group": "1_actions@1"
+        },
+        {
+          "command": "intelli-git.branch.create",
+          "when": "webviewSection == 'localBranch' || webviewSection == 'remoteBranch' || webviewSection == 'tag'",
+          "group": "1_actions@2"
+        },
+        {
+          "command": "intelli-git.branch.pull",
+          "when": "webviewSection == 'remoteBranch'",
+          "group": "1_actions@3"
+        },
+        {
+          "command": "intelli-git.branch.rebase",
+          "when": "webviewSection == 'localBranch'",
+          "group": "2_modify@1"
+        },
+        {
+          "command": "intelli-git.branch.merge",
+          "when": "webviewSection == 'localBranch'",
+          "group": "2_modify@2"
+        },
+        {
+          "command": "intelli-git.branch.rename",
+          "when": "webviewSection == 'localBranch'",
+          "group": "2_modify@3"
+        },
+        {
+          "command": "intelli-git.branch.delete",
+          "when": "webviewSection == 'localBranch'",
+          "group": "3_danger"
         }
       ]
     }
