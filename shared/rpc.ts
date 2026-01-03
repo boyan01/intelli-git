@@ -47,7 +47,12 @@ export class RpcPeer<TRemote = any, TLocal = any> {
         if (!this._proxy) {
             this._proxy = new Proxy({}, {
                 get: (_target, prop: string) => {
-                    return (...args: any[]) => this.call(prop, args);
+                    return (...args: any[]) => {
+                        if (args.length === 1) {
+                            return this.call(prop, args[0]);
+                        }
+                        return this.call(prop, args);
+                    };
                 }
             }) as TRemote;
         }

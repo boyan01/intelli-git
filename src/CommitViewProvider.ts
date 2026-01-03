@@ -104,4 +104,5 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
     public refresh() {
         this._rpc?.proxy.refresh();
     }
+
 }

@@ -12,6 +12,7 @@ export interface BaseFileTreeProps {
     readonly?: boolean;
     onToggleFile?: (path: string, checked: boolean) => void;
     onFileClick?: (path: string, status?: string) => void;
+    onFileDoubleClick?: (path: string, status?: string) => void;
     onFileContextMenu?: (e: React.MouseEvent, path: string, status?: string) => void;
     onFolderContextMenu?: (e: React.MouseEvent, filePaths: string[]) => void;
 }
@@ -110,6 +111,7 @@ export const BaseFileTree = React.forwardRef<BaseFileTreeRef, BaseFileTreeProps>
     readonly = false,
     onToggleFile,
     onFileClick,
+    onFileDoubleClick,
     onFileContextMenu,
     onFolderContextMenu
 }, ref) => {
@@ -194,6 +196,7 @@ export const BaseFileTree = React.forwardRef<BaseFileTreeRef, BaseFileTreeProps>
                     className={`${styles.fileItem} ${isActive ? styles.active : ''}`}
                     style={{ paddingLeft: `${28 + depth * 16}px` }}
                     onClick={() => handleFileClick(node.path, node.status)}
+                    onDoubleClick={() => onFileDoubleClick?.(node.path, node.status)}
                     onContextMenu={(e) => onFileContextMenu?.(e, node.path, node.status)}
                 >
                     {!readonly && onToggleFile && (

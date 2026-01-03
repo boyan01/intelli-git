@@ -105,16 +105,17 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(
         vscode.commands.registerCommand('idea-commit-panel.stashShowDiff', async (args: any) => {
             if (args && typeof args.stashIndex === 'number') {
-                const stashRef = `stash@{${args.stashIndex}}`;
-                const parentRef = `${stashRef}^`;
-
                 const files = await gitService.getStashFiles(args.stashIndex);
                 if (files.length === 0) {
                     vscode.window.showInformationMessage('No files in this stash.');
                     return;
                 }
 
-                const filePath = files[0].path;
+                // Use the selected file from context if available, otherwise default to first file
+                const filePath = args.selectedStashFile || files[0].path;
+
+                const stashRef = `stash@{${args.stashIndex}}`;
+                const parentRef = `${stashRef}^`;
                 const leftUri = vscode.Uri.parse(`idea-stash://stash/${encodeURIComponent(parentRef)}/${filePath}`).with({
                     query: JSON.stringify({ ref: parentRef, path: filePath })
                 });
@@ -122,7 +123,10 @@ export function activate(context: vscode.ExtensionContext) {
                     query: JSON.stringify({ ref: stashRef, path: filePath })
                 });
 
-                await vscode.commands.executeCommand('vscode.diff', leftUri, rightUri, `${filePath} (Stash@{${args.stashIndex}})`);
+                await vscode.commands.executeCommand('vscode.diff', leftUri, rightUri, `${filePath} (Stash@{${args.stashIndex}})`, {
+                    preview: true,
+                    viewColumn: vscode.ViewColumn.Active
+                });
             }
         })
     );

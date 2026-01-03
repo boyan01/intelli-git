@@ -5,6 +5,7 @@ import { RebaseForm } from './RebaseForm';
 import { CommitToolbar } from './CommitToolbar';
 import { useTranslation } from 'react-i18next';
 import { usePersistedState } from '../../hooks/usePersistedState';
+import { useRpcData } from '../../hooks/useRpcData';
 import styles from './CommitView.module.css';
 import { rpc, rpcEvents } from '../../lib/rpc_client';
 import type { ChangelistGroup, BranchInfo } from '@shared/messages';
@@ -17,7 +18,7 @@ export function CommitView({ rebaseStatus }: CommitViewProps) {
     const { t } = useTranslation();
 
     // Data State
-    const [changelists, setChangelists] = useState<ChangelistGroup[]>([]);
+    const { data: changelists, loading } = useRpcData(() => rpc.getChangelists(), { initialValue: [] as ChangelistGroup[] });
     const [activeFile, setActiveFile] = useState<string | null>(null);
 
     // Persisted UI State
@@ -30,33 +31,13 @@ export function CommitView({ rebaseStatus }: CommitViewProps) {
     // Non-persisted state
     const [isGenerating, setIsGenerating] = useState(false);
 
-    // Data loading functions
-    const loadChangelists = useCallback(async () => {
-        try {
-            const data = await rpc.getChangelists();
-            setChangelists(data);
-        } catch (e) {
-            console.error('Failed to load changelists:', e);
-        }
-    }, []);
-
-    // Initial Load & Event Subscriptions
+    // Active file subscription
     useEffect(() => {
-        loadChangelists();
-
-        const unsubRefresh = rpcEvents.refresh.subscribe(() => {
-            loadChangelists();
-        });
-
         const unsubActiveFile = rpcEvents.activeFileChange.subscribe(({ path }) => {
             setActiveFile(path);
         });
-
-        return () => {
-            unsubRefresh();
-            unsubActiveFile();
-        };
-    }, [loadChangelists]);
+        return () => unsubActiveFile();
+    }, []);
 
     const toggleFile = useCallback((path: string, checked: boolean) => {
         setSelectedFiles(prev => {
@@ -141,7 +122,7 @@ export function CommitView({ rebaseStatus }: CommitViewProps) {
 
             <div className={styles.fileListContainer}>
                 {changelists.length === 0 ? (
-                    <div className={styles.emptyState}>{t('commitView.emptyState')}</div>
+                    loading ? null : <div className={styles.emptyState}>{t('commitView.emptyState')}</div>
                 ) : (
                     changelists.map(group => (
                         <ChangelistTree

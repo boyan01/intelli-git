@@ -16,6 +16,7 @@ export function StashView() {
     const [viewMode, setViewMode] = usePersistedState('stash.viewMode');
     const [files, setFiles] = useState<CommitFile[]>([]);
     const [filesLoading, setFilesLoading] = useState(false);
+    const [selectedFile, setSelectedFile] = useState<string | null>(null);
     const treeRef = useRef<BaseFileTreeRef>(null);
 
     // Auto-select first stash when loaded
@@ -33,10 +34,12 @@ export function StashView() {
                 .then(setFiles)
                 .catch(() => setFiles([]))
                 .finally(() => setFilesLoading(false));
-        } else {
             setFiles([]);
+            setSelectedFile(null);
         }
     }, [selectedIndex]);
+
+
 
     const handleStashClick = useCallback((index: number) => {
         setSelectedIndex(index);
@@ -49,6 +52,29 @@ export function StashView() {
     const handleCollapseAll = useCallback(() => {
         treeRef.current?.collapseAll();
     }, []);
+
+
+    const handleFileClick = useCallback((path: string) => {
+        setSelectedFile(path);
+    }, []);
+
+    const handleFileDoubleClick = useCallback((path: string) => {
+        if (selectedIndex !== null) {
+            rpc.openStashDiff({ index: selectedIndex, path }).catch(e => {
+                console.error('Failed to open stash diff:', e);
+            });
+        }
+    }, [selectedIndex]);
+
+    const handleStashDoubleClick = useCallback((index: number) => {
+        if (selectedIndex === index && selectedFile) {
+            rpc.openStashDiff({ index, path: selectedFile });
+        } else if (selectedIndex === index && files.length > 0) {
+            // If no specific file selected, open first
+            rpc.openStashDiff({ index, path: files[0].path });
+            setSelectedFile(files[0].path);
+        }
+    }, [selectedIndex, selectedFile, files]);
 
     if (loading) return null;
 
@@ -75,9 +101,11 @@ export function StashView() {
                             className={`${styles.stashItem} ${selectedIndex === stash.index ? styles.selected : ''}`}
                             data-vscode-context={JSON.stringify({
                                 webviewSection: 'stashItem',
-                                stashIndex: stash.index
+                                stashIndex: stash.index,
+                                selectedStashFile: selectedFile,
                             })}
                             onClick={() => handleStashClick(stash.index)}
+                            onDoubleClick={() => handleStashDoubleClick(stash.index)}
                         >
                             <span className={styles.stashItemName}>
                                 {stash.message || `Stash@{${stash.index}}`}
@@ -132,7 +160,10 @@ export function StashView() {
                                     ref={treeRef}
                                     items={fileItems}
                                     viewMode={viewMode}
+                                    activeFile={selectedFile}
                                     readonly
+                                    onFileClick={handleFileClick}
+                                    onFileDoubleClick={handleFileDoubleClick}
                                 />
                             ) : (
                                 <div className={styles.emptyPreview}>

@@ -97,6 +97,7 @@ export interface ExtensionMethods {
     renameChangelist: (params: { id: string; name: string }) => Promise<void>;
     promptCreateChangelist: (file?: string) => Promise<void>;
     openFile: (params: { path: string }) => Promise<void>;
+    openStashDiff: (params: { index: number; path: string }) => Promise<void>;
 }
 
 export interface CommitState {

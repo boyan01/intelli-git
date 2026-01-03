@@ -371,6 +371,25 @@ export class ExtensionRpcHandler implements ExtensionMethods {
         }
     }
 
+    async openStashDiff(params: { index: number; path: string }): Promise<void> {
+        const stashRef = `stash@{${params.index}}`;
+        const parentRef = `${stashRef}^`;
+        const filePath = params.path;
+
+        const leftUri = vscode.Uri.parse(`idea-stash://stash/${encodeURIComponent(parentRef)}/${filePath}`).with({
+            query: JSON.stringify({ ref: parentRef, path: filePath })
+        });
+        const rightUri = vscode.Uri.parse(`idea-stash://stash/${encodeURIComponent(stashRef)}/${filePath}`).with({
+            query: JSON.stringify({ ref: stashRef, path: filePath })
+        });
+
+        const title = `${path.basename(filePath)} (Stash@{${params.index}})`;
+        await vscode.commands.executeCommand('vscode.diff', leftUri, rightUri, title, {
+            preview: true,
+            viewColumn: vscode.ViewColumn.Active
+        });
+    }
+
     // ===========================================
     // Branch operations
     // ===========================================
