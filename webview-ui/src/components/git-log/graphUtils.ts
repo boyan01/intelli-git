@@ -13,6 +13,8 @@ const BRANCH_COLORS = [
     '#9575cd'  // Deep Purple
 ];
 
+const LONG_DISTANCE_THRESHOLD = 30;
+
 export interface GraphLine {
     x1: number;
     y1: number;
@@ -20,6 +22,9 @@ export interface GraphLine {
     y2: number;
     color: string;
     isMerge: boolean;
+    isLongDistance?: boolean;
+    targetCommitHash?: string;
+    arrowDirection?: 'up' | 'down';
 }
 
 export interface GraphNode {
@@ -27,20 +32,65 @@ export interface GraphNode {
     color: string;
     lines: GraphLine[];
     isMerge: boolean;
+    maxX: number;
+}
+
+interface LaneInfo {
+    targetHash: string;
+    sourceRowIndex: number;
+    sourceHash: string;
+    color: string;
+    isResuming?: boolean;
+}
+
+interface SuspendedConnection {
+    targetHash: string;
+    sourceRowIndex: number;
+    sourceHash: string;
+    originalLane: number;
+    color: string;
 }
 
 export function computeGraph(commits: LogCommit[]): Map<string, GraphNode> {
     const graph = new Map<string, GraphNode>();
-    const lanes: (string | null)[] = [];
+    const lanes: (LaneInfo | null)[] = [];
+    const commitIndexMap = new Map<string, number>();
 
-    for (const commit of commits) {
+    // Suspended long-distance connections that freed their lane
+    const suspendedConnections: SuspendedConnection[] = [];
+
+    commits.forEach((c, i) => commitIndexMap.set(c.hash, i));
+
+    for (let rowIndex = 0; rowIndex < commits.length; rowIndex++) {
+        const commit = commits[rowIndex];
         const { hash, parentHashes } = commit;
         const lines: GraphLine[] = [];
+        let maxX = 0;
+
+        // Check if any suspended connections need to reconnect here (at target commit)
+        const reconnectingConnections: SuspendedConnection[] = [];
+        for (let i = suspendedConnections.length - 1; i >= 0; i--) {
+            if (suspendedConnections[i].targetHash === hash) {
+                reconnectingConnections.push(suspendedConnections[i]);
+                suspendedConnections.splice(i, 1);
+            }
+        }
+
+        // Check if any suspended connections should resume 2 rows before target
+        const resumingConnections: SuspendedConnection[] = [];
+        for (let i = suspendedConnections.length - 1; i >= 0; i--) {
+            const conn = suspendedConnections[i];
+            const targetRowIndex = commitIndexMap.get(conn.targetHash);
+            if (targetRowIndex !== undefined && targetRowIndex - rowIndex === 2) {
+                resumingConnections.push(conn);
+                suspendedConnections.splice(i, 1);
+            }
+        }
 
         // 1. Find all lanes expecting this commit
         const expectingLanes: number[] = [];
         for (let i = 0; i < lanes.length; i++) {
-            if (lanes[i] === hash) {
+            if (lanes[i]?.targetHash === hash) {
                 expectingLanes.push(i);
             }
         }
@@ -49,72 +99,237 @@ export function computeGraph(commits: LogCommit[]): Map<string, GraphNode> {
         let myLaneIndex: number;
         if (expectingLanes.length > 0) {
             myLaneIndex = expectingLanes[0];
-        } else {
-            // New branch tip or root
-            myLaneIndex = lanes.indexOf(null);
-            if (myLaneIndex === -1) {
+        } else if (reconnectingConnections.length > 0) {
+            // Reconnecting from a suspended connection - find an empty lane
+            const emptyIdx = lanes.findIndex(l => l === null);
+            if (emptyIdx === -1) {
                 myLaneIndex = lanes.length;
-                lanes.push(hash); // Temporarily occupy to reserve slot
+                lanes.push(null);
             } else {
-                lanes[myLaneIndex] = hash;
+                myLaneIndex = emptyIdx;
+            }
+        } else {
+            const emptyIdx = lanes.findIndex(l => l === null);
+            if (emptyIdx === -1) {
+                myLaneIndex = lanes.length;
+                lanes.push(null);
+            } else {
+                myLaneIndex = emptyIdx;
             }
         }
 
         const myColor = BRANCH_COLORS[myLaneIndex % BRANCH_COLORS.length];
         const isMerge = parentHashes.length > 1;
+        maxX = myLaneIndex;
 
-        // 3. Draw incoming line from previous row to the node center
+        // 3. Draw incoming line from previous row (if not reconnecting)
         if (expectingLanes.length > 0) {
+            const laneInfo = lanes[myLaneIndex]!;
+            const distance = rowIndex - laneInfo.sourceRowIndex;
+            const isLong = distance > LONG_DISTANCE_THRESHOLD;
+
             lines.push({
                 x1: myLaneIndex,
                 y1: 0,
                 x2: myLaneIndex,
                 y2: 0.5,
-                color: myColor,
-                isMerge: false
+                color: laneInfo.color,
+                isMerge: false,
+                isLongDistance: isLong,
+                targetCommitHash: isLong ? laneInfo.sourceHash : undefined,
+                arrowDirection: isLong ? 'up' : undefined
             });
         }
 
-        // 4. Draw incoming merges (merges into this commit from other lanes)
+        // 4. Draw reconnecting connections (from lanes that resumed 2 rows ago)
+        for (const conn of reconnectingConnections) {
+            // Find the lane that was used for this connection
+            let reconnectLane = lanes.findIndex(l => l?.targetHash === hash && l?.sourceHash === conn.sourceHash);
+            if (reconnectLane === -1) {
+                // Fallback: find any empty lane
+                reconnectLane = lanes.findIndex(l => l === null);
+                if (reconnectLane === -1) {
+                    reconnectLane = lanes.length;
+                    lanes.push(null);
+                }
+            }
+
+            if (reconnectLane > maxX) maxX = reconnectLane;
+
+            // Draw curved line from reconnect lane to commit
+            lines.push({
+                x1: reconnectLane,
+                y1: 0,
+                x2: myLaneIndex,
+                y2: 0.5,
+                color: conn.color,
+                isMerge: true
+            });
+
+            // Clear the lane
+            lanes[reconnectLane] = null;
+        }
+
+        // Calculate how many new lanes are needed for merge parents (fork lines)
+        let neededForForks = 0;
+        if (parentHashes.length > 1) {
+            for (let i = 1; i < parentHashes.length; i++) {
+                const parentHash = parentHashes[i];
+                // Check if this parent already has a lane
+                const existingLane = lanes.findIndex(l => l?.targetHash === parentHash);
+                if (existingLane === -1) {
+                    neededForForks++;
+                }
+            }
+        }
+
+        // 4b. Handle resuming connections (2 rows before target) - draw arrow and allocate lane
+        let reservedForForks = 0;
+        for (const conn of resumingConnections) {
+            // Find an empty lane, but skip myLaneIndex and lanes reserved for forks
+            let resumeLane = -1;
+            let skipped = 0;
+            for (let i = 0; i < lanes.length; i++) {
+                // Skip current commit's lane
+                if (i === myLaneIndex) continue;
+
+                if (lanes[i] === null) {
+                    if (skipped < neededForForks - reservedForForks) {
+                        skipped++;
+                        reservedForForks++;
+                        continue;
+                    }
+                    resumeLane = i;
+                    break;
+                }
+            }
+            if (resumeLane === -1) {
+                resumeLane = lanes.length;
+                lanes.push(null);
+            }
+
+            if (resumeLane > maxX) maxX = resumeLane;
+
+            // Draw only the arrow indicator at center (y=0.5), line continues to y=1
+            lines.push({
+                x1: resumeLane,
+                y1: 0.5,
+                x2: resumeLane,
+                y2: 1,
+                color: conn.color,
+                isMerge: false,
+                isLongDistance: true,
+                targetCommitHash: conn.sourceHash,
+                arrowDirection: 'up'
+            });
+
+            // Occupy the lane with this connection info, mark as resuming to skip pass-through line
+            lanes[resumeLane] = {
+                targetHash: conn.targetHash,
+                sourceRowIndex: rowIndex,
+                sourceHash: conn.sourceHash,
+                color: conn.color,
+                isResuming: true
+            };
+        }
+
+        // 5. Draw incoming merges from other lanes
         for (let i = 1; i < expectingLanes.length; i++) {
             const fromLane = expectingLanes[i];
-            const fromColor = BRANCH_COLORS[fromLane % BRANCH_COLORS.length];
+            const laneInfo = lanes[fromLane]!;
+            const distance = rowIndex - laneInfo.sourceRowIndex;
+            const isLong = distance > LONG_DISTANCE_THRESHOLD;
+
+            if (fromLane > maxX) maxX = fromLane;
+
             lines.push({
                 x1: fromLane,
                 y1: 0,
                 x2: myLaneIndex,
                 y2: 0.5,
-                color: fromColor,
-                isMerge: true
+                color: laneInfo.color,
+                isMerge: true,
+                isLongDistance: isLong,
+                targetCommitHash: isLong ? laneInfo.sourceHash : undefined,
+                arrowDirection: isLong ? 'up' : undefined
             });
             lanes[fromLane] = null;
         }
 
-        // 4. Draw pass-through lines for other active lanes
+        // 6. Draw pass-through lines for other active lanes
         for (let i = 0; i < lanes.length; i++) {
-            if (lanes[i] !== null && lanes[i] !== hash && i !== myLaneIndex) {
-                // Optimization: Don't draw if lane occupied by me (handled later) 
-                // (Already checked i !== myLaneIndex)
-                // Lane `i` is waiting for `lanes[i]`. Just pass through.
-                lines.push({
-                    x1: i,
-                    y1: 0,
-                    x2: i,
-                    y2: 1,
-                    color: BRANCH_COLORS[i % BRANCH_COLORS.length],
-                    isMerge: false
-                });
+            const laneInfo = lanes[i];
+            if (laneInfo !== null && laneInfo.targetHash !== hash && i !== myLaneIndex) {
+                const distance = rowIndex - laneInfo.sourceRowIndex;
+                const targetRowIndex = commitIndexMap.get(laneInfo.targetHash);
+                const distanceToTarget = targetRowIndex !== undefined ? targetRowIndex - rowIndex : 999;
+
+                // Check if this should become a suspended connection
+                // If target is not loaded yet (undefined), suspend after 2 rows
+                const targetNotLoaded = targetRowIndex === undefined;
+                const totalDistance = targetNotLoaded ? LONG_DISTANCE_THRESHOLD + 1 : targetRowIndex - laneInfo.sourceRowIndex;
+                const shouldSuspend = (targetNotLoaded && distance >= 2) ||
+                    (totalDistance > LONG_DISTANCE_THRESHOLD && distance >= 2 && distanceToTarget > 2);
+                if (shouldSuspend) {
+                    // Add arrow line pointing down before suspending
+                    if (i > maxX) maxX = i;
+                    lines.push({
+                        x1: i,
+                        y1: 0,
+                        x2: i,
+                        y2: 0.5,
+                        color: laneInfo.color,
+                        isMerge: false,
+                        isLongDistance: true,
+                        targetCommitHash: laneInfo.targetHash,
+                        arrowDirection: 'down'
+                    });
+
+                    // Suspend this connection and free the lane
+                    suspendedConnections.push({
+                        targetHash: laneInfo.targetHash,
+                        sourceRowIndex: laneInfo.sourceRowIndex,
+                        sourceHash: laneInfo.sourceHash,
+                        originalLane: i,
+                        color: laneInfo.color
+                    });
+                    lanes[i] = null;
+                } else {
+                    // Normal pass-through
+                    if (i > maxX) maxX = i;
+
+                    // If this lane was just resumed (isResuming), skip drawing here
+                    // because step 4b already drew the line from y=0.5 to y=1
+                    if (laneInfo.isResuming) {
+                        // Clear the flag and skip drawing
+                        lanes[i] = { ...laneInfo, isResuming: false };
+                    } else {
+                        lines.push({
+                            x1: i,
+                            y1: 0,
+                            x2: i,
+                            y2: 1,
+                            color: laneInfo.color,
+                            isMerge: false
+                        });
+                    }
+                }
             }
         }
 
-        // 5. Update my lane for parents and draw outgoing lines
+        // 7. Update my lane for parents and draw outgoing lines
         if (parentHashes.length === 0) {
-            lanes[myLaneIndex] = null; // End of history
+            lanes[myLaneIndex] = null;
         } else {
             parentHashes.forEach((parentHash, i) => {
                 if (i === 0) {
-                    // Primary parent keeps my lane
-                    lanes[myLaneIndex] = parentHash;
+                    lanes[myLaneIndex] = {
+                        targetHash: parentHash,
+                        sourceRowIndex: rowIndex,
+                        sourceHash: hash,
+                        color: myColor
+                    };
+
                     lines.push({
                         x1: myLaneIndex,
                         y1: 0.5,
@@ -124,27 +339,39 @@ export function computeGraph(commits: LogCommit[]): Map<string, GraphNode> {
                         isMerge: false
                     });
                 } else {
-                    // Merge parent (outgoing to another branch)
-                    // Check if parent already expected
-                    let parentLaneIndex = lanes.indexOf(parentHash);
+                    // Find existing lane for this parent, but exclude resuming lanes
+                    let parentLaneIndex = lanes.findIndex(l => l?.targetHash === parentHash && !l?.isResuming);
                     if (parentLaneIndex === -1) {
-                        // Allocate new lane for parent
-                        parentLaneIndex = lanes.indexOf(null);
-                        if (parentLaneIndex === -1) {
+                        const emptyIdx = lanes.findIndex(l => l === null);
+                        if (emptyIdx === -1) {
                             parentLaneIndex = lanes.length;
-                            lanes.push(parentHash);
+                            lanes.push({
+                                targetHash: parentHash,
+                                sourceRowIndex: rowIndex,
+                                sourceHash: hash,
+                                color: BRANCH_COLORS[parentLaneIndex % BRANCH_COLORS.length]
+                            });
                         } else {
-                            lanes[parentLaneIndex] = parentHash;
+                            parentLaneIndex = emptyIdx;
+                            lanes[parentLaneIndex] = {
+                                targetHash: parentHash,
+                                sourceRowIndex: rowIndex,
+                                sourceHash: hash,
+                                color: BRANCH_COLORS[parentLaneIndex % BRANCH_COLORS.length]
+                            };
                         }
                     }
 
-                    const parentColor = BRANCH_COLORS[parentLaneIndex % BRANCH_COLORS.length];
+                    if (parentLaneIndex > maxX) maxX = parentLaneIndex;
+
+                    const parentColor = lanes[parentLaneIndex]?.color || BRANCH_COLORS[parentLaneIndex % BRANCH_COLORS.length];
+
                     lines.push({
                         x1: myLaneIndex,
                         y1: 0.5,
                         x2: parentLaneIndex,
                         y2: 1,
-                        color: parentColor, // Use target color to indicate where it goes
+                        color: parentColor,
                         isMerge: true
                     });
                 }
@@ -155,7 +382,8 @@ export function computeGraph(commits: LogCommit[]): Map<string, GraphNode> {
             column: myLaneIndex,
             color: myColor,
             lines,
-            isMerge
+            isMerge,
+            maxX
         });
     }
 

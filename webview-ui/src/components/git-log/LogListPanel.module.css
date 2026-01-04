@@ -51,13 +51,8 @@
 }
 
 .graphCol {
-    width: 120px;
-    /* Fixed width for graph column area, but content can overflow */
     flex-shrink: 0;
-    overflow: hidden;
-    /* Or visible if we want lines to extend? Usually hidden to respect layout */
-    /* If we use overflow: visible in SVG, we might want visible here too, but it might overlap text. */
-    /* Let's try hidden first, and if lines are cut off (e.g. branch going far right), we might need scroll or wider panel.*/
+    overflow: visible;
     position: relative;
     margin-right: 8px;
 }

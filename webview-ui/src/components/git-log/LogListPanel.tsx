@@ -70,16 +70,17 @@ export const LogListPanel: React.FC<LogListPanelProps> = ({ onSelectionChange })
     const isSelected = (hash: string) => selectedCommits.includes(hash);
 
     // Compute graph data
-    const { graph, maxColumn } = useMemo(() => {
-        const g = computeGraph(commits);
-        let max = 0;
-        g.forEach(node => {
-            if (node.column > max) max = node.column;
-        });
-        return { graph: g, maxColumn: max };
-    }, [commits]);
+    const graph = useMemo(() => computeGraph(commits), [commits]);
 
-    const graphWidth = (maxColumn + 2) * CELL_WIDTH;
+    const handleJumpToCommit = useCallback((hash: string) => {
+        const index = commits.findIndex(c => c.hash === hash);
+        if (index !== -1 && containerRef.current) {
+            containerRef.current.scrollTop = index * ROW_HEIGHT;
+            setSelectedCommits([hash]);
+            onSelectionChange?.([hash]);
+            lastSelectedRef.current = hash;
+        }
+    }, [commits, onSelectionChange]);
 
     const loadMore = useCallback(async (reset = false) => {
         if (loading && !reset) return;
@@ -210,6 +211,7 @@ export const LogListPanel: React.FC<LogListPanelProps> = ({ onSelectionChange })
                         {visibleCommits.map((commit) => {
                             const graphNode = graph.get(commit.hash);
                             const selected = isSelected(commit.hash);
+                            const rowGraphWidth = graphNode ? (graphNode.maxX + 2) * CELL_WIDTH : CELL_WIDTH * 2;
                             return (
                                 <div
                                     key={commit.hash}
@@ -222,10 +224,9 @@ export const LogListPanel: React.FC<LogListPanelProps> = ({ onSelectionChange })
                                         subject: commit.subject
                                     })}
                                 >
-                                    <div className={styles.graphCol}>
-                                        {graphNode && <GraphColumn node={graphNode} rowHeight={ROW_HEIGHT} graphWidth={graphWidth} />}
+                                    <div className={styles.graphCol} style={{ width: rowGraphWidth }}>
+                                        {graphNode && <GraphColumn node={graphNode} rowHeight={ROW_HEIGHT} graphWidth={rowGraphWidth} onJumpToCommit={handleJumpToCommit} />}
                                     </div>
-                                    <span className={styles.hash}>{commit.shortHash}</span>
                                     <div className={styles.subject}>
                                         {commit.refs && commit.refs.map((ref, i) => (
                                             <RefLabel key={i} name={ref.name} type={ref.type} />
