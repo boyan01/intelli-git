@@ -86,3 +86,32 @@
     min-width: 80px;
     text-align: right;
 }
+
+.blink {
+    animation:
+        blinkOnce 0.3s ease-in-out 0s,
+        blinkOnce 0.3s ease-in-out 0.3s,
+        fadeToSelected 0.4s ease-out 0.6s forwards;
+}
+
+@keyframes blinkOnce {
+
+    0%,
+    100% {
+        background-color: transparent !important;
+    }
+
+    50% {
+        background-color: var(--vscode-editor-findMatchHighlightBackground) !important;
+    }
+}
+
+@keyframes fadeToSelected {
+    from {
+        background-color: transparent !important;
+    }
+
+    to {
+        background-color: var(--vscode-list-activeSelectionBackground) !important;
+    }
+}

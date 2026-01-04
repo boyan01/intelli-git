@@ -21,6 +21,7 @@ export const LogListPanel: React.FC<LogListPanelProps> = ({ onSelectionChange })
     const containerRef = useRef<HTMLDivElement>(null);
 
     const [selectedCommits, setSelectedCommits] = useState<string[]>([]);
+    const [blinkHash, setBlinkHash] = useState<string | null>(null);
     const lastSelectedRef = useRef<string | null>(null);
 
     const ROW_HEIGHT = 24;
@@ -76,12 +77,18 @@ export const LogListPanel: React.FC<LogListPanelProps> = ({ onSelectionChange })
     const handleJumpToCommit = useCallback((hash: string) => {
         const index = commits.findIndex(c => c.hash === hash);
         if (index !== -1 && containerRef.current) {
-            containerRef.current.scrollTop = index * ROW_HEIGHT;
+            // Center the target commit in viewport
+            const centerOffset = clientHeight / 2 - ROW_HEIGHT / 2;
+            containerRef.current.scrollTop = Math.max(0, index * ROW_HEIGHT - centerOffset);
             setSelectedCommits([hash]);
             onSelectionChange?.([hash]);
             lastSelectedRef.current = hash;
+
+            // Blink effect
+            setBlinkHash(hash);
+            setTimeout(() => setBlinkHash(null), 1000);
         }
-    }, [commits, onSelectionChange]);
+    }, [commits, onSelectionChange, clientHeight]);
 
     const loadMore = useCallback(async (reset = false) => {
         if (loading && !reset) return;
@@ -215,11 +222,12 @@ export const LogListPanel: React.FC<LogListPanelProps> = ({ onSelectionChange })
                         {visibleCommits.map((commit) => {
                             const graphNode = graph.get(commit.hash);
                             const selected = isSelected(commit.hash);
+                            const isBlink = commit.hash === blinkHash;
                             const rowGraphWidth = graphNode ? (graphNode.maxX + 2) * CELL_WIDTH : CELL_WIDTH * 2;
                             return (
                                 <div
                                     key={commit.hash}
-                                    className={`${styles.row} ${selected ? styles.selected : ''}`}
+                                    className={`${styles.row} ${!isBlink && selected ? styles.selected : ''} ${isBlink ? styles.blink : ''}`}
                                     onClick={(e) => handleRowClick(e, commit)}
                                     data-vscode-context={JSON.stringify({
                                         webviewSection: 'gitLogCommit',
