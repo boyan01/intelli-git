@@ -1,95 +1,111 @@
 import React, { useState, useEffect } from 'react';
 import type { LogOptions } from '../../../../shared/messages';
 import { rpc } from '../../lib/rpc_client';
+import styles from './FilterToolbar.module.css';
 
 interface FilterToolbarProps {
     onFilterChange: (options: Partial<LogOptions>) => void;
 }
 
-const styles = {
-    container: {
-        display: 'flex',
-        gap: '8px',
-        padding: '8px',
-        borderBottom: '1px solid var(--vscode-widget-border)',
-        alignItems: 'center',
-        flexWrap: 'wrap' as const,
-    },
-    select: {
-        backgroundColor: 'var(--vscode-dropdown-background)',
-        color: 'var(--vscode-dropdown-foreground)',
-        border: '1px solid var(--vscode-dropdown-border)',
-        padding: '2px 4px',
-        maxWidth: '200px',
-    },
-    input: {
-        backgroundColor: 'var(--vscode-input-background)',
-        color: 'var(--vscode-input-foreground)',
-        border: '1px solid var(--vscode-input-border)',
-        padding: '2px 4px',
-        minWidth: '150px',
-    }
-};
-
 export const FilterToolbar: React.FC<FilterToolbarProps> = ({ onFilterChange }) => {
-    const [branches, setBranches] = useState<string[]>([]);
     const [branch, setBranch] = useState('all');
     const [search, setSearch] = useState('');
-    const [author, setAuthor] = useState('');
+    const [regexMode, setRegexMode] = useState(false);
+    const [caseSensitive, setCaseSensitive] = useState(false);
 
-    useEffect(() => {
-        rpc.getBranchListData().then(data => {
-            const remoteBranches = Object.values(data.remoteBranches).flat();
-            const allBranches = ['all', ...data.localBranches, ...remoteBranches];
-            setBranches(Array.from(new Set(allBranches)));
-        }).catch(console.error);
-    }, []);
-
-    // Debounce search/author
     useEffect(() => {
         const timer = setTimeout(() => {
             onFilterChange({
                 branch: branch === 'all' ? undefined : branch,
                 search: search || undefined,
-                author: author || undefined,
             });
         }, 300);
         return () => clearTimeout(timer);
-    }, [branch, search, author, onFilterChange]);
+    }, [branch, search, onFilterChange]);
+
+    const handleBranchClick = async (e: React.MouseEvent) => {
+        if ((e.target as HTMLElement).closest('.branch-clear')) {
+            e.stopPropagation();
+            setBranch('all');
+            return;
+        }
+        const picked = await rpc.pickBranchForFilter();
+        if (picked !== undefined) {
+            setBranch(picked);
+        }
+    };
 
     return (
-        <div style={styles.container}>
-            <select
-                style={styles.select}
-                value={branch}
-                onChange={e => setBranch(e.target.value)}
-            >
-                {branches.map(b => <option key={b} value={b}>{b}</option>)}
-            </select>
+        <div className={styles.container}>
+            {/* Search box */}
+            <div className={styles.searchBox}>
+                <span className={`${styles.searchIcon} codicon codicon-search`} />
+                <input
+                    className={styles.searchInput}
+                    placeholder="文本或哈希"
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
+                />
+                <button
+                    className={`${styles.inlineToggle} ${regexMode ? styles.active : ''}`}
+                    onClick={() => setRegexMode(!regexMode)}
+                    title="正则表达式"
+                >
+                    .*
+                </button>
+                <button
+                    className={`${styles.inlineToggle} ${caseSensitive ? styles.active : ''}`}
+                    onClick={() => setCaseSensitive(!caseSensitive)}
+                    title="区分大小写"
+                >
+                    Cc
+                </button>
+            </div>
 
-            <input
-                style={styles.input}
-                placeholder="User..."
-                value={author}
-                onChange={e => setAuthor(e.target.value)}
-            />
+            <div className={styles.separator} />
 
-            <input
-                style={styles.input}
-                placeholder="Search..."
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-            />
-            {/* Refresh button maybe? */}
+            {/* Branch filter */}
             <button
-                onClick={() => onFilterChange({
-                    branch: branch === 'all' ? undefined : branch,
-                    search: search || undefined,
-                    author: author || undefined
-                })}
-                style={{ cursor: 'pointer', background: 'none', border: 'none', color: 'var(--vscode-button-foreground)' }}
+                className={`${styles.filterButton} ${styles.branchButton}`}
+                onClick={handleBranchClick}
+                title={branch !== 'all' ? branch : '全部分支'}
             >
-                ↻
+                <span className={styles.ellipsis}>
+                    分支{branch !== 'all' ? `: ${branch}` : ''}
+                </span>
+                {branch !== 'all' ? (
+                    <span
+                        className={`codicon codicon-close branch-clear ${styles.icon} ${styles.iconMedium}`}
+                        title="清除分支过滤"
+                    />
+                ) : (
+                    <span className={`codicon codicon-chevron-down ${styles.icon} ${styles.iconSmall}`} />
+                )}
+            </button>
+
+            {/* User filter */}
+            <button className={styles.filterButton}>
+                用户
+                <span className={`codicon codicon-chevron-down ${styles.icon} ${styles.iconSmall}`} />
+            </button>
+
+            {/* Date filter */}
+            <button className={styles.filterButton}>
+                日期
+                <span className={`codicon codicon-chevron-down ${styles.icon} ${styles.iconSmall}`} />
+            </button>
+
+            {/* Path filter */}
+            <button className={styles.filterButton}>
+                路径
+                <span className={`codicon codicon-chevron-down ${styles.icon} ${styles.iconSmall}`} />
+            </button>
+
+            <div className={styles.separator} />
+
+            {/* Right icons */}
+            <button className={styles.iconButton} title="Intel Sort">
+                <span className="codicon codicon-arrow-swap" />
             </button>
         </div>
     );

@@ -817,12 +817,16 @@ export class GitService {
                 args.push(`--grep=${options.search}`, '-i');
             }
 
-            // Branch filtering
+            // Branch filtering - supports comma-separated multiple branches
             if (options.branch) {
                 if (options.branch === 'all') {
                     args.push('--all');
                 } else if (options.branch === 'HEAD') {
                     // Default behavior (HEAD and ancestry)
+                } else if (options.branch.includes(',')) {
+                    // Multiple branches: split and add each as separate argument
+                    const branches = options.branch.split(',').map(b => b.trim()).filter(Boolean);
+                    args.push(...branches);
                 } else {
                     args.push(options.branch);
                 }
@@ -876,7 +880,13 @@ export class GitService {
             if (options.branch) {
                 if (options.branch === 'all') {
                     args.push('--all');
-                } else if (options.branch !== 'HEAD') {
+                } else if (options.branch === 'HEAD') {
+                    // Default behavior
+                } else if (options.branch.includes(',')) {
+                    // Multiple branches: split and add each as separate argument
+                    const branches = options.branch.split(',').map(b => b.trim()).filter(Boolean);
+                    args.push(...branches);
+                } else {
                     args.push(options.branch);
                 }
             } else {

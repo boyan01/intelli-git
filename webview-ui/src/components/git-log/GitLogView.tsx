@@ -16,13 +16,13 @@ export function GitLogView() {
         <div style={{ height: '100vh', width: '100vw', display: 'flex', flexDirection: 'column' }}>
             <SplitPane
                 direction="horizontal"
-                defaultSize={250}
-                minSize={150}
+                defaultSize={150}
+                minSize={0}
                 first={<BranchListPanel />}
                 second={
                     <SplitPane
                         direction="horizontal"
-                        defaultRatio={0.6}
+                        defaultRatio={1}
                         minSize={200}
                         first={<LogListPanel onSelectionChange={setSelectedCommits} />}
                         second={<CommitDetailsPanel commitHash={selectedHash} />}

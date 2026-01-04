@@ -135,6 +135,7 @@ export interface ExtensionMethods {
     getLog: (options: LogOptions) => Promise<LogCommit[]>;
     getLogCount: (options: LogOptions) => Promise<number>;
     getCommitDetails: (hash: string) => Promise<CommitDetails>;
+    pickBranchForFilter: () => Promise<string | undefined>;
 }
 
 export interface CommitState {

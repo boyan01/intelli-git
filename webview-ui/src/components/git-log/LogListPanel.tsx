@@ -202,7 +202,6 @@ export const LogListPanel: React.FC<LogListPanelProps> = ({ onSelectionChange })
     return (
         <div className={styles.container}>
             <FilterToolbar onFilterChange={setFilters} />
-            <div className={styles.header}>Git Log ({commits.length})</div>
 
             <div
                 ref={containerRef}

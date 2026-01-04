@@ -198,6 +198,101 @@ export class ExtensionRpcHandler implements ExtensionMethods {
         return this.gitService.getCommitDetails(hash);
     }
 
+    async pickBranchForFilter(): Promise<string | undefined> {
+        const branchData = await this.getBranchListData();
+
+        interface BranchQuickPickItem extends vscode.QuickPickItem {
+            branch: string;
+        }
+
+        const items: BranchQuickPickItem[] = [];
+        const addedBranches = new Set<string>();
+
+        const addBranch = (branch: string, icon: string, description?: string) => {
+            if (addedBranches.has(branch)) return;
+            addedBranches.add(branch);
+            items.push({
+                label: `${icon} ${branch}`,
+                description,
+                branch
+            });
+        };
+
+        // "All" option
+        items.push({
+            label: '$(git-branch) 全部',
+            branch: 'all',
+            kind: vscode.QuickPickItemKind.Default
+        });
+        addedBranches.add('all');
+
+        // Priority branches section
+        items.push({
+            label: '常用',
+            kind: vscode.QuickPickItemKind.Separator,
+            branch: ''
+        });
+
+        // HEAD
+        addBranch('HEAD', '$(symbol-reference)', '当前 HEAD');
+
+        // Current branch
+        if (branchData.currentBranch) {
+            addBranch(branchData.currentBranch, '$(git-branch)', '当前分支');
+        }
+
+        // main/master and their remotes
+        const priorityBranches = ['main', 'master'];
+        for (const pb of priorityBranches) {
+            if (branchData.localBranches.includes(pb)) {
+                addBranch(pb, '$(git-branch)');
+            }
+            for (const remote of Object.keys(branchData.remoteBranches)) {
+                if (branchData.remoteBranches[remote].includes(pb)) {
+                    addBranch(`${remote}/${pb}`, '$(cloud)');
+                }
+            }
+        }
+
+        // Separator for local branches
+        items.push({
+            label: '本地分支',
+            kind: vscode.QuickPickItemKind.Separator,
+            branch: ''
+        });
+
+        for (const branch of branchData.localBranches) {
+            addBranch(branch, '$(git-branch)');
+        }
+
+        // Remote branches grouped by remote
+        for (const [remote, branches] of Object.entries(branchData.remoteBranches)) {
+            items.push({
+                label: remote,
+                kind: vscode.QuickPickItemKind.Separator,
+                branch: ''
+            });
+
+            for (const branch of branches) {
+                addBranch(`${remote}/${branch}`, '$(cloud)');
+            }
+        }
+
+        const selected = await vscode.window.showQuickPick(items, {
+            placeHolder: '选择要过滤的分支（可多选）',
+            matchOnDescription: true,
+            canPickMany: true
+        });
+
+        if (!selected || selected.length === 0) {
+            return undefined;
+        }
+
+        // Return comma-separated branches for multiple selection
+        const branches = selected.map(s => s.branch).filter(b => b);
+        return branches.length === 1 ? branches[0] : branches.join(',');
+    }
+
     private async _buildChangelists(): Promise<ChangelistGroup[]> {
         const files = await this.gitService.getStatus();
 

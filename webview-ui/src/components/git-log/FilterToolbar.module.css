@@ -1,0 +1,129 @@
+.container {
+    display: flex;
+    align-items: center;
+    height: 28px;
+    padding: 0 4px;
+    border-bottom: 1px solid var(--vscode-widget-border);
+    gap: 2px;
+}
+
+.searchBox {
+    display: flex;
+    align-items: center;
+    background-color: var(--vscode-input-background);
+    border: 1px solid var(--vscode-input-border);
+    border-radius: 2px;
+    padding: 0 4px;
+    flex: 1;
+    max-width: 140px;
+    height: 22px;
+    gap: 2px;
+}
+
+.searchInput {
+    flex: 1;
+    background-color: transparent;
+    border: none;
+    outline: none;
+    color: var(--vscode-input-foreground);
+    font-size: 12px;
+    padding: 0 4px;
+    min-width: 0;
+}
+
+.searchIcon {
+    opacity: 0.6;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+}
+
+.inlineToggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: transparent;
+    border: none;
+    color: var(--vscode-foreground);
+    cursor: pointer;
+    padding: 2px 4px;
+    font-size: 11px;
+    border-radius: 2px;
+    opacity: 0.6;
+    font-family: monospace;
+}
+
+.inlineToggle.active {
+    opacity: 1;
+    background-color: var(--vscode-inputOption-activeBackground);
+    color: var(--vscode-inputOption-activeForeground);
+}
+
+.filterButton {
+    display: flex;
+    align-items: center;
+    background-color: transparent;
+    border: none;
+    color: var(--vscode-foreground);
+    cursor: pointer;
+    padding: 2px 6px;
+    font-size: 12px;
+    white-space: nowrap;
+    height: 22px;
+    border-radius: 2px;
+}
+
+.filterButton:hover {
+    background-color: var(--vscode-toolbar-hoverBackground);
+}
+
+.filterButton.active {
+    background-color: var(--vscode-toolbar-activeBackground);
+}
+
+.branchButton {
+    max-width: 150px;
+}
+
+.ellipsis {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.separator {
+    width: 1px;
+    height: 16px;
+    background-color: var(--vscode-widget-border);
+    margin: 0 4px;
+}
+
+.iconButton {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: transparent;
+    border: none;
+    color: var(--vscode-foreground);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 2px;
+    opacity: 0.8;
+}
+
+.iconButton:hover {
+    opacity: 1;
+    background-color: var(--vscode-toolbar-hoverBackground);
+}
+
+.icon {
+    flex-shrink: 0;
+}
+
+.iconSmall {
+    font-size: 10px;
+}
+
+.iconMedium {
+    font-size: 12px;
+}
