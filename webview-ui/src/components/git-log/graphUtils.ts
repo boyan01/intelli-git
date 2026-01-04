@@ -13,7 +13,7 @@ const BRANCH_COLORS = [
     '#9575cd'  // Deep Purple
 ];
 
-const LONG_DISTANCE_THRESHOLD = 30;
+export const LONG_DISTANCE_THRESHOLD = 30;
 
 export interface GraphLine {
     x1: number;
@@ -262,14 +262,13 @@ export function computeGraph(commits: LogCommit[]): Map<string, GraphNode> {
             if (laneInfo !== null && laneInfo.targetHash !== hash && i !== myLaneIndex) {
                 const distance = rowIndex - laneInfo.sourceRowIndex;
                 const targetRowIndex = commitIndexMap.get(laneInfo.targetHash);
-                const distanceToTarget = targetRowIndex !== undefined ? targetRowIndex - rowIndex : 999;
+                // If target not found, use max loaded index as fallback
+                const effectiveTargetIndex = targetRowIndex ?? commits.length - 1;
+                const distanceToTarget = effectiveTargetIndex - rowIndex;
 
                 // Check if this should become a suspended connection
-                // If target is not loaded yet (undefined), suspend after 2 rows
-                const targetNotLoaded = targetRowIndex === undefined;
-                const totalDistance = targetNotLoaded ? LONG_DISTANCE_THRESHOLD + 1 : targetRowIndex - laneInfo.sourceRowIndex;
-                const shouldSuspend = (targetNotLoaded && distance >= 2) ||
-                    (totalDistance > LONG_DISTANCE_THRESHOLD && distance >= 2 && distanceToTarget > 2);
+                const totalDistance = effectiveTargetIndex - laneInfo.sourceRowIndex;
+                const shouldSuspend = totalDistance > LONG_DISTANCE_THRESHOLD && distance >= 2 && distanceToTarget > 2;
                 if (shouldSuspend) {
                     // Add arrow line pointing down before suspending
                     if (i > maxX) maxX = i;

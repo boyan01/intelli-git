@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import styles from './LogListPanel.module.css';
 import type { LogCommit, LogOptions } from '../../../../shared/messages';
 import { rpc } from '../../lib/rpc_client';
-import { computeGraph } from './graphUtils';
+import { computeGraph, LONG_DISTANCE_THRESHOLD } from './graphUtils';
 import { GraphColumn, CELL_WIDTH } from './GraphColumn';
 import { FilterToolbar } from './FilterToolbar';
 import { RefLabel } from './RefLabel';
@@ -25,7 +25,8 @@ export const LogListPanel: React.FC<LogListPanelProps> = ({ onSelectionChange })
 
     const ROW_HEIGHT = 24;
     const BUFFER = 10;
-    const BATCH_SIZE = 50;
+    // Load extra commits to ensure long-distance targets (30 rows) are visible
+    const BATCH_SIZE = 50 + LONG_DISTANCE_THRESHOLD;
 
     const handleRowClick = (e: React.MouseEvent, commit: LogCommit) => {
         const hash = commit.hash;
@@ -130,7 +131,10 @@ export const LogListPanel: React.FC<LogListPanelProps> = ({ onSelectionChange })
         const target = e.currentTarget;
         setScrollTop(target.scrollTop);
 
-        if (hasMore && !loading && (target.scrollHeight - target.scrollTop - target.clientHeight < 500)) {
+        // Preload when less than 30 rows remain (LONG_DISTANCE_THRESHOLD)
+        const visibleEndRow = Math.ceil((target.scrollTop + target.clientHeight) / ROW_HEIGHT);
+        const remainingRows = commits.length - visibleEndRow;
+        if (hasMore && !loading && remainingRows < LONG_DISTANCE_THRESHOLD + 10) {
             loadMore();
         }
     };
