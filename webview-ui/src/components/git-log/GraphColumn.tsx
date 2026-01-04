@@ -5,13 +5,14 @@ interface GraphColumnProps {
     node: GraphNode;
     rowHeight: number;
     graphWidth: number;
+    rowIndex: number;
     onJumpToCommit?: (hash: string) => void;
 }
 
 export const CELL_WIDTH = 16;
 
 
-export const GraphColumn: React.FC<GraphColumnProps> = ({ node, rowHeight, graphWidth, onJumpToCommit }) => {
+export const GraphColumn: React.FC<GraphColumnProps> = ({ node, rowHeight, graphWidth, rowIndex, onJumpToCommit }) => {
     const DOT_RADIUS = 5;
     const STROKE_WIDTH = 3;
 
@@ -82,7 +83,9 @@ export const GraphColumn: React.FC<GraphColumnProps> = ({ node, rowHeight, graph
                         stroke={line.color}
                         strokeWidth={2}
                         fill="none"
-                        strokeLinecap="round"
+                        strokeLinecap={line.isDashed ? 'butt' : 'round'}
+                        strokeDasharray={line.isDashed ? '2 3' : undefined}
+                        strokeDashoffset={line.isDashed ? ((rowIndex + line.y1) * rowHeight) % 5 : undefined}
                     />
                     {renderArrow(line, i)}
                 </React.Fragment>

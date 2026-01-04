@@ -25,6 +25,7 @@ export interface GraphLine {
     isLongDistance?: boolean;
     targetCommitHash?: string;
     arrowDirection?: 'up' | 'down';
+    isDashed?: boolean;
 }
 
 export interface GraphNode {
@@ -41,6 +42,7 @@ interface LaneInfo {
     sourceHash: string;
     color: string;
     isResuming?: boolean;
+    isDashed?: boolean;
 }
 
 interface SuspendedConnection {
@@ -49,6 +51,7 @@ interface SuspendedConnection {
     sourceHash: string;
     originalLane: number;
     color: string;
+    isDashed?: boolean;
 }
 
 export function computeGraph(commits: LogCommit[]): Map<string, GraphNode> {
@@ -61,9 +64,18 @@ export function computeGraph(commits: LogCommit[]): Map<string, GraphNode> {
 
     commits.forEach((c, i) => commitIndexMap.set(c.hash, i));
 
+    // Detect filtered mode: if any commit has filteredAncestors
+    const isFilteredMode = commits.some(c => c.filteredAncestors && c.filteredAncestors.length > 0);
+
     for (let rowIndex = 0; rowIndex < commits.length; rowIndex++) {
         const commit = commits[rowIndex];
-        const { hash, parentHashes } = commit;
+        const { hash, parentHashes: rawParentHashes } = commit;
+
+        // In filtered mode, only consider parents that exist in the list
+        const parentHashes = isFilteredMode
+            ? rawParentHashes.filter(ph => commitIndexMap.has(ph))
+            : rawParentHashes;
+
         const lines: GraphLine[] = [];
         let maxX = 0;
 
@@ -137,7 +149,8 @@ export function computeGraph(commits: LogCommit[]): Map<string, GraphNode> {
                 isMerge: false,
                 isLongDistance: isLong,
                 targetCommitHash: isLong ? laneInfo.sourceHash : undefined,
-                arrowDirection: isLong ? 'up' : undefined
+                arrowDirection: isLong ? 'up' : undefined,
+                isDashed: laneInfo.isDashed
             });
         }
 
@@ -163,7 +176,8 @@ export function computeGraph(commits: LogCommit[]): Map<string, GraphNode> {
                 x2: myLaneIndex,
                 y2: 0.5,
                 color: conn.color,
-                isMerge: true
+                isMerge: true,
+                isDashed: conn.isDashed
             });
 
             // Clear the lane
@@ -220,7 +234,8 @@ export function computeGraph(commits: LogCommit[]): Map<string, GraphNode> {
                 isMerge: false,
                 isLongDistance: true,
                 targetCommitHash: conn.sourceHash,
-                arrowDirection: 'up'
+                arrowDirection: 'up',
+                isDashed: conn.isDashed
             });
 
             // Occupy the lane with this connection info, mark as resuming to skip pass-through line
@@ -229,7 +244,8 @@ export function computeGraph(commits: LogCommit[]): Map<string, GraphNode> {
                 sourceRowIndex: rowIndex,
                 sourceHash: conn.sourceHash,
                 color: conn.color,
-                isResuming: true
+                isResuming: true,
+                isDashed: conn.isDashed
             };
         }
 
@@ -251,7 +267,8 @@ export function computeGraph(commits: LogCommit[]): Map<string, GraphNode> {
                 isMerge: true,
                 isLongDistance: isLong,
                 targetCommitHash: isLong ? laneInfo.sourceHash : undefined,
-                arrowDirection: isLong ? 'up' : undefined
+                arrowDirection: isLong ? 'up' : undefined,
+                isDashed: laneInfo.isDashed
             });
             lanes[fromLane] = null;
         }
@@ -262,7 +279,15 @@ export function computeGraph(commits: LogCommit[]): Map<string, GraphNode> {
             if (laneInfo !== null && laneInfo.targetHash !== hash && i !== myLaneIndex) {
                 const distance = rowIndex - laneInfo.sourceRowIndex;
                 const targetRowIndex = commitIndexMap.get(laneInfo.targetHash);
-                // If target not found, use max loaded index as fallback
+
+                // In filtered mode, if target not found, clear the lane instead of using fallback
+                if (targetRowIndex === undefined) {
+                    if (isFilteredMode) {
+                        lanes[i] = null;
+                        continue;
+                    }
+                }
+
                 const effectiveTargetIndex = targetRowIndex ?? commits.length - 1;
                 const distanceToTarget = effectiveTargetIndex - rowIndex;
 
@@ -281,7 +306,8 @@ export function computeGraph(commits: LogCommit[]): Map<string, GraphNode> {
                         isMerge: false,
                         isLongDistance: true,
                         targetCommitHash: laneInfo.targetHash,
-                        arrowDirection: 'down'
+                        arrowDirection: 'down',
+                        isDashed: laneInfo.isDashed
                     });
 
                     // Suspend this connection and free the lane
@@ -290,7 +316,8 @@ export function computeGraph(commits: LogCommit[]): Map<string, GraphNode> {
                         sourceRowIndex: laneInfo.sourceRowIndex,
                         sourceHash: laneInfo.sourceHash,
                         originalLane: i,
-                        color: laneInfo.color
+                        color: laneInfo.color,
+                        isDashed: laneInfo.isDashed
                     });
                     lanes[i] = null;
                 } else {
@@ -309,7 +336,8 @@ export function computeGraph(commits: LogCommit[]): Map<string, GraphNode> {
                             x2: i,
                             y2: 1,
                             color: laneInfo.color,
-                            isMerge: false
+                            isMerge: false,
+                            isDashed: laneInfo.isDashed
                         });
                     }
                 }
@@ -318,7 +346,37 @@ export function computeGraph(commits: LogCommit[]): Map<string, GraphNode> {
 
         // 7. Update my lane for parents and draw outgoing lines
         if (parentHashes.length === 0) {
-            lanes[myLaneIndex] = null;
+            // In filtered mode, check if we have filteredAncestors to draw dashed lines
+            if (commit.filteredAncestors && commit.filteredAncestors.length > 0) {
+                // Draw dashed line to the first filtered ancestor
+                const ancestorHash = commit.filteredAncestors[0];
+                const ancestorRowIndex = commitIndexMap.get(ancestorHash);
+
+                if (ancestorRowIndex !== undefined) {
+                    lanes[myLaneIndex] = {
+                        targetHash: ancestorHash,
+                        sourceRowIndex: rowIndex,
+                        sourceHash: hash,
+                        color: myColor,
+                        isDashed: true
+                    };
+
+                    // Always draw as dashed line for filtered ancestor connection
+                    lines.push({
+                        x1: myLaneIndex,
+                        y1: 0.5,
+                        x2: myLaneIndex,
+                        y2: 1,
+                        color: myColor,
+                        isMerge: false,
+                        isDashed: true
+                    });
+                } else {
+                    lanes[myLaneIndex] = null;
+                }
+            } else {
+                lanes[myLaneIndex] = null;
+            }
         } else {
             parentHashes.forEach((parentHash, i) => {
                 if (i === 0) {
@@ -376,6 +434,34 @@ export function computeGraph(commits: LogCommit[]): Map<string, GraphNode> {
                 }
             });
         }
+
+        // 8. Compact lanes to fill empty gaps on the left
+        const compactedLanes: (LaneInfo | null)[] = [];
+        const laneMapping = new Map<number, number>();
+
+        for (let i = 0; i < lanes.length; i++) {
+            if (lanes[i] !== null) {
+                const newIndex = compactedLanes.length;
+                compactedLanes.push(lanes[i]);
+                laneMapping.set(i, newIndex);
+            }
+        }
+
+        // Apply mapping to lines that extend to the next row (y2 === 1)
+        lines.forEach(line => {
+            if (line.y2 === 1) {
+                const newX2 = laneMapping.get(line.x2);
+                if (newX2 !== undefined) {
+                    line.x2 = newX2;
+                }
+            }
+            // Update maxX to ensure SVG covers all drawn lines
+            if (line.x1 > maxX) maxX = line.x1;
+            if (line.x2 > maxX) maxX = line.x2;
+        });
+
+        // Update lanes for next iteration
+        lanes.splice(0, lanes.length, ...compactedLanes);
 
         graph.set(hash, {
             column: myLaneIndex,

@@ -851,7 +851,7 @@ export class GitService {
 
             if (!result) return [];
 
-            return result.split('\n')
+            const commits: LogCommit[] = result.split('\n')
                 .filter(line => line.trim())
                 .map(line => {
                     const [hash, shortHash, subject, authorName, authorEmail, date, parentsStr, refsStr] = line.split('\0');
@@ -867,10 +867,96 @@ export class GitService {
                         refs: this._parseRefs(refsStr)
                     };
                 });
+
+            // In filtered mode (search or specific branch), calculate filteredAncestors using in-memory graph
+            const isFilteredMode = !!options.search || (options.branch && options.branch !== 'all' && options.branch !== 'HEAD');
+
+            if (isFilteredMode && commits.length > 1) {
+                await this.ensureGraphLoaded();
+
+                const commitHashToIdx = new Map<string, number>();
+                commits.forEach((c, i) => commitHashToIdx.set(c.hash, i));
+
+                for (let i = 0; i < commits.length; i++) {
+                    const commit = commits[i];
+
+                    // Check if any direct parent is visible
+                    const hasVisibleParent = commit.parentHashes.some(ph => commitHashToIdx.has(ph));
+
+                    if (!hasVisibleParent) {
+                        // Use BFS to find the nearest visible ancestor
+                        // We only care about ancestors that appear LATER in the list (idx > i)
+                        const visibleAncestor = this.findNearestVisibleAncestor(commit.hash, new Set(commits.slice(i + 1).map(c => c.hash)));
+
+                        if (visibleAncestor) {
+                            commit.filteredAncestors = [visibleAncestor];
+                        }
+                    }
+                }
+            }
+
+            return commits;
         } catch (e) {
             console.error('getLog error:', e);
             return [];
         }
+    }
+
+    private graphCache: Map<string, string[]> | null = null;
+
+    private async ensureGraphLoaded(): Promise<void> {
+        if (this.graphCache) return;
+
+        try {
+            // Load all commits with their parents: "hash parent1 parent2..."
+            const result = await this.git.raw(['rev-list', '--all', '--parents']);
+            this.graphCache = new Map();
+
+            result.split('\n').forEach(line => {
+                if (!line) return;
+                const parts = line.split(' ');
+                const hash = parts[0];
+                const parents = parts.slice(1);
+                this.graphCache!.set(hash, parents);
+            });
+        } catch (e) {
+            console.error('Failed to load commit graph:', e);
+            this.graphCache = new Map();
+        }
+    }
+
+    private findNearestVisibleAncestor(startHash: string, visibleHashes: Set<string>): string | null {
+        if (!this.graphCache) return null;
+
+        const queue: string[] = [...(this.graphCache.get(startHash) || [])];
+        const visited = new Set<string>();
+
+        let iterations = 0;
+        const MAX_SEARCH_DEPTH = 5000;
+
+        while (queue.length > 0) {
+            iterations++;
+            if (iterations > MAX_SEARCH_DEPTH) break;
+
+            const current = queue.shift()!;
+            if (visited.has(current)) continue;
+            visited.add(current);
+
+            if (visibleHashes.has(current)) {
+                return current;
+            }
+
+            const parents = this.graphCache.get(current);
+            if (parents) {
+                for (const p of parents) {
+                    if (!visited.has(p)) {
+                        queue.push(p);
+                    }
+                }
+            }
+        }
+
+        return null;
     }
 
     public async getLogCount(options: LogOptions): Promise<number> {
@@ -883,7 +969,6 @@ export class GitService {
                 } else if (options.branch === 'HEAD') {
                     // Default behavior
                 } else if (options.branch.includes(',')) {
-                    // Multiple branches: split and add each as separate argument
                     const branches = options.branch.split(',').map(b => b.trim()).filter(Boolean);
                     args.push(...branches);
                 } else {
@@ -915,24 +1000,12 @@ export class GitService {
 
     public async getCommitDetails(hash: string): Promise<CommitDetails> {
         try {
-            // Get message and parents
             const showMsg = await this.git.show([hash, '--format=%B%x00%P', '--no-patch']);
             const [fullMessage, parentsStr] = showMsg.split('\0');
 
-            // Get stats and files
-            // --numstat gives: added deleted path
-            // --name-status gives: status path
-            // We want both? 
-            // Actually, we need list of changed files with status (A, M, D) for the list
-            // And maybe total additions/deletions.
-
-            // Let's use getCommitFiles which we already have, or improved version.
-            // Existing getCommitFiles uses --name-status.
             const files = await this.getCommitFiles(hash) as CommitFile[];
 
-            // Get stats
             const shortstat = await this.git.show([hash, '--format=', '--shortstat']);
-            // " 1 file changed, 1 insertion(+), 1 deletion(-)"
             let additions = 0;
             let deletions = 0;
             if (shortstat) {
@@ -957,7 +1030,6 @@ export class GitService {
 
     private _parseRefs(refsStr: string): RefInfo[] {
         if (!refsStr) return [];
-        // Example: "HEAD -> master, origin/master, tag: v1.0"
 
         return refsStr.split(', ').filter(Boolean).map(ref => {
             ref = ref.trim();
@@ -975,4 +1047,3 @@ export class GitService {
     }
 }
 export { FileStatus };
-

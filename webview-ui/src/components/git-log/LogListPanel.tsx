@@ -218,7 +218,8 @@ export const LogListPanel: React.FC<LogListPanelProps> = ({ onSelectionChange })
                         left: 0,
                         right: 0,
                     }}>
-                        {visibleCommits.map((commit) => {
+                        {visibleCommits.map((commit, i) => {
+                            const globalIndex = startIndex + i;
                             const graphNode = graph.get(commit.hash);
                             const selected = isSelected(commit.hash);
                             const isBlink = commit.hash === blinkHash;
@@ -236,7 +237,7 @@ export const LogListPanel: React.FC<LogListPanelProps> = ({ onSelectionChange })
                                     })}
                                 >
                                     <div className={styles.graphCol} style={{ width: rowGraphWidth }}>
-                                        {graphNode && <GraphColumn node={graphNode} rowHeight={ROW_HEIGHT} graphWidth={rowGraphWidth} onJumpToCommit={handleJumpToCommit} />}
+                                        {graphNode && <GraphColumn node={graphNode} rowHeight={ROW_HEIGHT} graphWidth={rowGraphWidth} rowIndex={globalIndex} onJumpToCommit={handleJumpToCommit} />}
                                     </div>
                                     <div className={styles.subject}>
                                         {commit.refs && commit.refs.map((ref, i) => (

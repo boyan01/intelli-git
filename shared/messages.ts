@@ -74,6 +74,7 @@ export interface LogCommit {
     date: string;
     parentHashes: string[];
     refs: RefInfo[];
+    filteredAncestors?: string[];
 }
 
 export interface LogOptions {
