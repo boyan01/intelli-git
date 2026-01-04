@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import type { LogOptions } from '../../../../shared/messages';
-import { rpc } from '../../lib/rpc_client';
+import type { LogOptions } from '../../../../../shared/messages';
+import { rpc } from '../../../lib/rpc_client';
 import styles from './FilterToolbar.module.css';
+import { DateFilter } from './DateFilter';
+import { UserFilter } from './UserFilter';
+import { logger } from '@/lib/log';
 
 interface FilterToolbarProps {
     onFilterChange: (options: Partial<LogOptions>) => void;
@@ -12,16 +15,26 @@ export const FilterToolbar: React.FC<FilterToolbarProps> = ({ onFilterChange }) 
     const [search, setSearch] = useState('');
     const [regexMode, setRegexMode] = useState(false);
     const [caseSensitive, setCaseSensitive] = useState(false);
+    const [authors, setAuthors] = useState<string[]>([]);
+    const [paths, setPaths] = useState<string[]>([]);
+    const [since, setSince] = useState<string | undefined>();
+    const [until, setUntil] = useState<string | undefined>();
 
     useEffect(() => {
         const timer = setTimeout(() => {
             onFilterChange({
                 branch: branch === 'all' ? undefined : branch,
                 search: search || undefined,
+                regexMode: regexMode || undefined,
+                caseSensitive: caseSensitive || undefined,
+                authors: authors.length > 0 ? authors : undefined,
+                paths: paths.length > 0 ? paths : undefined,
+                since,
+                until
             });
         }, 300);
         return () => clearTimeout(timer);
-    }, [branch, search, onFilterChange]);
+    }, [branch, search, regexMode, caseSensitive, authors, paths, since, until, onFilterChange]);
 
     const handleBranchClick = async (e: React.MouseEvent) => {
         if ((e.target as HTMLElement).closest('.branch-clear')) {
@@ -33,6 +46,33 @@ export const FilterToolbar: React.FC<FilterToolbarProps> = ({ onFilterChange }) 
         if (picked !== undefined) {
             setBranch(picked);
         }
+    };
+
+    const handleDateChange = (dates: { since?: string; until?: string }) => {
+        setSince(dates.since);
+        setUntil(dates.until);
+    };
+
+    const handlePathClick = async (e: React.MouseEvent) => {
+        if ((e.target as HTMLElement).closest('.path-clear')) {
+            e.stopPropagation();
+            setPaths([]);
+            return;
+        }
+        const picked = await rpc.pickPaths();
+        logger.log('picked paths:', picked);
+        if (picked !== undefined) {
+            setPaths(picked);
+        }
+    };
+
+    const getPathLabel = () => {
+        if (paths.length === 0) return '路径';
+        if (paths.length === 1) {
+            const name = paths[0].split('/').pop() || paths[0];
+            return `路径: ${name}`;
+        }
+        return `路径: ${paths.length} 个`;
     };
 
     return (
@@ -84,21 +124,27 @@ export const FilterToolbar: React.FC<FilterToolbarProps> = ({ onFilterChange }) 
             </button>
 
             {/* User filter */}
-            <button className={styles.filterButton}>
-                用户
-                <span className={`codicon codicon-chevron-down ${styles.icon} ${styles.iconSmall}`} />
-            </button>
+            <UserFilter onChange={authors => setAuthors(authors ?? [])} />
 
-            {/* Date filter */}
-            <button className={styles.filterButton}>
-                日期
-                <span className={`codicon codicon-chevron-down ${styles.icon} ${styles.iconSmall}`} />
-            </button>
+            <DateFilter onChange={handleDateChange} />
 
             {/* Path filter */}
-            <button className={styles.filterButton}>
-                路径
-                <span className={`codicon codicon-chevron-down ${styles.icon} ${styles.iconSmall}`} />
+            <button
+                className={`${styles.filterButton} ${styles.pathButton}`}
+                onClick={handlePathClick}
+                title={paths.length > 0 ? paths.join('\n') : '选择文件或文件夹'}
+            >
+                <span className={styles.ellipsis}>
+                    {getPathLabel()}
+                </span>
+                {paths.length > 0 ? (
+                    <span
+                        className={`codicon codicon-close path-clear ${styles.icon} ${styles.iconMedium}`}
+                        title="清除路径过滤"
+                    />
+                ) : (
+                    <span className={`codicon codicon-chevron-down ${styles.icon} ${styles.iconSmall}`} />
+                )}
             </button>
 
             <div className={styles.separator} />

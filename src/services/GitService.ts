@@ -809,12 +809,23 @@ export class GitService {
                 // We add it at the end
             }
 
-            if (options.author) {
-                args.push(`--author=${options.author}`);
+            if (options.authors && options.authors.length > 0) {
+                // Escape regex special chars and use OR pattern
+                const escapeRegex = (s: string) => s.replace(/[[\]{}()*+?.\\^$|]/g, '\\$&');
+                const authorPattern = options.authors.map(escapeRegex).join('\\|');
+                args.push(`--author=${authorPattern}`);
             }
 
             if (options.search) {
-                args.push(`--grep=${options.search}`, '-i');
+                if (options.regexMode) {
+                    args.push('-E'); // extended regex
+                } else {
+                    args.push('--fixed-strings'); // literal match
+                }
+                args.push(`--grep=${options.search}`);
+                if (!options.caseSensitive) {
+                    args.push('-i');
+                }
             }
 
             // Branch filtering - supports comma-separated multiple branches
@@ -840,10 +851,22 @@ export class GitService {
                 args.push('--all');
             }
 
+            if (options.since) {
+                args.push(`--since=${options.since}`);
+            }
+            if (options.until) {
+                args.push(`--until=${options.until}`);
+            }
+
+
+
             // Graph order matters. --topo-order is good for graphs.
             args.push('--topo-order');
 
-            if (options.fileFilter) {
+            // Path filtering: supports multiple paths
+            if (options.paths && options.paths.length > 0) {
+                args.push('--', ...options.paths);
+            } else if (options.fileFilter) {
                 args.push('--', options.fileFilter);
             }
 
@@ -902,6 +925,35 @@ export class GitService {
         }
     }
 
+    async getAuthors(): Promise<string[]> {
+        if (!this.git) return [];
+
+        const root = this.getWorkspaceRoot();
+        if (!root) return [];
+
+        try {
+            const logResult = await this.git.raw(['log', '--format=%aN']);
+            if (!logResult) return [];
+
+            const authors = new Set(logResult.split('\n').map(a => a.trim()).filter(a => !!a));
+            return Array.from(authors).sort();
+        } catch (e) {
+            console.error('getAuthors error:', e);
+            return [];
+        }
+    }
+
+    async getCurrentUser(): Promise<string> {
+        if (!this.git) return '';
+        try {
+            const result = await this.git.raw(['config', 'user.name']);
+            return result ? result.trim() : '';
+        } catch (e) {
+            console.error('getCurrentUser error:', e);
+            return '';
+        }
+    }
+
     private graphCache: Map<string, string[]> | null = null;
 
     private async ensureGraphLoaded(): Promise<void> {
@@ -957,45 +1009,6 @@ export class GitService {
         }
 
         return null;
-    }
-
-    public async getLogCount(options: LogOptions): Promise<number> {
-        try {
-            const args = ['rev-list', '--count'];
-
-            if (options.branch) {
-                if (options.branch === 'all') {
-                    args.push('--all');
-                } else if (options.branch === 'HEAD') {
-                    // Default behavior
-                } else if (options.branch.includes(',')) {
-                    const branches = options.branch.split(',').map(b => b.trim()).filter(Boolean);
-                    args.push(...branches);
-                } else {
-                    args.push(options.branch);
-                }
-            } else {
-                args.push('--all');
-            }
-
-            if (options.author) {
-                args.push(`--author=${options.author}`);
-            }
-
-            if (options.search) {
-                args.push(`--grep=${options.search}`, '-i');
-            }
-
-            if (options.fileFilter) {
-                args.push('--', options.fileFilter);
-            }
-
-            const result = await this.git.raw(args);
-            return parseInt(result.trim(), 10) || 0;
-        } catch (e) {
-            console.error('getLogCount error:', e);
-            return 0;
-        }
     }
 
     public async getCommitDetails(hash: string): Promise<CommitDetails> {

@@ -79,11 +79,16 @@ export interface LogCommit {
 
 export interface LogOptions {
     branch?: string;
-    author?: string;
+    authors?: string[];
     search?: string;
+    regexMode?: boolean;
+    caseSensitive?: boolean;
     maxCount?: number;
     skip?: number;
     fileFilter?: string;
+    paths?: string[];
+    since?: string;
+    until?: string;
 }
 
 export interface CommitDetails {
@@ -134,9 +139,11 @@ export interface ExtensionMethods {
     openStashDiff: (params: { index: number; path: string }) => Promise<void>;
     getBranchListData: () => Promise<BranchListData>;
     getLog: (options: LogOptions) => Promise<LogCommit[]>;
-    getLogCount: (options: LogOptions) => Promise<number>;
     getCommitDetails: (hash: string) => Promise<CommitDetails>;
     pickBranchForFilter: () => Promise<string | undefined>;
+    pickPaths: () => Promise<string[] | undefined>;
+    getAuthors: () => Promise<string[]>;
+    getCurrentUser: () => Promise<string>;
 }
 
 export interface CommitState {

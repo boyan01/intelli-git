@@ -190,12 +190,69 @@ export class ExtensionRpcHandler implements ExtensionMethods {
         return this.gitService.getLog(options);
     }
 
-    async getLogCount(options: LogOptions): Promise<number> {
-        return this.gitService.getLogCount(options);
-    }
-
     async getCommitDetails(hash: string): Promise<CommitDetails> {
         return this.gitService.getCommitDetails(hash);
+    }
+
+    async getAuthors(): Promise<string[]> {
+        return this.gitService.getAuthors();
+    }
+
+    async getCurrentUser(): Promise<string> {
+        return this.gitService.getCurrentUser();
+    }
+
+    async pickPaths(): Promise<string[] | undefined> {
+        const workspaceRoot = this.gitService.getWorkspaceRoot();
+
+        const result = await vscode.window.showOpenDialog({
+            canSelectFiles: true,
+            canSelectFolders: true,
+            canSelectMany: true,
+            openLabel: '选择路径',
+            defaultUri: workspaceRoot ? vscode.Uri.file(workspaceRoot) : undefined
+        });
+
+        if (!result || result.length === 0) {
+            return undefined;
+        }
+
+        if (!workspaceRoot) {
+            vscode.window.showWarningMessage('无法确定工作区根目录');
+            return undefined;
+        }
+
+        const validPaths: string[] = [];
+        const invalidPaths: string[] = [];
+
+        for (const uri of result) {
+            if (uri.fsPath.startsWith(workspaceRoot)) {
+                let relativePath = uri.fsPath.substring(workspaceRoot.length);
+                if (relativePath.startsWith('/') || relativePath.startsWith('\\')) {
+                    relativePath = relativePath.substring(1);
+                }
+                // Handle selecting the workspace root itself
+                if (relativePath === '') {
+                    relativePath = '.';
+                }
+                validPaths.push(relativePath);
+            } else {
+                invalidPaths.push(uri.fsPath);
+            }
+        }
+
+        if (invalidPaths.length > 0) {
+            const msg = invalidPaths.length === 1
+                ? `路径 "${invalidPaths[0]}" 不在工作区内，已忽略`
+                : `${invalidPaths.length} 个路径不在工作区内，已忽略`;
+            vscode.window.showWarningMessage(msg);
+        }
+
+        if (validPaths.length === 0) {
+            return undefined;
+        }
+
+        return validPaths;
     }
 
     async pickBranchForFilter(): Promise<string | undefined> {

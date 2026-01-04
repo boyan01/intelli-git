@@ -4,7 +4,7 @@ import type { LogCommit, LogOptions } from '../../../../shared/messages';
 import { rpc } from '../../lib/rpc_client';
 import { computeGraph, LONG_DISTANCE_THRESHOLD } from './graphUtils';
 import { GraphColumn, CELL_WIDTH } from './GraphColumn';
-import { FilterToolbar } from './FilterToolbar';
+import { FilterToolbar } from './filter-toolbar/FilterToolbar';
 import { RefLabel } from './RefLabel';
 
 interface LogListPanelProps {
