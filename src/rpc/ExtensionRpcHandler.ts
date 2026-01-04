@@ -4,6 +4,7 @@ import { RpcPeer } from '../../shared/rpc';
 import type { WebviewMethods, ExtensionMethods, CommitFile, CommitState, PushCommitsData, PushInitState, ChangelistGroup, BranchInfo, StashItem, BranchListData, LogCommit, LogOptions, CommitDetails } from '../../shared/messages';
 import { GitService } from '../services/GitService';
 import { ChangelistService } from '../services/ChangelistService';
+import { i18n } from '../utils/i18n';
 
 export interface ExtensionRpcHandlerOptions {
     gitService: GitService;
@@ -108,7 +109,7 @@ export class ExtensionRpcHandler implements ExtensionMethods {
         }
 
         vscode.window.showInformationMessage(
-            `Successfully pushed to ${params.remote}/${params.branch}`
+            i18n.t('extension.pushSuccess', params.remote, params.branch)
         );
     }
 
@@ -209,7 +210,7 @@ export class ExtensionRpcHandler implements ExtensionMethods {
             canSelectFiles: true,
             canSelectFolders: true,
             canSelectMany: true,
-            openLabel: '选择路径',
+            openLabel: i18n.t('extension.selectPath'),
             defaultUri: workspaceRoot ? vscode.Uri.file(workspaceRoot) : undefined
         });
 
@@ -218,7 +219,7 @@ export class ExtensionRpcHandler implements ExtensionMethods {
         }
 
         if (!workspaceRoot) {
-            vscode.window.showWarningMessage('无法确定工作区根目录');
+            vscode.window.showWarningMessage(i18n.t('extension.noRoot'));
             return undefined;
         }
 
@@ -243,8 +244,8 @@ export class ExtensionRpcHandler implements ExtensionMethods {
 
         if (invalidPaths.length > 0) {
             const msg = invalidPaths.length === 1
-                ? `路径 "${invalidPaths[0]}" 不在工作区内，已忽略`
-                : `${invalidPaths.length} 个路径不在工作区内，已忽略`;
+                ? i18n.t('extension.pathNotInWorkspace', invalidPaths[0])
+                : i18n.t('extension.pathsNotInWorkspace', invalidPaths.length);
             vscode.window.showWarningMessage(msg);
         }
 
@@ -277,7 +278,7 @@ export class ExtensionRpcHandler implements ExtensionMethods {
 
         // "All" option
         items.push({
-            label: '$(git-branch) 全部',
+            label: `$(git-branch) ${i18n.t('extension.all')}`,
             branch: 'all',
             kind: vscode.QuickPickItemKind.Default
         });
@@ -285,17 +286,17 @@ export class ExtensionRpcHandler implements ExtensionMethods {
 
         // Priority branches section
         items.push({
-            label: '常用',
+            label: i18n.t('extension.common'),
             kind: vscode.QuickPickItemKind.Separator,
             branch: ''
         });
 
         // HEAD
-        addBranch('HEAD', '$(symbol-reference)', '当前 HEAD');
+        addBranch('HEAD', '$(symbol-reference)', i18n.t('extension.currentHead'));
 
         // Current branch
         if (branchData.currentBranch) {
-            addBranch(branchData.currentBranch, '$(git-branch)', '当前分支');
+            addBranch(branchData.currentBranch, '$(git-branch)', i18n.t('extension.currentBranch'));
         }
 
         // main/master and their remotes
@@ -313,7 +314,7 @@ export class ExtensionRpcHandler implements ExtensionMethods {
 
         // Separator for local branches
         items.push({
-            label: '本地分支',
+            label: i18n.t('extension.localBranches'),
             kind: vscode.QuickPickItemKind.Separator,
             branch: ''
         });
@@ -336,7 +337,7 @@ export class ExtensionRpcHandler implements ExtensionMethods {
         }
 
         const selected = await vscode.window.showQuickPick(items, {
-            placeHolder: '选择要过滤的分支（可多选）',
+            placeHolder: i18n.t('extension.selectBranchFilter'),
             matchOnDescription: true,
             canPickMany: true
         });
@@ -444,14 +445,14 @@ export class ExtensionRpcHandler implements ExtensionMethods {
                 const branches = await this.gitService.getBranches();
                 if (branches.current) {
                     await this.gitService.push('origin', branches.current);
-                    vscode.window.showInformationMessage('Push successful');
+                    vscode.window.showInformationMessage(i18n.t('extension.pushSuccess', 'origin', branches.current));
                 }
             } else {
-                vscode.window.showInformationMessage('Commit successful');
+                vscode.window.showInformationMessage(i18n.t('extension.commitSuccess'));
             }
 
         } catch (e) {
-            vscode.window.showErrorMessage(`Commit failed: ${e}`);
+            vscode.window.showErrorMessage(i18n.t('extension.commitFailed', `${e}`));
             throw e;
         }
     }
@@ -477,19 +478,19 @@ export class ExtensionRpcHandler implements ExtensionMethods {
             let message = params.message;
             if (!message) {
                 message = await vscode.window.showInputBox({
-                    placeHolder: 'Stash message (optional)'
+                    placeHolder: i18n.t('extension.stashPlaceholder')
                 });
             }
             await this.gitService.stash(message, params.files);
-            vscode.window.showInformationMessage('Stash successful');
+            vscode.window.showInformationMessage(i18n.t('extension.stashSuccess'));
         } catch (e) {
-            vscode.window.showErrorMessage(`Stash failed: ${e}`);
+            vscode.window.showErrorMessage(i18n.t('extension.stashFailed', `${e}`));
         }
     }
 
     async deleteFiles(files: string[]): Promise<void> {
         const answer = await vscode.window.showWarningMessage(
-            `Are you sure you want to delete ${files.length} files from disk?`,
+            i18n.t('extension.deleteFilesConfirm', files.length),
             { modal: true },
             'Delete'
         );
@@ -503,14 +504,14 @@ export class ExtensionRpcHandler implements ExtensionMethods {
                 }
 
             } catch (e) {
-                vscode.window.showErrorMessage(`Delete failed: ${e}`);
+                vscode.window.showErrorMessage(i18n.t('extension.deleteFailed', `${e}`));
             }
         }
     }
 
     async rollback(files: string[]): Promise<void> {
         const answer = await vscode.window.showWarningMessage(
-            `Are you sure you want to rollback ${files.length} files? This cannot be undone.`,
+            i18n.t('extension.rollbackFilesConfirm', files.length),
             { modal: true },
             'Rollback'
         );
@@ -519,7 +520,7 @@ export class ExtensionRpcHandler implements ExtensionMethods {
                 await this.gitService.rollbackFiles(files);
 
             } catch (e) {
-                vscode.window.showErrorMessage(`Rollback failed: ${e}`);
+                vscode.window.showErrorMessage(i18n.t('extension.rollbackFailed', `${e}`));
             }
         }
     }
@@ -560,34 +561,34 @@ export class ExtensionRpcHandler implements ExtensionMethods {
             await this.gitService.switchBranch(branch);
 
         } catch (e) {
-            vscode.window.showErrorMessage(`Switch branch failed: ${e}`);
+            vscode.window.showErrorMessage(i18n.t('extension.switchBranchFailed', `${e}`));
         }
     }
 
     async pull(): Promise<void> {
         try {
             await this.gitService.pull();
-            vscode.window.showInformationMessage('Project updated');
+            vscode.window.showInformationMessage(i18n.t('extension.pullSuccess'));
 
         } catch (e) {
-            vscode.window.showErrorMessage(`Pull failed: ${e}`);
+            vscode.window.showErrorMessage(i18n.t('extension.pullFailed', `${e}`));
         }
     }
 
     async fetch(): Promise<void> {
         await vscode.window.withProgress({
             location: vscode.ProgressLocation.Notification,
-            title: "Fetching...",
+            title: i18n.t('extension.fetching'),
             cancellable: true
         }, async (progress, token) => {
             try {
                 await this.gitService.fetch();
                 if (!token.isCancellationRequested) {
-                    vscode.window.showInformationMessage('Fetch completed');
+                    vscode.window.showInformationMessage(i18n.t('extension.fetchSuccess'));
                 }
             } catch (e) {
                 if (!token.isCancellationRequested) {
-                    vscode.window.showErrorMessage(`Fetch failed: ${e}`);
+                    vscode.window.showErrorMessage(i18n.t('extension.fetchFailed', `${e}`));
                 }
             } finally {
 
@@ -602,20 +603,20 @@ export class ExtensionRpcHandler implements ExtensionMethods {
     async continueRebase(params: { message?: string; files?: string[] }): Promise<void> {
         try {
             await this.gitService.continueRebase(params.message);
-            vscode.window.showInformationMessage('Rebase continued');
+            vscode.window.showInformationMessage(i18n.t('extension.rebaseContinued'));
 
         } catch (e) {
-            vscode.window.showErrorMessage(`Continue rebase failed: ${e}`);
+            vscode.window.showErrorMessage(i18n.t('extension.continueRebaseFailed', `${e}`));
         }
     }
 
     async abortRebase(): Promise<void> {
         try {
             await this.gitService.abortRebase();
-            vscode.window.showInformationMessage('Rebase aborted');
+            vscode.window.showInformationMessage(i18n.t('extension.rebaseAborted'));
 
         } catch (e) {
-            vscode.window.showErrorMessage(`Abort rebase failed: ${e}`);
+            vscode.window.showErrorMessage(i18n.t('extension.abortRebaseFailed', `${e}`));
         }
     }
 
@@ -633,7 +634,7 @@ export class ExtensionRpcHandler implements ExtensionMethods {
         const list = this.changelistService?.getChangelistById(id);
         if (list && list.files.length > 0) {
             const answer = await vscode.window.showWarningMessage(
-                `Changelist '${list.name}' is not empty. Delete it and move files to default?`,
+                i18n.t('extension.changelistNotEmpty', list.name),
                 { modal: true },
                 'Delete'
             );
@@ -654,8 +655,8 @@ export class ExtensionRpcHandler implements ExtensionMethods {
 
     async promptCreateChangelist(file?: string): Promise<void> {
         const newName = await vscode.window.showInputBox({
-            prompt: 'Enter new changelist name',
-            placeHolder: 'New Changelist'
+            prompt: i18n.t('extension.enterChangelistName'),
+            placeHolder: i18n.t('extension.newChangelistPlaceholder')
         });
         if (newName) {
             const newId = await this.changelistService?.createChangelist(newName);
@@ -679,8 +680,8 @@ export class ExtensionRpcHandler implements ExtensionMethods {
 
             if (!diff) {
                 const message = files && files.length > 0
-                    ? 'No changes found for selected files.'
-                    : 'No staged changes to generate commit message for.';
+                    ? i18n.t('extension.noChangesForCommitGen')
+                    : i18n.t('extension.noStagedChangesForCommitGen');
                 vscode.window.showInformationMessage(message);
                 return '';
             }
@@ -692,11 +693,11 @@ export class ExtensionRpcHandler implements ExtensionMethods {
             }
 
             if (!model) {
-                throw new Error('No suitable AI model found. Please ensure GitHub Copilot Chat is installed and enabled.');
+                throw new Error(i18n.t('extension.noAIModel'));
             }
 
             const messages = [
-                vscode.LanguageModelChatMessage.User('Generate a concise commit message based on the following diff. Use the conventional commits format (e.g. feat: ..., fix: ...). Only return the commit message, no explanation, no code blocks'),
+                vscode.LanguageModelChatMessage.User(i18n.t('extension.commitGenPrompt')),
                 vscode.LanguageModelChatMessage.User(diff)
             ];
 
@@ -709,7 +710,7 @@ export class ExtensionRpcHandler implements ExtensionMethods {
             return fullMessage.trim();
         } catch (e) {
             console.error('Error generating commit message:', e);
-            vscode.window.showErrorMessage(`Failed to generate commit message: ${e}`);
+            vscode.window.showErrorMessage(i18n.t('extension.commitGenFailed', `${e}`));
             throw e;
         }
     }

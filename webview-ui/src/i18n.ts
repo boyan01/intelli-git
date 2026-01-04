@@ -1,8 +1,8 @@
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 
-import en from './locales/en.json';
-import zh from './locales/zh.json';
+import en from '../../shared/l10n/bundle.l10n.json';
+import zh from '../../shared/l10n/bundle.l10n.zh-cn.json';
 
 i18n
   .use(initReactI18next)

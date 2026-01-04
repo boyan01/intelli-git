@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import styles from './DateFilter.module.css';
 import { FilterMenu } from './FilterMenu';
+import { useTranslation } from 'react-i18next';
 
 interface DateFilterProps {
     onChange: (dates: { since?: string; until?: string }) => void;
 }
 
 export const DateFilter: React.FC<DateFilterProps> = ({ onChange }) => {
+    const { t } = useTranslation();
     const [filterType, setFilterType] = useState<'all' | '24h' | '7d' | 'custom'>('all');
     const [customSince, setCustomSince] = useState('');
     const [customUntil, setCustomUntil] = useState('');
@@ -69,32 +71,44 @@ export const DateFilter: React.FC<DateFilterProps> = ({ onChange }) => {
 
     const getLabel = () => {
         switch (filterType) {
-            case '24h': return '过去 24 小时';
-            case '7d': return '过去 7 天';
+            case '24h': return t('filter.date.24h');
+            case '7d': return t('filter.date.7d');
             case 'custom':
                 if (customSince && customUntil) return `${customSince} - ${customUntil}`;
-                if (customSince) return `Since ${customSince}`;
-                if (customUntil) return `Until ${customUntil}`;
-                return '自定义日期';
-            default: return '日期';
+                if (customSince) return t('filter.date.since', { 0: customSince }); // i18next interpolation uses {{key}} or just {0} if configured, standard i18next defaults. 
+                // Wait, useTranslation replacement usually uses keys. { "since": "Since {{date}}" }
+                // My JSON has "Since {0}". Extension uses {0}. i18next default is {{key}}.
+                // I should check if I configured i18next to use {0} or if I should assume standard.
+                // Standard i18next uses {{val}}.
+                // Extension vscode.l10n uses {0}.
+                // To support both, I might need different strings or a formatter.
+                // OR simpler: `t('filter.date.since').replace('{0}', customSince)` for now as a quick fix, 
+                // OR better, update JSON to use {{val}} for webview? But we want SHARED json.
+                // Shared JSON means one format. VS Code uses {0}. Webview i18next uses {{val}}.
+                // I can configure i18next to use {0} interpolation?
+                // Yes, `interpolation: { format: ... }` or a custom replace.
+                // Or I can just manual replace.
+                if (customUntil) return t('filter.date.until').replace('{0}', customUntil);
+                return t('filter.date.custom');
+            default: return t('filter.date.label');
         }
     };
 
     const dropdownItems = (
         <>
-            <div className={styles.dropdownItem} onClick={() => handleSelect('custom')}>选择...</div>
-            <div className={styles.dropdownItem} onClick={() => handleSelect('24h')}>过去 24 小时</div>
-            <div className={styles.dropdownItem} onClick={() => handleSelect('7d')}>过去 7 天</div>
+            <div className={styles.dropdownItem} onClick={() => handleSelect('custom')}>{t('filter.date.placeholder')}</div>
+            <div className={styles.dropdownItem} onClick={() => handleSelect('24h')}>{t('filter.date.24h')}</div>
+            <div className={styles.dropdownItem} onClick={() => handleSelect('7d')}>{t('filter.date.7d')}</div>
         </>
     );
 
     const popupContent = (
         <>
             <div className={styles.inputGroup}>
-                <span className={styles.inputLabel}>Since (之后)</span>
+                <span className={styles.inputLabel}>{t('filter.date.inputSince')}</span>
                 <input
                     className={`${styles.dateInput} ${sinceError ? styles.invalid : ''}`}
-                    placeholder="如: 2023-01-01"
+                    placeholder={t('filter.date.example')}
                     value={customSince}
                     onChange={e => {
                         setCustomSince(e.target.value);
@@ -103,10 +117,10 @@ export const DateFilter: React.FC<DateFilterProps> = ({ onChange }) => {
                 />
             </div>
             <div className={styles.inputGroup}>
-                <span className={styles.inputLabel}>Until (之前)</span>
+                <span className={styles.inputLabel}>{t('filter.date.inputUntil')}</span>
                 <input
                     className={`${styles.dateInput} ${untilError ? styles.invalid : ''}`}
-                    placeholder="如: 2023-01-31"
+                    placeholder={t('filter.date.example')}
                     value={customUntil}
                     onChange={e => {
                         setCustomUntil(e.target.value);
@@ -115,7 +129,7 @@ export const DateFilter: React.FC<DateFilterProps> = ({ onChange }) => {
                 />
             </div>
             <div className={styles.popupButtonRow}>
-                <button className={styles.primaryButton} onClick={handleCustomApply}>应用</button>
+                <button className={styles.primaryButton} onClick={handleCustomApply}>{t('common.apply')}</button>
             </div>
         </>
     );

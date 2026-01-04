@@ -61,7 +61,7 @@
     "branchList.tags": "标签",
     "branchList.filterPlaceholder": "过滤分支...",
     "filter.author.label": "用户",
-    "filter.author.me": "Me",
+    "filter.author.me": "我",
     "filter.author.hint": "回车选择建议，⌘+Enter 应用",
     "filter.author.placeholder": "选择...",
     "extension.pushSuccess": "成功推送到 {0}/{1}",

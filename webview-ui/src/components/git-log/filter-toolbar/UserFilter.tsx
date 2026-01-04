@@ -3,6 +3,7 @@ import sharedStyles from './DateFilter.module.css';
 import styles from './UserFilter.module.css';
 import { FilterMenu } from './FilterMenu';
 import { rpc } from '../../../lib/rpc_client';
+import { useTranslation } from 'react-i18next';
 
 interface AuthorInputPopupProps {
     initialValue: string;
@@ -15,6 +16,7 @@ const AuthorInputPopup: React.FC<AuthorInputPopupProps> = ({
     onApply,
     allAuthors
 }) => {
+    const { t } = useTranslation();
     const [value, setValue] = useState(initialValue);
     const [suggestions, setSuggestions] = useState<string[]>([]);
     const [activeIndex, setActiveIndex] = useState(0);
@@ -134,8 +136,8 @@ const AuthorInputPopup: React.FC<AuthorInputPopupProps> = ({
                 )}
             </div>
             <div className={sharedStyles.popupButtonRow}>
-                <span className={styles.hint}>回车选择建议，⌘+Enter 应用</span>
-                <button className={sharedStyles.primaryButton} onClick={handleApply}>应用</button>
+                <span className={styles.hint}>{t('filter.author.hint')}</span>
+                <button className={sharedStyles.primaryButton} onClick={handleApply}>{t('common.apply')}</button>
             </div>
         </div>
     );
@@ -146,6 +148,7 @@ interface UserFilterProps {
 }
 
 export const UserFilter: React.FC<UserFilterProps> = ({ onChange }) => {
+    const { t } = useTranslation();
     const [filterType, setFilterType] = useState<'all' | 'me' | 'custom'>('all');
     const [appliedValue, setAppliedValue] = useState('');
     const [showMenu, setShowMenu] = useState(false);
@@ -194,21 +197,21 @@ export const UserFilter: React.FC<UserFilterProps> = ({ onChange }) => {
     };
 
     const getLabel = () => {
-        if (filterType === 'all') return '用户';
-        if (filterType === 'me') return 'Me';
+        if (filterType === 'all') return t('filter.author.label');
+        if (filterType === 'me') return t('filter.author.me');
         if (appliedValue) {
             const lines = appliedValue.split('\n').filter(l => l.trim());
             if (lines.length > 1) return `${lines[0]} +${lines.length - 1}`;
-            return lines[0] || '用户';
+            return lines[0] || t('filter.author.label');
         }
-        return '用户';
+        return t('filter.author.label');
     };
 
     const dropdownItems = (
         <>
-            <div className={sharedStyles.dropdownItem} onClick={handleSelectCustom}>选择...</div>
+            <div className={sharedStyles.dropdownItem} onClick={handleSelectCustom}>{t('filter.author.placeholder')}</div>
             {currentUser && (
-                <div className={sharedStyles.dropdownItem} onClick={handleSelectMe}>Me ({currentUser})</div>
+                <div className={sharedStyles.dropdownItem} onClick={handleSelectMe}>{t('filter.author.me')} ({currentUser})</div>
             )}
         </>
     );
