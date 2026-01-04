@@ -223,7 +223,7 @@ export const LogListPanel: React.FC<LogListPanelProps> = ({ onSelectionChange })
                             const graphNode = graph.get(commit.hash);
                             const selected = isSelected(commit.hash);
                             const isBlink = commit.hash === blinkHash;
-                            const rowGraphWidth = graphNode ? (graphNode.maxX + 2) * CELL_WIDTH : CELL_WIDTH * 2;
+                            const rowGraphWidth = graphNode ? (graphNode.maxX + 1) * CELL_WIDTH : CELL_WIDTH;
                             return (
                                 <div
                                     key={commit.hash}
