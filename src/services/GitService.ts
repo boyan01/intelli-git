@@ -795,60 +795,73 @@ export class GitService {
             const format = '%H%x00%h%x00%s%x00%an%x00%ae%x00%aI%x00%P%x00%D';
             args.push(`--format=${format}`);
 
-            if (options.maxCount) {
-                args.push(`-n`, options.maxCount.toString());
-            }
-
-            if (options.skip) {
-                args.push(`--skip=${options.skip}`);
-            }
-
-            if (options.fileFilter) {
-                // If filtering by file, we stick to the file path
-                // Note: git log -- <file>
-                // We add it at the end
-            }
-
-            if (options.authors && options.authors.length > 0) {
-                // Escape regex special chars and use OR pattern
-                const escapeRegex = (s: string) => s.replace(/[[\]{}()*+?.\\^$|]/g, '\\$&');
-                const authorPattern = options.authors.map(escapeRegex).join('\\|');
-                args.push(`--author=${authorPattern}`);
-            }
-
+            // Check if search looks like a commit hash (7-40 hex characters)
+            let searchAsHash: string | null = null;
             if (options.search) {
-                if (options.regexMode) {
-                    args.push('-E'); // extended regex
-                } else {
-                    args.push('--fixed-strings'); // literal match
-                }
-                args.push(`--grep=${options.search}`);
-                if (!options.caseSensitive) {
-                    args.push('-i');
+                const isHexPattern = /^[0-9a-fA-F]{7,40}$/.test(options.search);
+                console.log('[getLog] search:', options.search, 'isHexPattern:', isHexPattern);
+                if (isHexPattern) {
+                    try {
+                        const resolved = await this.git.revparse([options.search]);
+                        console.log('[getLog] revparse result:', resolved);
+                        if (resolved && resolved.trim()) {
+                            searchAsHash = resolved.trim();
+                        }
+                    } catch (e) {
+                        console.log('[getLog] revparse error:', e);
+                    }
                 }
             }
 
-            // Branch filtering - supports comma-separated multiple branches
-            if (options.branch) {
-                if (options.branch === 'all') {
-                    args.push('--all');
-                } else if (options.branch === 'HEAD') {
-                    // Default behavior (HEAD and ancestry)
-                } else if (options.branch.includes(',')) {
-                    // Multiple branches: split and add each as separate argument
-                    const branches = options.branch.split(',').map(b => b.trim()).filter(Boolean);
-                    args.push(...branches);
-                } else {
-                    args.push(options.branch);
-                }
+            if (searchAsHash) {
+                // Search by commit hash: show only this exact commit
+                args.push('-n', '1', searchAsHash);
             } else {
-                // Default to --all if not specified, to show full graph?
-                // Requirement says "The Git Log view... displaying the commit history of the repository".
-                // Usually implies --all or at least HEAD.
-                // Let's default to HEAD if undefined, but maybe we want --all by default for graph.
-                // Let's assume options.branch is passed explicitly or we default to '--all' in UI or here.
-                // For now, if undefined, standard git log (HEAD).
-                args.push('--all');
+                // Normal search mode
+                if (options.maxCount) {
+                    args.push(`-n`, options.maxCount.toString());
+                }
+
+                if (options.skip) {
+                    args.push(`--skip=${options.skip}`);
+                }
+
+                if (options.authors && options.authors.length > 0) {
+                    const escapeRegex = (s: string) => s.replace(/[[\]{}()*+?.\\^$|]/g, '\\$&');
+                    const authorPattern = options.authors.map(escapeRegex).join('\\|');
+                    args.push(`--author=${authorPattern}`);
+                }
+
+                if (options.search) {
+                    if (options.regexMode) {
+                        args.push('-E');
+                    } else {
+                        args.push('--fixed-strings');
+                    }
+                    args.push(`--grep=${options.search}`);
+                    if (!options.caseSensitive) {
+                        args.push('-i');
+                    }
+                }
+            }
+
+            // Branch filtering - skip if searching by hash (hash already specifies the commit)
+            if (!searchAsHash) {
+                if (options.branch) {
+                    if (options.branch === 'all') {
+                        args.push('--all');
+                    } else if (options.branch === 'HEAD') {
+                        // Default behavior (HEAD and ancestry)
+                    } else if (options.branch.includes(',')) {
+                        // Multiple branches: split and add each as separate argument
+                        const branches = options.branch.split(',').map(b => b.trim()).filter(Boolean);
+                        args.push(...branches);
+                    } else {
+                        args.push(options.branch);
+                    }
+                } else {
+                    args.push('--all');
+                }
             }
 
             if (options.since) {
@@ -870,6 +883,7 @@ export class GitService {
                 args.push('--', options.fileFilter);
             }
 
+            console.log('[getLog] git', args.join(' '));
             const result = await this.git.raw(args);
 
             if (!result) return [];
