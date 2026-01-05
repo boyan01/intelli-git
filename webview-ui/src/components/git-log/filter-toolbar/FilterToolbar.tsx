@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import type { LogOptions } from '../../../../../shared/messages';
 import { rpc } from '../../../lib/rpc_client';
 import styles from './FilterToolbar.module.css';
@@ -20,7 +20,11 @@ export const FilterToolbar: React.FC<FilterToolbarProps> = ({ onFilterChange }) 
     const [since, setSince] = useState<string | undefined>();
     const [until, setUntil] = useState<string | undefined>();
 
+    const isInitialMount = useRef(true);
     useEffect(() => {
+        const delay = isInitialMount.current ? 0 : 300;
+        isInitialMount.current = false;
+
         const timer = setTimeout(() => {
             onFilterChange({
                 branch: branch === 'all' ? undefined : branch,
@@ -32,7 +36,7 @@ export const FilterToolbar: React.FC<FilterToolbarProps> = ({ onFilterChange }) 
                 since,
                 until
             });
-        }, 300);
+        }, delay);
         return () => clearTimeout(timer);
     }, [branch, search, regexMode, caseSensitive, authors, paths, since, until, onFilterChange]);
 

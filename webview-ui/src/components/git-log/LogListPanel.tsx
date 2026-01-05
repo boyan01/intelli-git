@@ -1,127 +1,55 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import styles from './LogListPanel.module.css';
-import type { LogCommit, LogOptions } from '../../../../shared/messages';
-import { rpc } from '../../lib/rpc_client';
+
 import { computeGraph, LONG_DISTANCE_THRESHOLD } from './graphUtils';
 import { GraphColumn, CELL_WIDTH } from './GraphColumn';
 import { FilterToolbar } from './filter-toolbar/FilterToolbar';
 import { RefLabel } from './RefLabel';
+import { useLogCommitLoader } from './hooks/useLogCommitLoader';
+import { useCommitSelection } from './hooks/useCommitSelection';
 
 interface LogListPanelProps {
     onSelectionChange?: (commits: string[]) => void;
 }
 
+const ROW_HEIGHT = 24;
+const BUFFER = 10;
+
 export const LogListPanel: React.FC<LogListPanelProps> = ({ onSelectionChange }) => {
-    const [commits, setCommits] = useState<LogCommit[]>([]);
-    const [loading, setLoading] = useState(false);
-    const [hasMore, setHasMore] = useState(true);
+    const containerRef = useRef<HTMLDivElement>(null);
     const [scrollTop, setScrollTop] = useState(0);
     const [clientHeight, setClientHeight] = useState(0);
-    const [filters, setFilters] = useState<Partial<LogOptions>>({});
-    const containerRef = useRef<HTMLDivElement>(null);
 
-    const [selectedCommits, setSelectedCommits] = useState<string[]>([]);
-    const [blinkHash, setBlinkHash] = useState<string | null>(null);
-    const lastSelectedRef = useRef<string | null>(null);
+    const {
+        commits,
+        loading,
+        hasMore,
+        loadMore,
+        setFilters
+    } = useLogCommitLoader();
 
-    const ROW_HEIGHT = 24;
-    const BUFFER = 10;
-    // Load extra commits to ensure long-distance targets (30 rows) are visible
-    const BATCH_SIZE = 50 + LONG_DISTANCE_THRESHOLD;
+    const scrollToRow = useCallback((index: number) => {
+        if (!containerRef.current) return;
 
-    const handleRowClick = (e: React.MouseEvent, commit: LogCommit) => {
-        const hash = commit.hash;
-        let newSelection: string[] = [];
+        const centerOffset = clientHeight / 2 - ROW_HEIGHT / 2;
+        containerRef.current.scrollTop = Math.max(0, index * ROW_HEIGHT - centerOffset);
+    }, [clientHeight]);
 
-        if (e.metaKey || e.ctrlKey) {
-            // Toggle selection
-            if (selectedCommits.includes(hash)) {
-                newSelection = selectedCommits.filter(h => h !== hash);
-            } else {
-                newSelection = [...selectedCommits, hash];
-            }
-            lastSelectedRef.current = hash;
-        } else if (e.shiftKey && lastSelectedRef.current) {
-            // Range selection
-            const lastIndex = commits.findIndex(c => c.hash === lastSelectedRef.current);
-            const currentIndex = commits.findIndex(c => c.hash === hash);
-            if (lastIndex !== -1 && currentIndex !== -1) {
-                const start = Math.min(lastIndex, currentIndex);
-                const end = Math.max(lastIndex, currentIndex);
-                const range = commits.slice(start, end + 1).map(c => c.hash);
-                // Combine with existing selection if using modifier? Usually Shift replaces or extends.
-                // Standard behavior: Shift+Click extends from anchor.
-                // For simplicity: Replace selection with new range, or union?
-                // VS Code / OS usually extends anchor.
-                // Let's just select the range.
-                newSelection = range;
-            } else {
-                newSelection = [hash];
-                lastSelectedRef.current = hash;
-            }
-        } else {
-            // Single selection
-            newSelection = [hash];
-            lastSelectedRef.current = hash;
-        }
-
-        setSelectedCommits(newSelection);
-        onSelectionChange?.(newSelection);
-    };
-
-    const isSelected = (hash: string) => selectedCommits.includes(hash);
+    const {
+        lastSelectedRef,
+        blinkHash,
+        handleRowClick,
+        handleJumpToCommit,
+        isSelected,
+        setSelectedCommits
+    } = useCommitSelection({
+        commits,
+        onSelectionChange,
+        scrollToRow
+    });
 
     // Compute graph data
     const graph = useMemo(() => computeGraph(commits), [commits]);
-
-    const handleJumpToCommit = useCallback((hash: string) => {
-        const index = commits.findIndex(c => c.hash === hash);
-        if (index !== -1 && containerRef.current) {
-            // Center the target commit in viewport
-            const centerOffset = clientHeight / 2 - ROW_HEIGHT / 2;
-            containerRef.current.scrollTop = Math.max(0, index * ROW_HEIGHT - centerOffset);
-            setSelectedCommits([hash]);
-            onSelectionChange?.([hash]);
-            lastSelectedRef.current = hash;
-
-            // Blink effect
-            setBlinkHash(hash);
-            setTimeout(() => setBlinkHash(null), 1000);
-        }
-    }, [commits, onSelectionChange, clientHeight]);
-
-    const loadMore = useCallback(async (reset = false) => {
-        if (loading && !reset) return;
-        setLoading(true);
-        try {
-            const currentCount = reset ? 0 : commits.length;
-            const newCommits = await rpc.getLog({
-                maxCount: BATCH_SIZE,
-                skip: currentCount,
-                ...filters
-            });
-
-            if (newCommits.length < BATCH_SIZE) {
-                setHasMore(false);
-            }
-
-            setCommits(prev => reset ? newCommits : [...prev, ...newCommits]);
-        } catch (error) {
-            console.error('Failed to load logs', error);
-        } finally {
-            setLoading(false);
-        }
-    }, [commits.length, loading, filters]);
-
-    // Reload when filters change
-    useEffect(() => {
-        setCommits([]);
-        setHasMore(true);
-        setScrollTop(0);
-        if (containerRef.current) containerRef.current.scrollTop = 0;
-        loadMore(true);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [filters]);
 
     useEffect(() => {
         if (!containerRef.current) return;
@@ -149,7 +77,6 @@ export const LogListPanel: React.FC<LogListPanelProps> = ({ onSelectionChange })
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (commits.length === 0) return;
 
-        let newHash: string | null = null;
         let newIndex = -1;
 
         const currentIndex = lastSelectedRef.current
@@ -169,7 +96,7 @@ export const LogListPanel: React.FC<LogListPanelProps> = ({ onSelectionChange })
         }
 
         if (newIndex !== -1 && newIndex !== currentIndex) {
-            newHash = commits[newIndex].hash;
+            const newHash = commits[newIndex].hash;
             setSelectedCommits([newHash]);
             onSelectionChange?.([newHash]);
             lastSelectedRef.current = newHash;
@@ -209,7 +136,7 @@ export const LogListPanel: React.FC<LogListPanelProps> = ({ onSelectionChange })
                 onScroll={handleScroll}
                 tabIndex={0}
                 onKeyDown={handleKeyDown}
-                style={{ outline: 'none' }} // Remove focus outline for cleaner look, or style it
+                style={{ outline: 'none' }}
             >
                 <div style={{ height: totalHeight, position: 'relative' }}>
                     <div style={{
@@ -254,9 +181,6 @@ export const LogListPanel: React.FC<LogListPanelProps> = ({ onSelectionChange })
                         })}
                     </div>
                 </div>
-                {loading && (
-                    <div style={{ padding: 8, textAlign: 'center', position: 'absolute', bottom: 0, width: '100%' }}>Loading...</div>
-                )}
             </div>
         </div>
     );
