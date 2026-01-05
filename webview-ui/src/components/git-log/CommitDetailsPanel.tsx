@@ -1,83 +1,24 @@
-import React, { useState, useEffect } from 'react';
-import type { CommitDetails, CommitFile } from '../../../../shared/messages';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import type { CommitDetails, RefInfo } from '../../../../shared/messages';
 import { rpc } from '../../lib/rpc_client';
+import { SplitPane } from '../common/SplitPane';
+import { BaseFileTree } from '../file-tree/BaseFileTree';
+import type { BaseFileTreeRef } from '../file-tree/BaseFileTree';
+// RefLabels is no longer used for containing branches, but keeping import if needed elsewhere or removal later
+// import { RefLabels } from './RefLabels'; 
+import { useTranslation } from 'react-i18next';
+import styles from './CommitDetailsPanel.module.css';
 
 interface CommitDetailsPanelProps {
     commitHash: string | null;
 }
 
-const styles = {
-    container: {
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column' as const,
-        overflow: 'hidden',
-        fontSize: '13px',
-    },
-    header: {
-        padding: '8px 16px',
-        borderBottom: '1px solid var(--vscode-panel-border)',
-        flexShrink: 0,
-    },
-    message: {
-        fontSize: '14px',
-        fontWeight: 'bold' as const,
-        marginBottom: '8px',
-        whiteSpace: 'pre-wrap' as const,
-    },
-    meta: {
-        color: 'var(--vscode-descriptionForeground)',
-        lineHeight: '1.5',
-    },
-    fileList: {
-        flex: 1,
-        overflow: 'auto',
-        padding: '0',
-    },
-    fileRow: {
-        display: 'flex',
-        alignItems: 'center',
-        padding: '4px 16px',
-        cursor: 'pointer',
-    },
-    fileStatus: {
-        width: '16px',
-        textAlign: 'center' as const,
-        marginRight: '8px',
-        fontWeight: 'bold' as const,
-    },
-    filePath: {
-        flex: 1,
-        textOverflow: 'ellipsis',
-        overflow: 'hidden',
-        whiteSpace: 'nowrap' as const,
-    },
-    statusA: { color: 'var(--vscode-gitDecoration-addedResourceForeground)' },
-    statusM: { color: 'var(--vscode-gitDecoration-modifiedResourceForeground)' },
-    statusD: { color: 'var(--vscode-gitDecoration-deletedResourceForeground)' },
-    statusR: { color: 'var(--vscode-gitDecoration-renamedResourceForeground)' },
-    empty: {
-        padding: '16px',
-        color: 'var(--vscode-descriptionForeground)',
-        textAlign: 'center' as const,
-    }
-};
-
-const StatusIcon: React.FC<{ status: string }> = ({ status }) => {
-    let style = {};
-    let label = status;
-
-    if (status.startsWith('A')) style = styles.statusA;
-    else if (status.startsWith('M')) style = styles.statusM;
-    else if (status.startsWith('D')) style = styles.statusD;
-    else if (status.startsWith('R')) style = styles.statusR;
-
-    return <span style={{ ...styles.fileStatus, ...style }}>{label[0]}</span>;
-};
-
 export const CommitDetailsPanel: React.FC<CommitDetailsPanelProps> = ({ commitHash }) => {
+    const { t } = useTranslation();
     const [details, setDetails] = useState<CommitDetails | null>(null);
     const [loading, setLoading] = useState(false);
+    const [viewMode, setViewMode] = useState<'tree' | 'list'>('tree');
+    const treeRef = useRef<BaseFileTreeRef>(null);
 
     useEffect(() => {
         if (!commitHash) {
@@ -101,8 +42,11 @@ export const CommitDetailsPanel: React.FC<CommitDetailsPanelProps> = ({ commitHa
         fetchDetails();
     }, [commitHash]);
 
-    const handleFileDoubleClick = async (file: CommitFile) => {
+    const handleFileDoubleClick = async (path: string) => {
         if (!details) return;
+
+        const file = details.files.find(f => f.path === path);
+        if (!file) return;
 
         const parentHash = details.parentHashes.length > 0 ? details.parentHashes[0] : '';
         const currentHash = details.hash;
@@ -111,9 +55,9 @@ export const CommitDetailsPanel: React.FC<CommitDetailsPanelProps> = ({ commitHa
         let rightRef = currentHash;
 
         if (file.status.startsWith('A')) {
-            leftRef = ''; // Diff against empty
+            leftRef = '';
         } else if (file.status.startsWith('D')) {
-            rightRef = ''; // Diff against empty (or effectively show deleted content in left)
+            rightRef = '4b825dc642cb6eb9a060e54bf8d69288fbee4904'; // Empty tree hash
         }
 
         await rpc.openCommitDiff({
@@ -123,46 +67,129 @@ export const CommitDetailsPanel: React.FC<CommitDetailsPanelProps> = ({ commitHa
         });
     };
 
-    if (!commitHash) {
-        return <div style={styles.empty}>Select a commit to view details</div>;
-    }
+    const fileItems = useMemo(() => {
+        if (!details) return [];
+        return details.files.map(f => ({
+            path: f.path,
+            status: f.status,
+            staged: false
+        }));
+    }, [details]);
 
-    if (loading) {
-        return <div style={styles.empty}>Loading details...</div>;
+    const containingBranchesRefs = useMemo<RefInfo[]>(() => {
+        if (!details || !details.containingBranches) return [];
+        return details.containingBranches.map(b => ({
+            name: b,
+            type: b.includes('/') ? 'remote' : 'local'
+        }));
+    }, [details]);
+
+    const messageParts = useMemo(() => {
+        if (!details) return { subject: '', body: '' };
+        const lines = details.fullMessage.split('\n');
+        const subject = lines[0];
+        const body = lines.slice(1).join('\n').trim();
+        return { subject, body };
+    }, [details]);
+
+    const formattedDate = useMemo(() => {
+        if (!details || !details.date) return '';
+        return new Date(details.date).toLocaleString();
+    }, [details]);
+
+    if (!commitHash) {
+        return <div className={styles.empty}>{t('commitDetails.selectCommit', 'Select a commit to view details')}</div>;
     }
 
     if (!details) {
-        return <div style={styles.empty}>No details available</div>;
+        if (loading) return null;
+        return <div className={styles.empty}>{t('commitDetails.noDetails', 'No details available')}</div>;
     }
 
-    return (
-        <div style={styles.container}>
-            <div style={styles.header}>
-                <div style={styles.message}>{details.fullMessage}</div>
-                <div style={styles.meta}>
-                    Commit: {details.hash}<br />
-                    Parents: {details.parentHashes.map(h => h.substring(0, 8)).join(', ')}<br />
-                    {details.stats && (
-                        <span>
-                            {details.files.length} files changed
-                            (+{details.stats.additions}, -{details.stats.deletions})
-                        </span>
+    const firstPane = (
+        <div className={styles.filesViewContainer}>
+            <div className={styles.filesToolbar}>
+                <div className={styles.toolbarActions}>
+                    <button
+                        className={`${styles.iconBtn} ${viewMode === 'list' ? styles.active : ''}`}
+                        title={t('toolbar.viewMode', 'Toggle View Mode')}
+                        onClick={() => setViewMode(v => v === 'tree' ? 'list' : 'tree')}
+                    >
+                        <i className={`codicon codicon-${viewMode === 'tree' ? 'list-tree' : 'list-flat'}`} />
+                    </button>
+                    <button
+                        className={styles.iconBtn}
+                        title={t('toolbar.expandAll', 'Expand All')}
+                        onClick={() => treeRef.current?.expandAll()}
+                    >
+                        <i className="codicon codicon-expand-all" />
+                    </button>
+                    <button
+                        className={styles.iconBtn}
+                        title={t('toolbar.collapseAll', 'Collapse All')}
+                        onClick={() => treeRef.current?.collapseAll()}
+                    >
+                        <i className="codicon codicon-collapse-all" />
+                    </button>
+                </div>
+            </div>
+            <div className={styles.filesTreeWrapper}>
+                <BaseFileTree
+                    ref={treeRef}
+                    items={fileItems}
+                    viewMode={viewMode}
+                    readonly={true}
+                    onFileDoubleClick={handleFileDoubleClick}
+                    selectedFiles={new Set()}
+                    activeFile={null}
+                    onToggleFile={() => { }}
+                    onFileClick={() => { }}
+                />
+            </div>
+        </div>
+    );
+
+    const secondPane = (
+        <div className={styles.detailsContainer}>
+            <div className={styles.detailsContent}>
+                <div className={styles.detailMessage}>
+                    <div className={styles.subject}>{messageParts.subject}</div>
+                    {messageParts.body && <div className={styles.body}>{messageParts.body}</div>}
+                </div>
+                <div className={styles.detailMeta}>
+                    <div className={styles.metaRow}>
+                        {details.authorName}{' <'}
+                        <a href={`mailto:${details.authorEmail}`} className={styles.emailLink}>
+                            {details.authorEmail}
+                        </a>
+                        {'>, '}
+                        {formattedDate}
+                    </div>
+                    <div className={styles.metaHash}>
+                        {details.hash}
+                    </div>
+                    {containingBranchesRefs.length > 0 && (
+                        <div className={styles.metaRow}>
+                            <div className={styles.metaLabel}>{t('commitDetails.branches', 'Branches')}:</div>
+                            {containingBranchesRefs.map(ref => (
+                                <div key={ref.name} className={styles.branchItem}>{ref.name}</div>
+                            ))}
+                        </div>
                     )}
                 </div>
             </div>
-            <div style={styles.fileList}>
-                {details.files.map((file, index) => (
-                    <div
-                        key={index}
-                        style={styles.fileRow}
-                        className="file-row" // For CSS hover if needed, or implement in JS
-                        onDoubleClick={() => handleFileDoubleClick(file)}
-                    >
-                        <StatusIcon status={file.status} />
-                        <span style={styles.filePath} title={file.path}>{file.path}</span>
-                    </div>
-                ))}
-            </div>
+        </div>
+    );
+
+    return (
+        <div className={styles.container}>
+            <SplitPane
+                direction="vertical"
+                first={firstPane}
+                second={secondPane}
+                defaultRatio={0.68}
+                className={styles.splitPane}
+            />
         </div>
     );
 };

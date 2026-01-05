@@ -10,6 +10,7 @@ interface FileTreeProps {
     collapsedGroups: Set<string>;
     onToggleFile: (path: string, checked: boolean) => void;
     onToggleGroup: (groupId: string) => void;
+    onFileDoubleClick?: (path: string) => void;
     readonly?: boolean;
 }
 
@@ -100,6 +101,7 @@ export const FileTree: React.FC<FileTreeProps> = ({
     collapsedGroups,
     onToggleFile,
     onToggleGroup,
+    onFileDoubleClick,
     readonly = false
 }) => {
     const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
@@ -173,7 +175,7 @@ export const FileTree: React.FC<FileTreeProps> = ({
                     />
                 )}
                 <span className={styles.fileIconSvg} style={{ color: getFileIcon(file.path.split('/').pop() || file.path).color }} dangerouslySetInnerHTML={{ __html: getFileIcon(file.path.split('/').pop() || file.path).svg }} />
-                <span className={`${styles.name} ${statusClass}`}>
+                <span className={`${styles.name} ${statusClass}`} onDoubleClick={() => onFileDoubleClick?.(file.path)}>
                     {file.path.split('/').pop()}
                 </span>
                 {showPath && (
@@ -202,7 +204,7 @@ export const FileTree: React.FC<FileTreeProps> = ({
                         />
                     )}
                     <span className={styles.fileIconSvg} style={{ color: getFileIcon(node.name).color }} dangerouslySetInnerHTML={{ __html: getFileIcon(node.name).svg }} />
-                    <span className={`${styles.name} ${statusClass}`}>{node.name}</span>
+                    <span className={`${styles.name} ${statusClass}`} onDoubleClick={() => onFileDoubleClick?.(node.path)}>{node.name}</span>
                 </div>
             );
         }

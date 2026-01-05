@@ -97,6 +97,10 @@ export interface CommitDetails {
     files: CommitFile[];
     stats: { additions: number; deletions: number };
     parentHashes: string[];
+    authorName: string;
+    authorEmail: string;
+    date: string;
+    containingBranches: string[];
 }
 
 export interface ExtensionMethods {

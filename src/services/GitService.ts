@@ -1049,10 +1049,19 @@ export class GitService {
 
     public async getCommitDetails(hash: string): Promise<CommitDetails> {
         try {
-            const showMsg = await this.git.show([hash, '--format=%B%x00%P', '--no-patch']);
-            const [fullMessage, parentsStr] = showMsg.split('\0');
+            const showMsg = await this.git.show([hash, '--format=%B%x00%P%x00%an%x00%ae%x00%aI', '--no-patch']);
+            const [fullMessage, parentsStr, authorName, authorEmail, date] = showMsg.split('\0');
 
             const files = await this.getCommitFiles(hash) as CommitFile[];
+
+            // Get containing branches
+            let containingBranches: string[] = [];
+            try {
+                const branchOutput = await this.git.branch(['--contains', hash]);
+                containingBranches = branchOutput.all;
+            } catch (e) {
+                // Ignore error if commit is not reachable
+            }
 
             const shortstat = await this.git.show([hash, '--format=', '--shortstat']);
             let additions = 0;
@@ -1069,7 +1078,11 @@ export class GitService {
                 fullMessage: fullMessage?.trim() || '',
                 files,
                 stats: { additions, deletions },
-                parentHashes: parentsStr ? parentsStr.trim().split(' ') : []
+                parentHashes: parentsStr ? parentsStr.trim().split(' ') : [],
+                authorName: authorName?.trim() || '',
+                authorEmail: authorEmail?.trim() || '',
+                date: date?.trim() || '',
+                containingBranches
             };
         } catch (e) {
             console.error('getCommitDetails error:', e);
