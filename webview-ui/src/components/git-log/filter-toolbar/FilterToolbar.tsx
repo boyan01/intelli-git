@@ -8,9 +8,10 @@ import { logger } from '@/lib/log';
 
 interface FilterToolbarProps {
     onFilterChange: (options: Partial<LogOptions>) => void;
+    externalBranch?: string;
 }
 
-export const FilterToolbar: React.FC<FilterToolbarProps> = ({ onFilterChange }) => {
+export const FilterToolbar: React.FC<FilterToolbarProps> = ({ onFilterChange, externalBranch }) => {
     const [branch, setBranch] = useState('all');
     const [search, setSearch] = useState('');
     const [regexMode, setRegexMode] = useState(false);
@@ -19,6 +20,14 @@ export const FilterToolbar: React.FC<FilterToolbarProps> = ({ onFilterChange }) 
     const [paths, setPaths] = useState<string[]>([]);
     const [since, setSince] = useState<string | undefined>();
     const [until, setUntil] = useState<string | undefined>();
+
+    // Sync external branch
+    useEffect(() => {
+        if (externalBranch !== undefined) {
+            setBranch(externalBranch);
+        }
+    }, [externalBranch]);
+
 
     const isInitialMount = useRef(true);
     useEffect(() => {
@@ -149,13 +158,6 @@ export const FilterToolbar: React.FC<FilterToolbarProps> = ({ onFilterChange }) 
                 ) : (
                     <span className={`codicon codicon-chevron-down ${styles.icon} ${styles.iconSmall}`} />
                 )}
-            </button>
-
-            <div className={styles.separator} />
-
-            {/* Right icons */}
-            <button className={styles.iconButton} title="Intel Sort">
-                <span className="codicon codicon-arrow-swap" />
             </button>
         </div>
     );

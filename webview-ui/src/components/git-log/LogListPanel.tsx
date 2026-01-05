@@ -30,12 +30,9 @@ export const LogListPanel: React.FC<LogListPanelProps> = ({ onSelectionChange, e
         setFilters
     } = useLogCommitLoader();
 
-    // Handle external branch filter from BranchListPanel double-click
-    useEffect(() => {
-        if (externalBranchFilter) {
-            setFilters({ branch: externalBranchFilter });
-        }
-    }, [externalBranchFilter, setFilters]);
+    // Cancelled manual effect for externalBranchFilter since FilterToolbar handles it via prop
+
+
 
     const scrollToRow = useCallback((index: number) => {
         if (!containerRef.current) return;
@@ -137,7 +134,7 @@ export const LogListPanel: React.FC<LogListPanelProps> = ({ onSelectionChange, e
 
     return (
         <div className={styles.container}>
-            <FilterToolbar onFilterChange={setFilters} />
+            <FilterToolbar onFilterChange={setFilters} externalBranch={externalBranchFilter} />
 
             <div
                 ref={containerRef}
