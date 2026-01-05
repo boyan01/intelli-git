@@ -4,9 +4,11 @@ import { GitService } from './services/GitService';
 import { ChangelistService } from './services/ChangelistService';
 import { BranchStatusBar } from './ui';
 import { registerStashCommands, registerNavigationCommands, registerBranchCommands, registerLogCommands } from './commands';
+import { initLogger, log } from './utils/logger';
 
 export function activate(context: vscode.ExtensionContext) {
-    console.log('Intelli Git is now active!');
+    initLogger(context);
+    log('Intelli Git is now active!');
 
     const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
 

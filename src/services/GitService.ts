@@ -1,5 +1,7 @@
 import simpleGit, { SimpleGit, StatusResult } from 'simple-git';
-import { BranchInfo, LogCommit, LogOptions, CommitDetails, RefInfo, FileStatus, CommitInfo, CommitFile } from '../../shared/messages'; import * as fs from 'fs';
+import { BranchInfo, LogCommit, LogOptions, CommitDetails, RefInfo, FileStatus, CommitInfo, CommitFile } from '../../shared/messages';
+import { log } from '../utils/logger';
+import * as fs from 'fs';
 import * as path from 'path';
 
 
@@ -221,7 +223,7 @@ export class GitService {
     public async getStashList(): Promise<Array<{ index: number, message: string, branch: string }>> {
         try {
             const result = await this.git.stashList();
-            console.log('simple-git stashList result:', JSON.stringify(result));
+            log('simple-git stashList result:', JSON.stringify(result));
             return result.all.map((item, index) => {
                 // Parse branch from message: "On <branch>: <message>" or "WIP on <branch>: ..."
                 const match = item.message?.match(/^(?:WIP )?[oO]n ([^:]+):/);
@@ -655,7 +657,7 @@ export class GitService {
                 gitDir = path.join(this._workspaceRoot, gitDir);
             }
 
-            console.log('rebaseMergeMsg gitDir', gitDir);
+            log('rebaseMergeMsg gitDir', gitDir);
 
             const rebaseMergeMsg = path.join(gitDir, 'rebase-merge', 'message');
             const rebaseApplyMsg = path.join(gitDir, 'rebase-apply', 'msg');
@@ -799,16 +801,16 @@ export class GitService {
             let searchAsHash: string | null = null;
             if (options.search) {
                 const isHexPattern = /^[0-9a-fA-F]{7,40}$/.test(options.search);
-                console.log('[getLog] search:', options.search, 'isHexPattern:', isHexPattern);
+                log('[getLog] search:', options.search, 'isHexPattern:', isHexPattern);
                 if (isHexPattern) {
                     try {
                         const resolved = await this.git.revparse([options.search]);
-                        console.log('[getLog] revparse result:', resolved);
+                        log('[getLog] revparse result:', resolved);
                         if (resolved && resolved.trim()) {
                             searchAsHash = resolved.trim();
                         }
                     } catch (e) {
-                        console.log('[getLog] revparse error:', e);
+                        log('[getLog] revparse error:', e);
                     }
                 }
             }
@@ -883,7 +885,7 @@ export class GitService {
                 args.push('--', options.fileFilter);
             }
 
-            console.log('[getLog] git', args.join(' '));
+            log('[getLog] git', args.join(' '));
             const result = await this.git.raw(args);
 
             if (!result) return [];
