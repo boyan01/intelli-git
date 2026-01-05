@@ -1,8 +1,25 @@
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useCallback } from 'react';
 import type { FileStatus } from '@shared/messages';
 import { rpc } from '../../lib/rpc_client';
 import { getFileIcon } from '../../lib/fileIcons';
 import styles from './FileTree.module.css';
+import { BasicTreeView } from '../common/BasicTreeView';
+import type { TreeNode, BasicTreeViewRef } from '../common/BasicTreeView';
+// import { getDirPath, getStatusColor } from '../../utils/fileUtils'; // Removed, will define locally
+
+const getDirPath = (fullPath: string): string => {
+    const lastSlash = fullPath.lastIndexOf('/');
+    return lastSlash > 0 ? fullPath.substring(0, lastSlash) : '';
+};
+
+const getStatusColor = (status?: string) => {
+    if (status === 'C' || status === 'U') return 'var(--vscode-gitDecoration-conflictingResourceForeground)';
+    if (status === 'A') return 'var(--vscode-gitDecoration-addedResourceForeground)';
+    if (status === 'M') return 'var(--vscode-gitDecoration-modifiedResourceForeground)';
+    if (status === 'D') return 'var(--vscode-gitDecoration-deletedResourceForeground)';
+    if (status === '?') return 'var(--vscode-gitDecoration-untrackedResourceForeground)';
+    return 'var(--vscode-foreground)';
+};
 
 export interface BaseFileTreeProps {
     items: FileStatus[];
@@ -17,29 +34,25 @@ export interface BaseFileTreeProps {
     onFolderContextMenu?: (e: React.MouseEvent, filePaths: string[]) => void;
 }
 
-export interface BaseFileTreeRef {
-    expandAll: () => void;
-    collapseAll: () => void;
-}
+export type BaseFileTreeRef = BasicTreeViewRef;
 
-interface TreeNode {
-    name: string;
+// Custom data attached to each tree node
+interface FileNodeData {
     path: string;
-    children?: TreeNode[];
     isFile: boolean;
     status?: string;
     fileCount: number;
 }
 
-const countFiles = (node: TreeNode): number => {
-    if (node.isFile) return 1;
+const countFiles = (node: TreeNode<FileNodeData>): number => {
+    if (node.data?.isFile) return 1;
     if (!node.children) return 0;
     return node.children.reduce((sum, child) => sum + countFiles(child), 0);
 };
 
-const buildTree = (files: FileStatus[]): TreeNode[] => {
-    const root: TreeNode[] = [];
-    const map = new Map<string, TreeNode>();
+const buildTree = (files: FileStatus[]): TreeNode<FileNodeData>[] => {
+    const root: TreeNode<FileNodeData>[] = [];
+    const map = new Map<string, TreeNode<FileNodeData>>();
 
     files.forEach(file => {
         const parts = file.path.split('/');
@@ -51,13 +64,16 @@ const buildTree = (files: FileStatus[]): TreeNode[] => {
             currentPath = currentPath ? `${currentPath}/${part}` : part;
 
             if (!map.has(currentPath)) {
-                const node: TreeNode = {
-                    name: part,
-                    path: currentPath,
-                    isFile: isLast,
-                    children: isLast ? undefined : [],
-                    status: isLast ? file.status : undefined,
-                    fileCount: 0
+                const node: TreeNode<FileNodeData> = {
+                    id: currentPath,
+                    label: part,
+                    data: {
+                        path: currentPath,
+                        isFile: isLast,
+                        status: isLast ? file.status : undefined,
+                        fileCount: 0
+                    },
+                    children: isLast ? undefined : []
                 };
 
                 map.set(currentPath, node);
@@ -74,33 +90,21 @@ const buildTree = (files: FileStatus[]): TreeNode[] => {
         });
     });
 
-    const processNodes = (nodes: TreeNode[]) => {
+    const processNodes = (nodes: TreeNode<FileNodeData>[]) => {
         nodes.sort((a, b) => {
-            if (a.isFile === b.isFile) return a.name.localeCompare(b.name);
-            return a.isFile ? 1 : -1;
+            const aIsFile = a.data?.isFile;
+            const bIsFile = b.data?.isFile;
+            if (aIsFile === bIsFile) return a.label.localeCompare(b.label);
+            return aIsFile ? 1 : -1;
         });
         nodes.forEach(node => {
             if (node.children) processNodes(node.children);
-            node.fileCount = countFiles(node);
+            node.data!.fileCount = countFiles(node);
         });
     };
     processNodes(root);
 
     return root;
-};
-
-const getDirPath = (fullPath: string): string => {
-    const lastSlash = fullPath.lastIndexOf('/');
-    return lastSlash > 0 ? fullPath.substring(0, lastSlash) : '';
-};
-
-const getStatusColor = (status?: string) => {
-    if (status === 'C' || status === 'U') return 'var(--vscode-gitDecoration-conflictingResourceForeground)';
-    if (status === 'A') return 'var(--vscode-gitDecoration-addedResourceForeground)';
-    if (status === 'M') return 'var(--vscode-gitDecoration-modifiedResourceForeground)';
-    if (status === 'D') return 'var(--vscode-gitDecoration-deletedResourceForeground)';
-    if (status === '?') return 'var(--vscode-gitDecoration-untrackedResourceForeground)';
-    return 'var(--vscode-foreground)';
 };
 
 export const BaseFileTree = React.forwardRef<BaseFileTreeRef, BaseFileTreeProps>(({
@@ -115,184 +119,159 @@ export const BaseFileTree = React.forwardRef<BaseFileTreeRef, BaseFileTreeProps>
     onFileContextMenu,
     onFolderContextMenu
 }, ref) => {
-    const tree = useMemo(() =>
-        viewMode === 'tree' ? buildTree(items) : [],
-        [items, viewMode]
-    );
-
-    const getAllFolderPaths = useCallback((nodes: TreeNode[]): Set<string> => {
-        const paths = new Set<string>();
-        const traverse = (currentNodes: TreeNode[]) => {
-            currentNodes.forEach(node => {
-                if (!node.isFile) {
-                    paths.add(node.path);
-                    if (node.children) traverse(node.children);
-                }
-            });
-        };
-        traverse(nodes);
-        return paths;
-    }, []);
-
-    const [expandedPaths, setExpandedPaths] = useState<Set<string>>(() =>
-        getAllFolderPaths(tree)
-    );
-
-    React.useImperativeHandle(ref, () => ({
-        expandAll: () => {
-            setExpandedPaths(getAllFolderPaths(tree));
-        },
-        collapseAll: () => {
-            setExpandedPaths(new Set());
+    const nodes = useMemo(() => {
+        if (viewMode === 'list') {
+            return items
+                .map(f => ({
+                    id: f.path,
+                    label: f.path.split('/').pop() || f.path,
+                    data: {
+                        path: f.path,
+                        isFile: true,
+                        status: f.status,
+                        fileCount: 1
+                    }
+                }))
+                .sort((a, b) => a.label.localeCompare(b.label));
         }
-    }));
+        return buildTree(items);
+    }, [items, viewMode]);
 
-    const toggleFolder = useCallback((path: string) => {
-        setExpandedPaths(prev => {
-            const next = new Set(prev);
-            if (next.has(path)) next.delete(path);
-            else next.add(path);
-            return next;
-        });
-    }, []);
-
-    const getAllFilePaths = useCallback((node: TreeNode): string[] => {
-        if (node.isFile) return [node.path];
+    const getAllFilePaths = useCallback((node: TreeNode<FileNodeData>): string[] => {
+        if (node.data?.isFile) return [node.data.path];
         if (!node.children) return [];
         return node.children.flatMap(getAllFilePaths);
     }, []);
 
-    const handleFolderToggle = useCallback((node: TreeNode, checked: boolean) => {
-        if (readonly || !onToggleFile) return;
-        getAllFilePaths(node).forEach(path => onToggleFile(path, checked));
-    }, [readonly, getAllFilePaths, onToggleFile]);
-
-    const handleFileClick = useCallback((path: string, status?: string) => {
-        if (onFileClick) {
-            onFileClick(path, status);
-        } else {
-            rpc.openFile({ path });
+    const handleNodeClick = useCallback((node: TreeNode<FileNodeData>) => {
+        if (node.data?.isFile) {
+            if (onFileClick) {
+                onFileClick(node.data.path, node.data.status);
+            } else {
+                rpc.openFile({ path: node.data.path });
+            }
         }
     }, [onFileClick]);
 
-    const renderTreeNode = (node: TreeNode, depth: number = 0): React.ReactNode => {
-        if (node.isFile) {
-            const showPath = viewMode === 'list';
-            const isActive = node.path === activeFile;
-            const isConflict = node.status === 'C' || node.status === 'U';
-            const isDeleted = node.status === 'D';
-            const statusColor = getStatusColor(node.status);
-
-            const statusClass = node.status === 'M' ? styles.statusM :
-                node.status === 'A' ? styles.statusA :
-                    node.status === 'D' ? styles.statusD :
-                        node.status === 'R' ? styles.statusR :
-                            node.status === '?' ? styles.statusUntracked :
-                                node.status === '!' ? styles.statusIgnored : '';
-
-            return (
-                <div
-                    key={node.path}
-                    className={`${styles.fileItem} ${isActive ? styles.active : ''}`}
-                    style={{ paddingLeft: `${28 + depth * 16}px` }}
-                    onClick={() => handleFileClick(node.path, node.status)}
-                    onDoubleClick={() => onFileDoubleClick?.(node.path, node.status)}
-                    onContextMenu={(e) => onFileContextMenu?.(e, node.path, node.status)}
-                >
-                    {!readonly && onToggleFile && (
-                        <input
-                            type="checkbox"
-                            className={styles.checkbox}
-                            checked={selectedFiles?.has(node.path) ?? false}
-                            onClick={(e) => e.stopPropagation()}
-                            onChange={(e) => onToggleFile(node.path, e.target.checked)}
-                        />
-                    )}
-                    {isConflict ? (
-                        <span className={`codicon codicon-warning ${styles.icon}`} style={{ color: statusColor }}></span>
-                    ) : (
-                        <span
-                            className={styles.fileIconSvg}
-                            style={{ color: getFileIcon(node.name).color }}
-                            dangerouslySetInnerHTML={{ __html: getFileIcon(node.name).svg }}
-                        />
-                    )}
-                    <span
-                        className={`${styles.name} ${statusClass}`}
-                        style={isDeleted ? undefined : { color: statusColor }}
-                    >
-                        {node.name}
-                    </span>
-                    {showPath && (
-                        <span className={styles.fileDirPath}>{getDirPath(node.path)}</span>
-                    )}
-                </div>
-            );
+    const handleNodeDoubleClick = useCallback((node: TreeNode<FileNodeData>) => {
+        if (node.data?.isFile) {
+            onFileDoubleClick?.(node.data.path, node.data.status);
         }
+    }, [onFileDoubleClick]);
 
-        const isExpanded = expandedPaths.has(node.path);
+    const handleContextMenu = useCallback((e: React.MouseEvent, node: TreeNode<FileNodeData>) => {
+        if (node.data?.isFile) {
+            onFileContextMenu?.(e, node.data.path, node.data.status);
+        } else {
+            const descendantPaths = getAllFilePaths(node);
+            onFolderContextMenu?.(e, descendantPaths);
+        }
+    }, [onFileContextMenu, onFolderContextMenu, getAllFilePaths]);
+
+    const handleToggleFile = useCallback((node: TreeNode<FileNodeData>, checked: boolean) => {
+        if (readonly || !onToggleFile) return;
+        const paths = getAllFilePaths(node);
+        paths.forEach(path => onToggleFile(path, checked));
+    }, [readonly, onToggleFile, getAllFilePaths]);
+
+    const renderLeading = useCallback((node: TreeNode<FileNodeData>) => {
+        if (readonly || !onToggleFile) return null;
+
         const descendantPaths = getAllFilePaths(node);
+        // Optimize: if it's a file, just check deeply. If folder, check all descendants.
+        // Actually, for a single node, getAllFilePaths returns itself if it's a file.
+
         const allSelected = selectedFiles && descendantPaths.length > 0 && descendantPaths.every(p => selectedFiles.has(p));
         const partialSelected = selectedFiles && !allSelected && descendantPaths.some(p => selectedFiles.has(p));
 
         return (
-            <div key={node.path} className={`${styles.folderItem} ${styles.folder}`}>
-                <div
-                    className={styles.folderHeader}
-                    style={{ paddingLeft: `${8 + depth * 16}px` }}
-                    onClick={() => toggleFolder(node.path)}
-                    onContextMenu={(e) => onFolderContextMenu?.(e, descendantPaths)}
-                >
-                    <span
-                        className={`codicon codicon-chevron-right ${styles.icon} ${styles.arrow}`}
-                        style={{ transform: isExpanded ? 'rotate(90deg)' : 'none', transition: 'transform 0.1s' }}
-                    ></span>
-                    {!readonly && onToggleFile && descendantPaths.length > 0 && (
-                        <input
-                            type="checkbox"
-                            className={styles.checkbox}
-                            checked={allSelected ?? false}
-                            ref={input => { if (input) input.indeterminate = partialSelected ?? false; }}
-                            onClick={(e) => e.stopPropagation()}
-                            onChange={(e) => handleFolderToggle(node, e.target.checked)}
-                        />
-                    )}
-                    <span className={`codicon codicon-folder ${styles.icon}`}></span>
-                    <span className={styles.name}>{node.name}</span>
-                    <span className={styles.fileCount}>{node.fileCount}</span>
-                </div>
-                {isExpanded && (
-                    <div className={styles.folderChildren}>
-                        {node.children?.map(child => renderTreeNode(child, depth + 1))}
-                    </div>
+            <input
+                type="checkbox"
+                className={styles.checkbox}
+                checked={allSelected ?? false}
+                ref={input => { if (input) input.indeterminate = partialSelected ?? false; }}
+                onClick={(e) => e.stopPropagation()}
+                onChange={(e) => handleToggleFile(node, e.target.checked)}
+            />
+        );
+    }, [readonly, onToggleFile, selectedFiles, getAllFilePaths, handleToggleFile]);
+
+    const renderTrailing = useCallback((node: TreeNode<FileNodeData>) => {
+        if (!node.data?.isFile && node.data?.fileCount !== undefined) {
+            return (
+                <span className={styles.fileCount} style={{ marginLeft: 0 }}>
+                    {node.data.fileCount}
+                </span>
+            );
+        }
+        return null;
+    }, []);
+
+    const renderLabel = useCallback((node: TreeNode<FileNodeData>) => {
+        const isFile = node.data?.isFile;
+        const status = node.data?.status;
+        const isDeleted = status === 'D';
+        const statusColor = getStatusColor(status);
+
+        const statusClass = status === 'M' ? styles.statusM :
+            status === 'A' ? styles.statusA :
+                status === 'D' ? styles.statusD :
+                    status === 'R' ? styles.statusR :
+                        status === '?' ? styles.statusUntracked :
+                            status === '!' ? styles.statusIgnored : '';
+
+        const showPath = viewMode === 'list' && isFile;
+
+        return (
+            <div className={styles.fileItemContent}>
+                {isFile ? (
+                    <>
+                        {/* Conflict warning or file icon */}
+                        {(status === 'C' || status === 'U') ? (
+                            <span className={`codicon codicon-warning ${styles.icon}`} style={{ color: statusColor }}></span>
+                        ) : (
+                            <span
+                                className={styles.fileIconSvg}
+                                style={{ color: getFileIcon(node.label).color }}
+                                dangerouslySetInnerHTML={{ __html: getFileIcon(node.label).svg }}
+                            />
+                        )}
+
+                        <span
+                            className={`${styles.name} ${statusClass}`}
+                            style={isDeleted ? undefined : { color: statusColor }}
+                        >
+                            {node.label}
+                        </span>
+
+                        {showPath && (
+                            <span className={styles.fileDirPath}>{getDirPath(node.data!.path)}</span>
+                        )}
+                    </>
+                ) : (
+                    <>
+                        <span className={`codicon codicon-folder ${styles.icon}`}></span>
+                        <span className={styles.name}>{node.label}</span>
+                    </>
                 )}
             </div>
         );
-    };
+    }, [viewMode]);
 
-    // List mode: flat rendering
-    if (viewMode === 'list') {
-        const flatNodes: TreeNode[] = items
-            .map(f => ({
-                name: f.path.split('/').pop() || f.path,
-                path: f.path,
-                isFile: true,
-                status: f.status,
-                fileCount: 1
-            }))
-            .sort((a, b) => a.name.localeCompare(b.name));
-
-        return (
-            <div className={styles.fileTreeRoot}>
-                {flatNodes.map(node => renderTreeNode(node, 0))}
-            </div>
-        );
-    }
-
-    // Tree mode: hierarchical rendering with multiple top-level nodes
     return (
-        <div className={styles.fileTreeRoot}>
-            {tree.map(node => renderTreeNode(node, 0))}
-        </div>
+        <BasicTreeView
+            ref={ref}
+            nodes={nodes}
+            defaultExpandAll={true}
+            selectedId={activeFile || undefined}
+            onSelect={handleNodeClick}
+            onDoubleClick={handleNodeDoubleClick}
+            onContextMenu={handleContextMenu}
+            renderLeading={renderLeading}
+            renderLabel={renderLabel}
+            renderTrailing={renderTrailing}
+            indent={16}
+            baseIndent={viewMode === 'list' ? 12 : 8}
+        />
     );
 });

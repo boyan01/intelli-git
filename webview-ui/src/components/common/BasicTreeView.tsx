@@ -26,6 +26,9 @@ export interface BasicTreeViewProps<T = unknown> {
     renderLabel?: (node: TreeNode<T>) => React.ReactNode;
     renderTrailing?: (node: TreeNode<T>) => React.ReactNode;
     getContextData?: (node: TreeNode<T>) => Record<string, unknown> | undefined;
+    indent?: number;
+    baseIndent?: number;
+    renderLeading?: (node: TreeNode<T>) => React.ReactNode;
 }
 
 export interface BasicTreeViewRef {
@@ -62,7 +65,10 @@ function BasicTreeViewInner<T>(
         onContextMenu,
         renderLabel,
         renderTrailing,
-        getContextData
+        getContextData,
+        indent = 8,
+        baseIndent = 0,
+        renderLeading
     } = props;
 
     const [internalExpandedIds, setInternalExpandedIds] = useState<Set<string>>(() => {
@@ -118,7 +124,7 @@ function BasicTreeViewInner<T>(
             <div key={node.id} className={styles.nodeWrapper}>
                 <div
                     className={`${styles.node} ${isSelected ? styles.selected : ''}`}
-                    style={{ paddingLeft: `${depth * 8}px` }}
+                    style={{ paddingLeft: `${baseIndent + depth * indent}px` }}
                     onClick={(e) => {
                         e.stopPropagation();
                         if (isLeaf) {
@@ -145,6 +151,12 @@ function BasicTreeViewInner<T>(
                             <i className={`codicon codicon-chevron-${isExpanded ? 'down' : 'right'}`} />
                         )}
                     </div>
+
+                    {renderLeading && (
+                        <div className={styles.leading}>
+                            {renderLeading(node)}
+                        </div>
+                    )}
 
                     {node.icon && (
                         <div className={styles.icon}>

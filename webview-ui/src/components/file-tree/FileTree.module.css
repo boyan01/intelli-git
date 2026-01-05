@@ -43,6 +43,7 @@
     color: var(--vscode-badge-foreground);
     border-radius: 10px;
     flex-shrink: 0;
+    line-height: normal;
 }
 
 .changelistContent {
@@ -251,4 +252,12 @@
     flex: 1;
     overflow-y: auto;
     min-height: 100px;
+}
+
+.fileItemContent {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    overflow: hidden;
+    gap: 6px;
 }
