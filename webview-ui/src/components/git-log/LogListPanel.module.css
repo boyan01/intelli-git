@@ -68,9 +68,17 @@
 .subject {
     flex: 1;
     white-space: nowrap;
-    overflow: hidden;
+    overflow: visible;
     text-overflow: ellipsis;
     margin-right: 8px;
+    display: flex;
+    align-items: center;
+    min-width: 0;
+}
+
+.subject>span:first-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .author {
@@ -85,6 +93,7 @@
     color: var(--vscode-descriptionForeground);
     min-width: 80px;
     text-align: right;
+    font-size: 11px;
 }
 
 .blink {

@@ -4,9 +4,10 @@ import styles from './LogListPanel.module.css';
 import { computeGraph, LONG_DISTANCE_THRESHOLD } from './graphUtils';
 import { GraphColumn, CELL_WIDTH } from './GraphColumn';
 import { FilterToolbar } from './filter-toolbar/FilterToolbar';
-import { RefLabel } from './RefLabel';
+import { RefLabels } from './RefLabels';
 import { useLogCommitLoader } from './hooks/useLogCommitLoader';
 import { useCommitSelection } from './hooks/useCommitSelection';
+import { formatRelativeDate } from '../../utils/dateUtils';
 
 interface LogListPanelProps {
     onSelectionChange?: (commits: string[]) => void;
@@ -167,14 +168,14 @@ export const LogListPanel: React.FC<LogListPanelProps> = ({ onSelectionChange })
                                         {graphNode && <GraphColumn node={graphNode} rowHeight={ROW_HEIGHT} graphWidth={rowGraphWidth} rowIndex={globalIndex} onJumpToCommit={handleJumpToCommit} />}
                                     </div>
                                     <div className={styles.subject}>
-                                        {commit.refs && commit.refs.map((ref, i) => (
-                                            <RefLabel key={i} name={ref.name} type={ref.type} />
-                                        ))}
-                                        {commit.subject}
+                                        <span>{commit.subject}</span>
+                                        {commit.refs && commit.refs.length > 0 && (
+                                            <RefLabels refs={commit.refs} />
+                                        )}
                                     </div>
                                     <span className={styles.author}>{commit.authorName}</span>
                                     <span className={styles.date}>
-                                        {new Date(commit.date).toLocaleDateString()}
+                                        {formatRelativeDate(commit.date)}
                                     </span>
                                 </div>
                             );

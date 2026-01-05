@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import type { LogCommit, LogOptions } from '../../../../../shared/messages';
 import { rpc } from '../../../lib/rpc_client';
 import { LONG_DISTANCE_THRESHOLD } from '../graphUtils';
@@ -18,9 +18,6 @@ export const useLogCommitLoader = (): UseLogCommitLoaderResult => {
     const [loading, setLoading] = useState(false);
     const [hasMore, setHasMore] = useState(true);
     const [filters, setFilters] = useState<Partial<LogOptions>>({});
-
-    // Track initial mount to avoid double load
-    const isInitialMount = useRef(true);
 
     const loadMore = useCallback(async (reset = false) => {
         if (!reset && loading) return;
@@ -49,20 +46,8 @@ export const useLogCommitLoader = (): UseLogCommitLoaderResult => {
         }
     }, [commits.length, loading, filters]);
 
-    // Reload when filters change
     useEffect(() => {
-        if (isInitialMount.current) {
-            isInitialMount.current = false;
-            // First load is triggered by initial effect or manually
-            // But usually we want to load when filters change.
-            // If filters are initially empty, this runs once.
-            loadMore(true);
-            return;
-        }
-
         loadMore(true);
-        loadMore(true);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [filters]);
 
     return {

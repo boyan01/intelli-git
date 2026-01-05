@@ -15,6 +15,8 @@ export interface SplitPaneProps {
     className?: string;
 }
 
+const RESIZER_SIZE = 4;
+
 export function SplitPane({
     direction,
     first,
@@ -27,48 +29,61 @@ export function SplitPane({
     className = ''
 }: SplitPaneProps) {
     const containerRef = useRef<HTMLDivElement>(null);
-    const needsCalculation = defaultRatio !== undefined || secondDefaultSize !== undefined;
-    const [size, setSize] = useState<number | null>(needsCalculation ? null : defaultSize);
+    // Store ratio (0-1) instead of pixel size
+    const [ratio, setRatio] = useState<number | null>(() => {
+        if (defaultRatio !== undefined) return defaultRatio;
+        return null;
+    });
     const isDragging = useRef(false);
     const startPos = useRef(0);
-    const startSize = useRef(0);
+    const startRatio = useRef(0);
 
+    const getContainerSize = useCallback(() => {
+        if (!containerRef.current) return 0;
+        return direction === 'horizontal'
+            ? containerRef.current.clientWidth
+            : containerRef.current.clientHeight;
+    }, [direction]);
+
+    // Calculate initial ratio from defaultSize or secondDefaultSize
     useEffect(() => {
-        if (size === null && containerRef.current) {
-            const containerSize = direction === 'horizontal'
-                ? containerRef.current.clientWidth
-                : containerRef.current.clientHeight;
+        if (ratio === null && containerRef.current) {
+            const containerSize = getContainerSize();
+            if (containerSize === 0) return;
 
-            if (defaultRatio !== undefined) {
-                setSize(Math.round(containerSize * defaultRatio));
-            } else if (secondDefaultSize !== undefined) {
-                // Subtract resizer width (4px) and second pane size from container
-                setSize(Math.max(minSize, containerSize - secondDefaultSize - 4));
+            if (secondDefaultSize !== undefined) {
+                const firstSize = Math.max(minSize, containerSize - secondDefaultSize - RESIZER_SIZE);
+                setRatio(firstSize / containerSize);
+            } else {
+                setRatio(defaultSize / containerSize);
             }
         }
-    }, [defaultRatio, secondDefaultSize, direction, size, minSize]);
+    }, [ratio, getContainerSize, secondDefaultSize, defaultSize, minSize]);
 
     const handleMouseDown = useCallback((e: React.MouseEvent) => {
         isDragging.current = true;
         startPos.current = direction === 'horizontal' ? e.clientX : e.clientY;
-        startSize.current = size ?? 0;
+        startRatio.current = ratio ?? 0.5;
         document.body.style.cursor = direction === 'horizontal' ? 'col-resize' : 'row-resize';
         document.body.style.userSelect = 'none';
-    }, [size, direction]);
+    }, [ratio, direction]);
 
     useEffect(() => {
         const handleMouseMove = (e: MouseEvent) => {
             if (!isDragging.current || !containerRef.current) return;
 
             const currentPos = direction === 'horizontal' ? e.clientX : e.clientY;
-            const containerSize = direction === 'horizontal'
-                ? containerRef.current.clientWidth
-                : containerRef.current.clientHeight;
+            const containerSize = getContainerSize();
+            if (containerSize === 0) return;
 
             const delta = currentPos - startPos.current;
-            const effectiveMax = maxSize ?? containerSize - minSize;
-            const newSize = Math.max(minSize, Math.min(startSize.current + delta, effectiveMax));
-            setSize(newSize);
+            const deltaRatio = delta / containerSize;
+
+            const minRatio = minSize / containerSize;
+            const maxRatio = maxSize ? maxSize / containerSize : 1 - minRatio;
+
+            const newRatio = Math.max(minRatio, Math.min(startRatio.current + deltaRatio, maxRatio));
+            setRatio(newRatio);
         };
 
         const handleMouseUp = () => {
@@ -83,29 +98,29 @@ export function SplitPane({
             document.removeEventListener('mousemove', handleMouseMove);
             document.removeEventListener('mouseup', handleMouseUp);
         };
-    }, [direction, minSize, maxSize]);
+    }, [direction, minSize, maxSize, getContainerSize]);
 
     const isHorizontal = direction === 'horizontal';
+    const firstPaneStyle = ratio !== null
+        ? { flex: `0 0 calc(${ratio * 100}% - ${RESIZER_SIZE / 2}px)` }
+        : { flex: 1 };
+    const secondPaneStyle = ratio !== null
+        ? { flex: `0 0 calc(${(1 - ratio) * 100}% - ${RESIZER_SIZE / 2}px)` }
+        : { flex: 1 };
 
     return (
         <div
             ref={containerRef}
             className={`${styles.container} ${isHorizontal ? styles.horizontal : styles.vertical} ${className}`}
         >
-            <div
-                className={styles.pane}
-                style={size !== null
-                    ? (isHorizontal ? { width: size } : { height: size })
-                    : { flex: 1 }
-                }
-            >
+            <div className={styles.pane} style={firstPaneStyle}>
                 {first}
             </div>
             <div
                 className={`${styles.resizer} ${isHorizontal ? styles.resizerHorizontal : styles.resizerVertical}`}
                 onMouseDown={handleMouseDown}
             />
-            <div className={`${styles.pane} ${styles.paneSecond}`}>
+            <div className={styles.pane} style={secondPaneStyle}>
                 {second}
             </div>
         </div>

@@ -113,5 +113,9 @@
     "filter.date.until": "Until {0}",
     "filter.date.inputSince": "Since",
     "filter.date.inputUntil": "Until",
-    "filter.date.example": "e.g. 2023-01-01"
+    "filter.date.example": "e.g. 2023-01-01",
+    "date.justNow": "just now",
+    "date.minutesAgo": "{{count}} min ago",
+    "date.today": "Today {{time}}",
+    "date.yesterday": "Yesterday {{time}}"
 }

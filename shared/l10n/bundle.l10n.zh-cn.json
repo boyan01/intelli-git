@@ -113,5 +113,9 @@
     "filter.date.until": "Until {0}",
     "filter.date.inputSince": "Since (之后)",
     "filter.date.inputUntil": "Until (之前)",
-    "filter.date.example": "如: 2023-01-01"
+    "filter.date.example": "如: 2023-01-01",
+    "date.justNow": "刚刚",
+    "date.minutesAgo": "{{count}} 分钟前",
+    "date.today": "今天 {{time}}",
+    "date.yesterday": "昨天 {{time}}"
 }

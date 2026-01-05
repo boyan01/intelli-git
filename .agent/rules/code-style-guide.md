@@ -19,7 +19,7 @@ The project is a VS Code Extension with a webview-based UI.
     - **Tech Stack**: React, Vite, TypeScript.
     - **Components**: Reusable UI components.
     - **Screens/Views**: Main page views.
-- **Shared (`/shared`)**: Types, interfaces, and utilities shared between Extension Host and Webview UI.
+- **Shared (`/shared`)**: Types, interfaces, l10n and utilities shared between Extension Host and Webview UI.
 
 ## 2. Technology Stack
 

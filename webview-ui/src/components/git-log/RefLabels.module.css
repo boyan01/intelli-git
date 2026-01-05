@@ -1,0 +1,108 @@
+.container {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    margin-left: 6px;
+    vertical-align: middle;
+}
+
+.label {
+    display: inline-block;
+    padding: 0 4px;
+    border-radius: 3px;
+    font-size: 11px;
+    line-height: 16px;
+    border: 1px solid transparent;
+    white-space: nowrap;
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-weight: 500;
+}
+
+.head {
+    background-color: color-mix(in srgb, #ffd700 25%, var(--vscode-editor-background, #1e1e1e));
+    border-color: #b8960a;
+    color: var(--vscode-editorWarning-foreground, #cca700);
+}
+
+.local {
+    background-color: color-mix(in srgb, #4bbe4b 20%, var(--vscode-editor-background, #1e1e1e));
+    border-color: #3d8b3d;
+    color: var(--vscode-gitDecoration-untrackedResourceForeground, #73c991);
+}
+
+.remote {
+    background-color: color-mix(in srgb, #8a6ec8 20%, var(--vscode-editor-background, #1e1e1e));
+    border-color: #6b4fa0;
+    color: var(--vscode-symbolIcon-methodForeground, #b180d7);
+}
+
+.tag {
+    background-color: color-mix(in srgb, #dc823c 20%, var(--vscode-editor-background, #1e1e1e));
+    border-color: #a86230;
+    color: var(--vscode-editorCodeLens-foreground, #e0a050);
+}
+
+.stackWrapper {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    padding-bottom: 2px;
+    padding-right: 2px;
+    vertical-align: middle;
+    margin-top: -1px;
+}
+
+.stackWrapper>.label:not(.stackedLabel) {
+    position: relative;
+    z-index: 2;
+}
+
+.stackedLabel {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    right: 0;
+    bottom: 0;
+    min-width: auto;
+    min-height: auto;
+    z-index: 1;
+    opacity: 0.6;
+}
+
+.extraBadge {
+    position: absolute;
+    top: -6px;
+    right: -8px;
+    background-color: var(--vscode-badge-background, #4d4d4d);
+    color: var(--vscode-badge-foreground, #fff);
+    font-size: 9px;
+    line-height: 12px;
+    padding: 0 3px;
+    border-radius: 6px;
+    font-weight: 600;
+}
+
+.tooltip {
+    position: absolute;
+    z-index: 1000;
+    background-color: var(--vscode-editorHoverWidget-background, #252526);
+    border: 1px solid var(--vscode-editorHoverWidget-border, #454545);
+    border-radius: 4px;
+    padding: 6px 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: max-content;
+}
+
+.tooltipItem {
+    font-size: 12px;
+    line-height: 18px;
+    white-space: nowrap;
+    background: none !important;
+    border: none !important;
+    padding: 0;
+}
