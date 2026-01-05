@@ -29,7 +29,9 @@ export interface PersistedStateSchema {
 
     // Branch List Panel
     'branchList.expandedGroups': Set<string>;
+    'branchList.expandedIds': Set<string>;
     'branchList.selectedBranch': string | null;
+    'branchList.selectedId': string | null;
     'branchList.filterText': string;
 }
 
@@ -57,7 +59,9 @@ export const stateDefaults: PersistedStateSchema = {
 
     // Branch List Panel
     'branchList.expandedGroups': new Set(['local']), // Default expand local branches
+    'branchList.expandedIds': new Set(['local']),
     'branchList.selectedBranch': null,
+    'branchList.selectedId': null,
     'branchList.filterText': '',
 };
 

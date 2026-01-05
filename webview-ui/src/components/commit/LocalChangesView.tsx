@@ -5,6 +5,7 @@ import { usePersistedState } from '../../hooks/usePersistedState';
 import { useRpcData } from '../../hooks/useRpcData';
 import { rpc } from '../../lib/rpc_client';
 import type { BranchInfo } from '@shared/messages';
+import { BranchStatus } from '../common/BranchStatus';
 import styles from './LocalChangesView.module.css';
 
 const defaultBranchInfo: BranchInfo = {
@@ -46,28 +47,7 @@ function RebaseIndicator({ status }: { status: 'interactive' | 'merging' }) {
     );
 }
 
-function BranchStatus({ current, ahead, behind }: { current: string; ahead?: number; behind?: number }) {
-    return (
-        <>
-            <i className="codicon codicon-repo-forked" style={{ marginRight: '4px' }}></i>
-            <span style={{ fontSize: '11px', marginRight: '4px', maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{current}</span>
 
-            {(ahead || 0) > 0 && (
-                <div style={{ display: 'flex', alignItems: 'center', color: 'var(--vscode-gitDecoration-addedResourceForeground)', marginLeft: '2px' }}>
-                    <i className="codicon codicon-arrow-up" style={{ fontSize: '10px', transform: 'rotate(45deg)' }}></i>
-                    <span style={{ fontSize: '10px' }}>{ahead}</span>
-                </div>
-            )}
-
-            {(behind || 0) > 0 && (
-                <div style={{ display: 'flex', alignItems: 'center', color: 'var(--vscode-gitDecoration-deletedResourceForeground)', marginLeft: '2px' }}>
-                    <i className="codicon codicon-arrow-down" style={{ fontSize: '10px', transform: 'rotate(45deg)' }}></i>
-                    <span style={{ fontSize: '10px' }}>{behind}</span>
-                </div>
-            )}
-        </>
-    );
-}
 
 export function LocalChangesView() {
     const { t } = useTranslation();

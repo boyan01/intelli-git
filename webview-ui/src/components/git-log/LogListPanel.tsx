@@ -11,12 +11,13 @@ import { formatRelativeDate } from '../../utils/dateUtils';
 
 interface LogListPanelProps {
     onSelectionChange?: (commits: string[]) => void;
+    externalBranchFilter?: string;
 }
 
 const ROW_HEIGHT = 24;
 const BUFFER = 10;
 
-export const LogListPanel: React.FC<LogListPanelProps> = ({ onSelectionChange }) => {
+export const LogListPanel: React.FC<LogListPanelProps> = ({ onSelectionChange, externalBranchFilter }) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const [scrollTop, setScrollTop] = useState(0);
     const [clientHeight, setClientHeight] = useState(0);
@@ -28,6 +29,13 @@ export const LogListPanel: React.FC<LogListPanelProps> = ({ onSelectionChange })
         loadMore,
         setFilters
     } = useLogCommitLoader();
+
+    // Handle external branch filter from BranchListPanel double-click
+    useEffect(() => {
+        if (externalBranchFilter) {
+            setFilters({ branch: externalBranchFilter });
+        }
+    }, [externalBranchFilter, setFilters]);
 
     const scrollToRow = useCallback((index: number) => {
         if (!containerRef.current) return;

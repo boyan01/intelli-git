@@ -165,9 +165,23 @@ export class ExtensionRpcHandler implements ExtensionMethods {
         const groupedRemote = await this.gitService.getGroupedRemoteBranches();
         const tags = await this.gitService.getTags();
 
+        // Get ahead/behind info for each local branch
+        const localBranchesInfo = await Promise.all(
+            branches.all.map(async (branchName) => {
+                const info = await this.gitService.getBranchAheadBehind(branchName);
+                return {
+                    name: branchName,
+                    ahead: info.ahead,
+                    behind: info.behind,
+                    upstream: info.upstream
+                };
+            })
+        );
+
         return {
             currentBranch: branches.current,
             localBranches: branches.all,
+            localBranchesInfo,
             remoteBranches: groupedRemote,
             tags: tags
         };

@@ -1,0 +1,40 @@
+.container {
+    display: flex;
+    align-items: center;
+}
+
+.icon {
+    margin-right: 4px;
+}
+
+.name {
+    font-size: 11px;
+    margin-right: 4px;
+    max-width: 100px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.statusItem {
+    display: flex;
+    align-items: center;
+    margin-left: 2px;
+}
+
+.ahead {
+    color: var(--vscode-gitDecoration-addedResourceForeground);
+}
+
+.behind {
+    color: var(--vscode-gitDecoration-deletedResourceForeground);
+}
+
+.statusIcon {
+    font-size: 10px;
+    transform: rotate(45deg);
+}
+
+.count {
+    font-size: 10px;
+}

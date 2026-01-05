@@ -462,6 +462,26 @@ export class GitService {
         }
     }
 
+    /**
+     * Get ahead/behind count for a specific local branch relative to its upstream.
+     */
+    public async getBranchAheadBehind(branchName: string): Promise<{ ahead: number; behind: number; upstream?: string }> {
+        try {
+            // Get upstream tracking branch
+            const upstream = await this.git.raw(['rev-parse', '--abbrev-ref', `${branchName}@{u}`]).catch(() => '');
+            if (!upstream.trim()) {
+                return { ahead: 0, behind: 0 };
+            }
+
+            const result = await this.git.raw(['rev-list', '--left-right', '--count', `${branchName}...${branchName}@{u}`]);
+            const [ahead, behind] = result.trim().split(/\s+/).map(n => parseInt(n, 10));
+
+            return { ahead: ahead || 0, behind: behind || 0, upstream: upstream.trim() };
+        } catch {
+            return { ahead: 0, behind: 0 };
+        }
+    }
+
     public async createBranch(branchName: string): Promise<void> {
         await this.git.checkoutLocalBranch(branchName);
     }

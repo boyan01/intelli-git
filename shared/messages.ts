@@ -169,9 +169,17 @@ export interface WebviewMethods {
     refresh: () => void;
 }
 
+export interface LocalBranchInfo {
+    name: string;
+    ahead: number;
+    behind: number;
+    upstream?: string;
+}
+
 export interface BranchListData {
     currentBranch: string;
     localBranches: string[];
+    localBranchesInfo: LocalBranchInfo[];
     remoteBranches: Record<string, string[]>;
     tags: string[];
 }

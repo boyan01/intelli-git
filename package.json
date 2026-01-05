@@ -13,7 +13,7 @@
   "activationEvents": [
     "onStartupFinished"
   ],
-  "l10n": "./l10n",
+  "l10n": "./shared/l10n",
   "main": "./out/src/extension.js",
   "contributes": {
     "viewsContainers": {
@@ -265,8 +265,7 @@
   "scripts": {
     "vscode:prepublish": "npm run compile",
     "build:webview": "cd webview-ui && npm run build",
-    "copy:l10n": "mkdir -p l10n && cp shared/l10n/*.json l10n/",
-    "compile": "npm run copy:l10n && npm run build:webview && tsc -p ./",
+    "compile": "npm run build:webview && tsc -p ./",
     "watch": "tsc -watch -p ./",
     "watch:webview": "cd webview-ui && npm run watch",
     "pretest": "npm run compile && npm run lint",
