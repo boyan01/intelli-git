@@ -1,58 +1,37 @@
 import * as vscode from 'vscode';
-import { GitService } from '../services/GitService';
-import type { ExtensionMethods, WebviewMethods } from '../../shared/messages';
-import { RpcPeer } from '../../shared/rpc';
-import { getWebviewHtml } from '../utils/webviewHtml';
-import { createRpc, ExtensionRpcHandler } from '../rpc';
+import { BaseWebviewProvider, WebviewProviderOptions } from './BaseWebviewProvider';
 
-export class PushPanel {
+export class PushPanel extends BaseWebviewProvider {
     public static currentPanel: PushPanel | undefined;
     private readonly _panel: vscode.WebviewPanel;
-    private readonly _extensionUri: vscode.Uri;
-    private readonly _gitService: GitService;
-    private _rpc?: RpcPeer<WebviewMethods, ExtensionMethods>;
-    private _disposables: vscode.Disposable[] = [];
     private _disposed: boolean = false;
 
     private constructor(
         panel: vscode.WebviewPanel,
-        extensionUri: vscode.Uri,
-        gitService: GitService
+        options: WebviewProviderOptions
     ) {
+        super(options);
         this._panel = panel;
-        this._extensionUri = extensionUri;
-        this._gitService = gitService;
 
         this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
 
-        this._rpc = createRpc({
-            webview: this._panel.webview,
-            onDisposed: () => this._disposed
-        });
-
-        const handler = new ExtensionRpcHandler({
-            gitService: this._gitService,
-            onDispose: () => this.dispose()
-        });
-        handler.registerAll(this._rpc);
-
-        this._panel.webview.onDidReceiveMessage(
-            async (message: { type: string;[key: string]: any }) => {
-                if (message.type === 'rpc-request' || message.type === 'rpc-response') {
-                    this._rpc?.handleMessage(message);
-                    return;
-                } else {
-                    console.log('Received unknown message type:', message.type);
-                }
-            },
-            null,
-            this._disposables
-        );
-
-        this._initialize();
+        this.setupWebview(this._panel.webview, () => this._disposed);
+        this._panel.webview.html = this.getHtml(this._panel.webview);
     }
 
-    public static createOrShow(extensionUri: vscode.Uri, gitService: GitService) {
+    protected getTitle(): string {
+        return 'Push Commits';
+    }
+
+    protected getInitialRoute(): string {
+        return '/push';
+    }
+
+    protected getOnDispose(): () => void {
+        return () => this.dispose();
+    }
+
+    public static createOrShow(options: WebviewProviderOptions) {
         if (PushPanel.currentPanel) {
             PushPanel.currentPanel._panel.reveal(vscode.ViewColumn.Active);
             return;
@@ -67,36 +46,19 @@ export class PushPanel {
             },
             {
                 enableScripts: true,
-                localResourceRoots: [extensionUri],
+                localResourceRoots: [options.extensionUri],
                 retainContextWhenHidden: true
             }
         );
 
-        PushPanel.currentPanel = new PushPanel(panel, extensionUri, gitService);
+        PushPanel.currentPanel = new PushPanel(panel, options);
     }
 
     public dispose() {
+        if (this._disposed) return;
         this._disposed = true;
         PushPanel.currentPanel = undefined;
         this._panel.dispose();
-        while (this._disposables.length) {
-            const x = this._disposables.pop();
-            if (x) {
-                x.dispose();
-            }
-        }
-    }
-
-    private async _initialize() {
-        this._panel.webview.html = this._getHtmlForWebview();
-    }
-
-    private _getHtmlForWebview() {
-        return getWebviewHtml({
-            webview: this._panel.webview,
-            extensionUri: this._extensionUri,
-            title: 'Push Commits',
-            initialRoute: '/push'
-        });
+        super.dispose();
     }
 }

@@ -21,7 +21,11 @@ export function registerNavigationCommands(
 
     context.subscriptions.push(
         vscode.commands.registerCommand('intelli-git.push', () => {
-            PushPanel.createOrShow(context.extensionUri, gitService);
+            PushPanel.createOrShow({
+                extensionUri: context.extensionUri,
+                context,
+                gitService
+            });
         })
     );
 

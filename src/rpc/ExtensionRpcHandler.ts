@@ -7,6 +7,7 @@ import { ChangelistService } from '../services/ChangelistService';
 import { i18n } from '../utils/i18n';
 
 export interface ExtensionRpcHandlerOptions {
+    context: vscode.ExtensionContext;
     gitService: GitService;
     changelistService?: ChangelistService;
     onDispose?: () => void;
@@ -16,85 +17,79 @@ export interface ExtensionRpcHandlerOptions {
  * Full implementation of ExtensionMethods interface for RPC handling.
  * Encapsulates all Git and Changelist operations.
  */
-export class ExtensionRpcHandler implements ExtensionMethods {
+export class ExtensionRpcHandler {
+    private context: vscode.ExtensionContext;
     private gitService: GitService;
     private changelistService?: ChangelistService;
     private onDispose: () => void;
     private _lastRebaseStatus?: string;
 
     constructor(options: ExtensionRpcHandlerOptions) {
+        this.context = options.context;
         this.gitService = options.gitService;
         this.changelistService = options.changelistService;
         this.onDispose = options.onDispose || (() => { });
     }
 
-    log(message: string): Promise<void> {
+    log = (message: string): Promise<void> => {
         console.log(message);
         return Promise.resolve();
-    }
+    };
 
     registerAll(rpc: RpcPeer<WebviewMethods, ExtensionMethods>) {
-        rpc.registerAll(this);
-    }
-
-    async getPushInitState(): Promise<PushInitState> {
-        const branches = await this.gitService.getBranches();
-        const remotes = await this.gitService.getRemotes();
-        return {
-            localBranch: branches.current,
-            remotes: remotes.length > 0 ? remotes : ['origin']
-        };
-    }
-
-    async getRemoteBranches(remote: string): Promise<string[]> {
-        const allRemoteBranches = await this.gitService.getRemoteBranches();
-        const prefix = `${remote}/`;
-        return allRemoteBranches
-            .filter(b => b.startsWith(prefix) && !b.includes('HEAD'))
-            .map(b => b.substring(prefix.length));
-    }
-
-    async getPushCommits(params: { remote: string; branch: string }): Promise<PushCommitsData> {
-        const branches = await this.gitService.getBranches();
-        const currentBranch = branches.current;
-
-        const commits = await this.gitService.getCommitsToPush(
-            currentBranch,
-            params.remote,
-            params.branch
-        );
-
-        let files: CommitFile[] = [];
-        if (commits.length > 0) {
-            files = await this.gitService.getCommitFiles(commits[0].hash);
-        }
-
-        return {
-            commits: commits,
-            files: files
-        };
-    }
-
-    async getCommitFiles(hash: string): Promise<CommitFile[]> {
-        return await this.gitService.getCommitFiles(hash);
-    }
-
-    async getMultiCommitFiles(hashes: string[]): Promise<CommitFile[]> {
-        const fileMap = new Map<string, CommitFile>();
-        for (const hash of hashes) {
-            try {
-                const files = await this.gitService.getCommitFiles(hash);
-                for (const file of files) {
-                    fileMap.set(file.path, file);
-                }
-            } catch {
-                // ignore
+        rpc.registerAll(
+            {
+                log: this.log,
+                getPushInitState: this.gitService.getPushInitState,
+                getRemoteBranches: this.gitService.getRemoteBranchesForRemote,
+                getPushCommits: this.gitService.getPushCommits,
+                getCommitFiles: this.gitService.getCommitFiles,
+                getMultiCommitFiles: this.gitService.getMultiCommitFiles,
+                push: this.push,
+                openDiff: this.openDiff,
+                closeWebView: this.closeWebView,
+                openCommitDiff: this.openCommitDiff,
+                getStatus: this.gitService.getStatus,
+                getBranchInfo: this.gitService.getRpcBranchInfo,
+                getStashList: this.gitService.getStashList,
+                getStashFiles: this.gitService.getStashFilesAsCommitFiles,
+                commit: this.commit,
+                stage: this.stage,
+                unstage: this.unstage,
+                stageAll: this.stageAll,
+                unstageAll: this.unstageAll,
+                generateCommitMessage: this.generateCommitMessage,
+                stash: this.stash,
+                deleteFiles: this.deleteFiles,
+                rollback: this.rollback,
+                switchBranch: this.switchBranch,
+                pull: this.pull,
+                fetch: this.fetch,
+                createChangelist: this.createChangelist,
+                pickBranch: this.pickBranch,
+                continueRebase: this.continueRebase,
+                abortRebase: this.abortRebase,
+                moveFiles: this.moveFiles,
+                deleteChangelist: this.deleteChangelist,
+                renameChangelist: this.renameChangelist,
+                promptCreateChangelist: this.promptCreateChangelist,
+                openFile: this.openFile,
+                openStashDiff: this.openStashDiff,
+                getBranchListData: this.gitService.getBranchListData,
+                getLog: this.gitService.getLog,
+                getCommitDetails: this.gitService.getCommitDetails,
+                pickBranchForFilter: this.pickBranchForFilter,
+                pickPaths: this.pickPaths,
+                getAuthors: this.gitService.getAuthors,
+                getCurrentUser: this.gitService.getCurrentUser,
+                getWorkspaceState: this.getWorkspaceState,
+                updateWorkspaceState: this.updateWorkspaceState
             }
-        }
-        return Array.from(fileMap.values());
+        )
     }
 
-    async push(params: { force: boolean; pushTags: boolean; remote: string; branch: string }): Promise<void> {
+
+    push = async (params: { force: boolean; pushTags: boolean; remote: string; branch: string }): Promise<void> => {
         const branches = await this.gitService.getBranches();
         const currentBranch = branches.current;
 
@@ -111,113 +106,26 @@ export class ExtensionRpcHandler implements ExtensionMethods {
         vscode.window.showInformationMessage(
             i18n.t('extension.pushSuccess', params.remote, params.branch)
         );
-    }
+    };
 
-    async openDiff(filePath: string): Promise<void> {
+    openDiff = async (filePath: string): Promise<void> => {
         const workspaceRoot = this.gitService.getWorkspaceRoot();
         const uri = vscode.Uri.file(`${workspaceRoot}/${filePath}`);
         vscode.commands.executeCommand('git.openChange', uri);
-    }
+    };
 
-    async closeWebView(): Promise<void> {
+    closeWebView = async (): Promise<void> => {
         this.onDispose();
-    }
+    };
 
-    async openCommitDiff(params: { path: string; leftRef: string; rightRef: string }): Promise<void> {
+    openCommitDiff = async (params: { path: string; leftRef: string; rightRef: string }): Promise<void> => {
         const leftUri = vscode.Uri.parse(`intelli-git-revision://load/${params.path}?${JSON.stringify({ ref: params.leftRef })}`);
         const rightUri = vscode.Uri.parse(`intelli-git-revision://load/${params.path}?${JSON.stringify({ ref: params.rightRef })}`);
         const title = `${path.basename(params.path)} (${params.leftRef.substring(0, 7)} ↔ ${params.rightRef.substring(0, 7)})`;
         vscode.commands.executeCommand('vscode.diff', leftUri, rightUri, title);
-    }
+    };
 
-    async getCommitState(): Promise<CommitState> {
-        const changelists = await this._buildChangelists();
-        const branches = await this.getBranchInfo();
-        const incomingCommits = await this.gitService.getIncomingCommitsCount();
-        const stashList = await this.gitService.getStashList();
-
-        const rebaseStatus = branches.rebaseStatus;
-        let recentCommitMessage = undefined;
-
-        const shouldUpdateMessage = (rebaseStatus && rebaseStatus !== 'none') &&
-            (this._lastRebaseStatus !== rebaseStatus);
-
-        if (shouldUpdateMessage) {
-            recentCommitMessage = await this.gitService.getRebaseCommitMessage();
-        }
-        this._lastRebaseStatus = rebaseStatus;
-
-        return {
-            changelists,
-            branches,
-            incomingCommits,
-            stashList,
-            recentCommitMessage
-        };
-    }
-
-    async getChangelists(): Promise<ChangelistGroup[]> {
-        return await this._buildChangelists();
-    }
-
-    async getBranchListData(): Promise<BranchListData> {
-        const branches = await this.gitService.getBranches();
-        const groupedRemote = await this.gitService.getGroupedRemoteBranches();
-        const tags = await this.gitService.getTags();
-
-        // Get ahead/behind info for each local branch
-        const localBranchesInfo = await Promise.all(
-            branches.all.map(async (branchName) => {
-                const info = await this.gitService.getBranchAheadBehind(branchName);
-                return {
-                    name: branchName,
-                    ahead: info.ahead,
-                    behind: info.behind,
-                    upstream: info.upstream
-                };
-            })
-        );
-
-        return {
-            currentBranch: branches.current,
-            localBranches: branches.all,
-            localBranchesInfo,
-            remoteBranches: groupedRemote,
-            tags: tags
-        };
-    }
-
-    async getBranchInfo(): Promise<BranchInfo> {
-        const branches = await this.gitService.getBranches();
-        const branchStatus = await this.gitService.getBranchStatus();
-        const rebaseStatus = await this.gitService.getRebaseStatus();
-
-        return {
-            current: branches.current,
-            all: branches.all,
-            ahead: branchStatus.ahead,
-            behind: branchStatus.behind,
-            rebaseStatus
-        };
-    }
-
-    async getLog(options: LogOptions): Promise<LogCommit[]> {
-        return this.gitService.getLog(options);
-    }
-
-    async getCommitDetails(hash: string): Promise<CommitDetails> {
-        return this.gitService.getCommitDetails(hash);
-    }
-
-    async getAuthors(): Promise<string[]> {
-        return this.gitService.getAuthors();
-    }
-
-    async getCurrentUser(): Promise<string> {
-        return this.gitService.getCurrentUser();
-    }
-
-    async pickPaths(): Promise<string[] | undefined> {
+    pickPaths = async (): Promise<string[] | undefined> => {
         const workspaceRoot = this.gitService.getWorkspaceRoot();
 
         const result = await vscode.window.showOpenDialog({
@@ -246,7 +154,6 @@ export class ExtensionRpcHandler implements ExtensionMethods {
                 if (relativePath.startsWith('/') || relativePath.startsWith('\\')) {
                     relativePath = relativePath.substring(1);
                 }
-                // Handle selecting the workspace root itself
                 if (relativePath === '') {
                     relativePath = '.';
                 }
@@ -268,10 +175,10 @@ export class ExtensionRpcHandler implements ExtensionMethods {
         }
 
         return validPaths;
-    }
+    };
 
-    async pickBranchForFilter(): Promise<string | undefined> {
-        const branchData = await this.getBranchListData();
+    pickBranchForFilter = async (): Promise<string | undefined> => {
+        const branchData = await this.gitService.getBranchListData();
 
         interface BranchQuickPickItem extends vscode.QuickPickItem {
             branch: string;
@@ -290,7 +197,6 @@ export class ExtensionRpcHandler implements ExtensionMethods {
             });
         };
 
-        // "All" option
         items.push({
             label: `$(git-branch) ${i18n.t('extension.all')}`,
             branch: 'all',
@@ -298,22 +204,18 @@ export class ExtensionRpcHandler implements ExtensionMethods {
         });
         addedBranches.add('all');
 
-        // Priority branches section
         items.push({
             label: i18n.t('extension.common'),
             kind: vscode.QuickPickItemKind.Separator,
             branch: ''
         });
 
-        // HEAD
         addBranch('HEAD', '$(symbol-reference)', i18n.t('extension.currentHead'));
 
-        // Current branch
         if (branchData.currentBranch) {
             addBranch(branchData.currentBranch, '$(git-branch)', i18n.t('extension.currentBranch'));
         }
 
-        // main/master and their remotes
         const priorityBranches = ['main', 'master'];
         for (const pb of priorityBranches) {
             if (branchData.localBranches.includes(pb)) {
@@ -326,7 +228,6 @@ export class ExtensionRpcHandler implements ExtensionMethods {
             }
         }
 
-        // Separator for local branches
         items.push({
             label: i18n.t('extension.localBranches'),
             kind: vscode.QuickPickItemKind.Separator,
@@ -337,7 +238,6 @@ export class ExtensionRpcHandler implements ExtensionMethods {
             addBranch(branch, '$(git-branch)');
         }
 
-        // Remote branches grouped by remote
         for (const [remote, branches] of Object.entries(branchData.remoteBranches)) {
             items.push({
                 label: remote,
@@ -360,94 +260,11 @@ export class ExtensionRpcHandler implements ExtensionMethods {
             return undefined;
         }
 
-        // Return comma-separated branches for multiple selection
         const branches = selected.map(s => s.branch).filter(b => b);
         return branches.length === 1 ? branches[0] : branches.join(',');
-    }
+    };
 
-    private async _buildChangelists(): Promise<ChangelistGroup[]> {
-        const files = await this.gitService.getStatus();
-
-        const conflictedFiles = files.filter(f => f.status === 'C' || f.status === 'U');
-        const trackedFiles = files.filter(f => f.status !== '?' && f.status !== 'C' && f.status !== 'U');
-        const untrackedFiles = files.filter(f => f.status === '?');
-
-        const changelists: ChangelistGroup[] = [];
-
-        if (conflictedFiles.length > 0) {
-            changelists.push({
-                id: 'merge-conflicts',
-                name: 'Merge Conflicts',
-                isDefault: false,
-                items: conflictedFiles.map(f => ({ path: f.path, status: f.status, staged: f.staged }))
-            });
-        }
-
-        if (trackedFiles.length > 0) {
-            if (this.changelistService) {
-                const userChangelists = await this.changelistService.getChangelists();
-                const filesByChangelist = new Map<string, typeof trackedFiles>();
-
-                for (const file of trackedFiles) {
-                    const listId = this.changelistService.getChangelistForFile(file.path);
-                    if (!filesByChangelist.has(listId)) {
-                        filesByChangelist.set(listId, []);
-                    }
-                    filesByChangelist.get(listId)!.push(file);
-                }
-
-                for (const cl of userChangelists) {
-                    const clFiles = filesByChangelist.get(cl.id) || [];
-                    if (clFiles.length > 0) {
-                        changelists.push({
-                            id: cl.id,
-                            name: cl.name,
-                            isDefault: cl.isDefault,
-                            items: clFiles.map(f => ({ path: f.path, status: f.status, staged: f.staged }))
-                        });
-                    }
-                }
-            } else {
-                changelists.push({
-                    id: 'default',
-                    name: 'Default Changelist',
-                    isDefault: true,
-                    items: trackedFiles.map(f => ({ path: f.path, status: f.status, staged: f.staged }))
-                });
-            }
-        }
-
-        if (untrackedFiles.length > 0) {
-            changelists.push({
-                id: 'unversioned',
-                name: 'Unversioned Files',
-                isDefault: false,
-                items: untrackedFiles.map(f => ({ path: f.path, status: f.status, staged: f.staged }))
-            });
-        }
-
-        if (changelists.length === 0) {
-            changelists.push({
-                id: 'default',
-                name: 'Default Changelist',
-                isDefault: true,
-                items: []
-            });
-        }
-
-        return changelists;
-    }
-
-    async getStashList(): Promise<StashItem[]> {
-        return await this.gitService.getStashList();
-    }
-
-    async getStashFiles(index: number): Promise<CommitFile[]> {
-        const files = await this.gitService.getStashFiles(index);
-        return files.map(f => ({ path: f.path, status: f.status }));
-    }
-
-    async commit(params: { message: string; amend: boolean; files: string[]; push?: boolean }): Promise<void> {
+    commit = async (params: { message: string; amend: boolean; files: string[]; push?: boolean }): Promise<void> => {
         try {
             if (params.amend) {
                 await this.gitService.commitAmend(params.message, params.files);
@@ -469,25 +286,25 @@ export class ExtensionRpcHandler implements ExtensionMethods {
             vscode.window.showErrorMessage(i18n.t('extension.commitFailed', `${e}`));
             throw e;
         }
-    }
+    };
 
-    async stage(filePath: string): Promise<void> {
+    stage = async (filePath: string): Promise<void> => {
         await this.gitService.stageFile(filePath);
-    }
+    };
 
-    async unstage(filePath: string): Promise<void> {
+    unstage = async (filePath: string): Promise<void> => {
         await this.gitService.unstageFile(filePath);
-    }
+    };
 
-    async stageAll(): Promise<void> {
+    stageAll = async (): Promise<void> => {
         await this.gitService.stageAll();
-    }
+    };
 
-    async unstageAll(): Promise<void> {
+    unstageAll = async (): Promise<void> => {
         await this.gitService.unstageAll();
-    }
+    };
 
-    async stash(params: { message?: string; files: string[] }): Promise<void> {
+    stash = async (params: { message?: string; files: string[] }): Promise<void> => {
         try {
             let message = params.message;
             if (!message) {
@@ -500,9 +317,9 @@ export class ExtensionRpcHandler implements ExtensionMethods {
         } catch (e) {
             vscode.window.showErrorMessage(i18n.t('extension.stashFailed', `${e}`));
         }
-    }
+    };
 
-    async deleteFiles(files: string[]): Promise<void> {
+    deleteFiles = async (files: string[]): Promise<void> => {
         const answer = await vscode.window.showWarningMessage(
             i18n.t('extension.deleteFilesConfirm', files.length),
             { modal: true },
@@ -521,9 +338,9 @@ export class ExtensionRpcHandler implements ExtensionMethods {
                 vscode.window.showErrorMessage(i18n.t('extension.deleteFailed', `${e}`));
             }
         }
-    }
+    };
 
-    async rollback(files: string[]): Promise<void> {
+    rollback = async (files: string[]): Promise<void> => {
         const answer = await vscode.window.showWarningMessage(
             i18n.t('extension.rollbackFilesConfirm', files.length),
             { modal: true },
@@ -537,9 +354,9 @@ export class ExtensionRpcHandler implements ExtensionMethods {
                 vscode.window.showErrorMessage(i18n.t('extension.rollbackFailed', `${e}`));
             }
         }
-    }
+    };
 
-    async openFile(params: { path: string }): Promise<void> {
+    openFile = async (params: { path: string }): Promise<void> => {
         const workspaceRoot = this.gitService.getWorkspaceRoot();
         if (!workspaceRoot) return;
         const uri = vscode.Uri.file(`${workspaceRoot}/${params.path}`);
@@ -549,9 +366,9 @@ export class ExtensionRpcHandler implements ExtensionMethods {
         } catch {
             // File doesn't exist, possibly deleted
         }
-    }
+    };
 
-    async openStashDiff(params: { index: number; path: string }): Promise<void> {
+    openStashDiff = async (params: { index: number; path: string }): Promise<void> => {
         const stashRef = `stash@{${params.index}}`;
         const parentRef = `${stashRef}^`;
         const filePath = params.path;
@@ -568,18 +385,18 @@ export class ExtensionRpcHandler implements ExtensionMethods {
             preview: true,
             viewColumn: vscode.ViewColumn.Active
         });
-    }
+    };
 
-    async switchBranch(branch: string): Promise<void> {
+    switchBranch = async (branch: string): Promise<void> => {
         try {
             await this.gitService.switchBranch(branch);
 
         } catch (e) {
             vscode.window.showErrorMessage(i18n.t('extension.switchBranchFailed', `${e}`));
         }
-    }
+    };
 
-    async pull(): Promise<void> {
+    pull = async (): Promise<void> => {
         try {
             await this.gitService.pull();
             vscode.window.showInformationMessage(i18n.t('extension.pullSuccess'));
@@ -587,9 +404,9 @@ export class ExtensionRpcHandler implements ExtensionMethods {
         } catch (e) {
             vscode.window.showErrorMessage(i18n.t('extension.pullFailed', `${e}`));
         }
-    }
+    };
 
-    async fetch(): Promise<void> {
+    fetch = async (): Promise<void> => {
         await vscode.window.withProgress({
             location: vscode.ProgressLocation.Notification,
             title: i18n.t('extension.fetching'),
@@ -608,13 +425,13 @@ export class ExtensionRpcHandler implements ExtensionMethods {
 
             }
         });
-    }
+    };
 
-    async pickBranch(): Promise<void> {
+    pickBranch = async (): Promise<void> => {
         await vscode.commands.executeCommand('intelli-git.showBranchPicker');
-    }
+    };
 
-    async continueRebase(params: { message?: string; files?: string[] }): Promise<void> {
+    continueRebase = async (params: { message?: string; files?: string[] }): Promise<void> => {
         try {
             await this.gitService.continueRebase(params.message);
             vscode.window.showInformationMessage(i18n.t('extension.rebaseContinued'));
@@ -622,9 +439,9 @@ export class ExtensionRpcHandler implements ExtensionMethods {
         } catch (e) {
             vscode.window.showErrorMessage(i18n.t('extension.continueRebaseFailed', `${e}`));
         }
-    }
+    };
 
-    async abortRebase(): Promise<void> {
+    abortRebase = async (): Promise<void> => {
         try {
             await this.gitService.abortRebase();
             vscode.window.showInformationMessage(i18n.t('extension.rebaseAborted'));
@@ -632,19 +449,19 @@ export class ExtensionRpcHandler implements ExtensionMethods {
         } catch (e) {
             vscode.window.showErrorMessage(i18n.t('extension.abortRebaseFailed', `${e}`));
         }
-    }
+    };
 
-    async createChangelist(name: string): Promise<void> {
+    createChangelist = async (name: string): Promise<void> => {
         await this.changelistService?.createChangelist(name);
 
-    }
+    };
 
-    async moveFiles(params: { files: string[]; targetListId: string }): Promise<void> {
+    moveFiles = async (params: { files: string[]; targetListId: string }): Promise<void> => {
         await this.changelistService?.moveFiles(params.files, params.targetListId);
 
-    }
+    };
 
-    async deleteChangelist(id: string): Promise<void> {
+    deleteChangelist = async (id: string): Promise<void> => {
         const list = this.changelistService?.getChangelistById(id);
         if (list && list.files.length > 0) {
             const answer = await vscode.window.showWarningMessage(
@@ -660,14 +477,14 @@ export class ExtensionRpcHandler implements ExtensionMethods {
             await this.changelistService?.removeChangelist(id);
 
         }
-    }
+    };
 
-    async renameChangelist(params: { id: string; name: string }): Promise<void> {
+    renameChangelist = async (params: { id: string; name: string }): Promise<void> => {
         await this.changelistService?.renameChangelist(params.id, params.name);
 
-    }
+    };
 
-    async promptCreateChangelist(file?: string): Promise<void> {
+    promptCreateChangelist = async (file?: string): Promise<void> => {
         const newName = await vscode.window.showInputBox({
             prompt: i18n.t('extension.enterChangelistName'),
             placeHolder: i18n.t('extension.newChangelistPlaceholder')
@@ -679,9 +496,9 @@ export class ExtensionRpcHandler implements ExtensionMethods {
             }
 
         }
-    }
+    };
 
-    async generateCommitMessage(files?: string[]): Promise<string> {
+    generateCommitMessage = async (files?: string[]): Promise<string> => {
         if (!this.gitService) return '';
 
         try {
@@ -727,5 +544,13 @@ export class ExtensionRpcHandler implements ExtensionMethods {
             vscode.window.showErrorMessage(i18n.t('extension.commitGenFailed', `${e}`));
             throw e;
         }
-    }
+    };
+
+    getWorkspaceState = async <T>(key: string): Promise<T | undefined> => {
+        return this.context.workspaceState.get<T>(key);
+    };
+
+    updateWorkspaceState = async <T>(key: string, value: T): Promise<void> => {
+        await this.context.workspaceState.update(key, value);
+    };
 }

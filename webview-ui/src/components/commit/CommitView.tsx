@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
-import { ChangelistTree } from '../file-tree/ChangelistTree';
+import { ChangelistTree } from './ChangelistTree';
 import { CommitForm } from './CommitForm';
 import { RebaseForm } from './RebaseForm';
 import { CommitToolbar } from './CommitToolbar';
@@ -8,17 +8,64 @@ import { usePersistedState } from '../../hooks/usePersistedState';
 import { useRpcData } from '../../hooks/useRpcData';
 import styles from './CommitView.module.css';
 import { rpc, rpcEvents } from '../../lib/rpc_client';
-import type { ChangelistGroup, BranchInfo } from '@shared/messages';
+import type { ChangelistGroup, BranchInfo, FileStatus } from '@shared/messages';
 
 interface CommitViewProps {
     rebaseStatus?: BranchInfo['rebaseStatus'];
+}
+
+function buildChangelists(files: FileStatus[]): ChangelistGroup[] {
+    const conflictedFiles = files.filter(f => f.status === 'C' || f.status === 'U');
+    const trackedFiles = files.filter(f => f.status !== '?' && f.status !== 'C' && f.status !== 'U');
+    const untrackedFiles = files.filter(f => f.status === '?');
+
+    const changelists: ChangelistGroup[] = [];
+
+    if (conflictedFiles.length > 0) {
+        changelists.push({
+            id: 'merge-conflicts',
+            name: 'Merge Conflicts',
+            isDefault: false,
+            items: conflictedFiles.map(f => ({ path: f.path, status: f.status, staged: f.staged }))
+        });
+    }
+
+    if (trackedFiles.length > 0) {
+        changelists.push({
+            id: 'default',
+            name: 'Default Changelist',
+            isDefault: true,
+            items: trackedFiles.map(f => ({ path: f.path, status: f.status, staged: f.staged }))
+        });
+    }
+
+    if (untrackedFiles.length > 0) {
+        changelists.push({
+            id: 'unversioned',
+            name: 'Unversioned Files',
+            isDefault: false,
+            items: untrackedFiles.map(f => ({ path: f.path, status: f.status, staged: f.staged }))
+        });
+    }
+
+    if (changelists.length === 0) {
+        changelists.push({
+            id: 'default',
+            name: 'Default Changelist',
+            isDefault: true,
+            items: []
+        });
+    }
+
+    return changelists;
 }
 
 export function CommitView({ rebaseStatus }: CommitViewProps) {
     const { t } = useTranslation();
 
     // Data State
-    const { data: changelists, loading } = useRpcData(() => rpc.getChangelists(), { initialValue: [] as ChangelistGroup[] });
+    const { data: files, loading } = useRpcData(() => rpc.getStatus(), { initialValue: [] as FileStatus[] });
+    const changelists = useMemo(() => buildChangelists(files), [files]);
     const [activeFile, setActiveFile] = useState<string | null>(null);
 
     // Persisted UI State

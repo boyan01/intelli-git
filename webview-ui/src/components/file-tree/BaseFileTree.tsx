@@ -27,6 +27,9 @@ export interface BaseFileTreeProps {
     selectedFiles?: Set<string>;
     activeFile?: string | null;
     readonly?: boolean;
+    rootLabel?: string;
+    isCollapsed?: boolean;
+    onToggleCollapse?: () => void;
     onToggleFile?: (path: string, checked: boolean) => void;
     onFileClick?: (path: string, status?: string) => void;
     onFileDoubleClick?: (path: string, status?: string) => void;
@@ -40,6 +43,7 @@ export type BaseFileTreeRef = BasicTreeViewRef;
 interface FileNodeData {
     path: string;
     isFile: boolean;
+    isRoot?: boolean;
     status?: string;
     fileCount: number;
 }
@@ -113,6 +117,9 @@ export const BaseFileTree = React.forwardRef<BaseFileTreeRef, BaseFileTreeProps>
     selectedFiles,
     activeFile,
     readonly = false,
+    rootLabel,
+    isCollapsed = false,
+    onToggleCollapse,
     onToggleFile,
     onFileClick,
     onFileDoubleClick,
@@ -120,8 +127,9 @@ export const BaseFileTree = React.forwardRef<BaseFileTreeRef, BaseFileTreeProps>
     onFolderContextMenu
 }, ref) => {
     const nodes = useMemo(() => {
+        let result: TreeNode<FileNodeData>[];
         if (viewMode === 'list') {
-            return items
+            result = items
                 .map(f => ({
                     id: f.path,
                     label: f.path.split('/').pop() || f.path,
@@ -133,9 +141,27 @@ export const BaseFileTree = React.forwardRef<BaseFileTreeRef, BaseFileTreeProps>
                     }
                 }))
                 .sort((a, b) => a.label.localeCompare(b.label));
+        } else {
+            result = buildTree(items);
         }
-        return buildTree(items);
-    }, [items, viewMode]);
+
+        if (rootLabel) {
+            const totalFiles = result.reduce((sum, n) => sum + countFiles(n), 0);
+            return [{
+                id: '__root__',
+                label: rootLabel,
+                data: {
+                    path: '',
+                    isFile: false,
+                    isRoot: true,
+                    fileCount: totalFiles
+                },
+                children: isCollapsed ? [] : result,
+                defaultExpanded: !isCollapsed
+            }];
+        }
+        return result;
+    }, [items, viewMode, rootLabel, isCollapsed]);
 
     const getAllFilePaths = useCallback((node: TreeNode<FileNodeData>): string[] => {
         if (node.data?.isFile) return [node.data.path];
@@ -144,6 +170,10 @@ export const BaseFileTree = React.forwardRef<BaseFileTreeRef, BaseFileTreeProps>
     }, []);
 
     const handleNodeClick = useCallback((node: TreeNode<FileNodeData>) => {
+        if (node.data?.isRoot) {
+            onToggleCollapse?.();
+            return;
+        }
         if (node.data?.isFile) {
             if (onFileClick) {
                 onFileClick(node.data.path, node.data.status);
@@ -151,7 +181,7 @@ export const BaseFileTree = React.forwardRef<BaseFileTreeRef, BaseFileTreeProps>
                 rpc.openFile({ path: node.data.path });
             }
         }
-    }, [onFileClick]);
+    }, [onFileClick, onToggleCollapse]);
 
     const handleNodeDoubleClick = useCallback((node: TreeNode<FileNodeData>) => {
         if (node.data?.isFile) {
@@ -248,6 +278,8 @@ export const BaseFileTree = React.forwardRef<BaseFileTreeRef, BaseFileTreeProps>
                             <span className={styles.fileDirPath}>{getDirPath(node.data!.path)}</span>
                         )}
                     </>
+                ) : node.data?.isRoot ? (
+                    <span className={styles.name}>{node.label}</span>
                 ) : (
                     <>
                         <span className={`codicon codicon-folder ${styles.icon}`}></span>

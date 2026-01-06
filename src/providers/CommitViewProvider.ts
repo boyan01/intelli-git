@@ -1,26 +1,21 @@
 import * as vscode from 'vscode';
-import { GitService } from '../services/GitService';
-import { ChangelistService } from '../services/ChangelistService';
-import type { ExtensionMethods, WebviewMethods } from '../../shared/messages';
-import { RpcPeer } from '../../shared/rpc';
-import { getWebviewHtml } from '../utils/webviewHtml';
-import { createRpc, ExtensionRpcHandler } from '../rpc';
+import { BaseWebviewProvider, WebviewProviderOptions } from './BaseWebviewProvider';
 
-export class CommitViewProvider implements vscode.WebviewViewProvider {
+export class CommitViewProvider extends BaseWebviewProvider implements vscode.WebviewViewProvider {
 
     public static readonly viewType = 'intelliGitView';
     private _view?: vscode.WebviewView;
-    private gitService: GitService;
-    private changelistService: ChangelistService;
-    private _rpc?: RpcPeer<WebviewMethods, ExtensionMethods>;
 
-    constructor(
-        private readonly _extensionUri: vscode.Uri,
-        gitService: GitService,
-        changelistService: ChangelistService
-    ) {
-        this.gitService = gitService;
-        this.changelistService = changelistService;
+    constructor(options: WebviewProviderOptions) {
+        super(options);
+    }
+
+    protected getTitle(): string {
+        return 'Commit';
+    }
+
+    protected getInitialRoute(): string | undefined {
+        return undefined;
     }
 
     public resolveWebviewView(
@@ -30,27 +25,18 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
     ) {
         this._view = webviewView;
 
-        webviewView.webview.options = {
-            enableScripts: true,
-            localResourceRoots: [
-                this._extensionUri
-            ]
-        };
+        this.setupWebview(webviewView.webview, () => !this._view);
+        webviewView.webview.html = this.getHtml(webviewView.webview);
 
-        webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
+        this.setupActiveFileListener(webviewView);
 
-        this._rpc = createRpc({
-            webview: webviewView.webview,
-            onDisposed: () => !this._view
+        webviewView.onDidDispose(() => {
+            this.dispose();
         });
+    }
 
-        const handler = new ExtensionRpcHandler({
-            gitService: this.gitService,
-            changelistService: this.changelistService
-        });
-        handler.registerAll(this._rpc);
-
-        const activeEditorListener = vscode.window.onDidChangeActiveTextEditor(editor => {
+    private setupActiveFileListener(webviewView: vscode.WebviewView): void {
+        const notifyActiveFile = (editor: vscode.TextEditor | undefined) => {
             if (!editor) return;
 
             const uri = editor.document.uri;
@@ -65,37 +51,18 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
             if (relativePath) {
                 this._rpc?.proxy.activeFileChange({ path: relativePath });
             }
-        });
+        };
 
-        webviewView.onDidDispose(() => {
-            activeEditorListener.dispose();
-        });
+        const activeEditorListener = vscode.window.onDidChangeActiveTextEditor(notifyActiveFile);
 
+        setTimeout(() => {
+            notifyActiveFile(vscode.window.activeTextEditor);
+        }, 100);
 
-        webviewView.webview.onDidReceiveMessage(async (data: { type: string; command?: string;[key: string]: any }) => {
-            if (!this.gitService) {
-                return;
-            }
-
-            const msg = { ...data, type: data.command || data.type };
-
-            if (msg.type === 'rpc-request' || msg.type === 'rpc-response') {
-                this._rpc?.handleMessage(msg);
-                return;
-            }
-        });
-    }
-
-    private _getHtmlForWebview(webview: vscode.Webview) {
-        return getWebviewHtml({
-            webview,
-            extensionUri: this._extensionUri,
-            title: 'Commit'
-        });
+        this._disposables.push(activeEditorListener);
     }
 
     public refresh() {
         this._rpc?.proxy.refresh();
     }
-
 }

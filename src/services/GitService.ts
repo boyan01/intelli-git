@@ -1,5 +1,5 @@
 import simpleGit, { SimpleGit, StatusResult } from 'simple-git';
-import { BranchInfo, LogCommit, LogOptions, CommitDetails, RefInfo, FileStatus, CommitFile } from '../../shared/messages';
+import { BranchInfo, LogCommit, LogOptions, CommitDetails, RefInfo, FileStatus, CommitFile, PushInitState, PushCommitsData, BranchListData, GitStatusCode } from '../../shared/messages';
 import { log } from '../utils/logger';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -18,7 +18,7 @@ export class GitService {
         return this._workspaceRoot;
     }
 
-    public async getStatus(): Promise<FileStatus[]> {
+    public getStatus = async (): Promise<FileStatus[]> => {
         const files: FileStatus[] = [];
 
         try {
@@ -104,11 +104,11 @@ export class GitService {
                 if (!existing && filePath) {
                     files.push({
                         path: filePath,
-                        status: statusCode,
+                        status: statusCode as GitStatusCode,
                         staged: true
                     });
-                } else if (existing && existing.status !== 'C') { // Don't overwrite conflict status
-                    existing.status = statusCode;
+                } else if (existing && existing.status !== 'C') {
+                    existing.status = statusCode as GitStatusCode;
                 }
             });
 
@@ -220,7 +220,7 @@ export class GitService {
         }
     }
 
-    public async getStashList(): Promise<Array<{ index: number, message: string, branch: string }>> {
+    public getStashList = async (): Promise<Array<{ index: number, message: string, branch: string }>> => {
         try {
             const result = await this.git.stashList();
             log('simple-git stashList result:', JSON.stringify(result));
@@ -724,7 +724,7 @@ export class GitService {
         return '';
     }
 
-    public async getCommitFiles(hash: string): Promise<{ path: string; status: string }[]> {
+    public getCommitFiles = async (hash: string): Promise<CommitFile[]> => {
         try {
             const result = await this.git.show([hash, '--name-status', '--pretty=format:']);
             const lines = result.split('\n').filter(l => l.trim());
@@ -732,14 +732,29 @@ export class GitService {
                 const [status, ...pathParts] = line.split('\t');
                 return {
                     path: pathParts.join('\t'),
-                    status: status
+                    status: status as GitStatusCode
                 };
             });
         } catch (e) {
             console.error('Error getting commit files:', e);
             return [];
         }
-    }
+    };
+
+    public getMultiCommitFiles = async (hashes: string[]): Promise<CommitFile[]> => {
+        const fileMap = new Map<string, CommitFile>();
+        for (const hash of hashes) {
+            try {
+                const files = await this.getCommitFiles(hash);
+                for (const file of files) {
+                    fileMap.set(file.path, file);
+                }
+            } catch {
+                // ignore
+            }
+        }
+        return Array.from(fileMap.values());
+    };
 
     public async forcePush(remote: string, branch: string): Promise<void> {
         await this.git.push(remote, branch, ['--force']);
@@ -783,6 +798,91 @@ export class GitService {
 
         return grouped;
     }
+
+    // RPC methods below (arrow functions for proper 'this' binding)
+
+    public getPushInitState = async (): Promise<PushInitState> => {
+        const branches = await this.getBranches();
+        const remotes = await this.getRemotes();
+        return {
+            localBranch: branches.current,
+            remotes: remotes.length > 0 ? remotes : ['origin']
+        };
+    };
+
+    public getRemoteBranchesForRemote = async (remote: string): Promise<string[]> => {
+        const allRemoteBranches = await this.getRemoteBranches();
+        const prefix = `${remote}/`;
+        return allRemoteBranches
+            .filter(b => b.startsWith(prefix) && !b.includes('HEAD'))
+            .map(b => b.substring(prefix.length));
+    };
+
+    public getPushCommits = async (params: { remote: string; branch: string }): Promise<PushCommitsData> => {
+        const branches = await this.getBranches();
+        const currentBranch = branches.current;
+
+        const commits = await this.getCommitsToPush(
+            currentBranch,
+            params.remote,
+            params.branch
+        );
+
+        let files: CommitFile[] = [];
+        if (commits.length > 0) {
+            files = await this.getCommitFiles(commits[0].hash);
+        }
+
+        return {
+            commits: commits,
+            files: files
+        };
+    };
+
+    public getRpcBranchInfo = async (): Promise<BranchInfo> => {
+        const branches = await this.getBranches();
+        const branchStatus = await this.getBranchStatus();
+        const rebaseStatus = await this.getRebaseStatus();
+
+        return {
+            current: branches.current,
+            all: branches.all,
+            ahead: branchStatus.ahead,
+            behind: branchStatus.behind,
+            rebaseStatus
+        };
+    };
+
+    public getBranchListData = async (): Promise<BranchListData> => {
+        const branches = await this.getBranches();
+        const groupedRemote = await this.getGroupedRemoteBranches();
+        const tags = await this.getTags();
+
+        const localBranchesInfo = await Promise.all(
+            branches.all.map(async (branchName) => {
+                const info = await this.getBranchAheadBehind(branchName);
+                return {
+                    name: branchName,
+                    ahead: info.ahead,
+                    behind: info.behind,
+                    upstream: info.upstream
+                };
+            })
+        );
+
+        return {
+            currentBranch: branches.current,
+            localBranches: branches.all,
+            localBranchesInfo,
+            remoteBranches: groupedRemote,
+            tags: tags
+        };
+    };
+
+    public getStashFilesAsCommitFiles = async (index: number): Promise<CommitFile[]> => {
+        const files = await this.getStashFiles(index);
+        return files.map(f => ({ path: f.path, status: f.status as GitStatusCode }));
+    };
 
     public async rebaseOnto(targetBranch: string): Promise<void> {
         await this.git.rebase([targetBranch]);
@@ -835,7 +935,7 @@ export class GitService {
         await this.git.checkout(commit);
     }
 
-    public async getLog(options: LogOptions): Promise<LogCommit[]> {
+    public getLog = async (options: LogOptions): Promise<LogCommit[]> => {
 
         try {
             const args = ['log', '--date=iso'];
@@ -994,7 +1094,7 @@ export class GitService {
         }
     }
 
-    async getAuthors(): Promise<string[]> {
+    getAuthors = async (): Promise<string[]> => {
         if (!this.git) return [];
 
         const root = this.getWorkspaceRoot();
@@ -1012,7 +1112,7 @@ export class GitService {
         }
     }
 
-    async getCurrentUser(): Promise<string> {
+    getCurrentUser = async (): Promise<string> => {
         if (!this.git) return '';
         try {
             const result = await this.git.raw(['config', 'user.name']);
@@ -1080,7 +1180,7 @@ export class GitService {
         return null;
     }
 
-    public async getCommitDetails(hash: string): Promise<CommitDetails> {
+    public getCommitDetails = async (hash: string): Promise<CommitDetails> => {
         try {
             const showMsg = await this.git.show([hash, '--format=%B%x00%P%x00%an%x00%ae%x00%aI%x00%h', '--no-patch']);
             const [fullMessage, parentsStr, authorName, authorEmail, date, shortHash] = showMsg.split('\0');

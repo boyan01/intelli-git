@@ -3,9 +3,11 @@
  * Both extension host and webview-ui should import from this file.
  */
 
+export type GitStatusCode = 'A' | 'M' | 'D' | 'R' | 'C' | 'U' | '?';
+
 export interface FileStatus {
     path: string;
-    status: string;
+    status: GitStatusCode;
     staged: boolean;
 }
 
@@ -32,7 +34,7 @@ export interface StashItem {
 
 export interface CommitFile {
     path: string;
-    status: string;
+    status: GitStatusCode;
 }
 
 export interface PushConfig {
@@ -97,8 +99,7 @@ export interface ExtensionMethods {
     openDiff: (path: string) => Promise<void>;
     closeWebView: () => Promise<void>;
     openCommitDiff: (params: { path: string; leftRef: string; rightRef: string }) => Promise<void>;
-    getCommitState: () => Promise<CommitState>;
-    getChangelists: () => Promise<ChangelistGroup[]>;
+    getStatus: () => Promise<FileStatus[]>;
     getBranchInfo: () => Promise<BranchInfo>;
     getStashList: () => Promise<StashItem[]>;
     getStashFiles: (index: number) => Promise<CommitFile[]>;
@@ -131,6 +132,8 @@ export interface ExtensionMethods {
     pickPaths: () => Promise<string[] | undefined>;
     getAuthors: () => Promise<string[]>;
     getCurrentUser: () => Promise<string>;
+    getWorkspaceState: <T>(key: string) => Promise<T | undefined>;
+    updateWorkspaceState: <T>(key: string, value: T) => Promise<void>;
 }
 
 export interface CommitState {

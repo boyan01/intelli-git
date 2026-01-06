@@ -3,9 +3,8 @@ import type { ChangelistGroup } from '@shared/messages';
 import { useTranslation } from 'react-i18next';
 import { ContextMenu } from '../common/ContextMenu';
 import type { ContextMenuItem } from '../common/ContextMenu';
-import { BaseFileTree } from './BaseFileTree';
-import type { BaseFileTreeRef } from './BaseFileTree';
-import styles from './BaseFileTree.module.css';
+import { BaseFileTree } from '../file-tree/BaseFileTree';
+import type { BaseFileTreeRef } from '../file-tree/BaseFileTree';
 import { rpc } from '@/lib/rpc_client';
 
 export interface ChangelistTreeProps {
@@ -151,60 +150,23 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
         });
     }, [buildFolderContextMenu]);
 
-    const handleGroupToggle = useCallback((checked: boolean) => {
-        if (readonly) return;
-        group.items.forEach(f => onToggleFile(f.path, checked));
-    }, [readonly, group.items, onToggleFile]);
-
-    const allSelected = group.items.length > 0 && group.items.every(f => selectedFiles.has(f.path));
-    const partialSelected = !allSelected && group.items.some(f => selectedFiles.has(f.path));
-
-    const renderTree = () => (
-        <BaseFileTree
-            ref={treeRef}
-            items={group.items}
-            viewMode={viewMode}
-            selectedFiles={selectedFiles}
-            activeFile={activeFile}
-            readonly={readonly}
-            onToggleFile={onToggleFile}
-            onFileClick={handleFileClick}
-            onFileContextMenu={handleFileContextMenu}
-            onFolderContextMenu={handleFolderContextMenu}
-        />
-    );
-
-    // Normal mode: render with header
     return (
         <>
-            <div className={styles.changelistTree}>
-                <div
-                    className={styles.folderHeader}
-                    onClick={onToggleCollapse}
-                >
-                    <span
-                        className={`codicon codicon-chevron-right ${styles.icon} ${styles.arrow}`}
-                        style={{ transform: isCollapsed ? 'none' : 'rotate(90deg)', transition: 'transform 0.1s' }}
-                    ></span>
-                    {!readonly && group.items.length > 0 && (
-                        <input
-                            type="checkbox"
-                            className={styles.checkbox}
-                            checked={allSelected}
-                            ref={input => { if (input) input.indeterminate = partialSelected; }}
-                            onClick={(e) => e.stopPropagation()}
-                            onChange={(e) => handleGroupToggle(e.target.checked)}
-                        />
-                    )}
-                    <span className={styles.name}>{group.name}</span>
-                    <span className={styles.fileCount}>{group.items.length}</span>
-                </div>
-                {!isCollapsed && (
-                    <div className={styles.changelistContent}>
-                        {renderTree()}
-                    </div>
-                )}
-            </div>
+            <BaseFileTree
+                ref={treeRef}
+                items={group.items}
+                viewMode={viewMode}
+                selectedFiles={selectedFiles}
+                activeFile={activeFile}
+                readonly={readonly}
+                rootLabel={group.name}
+                isCollapsed={isCollapsed}
+                onToggleCollapse={onToggleCollapse}
+                onToggleFile={onToggleFile}
+                onFileClick={handleFileClick}
+                onFileContextMenu={handleFileContextMenu}
+                onFolderContextMenu={handleFolderContextMenu}
+            />
             {contextMenu.visible && (
                 <ContextMenu
                     items={contextMenu.items}

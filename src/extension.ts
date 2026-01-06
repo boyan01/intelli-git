@@ -22,8 +22,14 @@ export function activate(context: vscode.ExtensionContext) {
     const changelistService = new ChangelistService(context);
 
     // Initialize providers
-    const provider = new CommitViewProvider(context.extensionUri, gitService, changelistService);
-    const gitLogProvider = new GitLogViewProvider(context.extensionUri, gitService, changelistService);
+    const providerOptions = {
+        extensionUri: context.extensionUri,
+        context,
+        gitService,
+        changelistService
+    };
+    const provider = new CommitViewProvider(providerOptions);
+    const gitLogProvider = new GitLogViewProvider(providerOptions);
     const branchStatusBar = new BranchStatusBar(gitService);
     const gitLogStatusBar = new GitLogStatusBar(gitService);
     const stashContentProvider = new StashContentProvider(gitService);
