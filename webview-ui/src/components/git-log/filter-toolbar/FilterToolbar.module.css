@@ -1,10 +1,10 @@
 .container {
     display: flex;
     align-items: center;
-    height: 28px;
-    padding: 0 4px;
-    border-bottom: 1px solid var(--vscode-widget-border);
-    gap: 2px;
+    height: 22px;
+    padding: 0 8px;
+    background-color: var(--vscode-titleBar-activeBackground);
+    gap: 4px;
 }
 
 .searchBox {
@@ -16,7 +16,7 @@
     padding: 0 4px;
     flex: 1;
     max-width: 140px;
-    height: 22px;
+    height: 18px;
     gap: 2px;
 }
 
@@ -33,7 +33,7 @@
 
 .searchIcon {
     opacity: 0.6;
-    font-size: 14px;
+    font-size: 12px;
     display: flex;
     align-items: center;
 }
@@ -46,12 +46,13 @@
     border: none;
     color: var(--vscode-foreground);
     cursor: pointer;
-    padding: 2px 4px;
-    font-size: 11px;
+    padding: 1px 3px;
+    font-size: 10px;
     border-radius: 2px;
     opacity: 0.6;
     font-family: monospace;
     outline: none;
+    flex-shrink: 0;
 }
 
 .inlineToggle.active {
@@ -67,12 +68,13 @@
     border: none;
     color: var(--vscode-foreground);
     cursor: pointer;
-    padding: 2px 6px;
-    font-size: 12px;
+    padding: 0 4px;
+    font-size: 11px;
     white-space: nowrap;
-    height: 22px;
+    height: 18px;
     border-radius: 2px;
     outline: none;
+    gap: 2px;
 }
 
 .filterButton:hover {

@@ -9,21 +9,24 @@
 .searchContainer {
     display: flex;
     align-items: center;
-    gap: 2px;
-    padding: 4px 8px;
-    border-bottom: 1px solid var(--vscode-panel-border);
+    gap: 4px;
+    padding: 0 8px;
+    height: 22px;
+    background-color: var(--vscode-titleBar-activeBackground);
 }
 
 .searchInput {
     flex: 1;
     box-sizing: border-box;
-    padding: 3px 6px;
+    padding: 0 6px;
+    height: 18px;
     background-color: var(--vscode-input-background);
     color: var(--vscode-input-foreground);
-    border: none;
+    border: 1px solid var(--vscode-input-border);
     border-radius: 2px;
-    font-size: 13px;
+    font-size: 12px;
     outline: none;
+    min-width: 0;
 }
 
 .searchInput:focus {
@@ -38,13 +41,13 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 22px;
-    height: 22px;
+    width: 18px;
+    height: 18px;
     background: transparent;
     border: none;
     color: var(--vscode-foreground);
     cursor: pointer;
-    border-radius: 3px;
+    border-radius: 2px;
     opacity: 0.8;
     flex-shrink: 0;
 }
