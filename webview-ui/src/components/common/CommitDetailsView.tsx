@@ -102,7 +102,7 @@ export const CommitDetailsView: React.FC<CommitDetailsViewProps> = ({
     }, [commit]);
 
     if (selectedHashes.length === 0) {
-        return <div className={styles.empty}>{t('commitDetails.selectCommit', 'Select a commit to view details')}</div>;
+        return <div className={styles.empty}>{t('Select a commit to view details')}</div>;
     }
 
     const filesView = (
@@ -192,7 +192,7 @@ export const CommitDetailsView: React.FC<CommitDetailsViewProps> = ({
                     </div>
                     {containingBranchesRefs.length > 0 && (
                         <div className={styles.metaRow}>
-                            <span className={styles.metaLabel}>{t('commitDetails.branches', 'Branches')}:</span>
+                            <span className={styles.metaLabel}>{t('Branches')}:</span>
                             {containingBranchesRefs.map(ref => (
                                 <div key={ref.name} className={styles.branchItem}>{ref.name}</div>
                             ))}

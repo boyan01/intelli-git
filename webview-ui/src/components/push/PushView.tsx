@@ -149,14 +149,14 @@ export function PushView() {
                                 checked={pushTags}
                                 onChange={e => setPushTags(e.target.checked)}
                             />
-                            {t('pushView.pushTags')}
+                            {t('Push Tags')}
                         </label>
                     </div>
                 </div>
                 <div className={styles.footerRight}>
-                    <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={() => rpc.closeWebView()}>{t('pushView.cancel')}</button>
+                    <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={() => rpc.closeWebView()}>{t('Cancel')}</button>
                     <div className={styles.btnSplit} style={{ position: 'relative' }}>
-                        <button className={`${styles.btn} ${styles.btnPrimary} ${styles.btnMain}`} onClick={() => handlePush(false)}>{t('pushView.push')}</button>
+                        <button className={`${styles.btn} ${styles.btnPrimary} ${styles.btnMain}`} onClick={() => handlePush(false)}>{t('Push')}</button>
                         <button
                             className={`${styles.btn} ${styles.btnPrimary} ${styles.btnDropdown}`}
                             onClick={() => setIsForcePushExpanded(!isForcePushExpanded)}
@@ -170,7 +170,7 @@ export function PushView() {
                                     setIsForcePushExpanded(false);
                                 }}>
                                     <i className="codicon codicon-warning icon"></i>
-                                    <span>{t('pushView.forcePush')}</span>
+                                    <span>{t('Force Push')}</span>
                                 </div>
                             </div>
                         )}

@@ -22,29 +22,29 @@ export function CommitToolbar({
     return (
         <div className={styles.commitToolbar}>
             <div className={styles.toolbarLeft}>
-                <button className={styles.iconBtn} title={t('commitView.toolbar.refresh')} onClick={() => rpcEvents.refresh.emit()}>
+                <button className={styles.iconBtn} title={t('Refresh')} onClick={() => rpcEvents.refresh.emit()}>
                     <i className="codicon codicon-sync"></i>
                 </button>
 
                 <div className={styles.toolbarSeparator} style={{ margin: '0 8px' }}></div>
 
-                <button className={styles.iconBtn} title={t('commitView.toolbar.rollback')} onClick={() => rpc.rollback(Array.from(selectedFiles))} disabled={selectedFiles.size === 0}>
+                <button className={styles.iconBtn} title={t('Rollback')} onClick={() => rpc.rollback(Array.from(selectedFiles))} disabled={selectedFiles.size === 0}>
                     <i className="codicon codicon-discard"></i>
                 </button>
-                <button className={styles.iconBtn} title={t('commitView.toolbar.stash')} onClick={() => rpc.stash({ files: Array.from(selectedFiles) })} disabled={selectedFiles.size === 0}>
+                <button className={styles.iconBtn} title={t('Stash')} onClick={() => rpc.stash({ files: Array.from(selectedFiles) })} disabled={selectedFiles.size === 0}>
                     <i className="codicon codicon-archive"></i>
                 </button>
                 <div className={styles.toolbarSeparator}></div>
                 <button
                     className={styles.iconBtn}
-                    title={t('commitView.toolbar.expandAll')}
+                    title={t('Expand All')}
                     onClick={onExpandAll}
                 >
                     <i className="codicon codicon-expand-all"></i>
                 </button>
                 <button
                     className={styles.iconBtn}
-                    title={t('commitView.toolbar.collapseAll')}
+                    title={t('Collapse All')}
                     onClick={onCollapseAll}
                 >
                     <i className="codicon codicon-collapse-all"></i>
@@ -52,7 +52,7 @@ export function CommitToolbar({
                 <div className={styles.toolbarSeparator}></div>
                 <button
                     className={`${styles.iconBtn} ${viewMode === 'tree' ? styles.active : ''}`}
-                    title={t('commitView.toolbar.viewMode')}
+                    title={t('View Mode')}
                     onClick={() => onViewModeChange(viewMode === 'tree' ? 'list' : 'tree')}
                 >
                     <i className="codicon codicon-list-tree"></i>

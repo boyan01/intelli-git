@@ -45,9 +45,9 @@ export function registerBranchCommands(
                     // Local branch or Tag
                     await gitService.switchBranch(branch);
                 }
-                vscode.window.showInformationMessage(`Checked out ${branch}`);
+                vscode.window.showInformationMessage(vscode.l10n.t('Checked out {0}', branch));
             } catch (error: any) {
-                vscode.window.showErrorMessage(`Failed to checkout ${branch}: ${error.message}`);
+                vscode.window.showErrorMessage(vscode.l10n.t('Failed to checkout {0}: {1}', branch, error.message));
             }
         })
     );
@@ -57,17 +57,17 @@ export function registerBranchCommands(
             const sourceBranch = getBranchName(arg) || (await gitService.getBranches()).current;
 
             const newBranchName = await vscode.window.showInputBox({
-                prompt: `Create new branch from ${sourceBranch}`,
-                placeHolder: 'New branch name'
+                prompt: vscode.l10n.t('Create new branch from {0}', sourceBranch),
+                placeHolder: vscode.l10n.t('New branch name')
             });
 
             if (!newBranchName) return;
 
             try {
                 await gitService.createBranchFrom(newBranchName, sourceBranch);
-                vscode.window.showInformationMessage(`Created branch ${newBranchName} from ${sourceBranch}`);
+                vscode.window.showInformationMessage(vscode.l10n.t('Created branch {0} from {1}', newBranchName, sourceBranch));
             } catch (error: any) {
-                vscode.window.showErrorMessage(`Failed to create branch: ${error.message}`);
+                vscode.window.showErrorMessage(vscode.l10n.t('Failed to create branch: {0}', error.message));
             }
         })
     );
@@ -78,18 +78,18 @@ export function registerBranchCommands(
             if (!branch) return;
 
             const confirm = await vscode.window.showWarningMessage(
-                `Are you sure you want to delete branch ${branch}?`,
+                vscode.l10n.t('Are you sure you want to delete branch {0}?', branch),
                 { modal: true },
-                'Delete'
+                vscode.l10n.t('Delete')
             );
 
-            if (confirm !== 'Delete') return;
+            if (confirm !== vscode.l10n.t('Delete')) return;
 
             try {
                 await gitService.deleteBranches([branch]);
-                vscode.window.showInformationMessage(`Deleted branch ${branch}`);
+                vscode.window.showInformationMessage(vscode.l10n.t('Deleted branch {0}', branch));
             } catch (error: any) {
-                vscode.window.showErrorMessage(`Failed to delete branch: ${error.message}`);
+                vscode.window.showErrorMessage(vscode.l10n.t('Failed to delete branch: {0}', error.message));
             }
         })
     );
@@ -100,7 +100,7 @@ export function registerBranchCommands(
             if (!oldName) return;
 
             const newName = await vscode.window.showInputBox({
-                prompt: `Rename branch ${oldName} to`,
+                prompt: vscode.l10n.t('Rename branch {0} to', oldName),
                 value: oldName
             });
 
@@ -108,9 +108,9 @@ export function registerBranchCommands(
 
             try {
                 await gitService.renameBranch(oldName, newName);
-                vscode.window.showInformationMessage(`Renamed branch ${oldName} to ${newName}`);
+                vscode.window.showInformationMessage(vscode.l10n.t('Renamed branch {0} to {1}', oldName, newName));
             } catch (error: any) {
-                vscode.window.showErrorMessage(`Failed to rename branch: ${error.message}`);
+                vscode.window.showErrorMessage(vscode.l10n.t('Failed to rename branch: {0}', error.message));
             }
         })
     );
@@ -122,9 +122,9 @@ export function registerBranchCommands(
 
             try {
                 await gitService.merge(branchToMerge);
-                vscode.window.showInformationMessage(`Merged ${branchToMerge} into current branch`);
+                vscode.window.showInformationMessage(vscode.l10n.t('Merged {0} into current branch', branchToMerge));
             } catch (error: any) {
-                vscode.window.showErrorMessage(`Failed to merge ${branchToMerge}: ${error.message}`);
+                vscode.window.showErrorMessage(vscode.l10n.t('Failed to merge {0}: {1}', branchToMerge, error.message));
             }
         })
     );
@@ -136,9 +136,9 @@ export function registerBranchCommands(
 
             try {
                 await gitService.rebaseOnto(branchToRebaseOnto);
-                vscode.window.showInformationMessage(`Rebased current branch onto ${branchToRebaseOnto}`);
+                vscode.window.showInformationMessage(vscode.l10n.t('Rebased current branch onto {0}', branchToRebaseOnto));
             } catch (error: any) {
-                vscode.window.showErrorMessage(`Failed to rebase onto ${branchToRebaseOnto}: ${error.message}`);
+                vscode.window.showErrorMessage(vscode.l10n.t('Failed to rebase onto {0}: {1}', branchToRebaseOnto, error.message));
             }
         })
     );
@@ -155,9 +155,9 @@ export function registerBranchCommands(
 
             try {
                 await gitService.pullWithMerge(remote, branch);
-                vscode.window.showInformationMessage(`Pulled ${remote}/${branch}`);
+                vscode.window.showInformationMessage(vscode.l10n.t('Pulled {0}/{1}', remote, branch));
             } catch (error: any) {
-                vscode.window.showErrorMessage(`Failed to pull: ${error.message}`);
+                vscode.window.showErrorMessage(vscode.l10n.t('Failed to pull: {0}', error.message));
             }
         })
     );

@@ -5,6 +5,7 @@ import styles from './FilterToolbar.module.css';
 import { DateFilter } from './DateFilter';
 import { UserFilter } from './UserFilter';
 import { logger } from '@/lib/log';
+import { useTranslation } from 'react-i18next';
 
 interface FilterToolbarProps {
     onFilterChange: (options: Partial<LogOptions>) => void;
@@ -12,6 +13,7 @@ interface FilterToolbarProps {
 }
 
 export const FilterToolbar: React.FC<FilterToolbarProps> = ({ onFilterChange, externalBranch }) => {
+    const { t } = useTranslation();
     const [branch, setBranch] = useState('all');
     const [search, setSearch] = useState('');
     const [regexMode, setRegexMode] = useState(false);
@@ -80,12 +82,12 @@ export const FilterToolbar: React.FC<FilterToolbarProps> = ({ onFilterChange, ex
     };
 
     const getPathLabel = () => {
-        if (paths.length === 0) return '路径';
+        if (paths.length === 0) return t('Paths');
         if (paths.length === 1) {
             const name = paths[0].split('/').pop() || paths[0];
-            return `路径: ${name}`;
+            return `${t('Path')}: ${name}`;
         }
-        return `路径: ${paths.length} 个`;
+        return `${t('Paths')}: ${paths.length}`;
     };
 
     return (
@@ -95,21 +97,21 @@ export const FilterToolbar: React.FC<FilterToolbarProps> = ({ onFilterChange, ex
                 <span className={`${styles.searchIcon} codicon codicon-search`} />
                 <input
                     className={styles.searchInput}
-                    placeholder="文本或哈希"
+                    placeholder={t('Text or Hash')}
                     value={search}
                     onChange={e => setSearch(e.target.value)}
                 />
                 <button
                     className={`${styles.inlineToggle} ${regexMode ? styles.active : ''}`}
                     onClick={() => setRegexMode(!regexMode)}
-                    title="正则表达式"
+                    title={t('Regex')}
                 >
                     .*
                 </button>
                 <button
                     className={`${styles.inlineToggle} ${caseSensitive ? styles.active : ''}`}
                     onClick={() => setCaseSensitive(!caseSensitive)}
-                    title="区分大小写"
+                    title={t('Match Case')}
                 >
                     Cc
                 </button>
@@ -121,15 +123,15 @@ export const FilterToolbar: React.FC<FilterToolbarProps> = ({ onFilterChange, ex
             <button
                 className={`${styles.filterButton} ${styles.branchButton}`}
                 onClick={handleBranchClick}
-                title={branch !== 'all' ? branch : '全部分支'}
+                title={branch !== 'all' ? branch : t('All Branches')}
             >
                 <span className={styles.ellipsis}>
-                    分支{branch !== 'all' ? `: ${branch}` : ''}
+                    {branch !== 'all' ? `${t('Branch')}: ${branch}` : t('Branch')}
                 </span>
                 {branch !== 'all' ? (
                     <span
                         className={`codicon codicon-close branch-clear ${styles.icon} ${styles.iconMedium}`}
-                        title="清除分支过滤"
+                        title={t('Clear branch filter')}
                     />
                 ) : (
                     <span className={`codicon codicon-chevron-down ${styles.icon} ${styles.iconSmall}`} />
@@ -145,7 +147,7 @@ export const FilterToolbar: React.FC<FilterToolbarProps> = ({ onFilterChange, ex
             <button
                 className={`${styles.filterButton} ${styles.pathButton}`}
                 onClick={handlePathClick}
-                title={paths.length > 0 ? paths.join('\n') : '选择文件或文件夹'}
+                title={paths.length > 0 ? paths.join('\n') : t('Select files or folders')}
             >
                 <span className={styles.ellipsis}>
                     {getPathLabel()}
@@ -153,7 +155,7 @@ export const FilterToolbar: React.FC<FilterToolbarProps> = ({ onFilterChange, ex
                 {paths.length > 0 ? (
                     <span
                         className={`codicon codicon-close path-clear ${styles.icon} ${styles.iconMedium}`}
-                        title="清除路径过滤"
+                        title={t('Clear path filter')}
                     />
                 ) : (
                     <span className={`codicon codicon-chevron-down ${styles.icon} ${styles.iconSmall}`} />

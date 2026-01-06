@@ -23,36 +23,36 @@ export function registerLogCommands(
         vscode.commands.registerCommand('intelli-git.log.resetSoft', async (arg) => {
             const hash = getCommitHash(arg);
             if (!hash) return;
-            if (await confirmAction(`Reset current branch to ${hash} (Soft)?\nChanges will be staged.`, 'Reset')) {
+            if (await confirmAction(vscode.l10n.t('Reset current branch to {0} (Soft)?\nChanges will be staged.', hash), vscode.l10n.t('Reset'))) {
                 try {
                     await gitService.reset('soft', hash);
-                    vscode.window.showInformationMessage(`Soft reset successful.`);
+                    vscode.window.showInformationMessage(vscode.l10n.t('Soft reset successful.'));
                 } catch (e: any) {
-                    vscode.window.showErrorMessage(`Reset failed: ${e.message}`);
+                    vscode.window.showErrorMessage(vscode.l10n.t('Reset failed: {0}', e.message));
                 }
             }
         }),
         vscode.commands.registerCommand('intelli-git.log.resetMixed', async (arg) => {
             const hash = getCommitHash(arg);
             if (!hash) return;
-            if (await confirmAction(`Reset current branch to ${hash} (Mixed)?\nChanges will be unstaged.`, 'Reset')) {
+            if (await confirmAction(vscode.l10n.t('Reset current branch to {0} (Mixed)?\nChanges will be unstaged.', hash), vscode.l10n.t('Reset'))) {
                 try {
                     await gitService.reset('mixed', hash);
-                    vscode.window.showInformationMessage(`Mixed reset successful.`);
+                    vscode.window.showInformationMessage(vscode.l10n.t('Mixed reset successful.'));
                 } catch (e: any) {
-                    vscode.window.showErrorMessage(`Reset failed: ${e.message}`);
+                    vscode.window.showErrorMessage(vscode.l10n.t('Reset failed: {0}', e.message));
                 }
             }
         }),
         vscode.commands.registerCommand('intelli-git.log.resetHard', async (arg) => {
             const hash = getCommitHash(arg);
             if (!hash) return;
-            if (await confirmAction(`Reset current branch to ${hash} (Hard)?\nALL LOCAL CHANGES WILL BE LOST.`, 'Reset Hard')) {
+            if (await confirmAction(vscode.l10n.t('Reset current branch to {0} (Hard)?\nALL LOCAL CHANGES WILL BE LOST.', hash), vscode.l10n.t('Reset Hard'))) {
                 try {
                     await gitService.reset('hard', hash);
-                    vscode.window.showInformationMessage(`Hard reset successful.`);
+                    vscode.window.showInformationMessage(vscode.l10n.t('Hard reset successful.'));
                 } catch (e: any) {
-                    vscode.window.showErrorMessage(`Reset failed: ${e.message}`);
+                    vscode.window.showErrorMessage(vscode.l10n.t('Reset failed: {0}', e.message));
                 }
             }
         })
@@ -63,12 +63,12 @@ export function registerLogCommands(
         vscode.commands.registerCommand('intelli-git.log.checkout', async (arg) => {
             const hash = getCommitHash(arg);
             if (!hash) return;
-            if (await confirmAction(`Checkout commit ${hash}? You will be in detached HEAD state.`, 'Checkout')) {
+            if (await confirmAction(vscode.l10n.t('Checkout commit {0}? You will be in detached HEAD state.', hash), vscode.l10n.t('Checkout'))) {
                 try {
                     await gitService.checkoutCommit(hash);
-                    vscode.window.showInformationMessage(`Checked out ${hash}`);
+                    vscode.window.showInformationMessage(vscode.l10n.t('Checked out {0}', hash));
                 } catch (e: any) {
-                    vscode.window.showErrorMessage(`Checkout failed: ${e.message}`);
+                    vscode.window.showErrorMessage(vscode.l10n.t('Checkout failed: {0}', e.message));
                 }
             }
         })
@@ -81,16 +81,16 @@ export function registerLogCommands(
             if (!hash) return;
 
             const branchName = await vscode.window.showInputBox({
-                prompt: `Create new branch at ${hash}`,
-                placeHolder: 'Branch name'
+                prompt: vscode.l10n.t('Create new branch at {0}', hash),
+                placeHolder: vscode.l10n.t('Branch name')
             });
 
             if (branchName) {
                 try {
                     await gitService.createBranchFrom(branchName, hash);
-                    vscode.window.showInformationMessage(`Created branch ${branchName} at ${hash}`);
+                    vscode.window.showInformationMessage(vscode.l10n.t('Created branch {0} at {1}', branchName, hash));
                 } catch (e: any) {
-                    vscode.window.showErrorMessage(`Failed to create branch: ${e.message}`);
+                    vscode.window.showErrorMessage(vscode.l10n.t('Failed to create branch: {0}', e.message));
                 }
             }
         })
@@ -102,12 +102,12 @@ export function registerLogCommands(
             const hash = getCommitHash(arg);
             if (!hash) return;
 
-            if (await confirmAction(`Cherry-pick commit ${hash}?`, 'Cherry-pick')) {
+            if (await confirmAction(vscode.l10n.t('Cherry-pick commit {0}?', hash), vscode.l10n.t('Cherry-pick'))) {
                 try {
                     await gitService.cherryPick(hash);
-                    vscode.window.showInformationMessage(`Cherry-picked ${hash}`);
+                    vscode.window.showInformationMessage(vscode.l10n.t('Cherry-picked {0}', hash));
                 } catch (e: any) {
-                    vscode.window.showErrorMessage(`Cherry-pick failed: ${e.message}`);
+                    vscode.window.showErrorMessage(vscode.l10n.t('Cherry-pick failed: {0}', e.message));
                 }
             }
         })
@@ -119,12 +119,12 @@ export function registerLogCommands(
             const hash = getCommitHash(arg);
             if (!hash) return;
 
-            if (await confirmAction(`Revert commit ${hash}?`, 'Revert')) {
+            if (await confirmAction(vscode.l10n.t('Revert commit {0}?', hash), vscode.l10n.t('Revert'))) {
                 try {
                     await gitService.revert(hash);
-                    vscode.window.showInformationMessage(`Reverted ${hash}`);
+                    vscode.window.showInformationMessage(vscode.l10n.t('Reverted {0}', hash));
                 } catch (e: any) {
-                    vscode.window.showErrorMessage(`Revert failed: ${e.message}`);
+                    vscode.window.showErrorMessage(vscode.l10n.t('Revert failed: {0}', e.message));
                 }
             }
         })

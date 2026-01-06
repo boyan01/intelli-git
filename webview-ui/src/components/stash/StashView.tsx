@@ -79,7 +79,7 @@ export function StashView() {
     if (loading) return null;
 
     if (!stashes || stashes.length === 0) {
-        return <div className={styles.emptyState}>{t('stashList.empty')}</div>;
+        return <div className={styles.emptyState}>{t('No stashed changes')}</div>;
     }
 
     const fileItems: FileStatus[] = files.map(f => ({
@@ -121,32 +121,32 @@ export function StashView() {
             second={
                 <div className={styles.previewSection}>
                     <div className={styles.previewHeader}>
-                        <span className={styles.previewTitle}>{t('stashList.preview.title')}</span>
+                        <span className={styles.previewTitle}>{t('Stored files')}</span>
                         <div className={styles.previewActions}>
                             <button
                                 className={styles.iconBtn}
-                                title={t('stashList.preview.expandAll')}
+                                title={t('Expand All')}
                                 onClick={handleExpandAll}
                             >
                                 <i className="codicon codicon-expand-all" />
                             </button>
                             <button
                                 className={styles.iconBtn}
-                                title={t('stashList.preview.collapseAll')}
+                                title={t('Collapse All')}
                                 onClick={handleCollapseAll}
                             >
                                 <i className="codicon codicon-collapse-all" />
                             </button>
                             <button
                                 className={`${styles.iconBtn} ${viewMode === 'tree' ? styles.active : ''}`}
-                                title={t('stashList.preview.treeView')}
+                                title={t('Tree View')}
                                 onClick={() => setViewMode('tree')}
                             >
                                 <i className="codicon codicon-list-tree" />
                             </button>
                             <button
                                 className={`${styles.iconBtn} ${viewMode === 'list' ? styles.active : ''}`}
-                                title={t('stashList.preview.listView')}
+                                title={t('List View')}
                                 onClick={() => setViewMode('list')}
                             >
                                 <i className="codicon codicon-list-flat" />
@@ -167,7 +167,7 @@ export function StashView() {
                                 />
                             ) : (
                                 <div className={styles.emptyPreview}>
-                                    {selectedIndex !== null ? t('stashList.preview.noFiles') : t('stashList.preview.selectStash')}
+                                    {selectedIndex !== null ? t('No files in this stash') : t('Select a stash to view files')}
                                 </div>
                             )
                         )}

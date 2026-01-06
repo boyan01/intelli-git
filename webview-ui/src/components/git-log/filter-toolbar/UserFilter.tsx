@@ -136,8 +136,8 @@ const AuthorInputPopup: React.FC<AuthorInputPopupProps> = ({
                 )}
             </div>
             <div className={sharedStyles.popupButtonRow}>
-                <span className={styles.hint}>{t('filter.author.hint')}</span>
-                <button className={sharedStyles.primaryButton} onClick={handleApply}>{t('common.apply')}</button>
+                <span className={styles.hint}>{t('Press Enter to apply, Ctrl+Enter to force apply')}</span>
+                <button className={sharedStyles.primaryButton} onClick={handleApply}>{t('Apply')}</button>
             </div>
         </div>
     );
@@ -197,21 +197,21 @@ export const UserFilter: React.FC<UserFilterProps> = ({ onChange }) => {
     };
 
     const getLabel = () => {
-        if (filterType === 'all') return t('filter.author.label');
-        if (filterType === 'me') return t('filter.author.me');
+        if (filterType === 'all') return t('Author');
+        if (filterType === 'me') return t('Me');
         if (appliedValue) {
             const lines = appliedValue.split('\n').filter(l => l.trim());
             if (lines.length > 1) return `${lines[0]} +${lines.length - 1}`;
-            return lines[0] || t('filter.author.label');
+            return lines[0] || t('Author');
         }
-        return t('filter.author.label');
+        return t('Author');
     };
 
     const dropdownItems = (
         <>
-            <div className={sharedStyles.dropdownItem} onClick={handleSelectCustom}>{t('filter.author.placeholder')}</div>
+            <div className={sharedStyles.dropdownItem} onClick={handleSelectCustom}>{t('Custom...')}</div>
             {currentUser && (
-                <div className={sharedStyles.dropdownItem} onClick={handleSelectMe}>{t('filter.author.me')} ({currentUser})</div>
+                <div className={sharedStyles.dropdownItem} onClick={handleSelectMe}>{t('Me')} ({currentUser})</div>
             )}
         </>
     );

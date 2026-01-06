@@ -75,29 +75,29 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
         return [
             {
                 icon: 'go-to-file',
-                label: t('commitView.contextMenu.openFile'),
+                label: t('Open File'),
                 onClick: () => handleFileClick(path)
             },
             { separator: true, label: '', onClick: () => { } },
             {
                 icon: 'discard',
-                label: t('commitView.contextMenu.rollback'),
+                label: t('Rollback'),
                 onClick: () => onRollback?.([path])
             },
             {
                 icon: 'archive',
-                label: t('commitView.contextMenu.stash'),
+                label: t('Stash'),
                 onClick: () => onStash?.([path])
             },
             { separator: true, label: '', onClick: () => { } },
             {
                 icon: 'trash',
-                label: t('commitView.contextMenu.deleteFromDisk'),
+                label: t('Delete from Disk'),
                 onClick: () => onDelete?.([path])
             },
             {
                 icon: 'new-folder',
-                label: t('commitView.contextMenu.moveToChangelist'),
+                label: t('Move to Changelist...'),
                 onClick: () => onMoveToChangelist?.([path])
             }
         ];
@@ -107,23 +107,23 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
         return [
             {
                 icon: 'check-all',
-                label: t('commitView.contextMenu.selectAll'),
+                label: t('Select All'),
                 onClick: () => filePaths.forEach(p => onToggleFile(p, true))
             },
             {
                 icon: 'close-all',
-                label: t('commitView.contextMenu.deselectAll'),
+                label: t('Deselect All'),
                 onClick: () => filePaths.forEach(p => onToggleFile(p, false))
             },
             { separator: true, label: '', onClick: () => { } },
             {
                 icon: 'discard',
-                label: t('commitView.contextMenu.rollbackAll'),
+                label: t('Rollback All'),
                 onClick: () => onRollback?.(filePaths)
             },
             {
                 icon: 'archive',
-                label: t('commitView.contextMenu.stashAll'),
+                label: t('Stash All'),
                 onClick: () => onStash?.(filePaths)
             }
         ];

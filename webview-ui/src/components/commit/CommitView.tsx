@@ -122,7 +122,7 @@ export function CommitView({ rebaseStatus }: CommitViewProps) {
 
             <div className={styles.fileListContainer}>
                 {changelists.length === 0 ? (
-                    loading ? null : <div className={styles.emptyState}>{t('commitView.emptyState')}</div>
+                    loading ? null : <div className={styles.emptyState}>{t('No changes')}</div>
                 ) : (
                     changelists.map(group => (
                         <ChangelistTree

@@ -40,7 +40,7 @@ export const CommitForm: React.FC<CommitFormProps> = ({
                             onChange={(e) => onAmendChange(e.target.checked)}
                             className={styles.amendInput}
                         />
-                        <span>{t('commitForm.amend')}</span>
+                        <span>{t('Amend(M)')}</span>
                     </label>
 
                     {onGenerate && (
@@ -48,7 +48,7 @@ export const CommitForm: React.FC<CommitFormProps> = ({
                             className={`${styles.iconBtn} ${styles.generateBtn}`}
                             onClick={onGenerate}
                             disabled={isGenerating}
-                            title={t('commitForm.generate')}
+                            title={t('Generate')}
                         >
                             <i className={`codicon ${isGenerating ? 'codicon-loading codicon-modifier-spin' : 'codicon-sparkle'}`}></i>
                         </button>
@@ -57,9 +57,9 @@ export const CommitForm: React.FC<CommitFormProps> = ({
 
                 {(addedCount > 0 || modifiedCount > 0 || deletedCount > 0) && (
                     <div className={styles.stats}>
-                        {addedCount > 0 && <span className={styles.statAdded}>{t('commitForm.stats.added', { count: addedCount })}</span>}
-                        {modifiedCount > 0 && <span className={styles.statModified}>{t('commitForm.stats.modified', { count: modifiedCount })}</span>}
-                        {deletedCount > 0 && <span className={styles.statDeleted}>{t('commitForm.stats.deleted', { count: deletedCount })}</span>}
+                        {addedCount > 0 && <span className={styles.statAdded}>{t('{{count}} Added', { count: addedCount })}</span>}
+                        {modifiedCount > 0 && <span className={styles.statModified}>{t('{{count}} Modified', { count: modifiedCount })}</span>}
+                        {deletedCount > 0 && <span className={styles.statDeleted}>{t('{{count}} Deleted', { count: deletedCount })}</span>}
                     </div>
                 )}
             </div>
@@ -67,7 +67,7 @@ export const CommitForm: React.FC<CommitFormProps> = ({
             <textarea
                 value={message}
                 onChange={(e) => onMessageChange(e.target.value)}
-                placeholder={t('commitForm.placeholder')}
+                placeholder={t('Commit Message')}
                 rows={4}
                 className={styles.textarea}
             />
@@ -78,17 +78,17 @@ export const CommitForm: React.FC<CommitFormProps> = ({
                         className={`${styles.btn} ${styles.btnPrimary}`}
                         onClick={() => onCommit(false)}
                     >
-                        {t('commitForm.actions.commit')}
+                        {t('Commit(I)')}
                     </button>
                     <button
                         className={`${styles.btn} ${styles.btnSecondary}`}
                         onClick={() => onCommit(true)}
                     >
-                        {t('commitForm.actions.commitAndPush')}
+                        {t('Commit & Push(P)...')}
                     </button>
                 </div>
                 <div className={styles.actionsRight}>
-                    <button className={styles.iconBtn} title={t('commitForm.settings')}>
+                    <button className={styles.iconBtn} title={t('Settings')}>
                         <i className="codicon codicon-settings-gear"></i>
                     </button>
                 </div>

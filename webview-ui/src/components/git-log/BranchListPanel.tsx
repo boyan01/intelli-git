@@ -205,7 +205,7 @@ export const BranchListPanel: React.FC<BranchListPanelProps> = ({ onBranchDouble
         // HEAD
         nodes.push({
             id: 'head',
-            label: `${t('branchList.head')} (${data.currentBranch})`,
+            label: `${t('HEAD')} (${data.currentBranch})`,
             icon: 'target',
             data: { type: 'head', fullPath: 'HEAD' }
         });
@@ -215,7 +215,7 @@ export const BranchListPanel: React.FC<BranchListPanelProps> = ({ onBranchDouble
         const localChildren = buildBranchTree(sortBranchNames(filteredLocal), 'local', 'local');
         nodes.push({
             id: 'local',
-            label: t('branchList.localBranches'),
+            label: t('Local'),
             children: localChildren,
             data: { type: 'folder', fullPath: '' }
         });
@@ -237,7 +237,7 @@ export const BranchListPanel: React.FC<BranchListPanelProps> = ({ onBranchDouble
         }
         nodes.push({
             id: 'remote',
-            label: t('branchList.remoteBranches'),
+            label: t('Remote'),
             children: remoteChildren,
             data: { type: 'folder', fullPath: '' }
         });
@@ -252,7 +252,7 @@ export const BranchListPanel: React.FC<BranchListPanelProps> = ({ onBranchDouble
         }));
         nodes.push({
             id: 'tags',
-            label: t('branchList.tags'),
+            label: t('Tags'),
             children: tagNodes,
             data: { type: 'folder', fullPath: '' }
         });
@@ -354,7 +354,7 @@ export const BranchListPanel: React.FC<BranchListPanelProps> = ({ onBranchDouble
                 <input
                     type="text"
                     className={styles.searchInput}
-                    placeholder={t('branchList.filterPlaceholder')}
+                    placeholder={t('Filter branches...')}
                     value={filterText}
                     onChange={(e) => setFilterText(e.target.value)}
                 />

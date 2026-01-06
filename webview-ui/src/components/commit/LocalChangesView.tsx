@@ -64,17 +64,17 @@ export function LocalChangesView() {
                         className={`${styles.tab} ${activeTab === 'commit' ? styles.active : ''}`}
                         onClick={() => setActiveTab('commit')}
                     >
-                        {t('commitView.tabs.commit')}
+                        {t('Commit')}
                     </button>
                     <button
                         className={`${styles.tab} ${activeTab === 'stash' ? styles.active : ''}`}
                         onClick={() => setActiveTab('stash')}
                     >
-                        {t('commitView.tabs.stash')}
+                        {t('Stash')}
                     </button>
                 </div>
                 <div className={styles.tabsRight}>
-                    <button className={styles.iconBtn} title={t('commitView.toolbar.fetch')} onClick={() => rpc.fetch()}>
+                    <button className={styles.iconBtn} title={t('Fetch')} onClick={() => rpc.fetch()}>
                         <i className="codicon codicon-cloud-download"></i>
                     </button>
 
@@ -84,7 +84,7 @@ export function LocalChangesView() {
                             onClick={() => rpc.pickBranch()}
                             title={isRebasing
                                 ? `Rebase in progress (${branches.rebaseStatus})`
-                                : t('toolbar.branchTooltip')}
+                                : t('Switch Branch')}
                         >
                             {isRebasing ? (
                                 <RebaseIndicator status={branches.rebaseStatus as 'interactive' | 'merging'} />

@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import { CommitViewProvider, GitLogViewProvider, PushPanel, StashContentProvider, RevisionContentProvider } from './providers';
 import { GitService } from './services/GitService';
 import { ChangelistService } from './services/ChangelistService';
-import { BranchStatusBar } from './ui';
+import { BranchStatusBar, GitLogStatusBar } from './ui';
 import { registerStashCommands, registerNavigationCommands, registerBranchCommands, registerLogCommands } from './commands';
 import { initLogger, log } from './utils/logger';
 
@@ -25,6 +25,7 @@ export function activate(context: vscode.ExtensionContext) {
     const provider = new CommitViewProvider(context.extensionUri, gitService, changelistService);
     const gitLogProvider = new GitLogViewProvider(context.extensionUri, gitService, changelistService);
     const branchStatusBar = new BranchStatusBar(gitService);
+    const gitLogStatusBar = new GitLogStatusBar(gitService);
     const stashContentProvider = new StashContentProvider(gitService);
     const revisionContentProvider = new RevisionContentProvider(gitService);
 
@@ -51,6 +52,7 @@ export function activate(context: vscode.ExtensionContext) {
     registerLogCommands(context, gitService);
 
     context.subscriptions.push(branchStatusBar);
+    context.subscriptions.push(gitLogStatusBar);
 
     // File watcher for auto-refresh
     const watcher = vscode.workspace.createFileSystemWatcher('**/*');
@@ -67,6 +69,7 @@ export function activate(context: vscode.ExtensionContext) {
         refreshTimeout = setTimeout(() => {
             provider.refresh();
             branchStatusBar.update();
+            gitLogStatusBar.update();
         }, 200);
     };
 
@@ -79,6 +82,7 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(
         vscode.workspace.onDidChangeWorkspaceFolders(() => {
             branchStatusBar.update();
+            gitLogStatusBar.update();
         })
     );
 }

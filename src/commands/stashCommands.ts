@@ -49,7 +49,7 @@ export function registerStashCommands(
             if (args && typeof args.stashIndex === 'number') {
                 const files = await gitService.getStashFiles(args.stashIndex);
                 if (files.length === 0) {
-                    vscode.window.showInformationMessage('No files in this stash.');
+                    vscode.window.showInformationMessage(vscode.l10n.t('No files in this stash.'));
                     return;
                 }
 

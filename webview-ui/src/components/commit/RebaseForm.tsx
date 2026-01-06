@@ -32,9 +32,9 @@ export const RebaseForm: React.FC<RebaseFormProps> = ({
                 </div>
                 {(addedCount > 0 || modifiedCount > 0 || deletedCount > 0) && (
                     <div className={styles.stats}>
-                        {addedCount > 0 && <span className={styles.statAdded}>{t('commitForm.stats.added', { count: addedCount })}</span>}
-                        {modifiedCount > 0 && <span className={styles.statModified}>{t('commitForm.stats.modified', { count: modifiedCount })}</span>}
-                        {deletedCount > 0 && <span className={styles.statDeleted}>{t('commitForm.stats.deleted', { count: deletedCount })}</span>}
+                        {addedCount > 0 && <span className={styles.statAdded}>{t('{{count}} Added', { count: addedCount })}</span>}
+                        {modifiedCount > 0 && <span className={styles.statModified}>{t('{{count}} Modified', { count: modifiedCount })}</span>}
+                        {deletedCount > 0 && <span className={styles.statDeleted}>{t('{{count}} Deleted', { count: deletedCount })}</span>}
                     </div>
                 )}
             </div>
@@ -43,7 +43,7 @@ export const RebaseForm: React.FC<RebaseFormProps> = ({
                 className={styles.textarea}
                 value={message}
                 onChange={(e) => onMessageChange(e.target.value)}
-                placeholder={t('commitForm.placeholder')}
+                placeholder={t('Commit Message')}
                 rows={4}
             />
 
@@ -56,7 +56,7 @@ export const RebaseForm: React.FC<RebaseFormProps> = ({
                         title={disableContinue ? 'Resolve conflicts before continuing' : ''}
                     >
                         <span className={`codicon codicon-play ${styles.icon}`}></span>
-                        {t('commitForm.actions.continue')}
+                        {t('Continue')}
                     </button>
                 </div>
             </div>

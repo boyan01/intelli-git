@@ -71,11 +71,11 @@ export const DateFilter: React.FC<DateFilterProps> = ({ onChange }) => {
 
     const getLabel = () => {
         switch (filterType) {
-            case '24h': return t('filter.date.24h');
-            case '7d': return t('filter.date.7d');
+            case '24h': return t('Last 24 Hours');
+            case '7d': return t('Last 7 Days');
             case 'custom':
                 if (customSince && customUntil) return `${customSince} - ${customUntil}`;
-                if (customSince) return t('filter.date.since', { 0: customSince }); // i18next interpolation uses {{key}} or just {0} if configured, standard i18next defaults. 
+                if (customSince) return t('Since {{date}}', { date: customSince }); // i18next interpolation uses {{key}} or just {0} if configured, standard i18next defaults. 
                 // Wait, useTranslation replacement usually uses keys. { "since": "Since {{date}}" }
                 // My JSON has "Since {0}". Extension uses {0}. i18next default is {{key}}.
                 // I should check if I configured i18next to use {0} or if I should assume standard.
@@ -88,27 +88,27 @@ export const DateFilter: React.FC<DateFilterProps> = ({ onChange }) => {
                 // I can configure i18next to use {0} interpolation?
                 // Yes, `interpolation: { format: ... }` or a custom replace.
                 // Or I can just manual replace.
-                if (customUntil) return t('filter.date.until').replace('{0}', customUntil);
-                return t('filter.date.custom');
-            default: return t('filter.date.label');
+                if (customUntil) return t('Until {{date}}', { date: customUntil });
+                return t('Custom Range');
+            default: return t('Date');
         }
     };
 
     const dropdownItems = (
         <>
-            <div className={styles.dropdownItem} onClick={() => handleSelect('custom')}>{t('filter.date.placeholder')}</div>
-            <div className={styles.dropdownItem} onClick={() => handleSelect('24h')}>{t('filter.date.24h')}</div>
-            <div className={styles.dropdownItem} onClick={() => handleSelect('7d')}>{t('filter.date.7d')}</div>
+            <div className={styles.dropdownItem} onClick={() => handleSelect('custom')}>{t('Custom...')}</div>
+            <div className={styles.dropdownItem} onClick={() => handleSelect('24h')}>{t('Last 24 Hours')}</div>
+            <div className={styles.dropdownItem} onClick={() => handleSelect('7d')}>{t('Last 7 Days')}</div>
         </>
     );
 
     const popupContent = (
         <>
             <div className={styles.inputGroup}>
-                <span className={styles.inputLabel}>{t('filter.date.inputSince')}</span>
+                <span className={styles.inputLabel}>{t('From (Since)')}</span>
                 <input
                     className={`${styles.dateInput} ${sinceError ? styles.invalid : ''}`}
-                    placeholder={t('filter.date.example')}
+                    placeholder={t('e.g. 2024-01-01 or 3 days ago')}
                     value={customSince}
                     onChange={e => {
                         setCustomSince(e.target.value);
@@ -117,10 +117,10 @@ export const DateFilter: React.FC<DateFilterProps> = ({ onChange }) => {
                 />
             </div>
             <div className={styles.inputGroup}>
-                <span className={styles.inputLabel}>{t('filter.date.inputUntil')}</span>
+                <span className={styles.inputLabel}>{t('Until (Before)')}</span>
                 <input
                     className={`${styles.dateInput} ${untilError ? styles.invalid : ''}`}
-                    placeholder={t('filter.date.example')}
+                    placeholder={t('e.g. 2024-01-01 or 3 days ago')}
                     value={customUntil}
                     onChange={e => {
                         setCustomUntil(e.target.value);
@@ -129,7 +129,7 @@ export const DateFilter: React.FC<DateFilterProps> = ({ onChange }) => {
                 />
             </div>
             <div className={styles.popupButtonRow}>
-                <button className={styles.primaryButton} onClick={handleCustomApply}>{t('common.apply')}</button>
+                <button className={styles.primaryButton} onClick={handleCustomApply}>{t('Apply')}</button>
             </div>
         </>
     );
