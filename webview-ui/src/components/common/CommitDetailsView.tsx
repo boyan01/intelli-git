@@ -12,13 +12,21 @@ export interface CommitDetailsViewProps {
     commit?: CommitDetails;
     showToggleDetails?: boolean;
     showBranches?: boolean;
+    onFileInteraction?: () => void;
+    onClose?: () => void;
+    isPinned?: boolean;
+    onPin?: () => void;
 }
 
 export const CommitDetailsView: React.FC<CommitDetailsViewProps> = ({
     selectedHashes,
     commit,
     showToggleDetails = false,
-    showBranches = false
+    showBranches = false,
+    onFileInteraction,
+    onClose,
+    isPinned = false,
+    onPin
 }) => {
     const { t } = useTranslation();
     const [files, setFiles] = useState<CommitFile[]>([]);
@@ -45,6 +53,7 @@ export const CommitDetailsView: React.FC<CommitDetailsViewProps> = ({
     }, [selectedHashes]);
 
     const handleFileClick = (path: string) => {
+        onFileInteraction?.();
         if (selectedHashes.length === 0) return;
 
         if (selectedHashes.length === 1 && commit) {
@@ -100,14 +109,18 @@ export const CommitDetailsView: React.FC<CommitDetailsViewProps> = ({
         <div className={styles.filesViewContainer}>
             <div className={styles.filesToolbar}>
                 <div className={styles.toolbarLeft}>
-                    <span className={styles.filesCount}>
-                        {t('commitDetails.files', { count: files.length })}
-                    </span>
+                    {onPin && (
+                        <button
+                            className={`${styles.iconBtn} ${isPinned ? styles.active : ''}`}
+                            onClick={onPin}
+                        >
+                            <i className={`codicon codicon-${isPinned ? 'pinned' : 'pin'}`} />
+                        </button>
+                    )}
                 </div>
                 <div className={styles.toolbarActions}>
                     <button
                         className={`${styles.iconBtn} ${viewMode === 'list' ? styles.active : ''}`}
-                        title={t('toolbar.viewMode', 'Toggle View Mode')}
                         onClick={() => setViewMode(v => v === 'tree' ? 'list' : 'tree')}
                     >
                         <i className={`codicon codicon-${viewMode === 'tree' ? 'list-tree' : 'list-flat'}`} />
@@ -115,7 +128,6 @@ export const CommitDetailsView: React.FC<CommitDetailsViewProps> = ({
                     {showToggleDetails && (
                         <button
                             className={`${styles.iconBtn} ${showDetails ? styles.active : ''}`}
-                            title={t('toolbar.toggleDetails', 'Toggle Details')}
                             onClick={() => setShowDetails(prev => !prev)}
                         >
                             <i className={`codicon codicon-${showDetails ? 'layout-panel' : 'layout-panel-off'}`} />
@@ -123,18 +135,24 @@ export const CommitDetailsView: React.FC<CommitDetailsViewProps> = ({
                     )}
                     <button
                         className={styles.iconBtn}
-                        title={t('toolbar.expandAll', 'Expand All')}
                         onClick={() => treeRef.current?.expandAll()}
                     >
                         <i className="codicon codicon-expand-all" />
                     </button>
                     <button
                         className={styles.iconBtn}
-                        title={t('toolbar.collapseAll', 'Collapse All')}
                         onClick={() => treeRef.current?.collapseAll()}
                     >
                         <i className="codicon codicon-collapse-all" />
                     </button>
+                    {isPinned && onClose && (
+                        <button
+                            className={styles.iconBtn}
+                            onClick={onClose}
+                        >
+                            <i className="codicon codicon-close" />
+                        </button>
+                    )}
                 </div>
             </div>
             <div className={styles.filesTreeWrapper}>

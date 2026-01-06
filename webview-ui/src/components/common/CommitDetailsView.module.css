@@ -18,10 +18,10 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 4px 8px;
+    padding: 0 4px;
     border-bottom: 1px solid var(--vscode-panel-border);
     flex-shrink: 0;
-    height: 28px;
+    height: 20px;
     background-color: var(--vscode-sideBarSectionHeader-background);
 }
 

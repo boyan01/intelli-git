@@ -2,18 +2,34 @@ import { SplitPane } from '../common/SplitPane';
 import { BranchListPanel } from './BranchListPanel';
 import { LogListPanel } from './LogListPanel';
 import { CommitDetailsView } from '../common/CommitDetailsView';
+import styles from './GitLogView.module.css';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import type { CommitDetails } from '../../../../shared/messages';
 import { rpc } from '../../lib/rpc_client';
 
+const NARROW_THRESHOLD = 800;
+
 export function GitLogView() {
+    const containerRef = useRef<HTMLDivElement>(null);
     const [selectedHashes, setSelectedHashes] = useState<string[]>([]);
     const [branchFilter, setBranchFilter] = useState<string | undefined>(undefined);
     const [commitDetails, setCommitDetails] = useState<CommitDetails | undefined>(undefined);
+    const [isNarrowMode, setIsNarrowMode] = useState(false);
 
     const handleBranchDoubleClick = useCallback((branch: string) => {
         setBranchFilter(branch);
+    }, []);
+
+    useEffect(() => {
+        if (!containerRef.current) return;
+        const observer = new ResizeObserver(entries => {
+            for (const entry of entries) {
+                setIsNarrowMode(entry.contentRect.width < NARROW_THRESHOLD);
+            }
+        });
+        observer.observe(containerRef.current);
+        return () => observer.disconnect();
     }, []);
 
     useEffect(() => {
@@ -26,27 +42,43 @@ export function GitLogView() {
         }
     }, [selectedHashes]);
 
+    const logListPanel = (
+        <LogListPanel
+            onSelectionChange={setSelectedHashes}
+            externalBranchFilter={branchFilter}
+            isNarrowMode={isNarrowMode}
+            selectedHashes={selectedHashes}
+            commitDetails={commitDetails}
+        />
+    );
+
+    const commitDetailsPanel = (
+        <CommitDetailsView
+            selectedHashes={selectedHashes}
+            commit={commitDetails}
+            showBranches={true}
+        />
+    );
+
     return (
-        <div style={{ height: '100vh', width: '100vw', display: 'flex', flexDirection: 'column' }}>
+        <div ref={containerRef} className={styles.container}>
             <SplitPane
                 direction="horizontal"
                 defaultSize={200}
                 minSize={0}
                 first={<BranchListPanel onBranchDoubleClick={handleBranchDoubleClick} />}
                 second={
-                    <SplitPane
-                        direction="horizontal"
-                        defaultRatio={0.68}
-                        minSize={200}
-                        first={<LogListPanel onSelectionChange={setSelectedHashes} externalBranchFilter={branchFilter} />}
-                        second={
-                            <CommitDetailsView
-                                selectedHashes={selectedHashes}
-                                commit={commitDetails}
-                                showBranches={true}
-                            />
-                        }
-                    />
+                    isNarrowMode ? (
+                        logListPanel
+                    ) : (
+                        <SplitPane
+                            direction="horizontal"
+                            defaultRatio={0.68}
+                            minSize={200}
+                            first={logListPanel}
+                            second={commitDetailsPanel}
+                        />
+                    )
                 }
             />
         </div>

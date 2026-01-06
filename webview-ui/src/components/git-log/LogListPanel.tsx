@@ -8,19 +8,108 @@ import { RefLabels } from './RefLabels';
 import { useLogCommitLoader } from './hooks/useLogCommitLoader';
 import { useCommitSelection } from './hooks/useCommitSelection';
 import { formatRelativeDate } from '../../utils/dateUtils';
+import { CommitDetailsView } from '../common/CommitDetailsView';
+import type { CommitDetails } from '../../../../shared/messages';
 
 interface LogListPanelProps {
     onSelectionChange?: (commits: string[]) => void;
     externalBranchFilter?: string;
+    isNarrowMode?: boolean;
+    selectedHashes?: string[];
+    commitDetails?: CommitDetails;
 }
 
 const ROW_HEIGHT = 24;
 const BUFFER = 10;
 
-export const LogListPanel: React.FC<LogListPanelProps> = ({ onSelectionChange, externalBranchFilter }) => {
+export const LogListPanel: React.FC<LogListPanelProps> = ({
+    onSelectionChange,
+    externalBranchFilter,
+    isNarrowMode = false,
+    selectedHashes: externalSelectedHashes = [],
+    commitDetails
+}) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const [scrollTop, setScrollTop] = useState(0);
     const [clientHeight, setClientHeight] = useState(0);
+    const [hoveredHash, setHoveredHash] = useState<string | null>(null);
+    const [isClosing, setIsClosing] = useState(false);
+    const [isPanelLocked, setIsPanelLocked] = useState(false);
+    const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const isPanelHoveredRef = useRef(false);
+
+    const clearAllTimers = useCallback(() => {
+        if (hoverTimerRef.current) {
+            clearTimeout(hoverTimerRef.current);
+            hoverTimerRef.current = null;
+        }
+        if (hideTimerRef.current) {
+            clearTimeout(hideTimerRef.current);
+            hideTimerRef.current = null;
+        }
+    }, []);
+
+    const startShowTimer = useCallback((hash: string) => {
+        if (!isNarrowMode) return;
+        clearAllTimers();
+        hoverTimerRef.current = setTimeout(() => {
+            setIsClosing(false);
+            setHoveredHash(hash);
+        }, 1000);
+    }, [isNarrowMode, clearAllTimers]);
+
+    const startHideTimer = useCallback(() => {
+        if (isPanelHoveredRef.current || isPanelLocked) return;
+        clearAllTimers();
+        hideTimerRef.current = setTimeout(() => {
+            setIsClosing(true);
+            setTimeout(() => {
+                setHoveredHash(null);
+                setIsClosing(false);
+            }, 200);
+        }, 500);
+    }, [clearAllTimers, isPanelLocked]);
+
+    const handleRowMouseEnter = useCallback((hash: string, selected: boolean) => {
+        if (!selected || !isNarrowMode) return;
+        startShowTimer(hash);
+    }, [isNarrowMode, startShowTimer]);
+
+    const handleRowMouseLeave = useCallback(() => {
+        if (hoverTimerRef.current) {
+            clearTimeout(hoverTimerRef.current);
+            hoverTimerRef.current = null;
+        }
+        if (hoveredHash) {
+            startHideTimer();
+        }
+    }, [hoveredHash, startHideTimer]);
+
+    const handlePanelMouseEnter = useCallback(() => {
+        isPanelHoveredRef.current = true;
+        clearAllTimers();
+    }, [clearAllTimers]);
+
+    const handlePanelMouseLeave = useCallback(() => {
+        isPanelHoveredRef.current = false;
+        if (!isPanelLocked) {
+            startHideTimer();
+        }
+    }, [startHideTimer, isPanelLocked]);
+
+    const handlePanelClick = useCallback(() => {
+        setIsPanelLocked(true);
+    }, []);
+
+    const closePanel = useCallback(() => {
+        setIsPanelLocked(false);
+        setIsClosing(true);
+        setTimeout(() => {
+            setHoveredHash(null);
+            setIsClosing(false);
+        }, 200);
+    }, []);
 
     const {
         commits,
@@ -30,7 +119,6 @@ export const LogListPanel: React.FC<LogListPanelProps> = ({ onSelectionChange, e
         setFilters
     } = useLogCommitLoader();
 
-    // Cancelled manual effect for externalBranchFilter since FilterToolbar handles it via prop
 
 
 
@@ -53,6 +141,18 @@ export const LogListPanel: React.FC<LogListPanelProps> = ({ onSelectionChange, e
         onSelectionChange,
         scrollToRow
     });
+
+    const handleRowClickWithHover = useCallback((e: React.MouseEvent, commit: Parameters<typeof handleRowClick>[1]) => {
+        const clickedHash = commit.hash;
+        if (hoveredHash && hoveredHash !== clickedHash) {
+            setIsPanelLocked(false);
+            setHoveredHash(null);
+        }
+        handleRowClick(e, commit);
+        if (isNarrowMode) {
+            startShowTimer(clickedHash);
+        }
+    }, [handleRowClick, isNarrowMode, startShowTimer, hoveredHash]);
 
     // Compute graph data
     const graph = useMemo(() => computeGraph(commits), [commits]);
@@ -134,60 +234,82 @@ export const LogListPanel: React.FC<LogListPanelProps> = ({ onSelectionChange, e
 
     return (
         <div className={styles.container}>
-            <FilterToolbar onFilterChange={setFilters} externalBranch={externalBranchFilter} />
+            <div className={styles.mainContent}>
+                <FilterToolbar onFilterChange={setFilters} externalBranch={externalBranchFilter} />
 
-            <div
-                ref={containerRef}
-                className={styles.list}
-                onScroll={handleScroll}
-                tabIndex={0}
-                onKeyDown={handleKeyDown}
-                style={{ outline: 'none' }}
-            >
-                <div style={{ height: totalHeight, position: 'relative' }}>
-                    <div style={{
-                        position: 'absolute',
-                        top: offsetY,
-                        left: 0,
-                        right: 0,
-                    }}>
-                        {visibleCommits.map((commit, i) => {
-                            const globalIndex = startIndex + i;
-                            const graphNode = graph.get(commit.hash);
-                            const selected = isSelected(commit.hash);
-                            const isBlink = commit.hash === blinkHash;
-                            const rowGraphWidth = graphNode ? (graphNode.maxX + 1) * CELL_WIDTH : CELL_WIDTH;
-                            return (
-                                <div
-                                    key={commit.hash}
-                                    className={`${styles.row} ${!isBlink && selected ? styles.selected : ''} ${isBlink ? styles.blink : ''}`}
-                                    onClick={(e) => handleRowClick(e, commit)}
-                                    data-vscode-context={JSON.stringify({
-                                        webviewSection: 'gitLogCommit',
-                                        hash: commit.hash,
-                                        shortHash: commit.shortHash,
-                                        subject: commit.subject
-                                    })}
-                                >
-                                    <div className={styles.graphCol} style={{ width: rowGraphWidth }}>
-                                        {graphNode && <GraphColumn node={graphNode} rowHeight={ROW_HEIGHT} graphWidth={rowGraphWidth} rowIndex={globalIndex} onJumpToCommit={handleJumpToCommit} />}
+                <div
+                    ref={containerRef}
+                    className={styles.list}
+                    onScroll={handleScroll}
+                    tabIndex={0}
+                    onKeyDown={handleKeyDown}
+                    style={{ outline: 'none' }}
+                >
+                    <div style={{ height: totalHeight, position: 'relative' }}>
+                        <div style={{
+                            position: 'absolute',
+                            top: offsetY,
+                            left: 0,
+                            right: 0,
+                        }}>
+                            {visibleCommits.map((commit, i) => {
+                                const globalIndex = startIndex + i;
+                                const graphNode = graph.get(commit.hash);
+                                const selected = isSelected(commit.hash);
+                                const isBlink = commit.hash === blinkHash;
+                                const rowGraphWidth = graphNode ? (graphNode.maxX + 1) * CELL_WIDTH : CELL_WIDTH;
+                                return (
+                                    <div
+                                        key={commit.hash}
+                                        className={`${styles.row} ${!isBlink && selected ? styles.selected : ''} ${isBlink ? styles.blink : ''}`}
+                                        onClick={(e) => handleRowClickWithHover(e, commit)}
+                                        onMouseEnter={() => handleRowMouseEnter(commit.hash, selected)}
+                                        onMouseLeave={handleRowMouseLeave}
+                                        data-vscode-context={JSON.stringify({
+                                            webviewSection: 'gitLogCommit',
+                                            hash: commit.hash,
+                                            shortHash: commit.shortHash,
+                                            subject: commit.subject
+                                        })}
+                                    >
+                                        <div className={styles.graphCol} style={{ width: rowGraphWidth }}>
+                                            {graphNode && <GraphColumn node={graphNode} rowHeight={ROW_HEIGHT} graphWidth={rowGraphWidth} rowIndex={globalIndex} onJumpToCommit={handleJumpToCommit} />}
+                                        </div>
+                                        <div className={styles.subject}>
+                                            <span>{commit.subject}</span>
+                                            {commit.refs && commit.refs.length > 0 && (
+                                                <RefLabels refs={commit.refs} />
+                                            )}
+                                        </div>
+                                        <span className={styles.author}>{commit.authorName}</span>
+                                        <span className={styles.date}>
+                                            {formatRelativeDate(commit.date)}
+                                        </span>
                                     </div>
-                                    <div className={styles.subject}>
-                                        <span>{commit.subject}</span>
-                                        {commit.refs && commit.refs.length > 0 && (
-                                            <RefLabels refs={commit.refs} />
-                                        )}
-                                    </div>
-                                    <span className={styles.author}>{commit.authorName}</span>
-                                    <span className={styles.date}>
-                                        {formatRelativeDate(commit.date)}
-                                    </span>
-                                </div>
-                            );
-                        })}
+                                );
+                            })}
+                        </div>
                     </div>
                 </div>
             </div>
+
+            {isNarrowMode && hoveredHash && externalSelectedHashes.includes(hoveredHash) && (
+                <div
+                    className={`${styles.sidePanel} ${isClosing ? styles.sidePanelClosing : ''}`}
+                    onMouseEnter={handlePanelMouseEnter}
+                    onMouseLeave={handlePanelMouseLeave}
+                >
+                    <CommitDetailsView
+                        selectedHashes={externalSelectedHashes}
+                        commit={commitDetails}
+                        showBranches={true}
+                        onFileInteraction={handlePanelClick}
+                        onClose={closePanel}
+                        isPinned={isPanelLocked}
+                        onPin={handlePanelClick}
+                    />
+                </div>
+            )}
         </div>
     );
 };
