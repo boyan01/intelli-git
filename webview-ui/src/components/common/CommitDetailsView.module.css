@@ -1,7 +1,9 @@
-.filesPanel {
-    flex: 1;
+.container {
+    height: 100%;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
+    font-size: 13px;
     min-width: 0;
 }
 
@@ -20,6 +22,13 @@
     border-bottom: 1px solid var(--vscode-panel-border);
     flex-shrink: 0;
     height: 28px;
+    background-color: var(--vscode-sideBarSectionHeader-background);
+}
+
+.toolbarLeft {
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 
 .toolbarActions {
@@ -47,7 +56,6 @@
 
 .iconBtn.active {
     background-color: var(--vscode-toolbar-activeBackground);
-    color: var(--vscode-icon-foreground);
 }
 
 .filesCount {
@@ -60,8 +68,7 @@
     overflow-y: auto;
 }
 
-.commitDetailsPane {
-    flex: 1;
+.detailsContainer {
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -75,10 +82,21 @@
 .detailMessage {
     white-space: pre-wrap;
     font-family: var(--vscode-editor-font-family);
-    font-size: 13px;
-    line-height: 1.4;
     margin-bottom: 8px;
+    color: var(--vscode-foreground);
+}
+
+.subject {
+    font-size: 13px;
     font-weight: 600;
+    line-height: 1.4;
+}
+
+.body {
+    font-size: 11px;
+    margin-top: 4px;
+    line-height: 1.4;
+    opacity: 0.9;
 }
 
 .detailMeta {
@@ -92,6 +110,8 @@
 .metaRow {
     line-height: 1.5;
     word-break: break-word;
+    display: block;
+    margin-bottom: 4px;
 }
 
 .emailLink {
@@ -103,29 +123,30 @@
     text-decoration: underline;
 }
 
+.branchItem {
+    padding-left: 8px;
+    line-height: 1.4;
+    font-family: var(--vscode-editor-font-family);
+    opacity: 0.9;
+}
+
 .metaHash {
     font-family: var(--vscode-editor-font-family);
     opacity: 0.8;
     font-size: 11px;
 }
 
-.loadingSpinner {
-    width: 24px;
-    height: 24px;
-    border: 2px solid var(--vscode-progressBar-background);
-    border-top-color: transparent;
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-    display: block;
-    margin: 20px auto;
+.metaLabel {
+    font-weight: 500;
 }
 
-@keyframes spin {
-    from {
-        transform: rotate(0deg);
-    }
-
-    to {
-        transform: rotate(360deg);
-    }
+.empty {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    color: var(--vscode-descriptionForeground);
+    text-align: center;
 }

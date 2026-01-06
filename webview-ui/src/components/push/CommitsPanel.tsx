@@ -1,9 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
-import type { CommitInfo } from '@shared/messages';
+import type { CommitDetails } from '@shared/messages';
 import styles from './CommitsPanel.module.css';
 
 interface CommitsPanelProps {
-    commits: CommitInfo[];
+    commits: CommitDetails[];
     localBranch: string;
     currentRemote: string;
     currentRemoteBranch: string;

@@ -3,7 +3,7 @@ export type {
     FileStatus,
     ChangelistGroup,
     BranchInfo,
-    CommitInfo,
+    CommitDetails,
     CommitFile,
     PushConfig,
     StashItem,
@@ -19,7 +19,7 @@ export interface Changelist {
 }
 
 export interface PushState {
-    commits: import('@shared/messages').CommitInfo[];
+    commits: import('@shared/messages').CommitDetails[];
     files: import('@shared/messages').CommitFile[];
     config: import('@shared/messages').PushConfig;
 }

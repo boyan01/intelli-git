@@ -1,5 +1,5 @@
 import simpleGit, { SimpleGit, StatusResult } from 'simple-git';
-import { BranchInfo, LogCommit, LogOptions, CommitDetails, RefInfo, FileStatus, CommitInfo, CommitFile } from '../../shared/messages';
+import { BranchInfo, LogCommit, LogOptions, CommitDetails, RefInfo, FileStatus, CommitFile } from '../../shared/messages';
 import { log } from '../utils/logger';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -518,7 +518,7 @@ export class GitService {
         localBranch: string,
         remote: string,
         remoteBranch: string
-    ): Promise<CommitInfo[]> {
+    ): Promise<CommitDetails[]> {
         try {
             const hasRemoteBranch = await this._remoteBranchExists(remote, remoteBranch);
 
@@ -534,7 +534,14 @@ export class GitService {
                     subject: commit.message,
                     authorName: commit.author_name,
                     date: commit.date,
-                    email: commit.author_email,
+                    authorEmail: commit.author_email,
+                    body: '',
+                    files: [],
+                    stats: { additions: 0, deletions: 0 },
+                    parentHashes: [],
+                    containingBranches: [],
+                    refs: [],
+                    filteredAncestors: []
                 }));
             } else {
                 // New remote branch: get commits not reachable from any remote
@@ -546,7 +553,7 @@ export class GitService {
         }
     }
 
-    private async _getCommitsNotInRemote(branch: string, maxCount: number): Promise<CommitInfo[]> {
+    private async _getCommitsNotInRemote(branch: string, maxCount: number): Promise<CommitDetails[]> {
         try {
             const result = await this.git.raw([
                 'log',
@@ -562,8 +569,22 @@ export class GitService {
             }
 
             return result.trim().split('\n').map(line => {
-                const [hash, shortHash, subject, authorName, date, email] = line.split('|');
-                return { hash, shortHash, subject, authorName, date, email };
+                const [hash, shortHash, subject, authorName, date, authorEmail] = line.split('|');
+                return {
+                    hash,
+                    shortHash,
+                    subject,
+                    authorName,
+                    date,
+                    authorEmail,
+                    body: '',
+                    files: [],
+                    stats: { additions: 0, deletions: 0 },
+                    parentHashes: [],
+                    containingBranches: [],
+                    refs: [],
+                    filteredAncestors: []
+                };
             });
         } catch {
             return [];
@@ -579,7 +600,7 @@ export class GitService {
         }
     }
 
-    private async _getRecentCommits(count: number): Promise<CommitInfo[]> {
+    private async _getRecentCommits(count: number): Promise<CommitDetails[]> {
         try {
             const log = await this.git.log({ maxCount: count });
             return log.all.map(commit => ({
@@ -588,7 +609,14 @@ export class GitService {
                 subject: commit.message,
                 authorName: commit.author_name,
                 date: commit.date,
-                email: commit.author_email,
+                authorEmail: commit.author_email,
+                body: '',
+                files: [],
+                stats: { additions: 0, deletions: 0 },
+                parentHashes: [],
+                containingBranches: [],
+                refs: [],
+                filteredAncestors: []
             }));
         } catch {
             return [];
@@ -923,7 +951,12 @@ export class GitService {
                         authorEmail,
                         date,
                         parentHashes: parentsStr ? parentsStr.split(' ') : [],
-                        refs: this._parseRefs(refsStr)
+                        refs: this._parseRefs(refsStr),
+                        body: '',
+                        files: [],
+                        stats: { additions: 0, deletions: 0 },
+                        containingBranches: [],
+                        filteredAncestors: []
                     };
                 });
 
@@ -1049,8 +1082,8 @@ export class GitService {
 
     public async getCommitDetails(hash: string): Promise<CommitDetails> {
         try {
-            const showMsg = await this.git.show([hash, '--format=%B%x00%P%x00%an%x00%ae%x00%aI', '--no-patch']);
-            const [fullMessage, parentsStr, authorName, authorEmail, date] = showMsg.split('\0');
+            const showMsg = await this.git.show([hash, '--format=%B%x00%P%x00%an%x00%ae%x00%aI%x00%h', '--no-patch']);
+            const [fullMessage, parentsStr, authorName, authorEmail, date, shortHash] = showMsg.split('\0');
 
             const files = await this.getCommitFiles(hash) as CommitFile[];
 
@@ -1073,16 +1106,25 @@ export class GitService {
                 if (delMatch) deletions = parseInt(delMatch[1], 10);
             }
 
+            // Split fullMessage into subject and body
+            const messageLines = (fullMessage?.trim() || '').split('\n');
+            const subject = messageLines[0] || '';
+            const body = messageLines.slice(1).join('\n').trim() || undefined;
+
             return {
                 hash,
-                fullMessage: fullMessage?.trim() || '',
+                shortHash: shortHash?.trim() || hash.substring(0, 8),
+                subject,
+                body: body || '',
                 files,
                 stats: { additions, deletions },
                 parentHashes: parentsStr ? parentsStr.trim().split(' ') : [],
                 authorName: authorName?.trim() || '',
                 authorEmail: authorEmail?.trim() || '',
                 date: date?.trim() || '',
-                containingBranches
+                containingBranches,
+                refs: [],
+                filteredAncestors: []
             };
         } catch (e) {
             console.error('getCommitDetails error:', e);

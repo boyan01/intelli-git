@@ -1,19 +1,30 @@
 import { SplitPane } from '../common/SplitPane';
 import { BranchListPanel } from './BranchListPanel';
-
 import { LogListPanel } from './LogListPanel';
+import { CommitDetailsView } from '../common/CommitDetailsView';
 
-import { useState, useCallback } from 'react';
-import { CommitDetailsPanel } from './CommitDetailsPanel';
+import { useState, useCallback, useEffect } from 'react';
+import type { CommitDetails } from '../../../../shared/messages';
+import { rpc } from '../../lib/rpc_client';
 
 export function GitLogView() {
-    const [selectedCommits, setSelectedCommits] = useState<string[]>([]);
+    const [selectedHashes, setSelectedHashes] = useState<string[]>([]);
     const [branchFilter, setBranchFilter] = useState<string | undefined>(undefined);
-    const selectedHash = selectedCommits.length > 0 ? selectedCommits[0] : null;
+    const [commitDetails, setCommitDetails] = useState<CommitDetails | undefined>(undefined);
 
     const handleBranchDoubleClick = useCallback((branch: string) => {
         setBranchFilter(branch);
     }, []);
+
+    useEffect(() => {
+        if (selectedHashes.length === 1) {
+            rpc.getCommitDetails(selectedHashes[0])
+                .then(setCommitDetails)
+                .catch(() => setCommitDetails(undefined));
+        } else {
+            setCommitDetails(undefined);
+        }
+    }, [selectedHashes]);
 
     return (
         <div style={{ height: '100vh', width: '100vw', display: 'flex', flexDirection: 'column' }}>
@@ -27,8 +38,14 @@ export function GitLogView() {
                         direction="horizontal"
                         defaultRatio={0.68}
                         minSize={200}
-                        first={<LogListPanel onSelectionChange={setSelectedCommits} externalBranchFilter={branchFilter} />}
-                        second={<CommitDetailsPanel commitHash={selectedHash} />}
+                        first={<LogListPanel onSelectionChange={setSelectedHashes} externalBranchFilter={branchFilter} />}
+                        second={
+                            <CommitDetailsView
+                                selectedHashes={selectedHashes}
+                                commit={commitDetails}
+                                showBranches={true}
+                            />
+                        }
                     />
                 }
             />

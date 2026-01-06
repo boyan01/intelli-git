@@ -2,7 +2,7 @@ import React, { useMemo, useCallback } from 'react';
 import type { FileStatus } from '@shared/messages';
 import { rpc } from '../../lib/rpc_client';
 import { getFileIcon } from '../../lib/fileIcons';
-import styles from './FileTree.module.css';
+import styles from './BaseFileTree.module.css';
 import { BasicTreeView } from '../common/BasicTreeView';
 import type { TreeNode, BasicTreeViewRef } from '../common/BasicTreeView';
 // import { getDirPath, getStatusColor } from '../../utils/fileUtils'; // Removed, will define locally

@@ -5,7 +5,7 @@ import { ContextMenu } from '../common/ContextMenu';
 import type { ContextMenuItem } from '../common/ContextMenu';
 import { BaseFileTree } from './BaseFileTree';
 import type { BaseFileTreeRef } from './BaseFileTree';
-import styles from './FileTree.module.css';
+import styles from './BaseFileTree.module.css';
 import { rpc } from '@/lib/rpc_client';
 
 export interface ChangelistTreeProps {

@@ -30,15 +30,6 @@ export interface StashItem {
     branch: string;
 }
 
-export interface CommitInfo {
-    hash: string;
-    shortHash: string;
-    subject: string;
-    authorName: string;
-    email?: string;
-    date: string;
-}
-
 export interface CommitFile {
     path: string;
     status: string;
@@ -52,29 +43,33 @@ export interface PushConfig {
     remoteBranches: string[];
 }
 
-
-
-export interface PushData {
-    commits: CommitInfo[];
-    files: CommitFile[];
-    config: PushConfig;
-}
-
 export interface RefInfo {
     name: string;
     type: 'local' | 'remote' | 'tag' | 'head';
 }
 
-export interface LogCommit {
+export interface CommitDetails {
     hash: string;
     shortHash: string;
     subject: string;
     authorName: string;
     authorEmail: string;
     date: string;
+    body: string;
+    files: CommitFile[];
+    stats: { additions: number; deletions: number };
     parentHashes: string[];
+    containingBranches: string[];
     refs: RefInfo[];
-    filteredAncestors?: string[];
+    filteredAncestors: string[];
+}
+
+export type LogCommit = CommitDetails;
+
+export interface PushData {
+    commits: CommitDetails[];
+    files: CommitFile[];
+    config: PushConfig;
 }
 
 export interface LogOptions {
@@ -89,18 +84,6 @@ export interface LogOptions {
     paths?: string[];
     since?: string;
     until?: string;
-}
-
-export interface CommitDetails {
-    hash: string;
-    fullMessage: string;
-    files: CommitFile[];
-    stats: { additions: number; deletions: number };
-    parentHashes: string[];
-    authorName: string;
-    authorEmail: string;
-    date: string;
-    containingBranches: string[];
 }
 
 export interface ExtensionMethods {
@@ -164,7 +147,7 @@ export interface PushInitState {
 }
 
 export interface PushCommitsData {
-    commits: CommitInfo[];
+    commits: CommitDetails[];
     files: CommitFile[];
 }
 

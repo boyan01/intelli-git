@@ -2,37 +2,9 @@
     border-bottom: 1px solid transparent;
 }
 
-.fileGroupHeader {
-    display: flex;
-    align-items: center;
-    padding: 4px 8px;
-    gap: 6px;
-    font-size: 12px;
-    background: var(--vscode-sideBarSectionHeader-background);
-    cursor: pointer;
-    user-select: none;
-}
-
-.fileGroupHeader:hover {
-    background: var(--vscode-list-hoverBackground);
-}
-
-.fileGroupHeader .checkbox {
-    margin: 0;
-}
-
 .arrow {
     font-size: 10px;
     transition: transform 0.15s;
-}
-
-/* Note: rotation helps to be inline style often, but we can do class based too */
-.arrowCollapsed {
-    transform: rotate(-90deg);
-}
-
-.title {
-    flex: 1;
 }
 
 .fileCount {
@@ -48,33 +20,6 @@
 
 .changelistContent {
     margin-left: 8px;
-}
-
-.fileItem {
-    display: flex;
-    align-items: center;
-    padding: 3px 8px;
-    font-size: 13px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    user-select: none;
-    cursor: pointer;
-    border-radius: 4px;
-    gap: 6px;
-}
-
-.fileItem:hover {
-    background: var(--vscode-list-hoverBackground);
-}
-
-.fileItem.active {
-    background: var(--vscode-list-activeSelectionBackground);
-    color: var(--vscode-list-activeSelectionForeground);
-}
-
-.fileItem.active .name {
-    color: inherit;
 }
 
 .checkbox {
@@ -193,11 +138,6 @@
     opacity: 0.7;
 }
 
-.folderItem {
-    display: flex;
-    flex-direction: column;
-}
-
 .folderHeader {
     display: flex;
     align-items: center;
@@ -216,10 +156,6 @@
     margin-right: 4px;
 }
 
-.folderChildren {
-    /* Consistent indenting for folder children */
-}
-
 .fileDirPath {
     margin-left: auto;
     padding-left: 16px;
@@ -230,28 +166,6 @@
     overflow: hidden;
     text-overflow: ellipsis;
     max-width: 50%;
-}
-
-.emptyState {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    padding: 20px;
-    color: var(--vscode-descriptionForeground);
-    font-size: 13px;
-    opacity: 0.7;
-    text-align: center;
-}
-
-.fileTreeRoot {
-    display: flex;
-    flex-direction: column;
-}
-
-.fileTreeList {
-    flex: 1;
-    overflow-y: auto;
-    min-height: 100px;
 }
 
 .fileItemContent {

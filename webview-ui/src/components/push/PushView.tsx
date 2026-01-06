@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import type { CommitInfo } from '@shared/messages';
+import type { CommitDetails } from '@shared/messages';
 import { rpc } from '@/lib/rpc_client';
 import { CommitsPanel } from './CommitsPanel';
 import { PushCommitDetails } from './PushCommitDetails';
@@ -10,7 +10,7 @@ import styles from './PushView.module.css';
 export function PushView() {
     const { t } = useTranslation();
 
-    const [commits, setCommits] = useState<CommitInfo[]>([]);
+    const [commits, setCommits] = useState<CommitDetails[]>([]);
     const [selectedCommitHashes, setSelectedCommitHashes] = useState<string[]>([]);
     const [pushTags, setPushTags] = useState(false);
     const [isPushing, setIsPushing] = useState(false);
@@ -136,7 +136,6 @@ export function PushView() {
                     <PushCommitDetails
                         selectedHashes={selectedCommitHashes.length === 0 ? commits.map(c => c.hash) : selectedCommitHashes}
                         commit={selectedCommitHashes.length === 1 ? commits.find(c => c.hash === selectedCommitHashes[0]) : undefined}
-                        allCommits={commits}
                     />
                 }
             />
