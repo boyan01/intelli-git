@@ -121,6 +121,7 @@ function BasicTreeViewInner<T>(
         const isLeaf = !hasChildren;
 
         const contextData = getContextData?.(node);
+        const leadingContent = renderLeading?.(node);
 
         return (
             <div key={node.id} className={styles.nodeWrapper}>
@@ -154,9 +155,9 @@ function BasicTreeViewInner<T>(
                         )}
                     </div>
 
-                    {renderLeading && (
+                    {leadingContent && (
                         <div className={styles.leading}>
-                            {renderLeading(node)}
+                            {leadingContent}
                         </div>
                     )}
 
@@ -184,7 +185,7 @@ function BasicTreeViewInner<T>(
                 )}
             </div>
         );
-    }, [expandedIds, selectedId, toggleNode, onSelect, onDoubleClick, onContextMenu, renderLabel, renderTrailing, getContextData]);
+    }, [expandedIds, selectedId, toggleNode, onSelect, onDoubleClick, onContextMenu, renderLabel, renderTrailing, getContextData, renderLeading, baseIndent, indent]);
 
     return (
         <div ref={rootRef} className={styles.root} tabIndex={0}>

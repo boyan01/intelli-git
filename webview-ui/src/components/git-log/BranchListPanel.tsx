@@ -386,6 +386,7 @@ export const BranchListPanel: React.FC<BranchListPanelProps> = ({ onBranchDouble
                     renderLabel={renderLabel}
                     renderTrailing={renderTrailing}
                     getContextData={getContextData}
+                    baseIndent={8}
                 />
             </div>
         </div>

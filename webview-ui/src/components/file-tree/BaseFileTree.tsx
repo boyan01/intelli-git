@@ -327,7 +327,7 @@ export const BaseFileTree = React.forwardRef<BaseFileTreeRef, BaseFileTreeProps>
             renderLabel={renderLabel}
             renderTrailing={renderTrailing}
             indent={16}
-            baseIndent={viewMode === 'list' ? 12 : 8}
+            baseIndent={8}
         />
     );
 });
