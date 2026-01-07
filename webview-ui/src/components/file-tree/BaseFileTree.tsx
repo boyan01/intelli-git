@@ -1,6 +1,5 @@
 import React, { useMemo, useCallback } from 'react';
 import type { FileStatus } from '@shared/messages';
-import { rpc } from '../../lib/rpc_client';
 import { getFileIcon } from '../../lib/fileIcons';
 import styles from './BaseFileTree.module.css';
 import { BasicTreeView } from '../common/BasicTreeView';
@@ -39,19 +38,53 @@ export interface BaseFileTreeProps {
 
 export type BaseFileTreeRef = BasicTreeViewRef;
 
-// Custom data attached to each tree node
+type SelectionStatus = 'all' | 'partial' | 'none';
+
 interface FileNodeData {
     path: string;
     isFile: boolean;
     isRoot?: boolean;
     status?: string;
     fileCount: number;
+    selectedStatus?: SelectionStatus;
 }
 
 const countFiles = (node: TreeNode<FileNodeData>): number => {
     if (node.data?.isFile) return 1;
     if (!node.children) return 0;
     return node.children.reduce((sum, child) => sum + countFiles(child), 0);
+};
+
+const getAllFilePaths = (node: TreeNode<FileNodeData>): string[] => {
+    if (node.data?.isFile) return [node.data.path];
+    if (!node.children) return [];
+    return node.children.flatMap(getAllFilePaths);
+};
+
+const computeSelection = (nodes: TreeNode<FileNodeData>[], selectedFiles?: Set<string>) => {
+    const compute = (node: TreeNode<FileNodeData>): SelectionStatus => {
+        if (node.data?.isFile) {
+            const status = selectedFiles?.has(node.data.path) ? 'all' : 'none';
+            node.data.selectedStatus = status;
+            return status;
+        }
+        if (!node.children || node.children.length === 0) {
+            node.data!.selectedStatus = 'none';
+            return 'none';
+        }
+        const childStatuses = node.children.map(compute);
+        let status: SelectionStatus;
+        if (childStatuses.every(s => s === 'all')) {
+            status = 'all';
+        } else if (childStatuses.every(s => s === 'none')) {
+            status = 'none';
+        } else {
+            status = 'partial';
+        }
+        node.data!.selectedStatus = status;
+        return status;
+    };
+    nodes.forEach(compute);
 };
 
 const buildTree = (files: FileStatus[]): TreeNode<FileNodeData>[] => {
@@ -126,6 +159,8 @@ export const BaseFileTree = React.forwardRef<BaseFileTreeRef, BaseFileTreeProps>
     onFileContextMenu,
     onFolderContextMenu
 }, ref) => {
+    const [, forceUpdate] = React.useReducer(x => x + 1, 0);
+
     const nodes = useMemo(() => {
         let result: TreeNode<FileNodeData>[];
         if (viewMode === 'list') {
@@ -147,7 +182,7 @@ export const BaseFileTree = React.forwardRef<BaseFileTreeRef, BaseFileTreeProps>
 
         if (rootLabel) {
             const totalFiles = result.reduce((sum, n) => sum + countFiles(n), 0);
-            return [{
+            result = [{
                 id: '__root__',
                 label: rootLabel,
                 data: {
@@ -156,18 +191,17 @@ export const BaseFileTree = React.forwardRef<BaseFileTreeRef, BaseFileTreeProps>
                     isRoot: true,
                     fileCount: totalFiles
                 },
-                children: isCollapsed ? [] : result,
-                defaultExpanded: !isCollapsed
+                children: isCollapsed ? [] : result
             }];
         }
         return result;
     }, [items, viewMode, rootLabel, isCollapsed]);
 
-    const getAllFilePaths = useCallback((node: TreeNode<FileNodeData>): string[] => {
-        if (node.data?.isFile) return [node.data.path];
-        if (!node.children) return [];
-        return node.children.flatMap(getAllFilePaths);
-    }, []);
+    React.useLayoutEffect(() => {
+        computeSelection(nodes, selectedFiles);
+        forceUpdate();
+    }, [nodes, selectedFiles]);
+
 
     const handleNodeClick = useCallback((node: TreeNode<FileNodeData>) => {
         if (node.data?.isRoot) {
@@ -175,11 +209,7 @@ export const BaseFileTree = React.forwardRef<BaseFileTreeRef, BaseFileTreeProps>
             return;
         }
         if (node.data?.isFile) {
-            if (onFileClick) {
-                onFileClick(node.data.path, node.data.status);
-            } else {
-                rpc.openFile({ path: node.data.path });
-            }
+            onFileClick?.(node.data.path, node.data.status);
         }
     }, [onFileClick, onToggleCollapse]);
 
@@ -196,35 +226,29 @@ export const BaseFileTree = React.forwardRef<BaseFileTreeRef, BaseFileTreeProps>
             const descendantPaths = getAllFilePaths(node);
             onFolderContextMenu?.(e, descendantPaths);
         }
-    }, [onFileContextMenu, onFolderContextMenu, getAllFilePaths]);
+    }, [onFileContextMenu, onFolderContextMenu]);
 
     const handleToggleFile = useCallback((node: TreeNode<FileNodeData>, checked: boolean) => {
         if (readonly || !onToggleFile) return;
         const paths = getAllFilePaths(node);
         paths.forEach(path => onToggleFile(path, checked));
-    }, [readonly, onToggleFile, getAllFilePaths]);
+    }, [readonly, onToggleFile]);
 
     const renderLeading = useCallback((node: TreeNode<FileNodeData>) => {
         if (readonly || !onToggleFile) return null;
 
-        const descendantPaths = getAllFilePaths(node);
-        // Optimize: if it's a file, just check deeply. If folder, check all descendants.
-        // Actually, for a single node, getAllFilePaths returns itself if it's a file.
-
-        const allSelected = selectedFiles && descendantPaths.length > 0 && descendantPaths.every(p => selectedFiles.has(p));
-        const partialSelected = selectedFiles && !allSelected && descendantPaths.some(p => selectedFiles.has(p));
-
+        const status = node.data?.selectedStatus ?? 'none';
         return (
             <input
                 type="checkbox"
                 className={styles.checkbox}
-                checked={allSelected ?? false}
-                ref={input => { if (input) input.indeterminate = partialSelected ?? false; }}
+                checked={status === 'all'}
+                ref={input => { if (input) input.indeterminate = status === 'partial'; }}
                 onClick={(e) => e.stopPropagation()}
                 onChange={(e) => handleToggleFile(node, e.target.checked)}
             />
         );
-    }, [readonly, onToggleFile, selectedFiles, getAllFilePaths, handleToggleFile]);
+    }, [readonly, onToggleFile, handleToggleFile]);
 
     const renderTrailing = useCallback((node: TreeNode<FileNodeData>) => {
         if (!node.data?.isFile && node.data?.fileCount !== undefined) {

@@ -67,7 +67,13 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
     }, []);
 
     const handleFileClick = useCallback((path: string) => {
-        rpc.openFile({ path });
+        // Single click: open file but preserve focus in tree
+        rpc.openFile({ path, preserveFocus: true });
+    }, []);
+
+    const handleFileDoubleClick = useCallback((path: string) => {
+        // Double click: open file and focus the editor
+        rpc.openFile({ path, preserveFocus: false });
     }, []);
 
     const buildFileContextMenu = useCallback((path: string): ContextMenuItem[] => {
@@ -164,6 +170,7 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
                 onToggleCollapse={onToggleCollapse}
                 onToggleFile={onToggleFile}
                 onFileClick={handleFileClick}
+                onFileDoubleClick={handleFileDoubleClick}
                 onFileContextMenu={handleFileContextMenu}
                 onFolderContextMenu={handleFolderContextMenu}
             />

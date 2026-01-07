@@ -25,8 +25,8 @@
 .checkbox {
     appearance: none;
     -webkit-appearance: none;
-    width: 16px;
-    height: 16px;
+    width: 14px;
+    height: 14px;
     border: 1px solid var(--vscode-checkbox-border, #6b6b6b);
     border-radius: 3px;
     background: var(--vscode-checkbox-background, transparent);
@@ -46,10 +46,10 @@
     position: absolute;
     left: 4px;
     top: 1px;
-    width: 4px;
-    height: 8px;
+    width: 3px;
+    height: 7px;
     border: solid var(--vscode-checkbox-foreground, #fff);
-    border-width: 0 2px 2px 0;
+    border-width: 0 1.5px 1.5px 0;
     transform: rotate(45deg);
 }
 
@@ -62,9 +62,9 @@
     content: '';
     position: absolute;
     left: 3px;
-    top: 6px;
-    width: 8px;
-    height: 2px;
+    top: 5px;
+    width: 6px;
+    height: 1.5px;
     background: var(--vscode-checkbox-foreground, #fff);
 }
 
@@ -94,7 +94,6 @@
     justify-content: center;
     flex-shrink: 0;
     overflow: hidden;
-    margin-right: 4px;
 }
 
 .fileIconSvg svg {
@@ -173,5 +172,5 @@
     align-items: center;
     width: 100%;
     overflow: hidden;
-    gap: 6px;
+    gap: 4px;
 }

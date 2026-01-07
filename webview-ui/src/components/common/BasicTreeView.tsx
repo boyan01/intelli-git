@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import styles from './BasicTreeView.module.css';
 
 /**
@@ -70,6 +70,8 @@ function BasicTreeViewInner<T>(
         baseIndent = 0,
         renderLeading
     } = props;
+
+    const rootRef = useRef<HTMLDivElement>(null);
 
     const [internalExpandedIds, setInternalExpandedIds] = useState<Set<string>>(() => {
         if (controlledExpandedIds) return controlledExpandedIds;
@@ -185,7 +187,7 @@ function BasicTreeViewInner<T>(
     }, [expandedIds, selectedId, toggleNode, onSelect, onDoubleClick, onContextMenu, renderLabel, renderTrailing, getContextData]);
 
     return (
-        <div className={styles.root}>
+        <div ref={rootRef} className={styles.root} tabIndex={0}>
             {nodes.map(node => renderNode(node, 0))}
         </div>
     );

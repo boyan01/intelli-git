@@ -123,7 +123,7 @@ export interface ExtensionMethods {
     deleteChangelist: (id: string) => Promise<void>;
     renameChangelist: (params: { id: string; name: string }) => Promise<void>;
     promptCreateChangelist: (file?: string) => Promise<void>;
-    openFile: (params: { path: string }) => Promise<void>;
+    openFile: (params: { path: string; preserveFocus?: boolean }) => Promise<void>;
     openStashDiff: (params: { index: number; path: string }) => Promise<void>;
     getBranchListData: () => Promise<BranchListData>;
     getLog: (options: LogOptions) => Promise<LogCommit[]>;

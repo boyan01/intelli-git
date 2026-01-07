@@ -1,6 +1,7 @@
 .root {
     display: flex;
     flex-direction: column;
+    outline: none;
 }
 
 .nodeWrapper {
@@ -23,9 +24,18 @@
     background-color: var(--vscode-list-hoverBackground);
 }
 
+/* Inactive selection (when tree loses focus) */
 .node.selected {
+    background-color: var(--vscode-list-inactiveSelectionBackground);
+    color: var(--vscode-list-inactiveSelectionForeground, inherit);
+}
+
+/* Active selection (when tree has focus) */
+.root:focus-within .node.selected {
     background-color: var(--vscode-list-activeSelectionBackground);
     color: var(--vscode-list-activeSelectionForeground);
+    outline: 1px solid var(--vscode-list-focusOutline, var(--vscode-focusBorder));
+    outline-offset: -1px;
 }
 
 .twistie {
@@ -35,6 +45,9 @@
     width: 16px;
     height: 22px;
     flex-shrink: 0;
+    font-size: 10px;
+    padding-right: 6px;
+    box-sizing: content-box;
 }
 
 .twistie .codicon {
@@ -44,8 +57,8 @@
 .leading {
     display: flex;
     align-items: center;
-    margin-right: 4px;
     flex-shrink: 0;
+    gap: 4px;
 }
 
 .icon {
@@ -54,7 +67,6 @@
     justify-content: center;
     width: 16px;
     height: 16px;
-    margin-right: 6px;
     flex-shrink: 0;
     color: var(--vscode-icon-foreground);
 }
@@ -68,6 +80,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    padding-left: 4px;
 }
 
 .trailing {

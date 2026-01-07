@@ -356,13 +356,15 @@ export class ExtensionRpcHandler {
         }
     };
 
-    openFile = async (params: { path: string }): Promise<void> => {
+    openFile = async (params: { path: string; preserveFocus?: boolean }): Promise<void> => {
         const workspaceRoot = this.gitService.getWorkspaceRoot();
         if (!workspaceRoot) return;
         const uri = vscode.Uri.file(`${workspaceRoot}/${params.path}`);
         try {
             await vscode.workspace.fs.stat(uri);
-            vscode.commands.executeCommand('vscode.open', uri);
+            await vscode.commands.executeCommand('vscode.open', uri, {
+                preserveFocus: params.preserveFocus ?? false
+            });
         } catch {
             // File doesn't exist, possibly deleted
         }
