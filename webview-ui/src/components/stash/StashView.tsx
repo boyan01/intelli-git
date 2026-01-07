@@ -5,6 +5,7 @@ import { useRpcData } from '../../hooks/useRpcData';
 import { usePersistedState } from '../../hooks/usePersistedState';
 import { rpc } from '../../lib/rpc_client';
 import { SplitPane } from '../common/SplitPane';
+import { ViewModeToggle } from '../common/ViewModeToggle';
 import { BaseFileTree } from '../file-tree/BaseFileTree';
 import type { BaseFileTreeRef } from '../file-tree/BaseFileTree';
 import styles from './StashView.module.css';
@@ -137,20 +138,7 @@ export function StashView() {
                             >
                                 <i className="codicon codicon-collapse-all" />
                             </button>
-                            <button
-                                className={`${styles.iconBtn} ${viewMode === 'tree' ? styles.active : ''}`}
-                                title={t('Tree View')}
-                                onClick={() => setViewMode('tree')}
-                            >
-                                <i className="codicon codicon-list-tree" />
-                            </button>
-                            <button
-                                className={`${styles.iconBtn} ${viewMode === 'list' ? styles.active : ''}`}
-                                title={t('List View')}
-                                onClick={() => setViewMode('list')}
-                            >
-                                <i className="codicon codicon-list-flat" />
-                            </button>
+                            <ViewModeToggle viewMode={viewMode} onChange={setViewMode} />
                         </div>
                     </div>
                     <div className={styles.previewContent}>

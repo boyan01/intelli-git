@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import type { CommitDetails, CommitFile, RefInfo, FileStatus } from '../../../../shared/messages';
 import { rpc } from '../../lib/rpc_client';
 import { SplitPane } from './SplitPane';
+import { ViewModeToggle } from './ViewModeToggle';
 import { BaseFileTree } from '../file-tree/BaseFileTree';
 import type { BaseFileTreeRef } from '../file-tree/BaseFileTree';
 import { useTranslation } from 'react-i18next';
@@ -119,12 +120,7 @@ export const CommitDetailsView: React.FC<CommitDetailsViewProps> = ({
                     )}
                 </div>
                 <div className={styles.toolbarActions}>
-                    <button
-                        className={`${styles.iconBtn} ${viewMode === 'list' ? styles.active : ''}`}
-                        onClick={() => setViewMode(v => v === 'tree' ? 'list' : 'tree')}
-                    >
-                        <i className={`codicon codicon-${viewMode === 'tree' ? 'list-tree' : 'list-flat'}`} />
-                    </button>
+                    <ViewModeToggle viewMode={viewMode} onChange={setViewMode} />
                     {showToggleDetails && (
                         <button
                             className={`${styles.iconBtn} ${showDetails ? styles.active : ''}`}

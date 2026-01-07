@@ -1,5 +1,6 @@
 import { rpc, rpcEvents } from '../../lib/rpc_client';
 import { useTranslation } from 'react-i18next';
+import { ViewModeToggle } from '../common/ViewModeToggle';
 import styles from './CommitToolbar.module.css';
 
 interface CommitToolbarProps {
@@ -50,13 +51,7 @@ export function CommitToolbar({
                     <i className="codicon codicon-collapse-all"></i>
                 </button>
                 <div className={styles.toolbarSeparator}></div>
-                <button
-                    className={`${styles.iconBtn} ${viewMode === 'tree' ? styles.active : ''}`}
-                    title={t('View Mode')}
-                    onClick={() => onViewModeChange(viewMode === 'tree' ? 'list' : 'tree')}
-                >
-                    <i className="codicon codicon-list-tree"></i>
-                </button>
+                <ViewModeToggle viewMode={viewMode} onChange={onViewModeChange} />
             </div>
         </div>
     );
