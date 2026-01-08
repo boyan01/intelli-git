@@ -24,7 +24,7 @@ interface BranchListPanelProps {
 export const BranchListPanel: React.FC<BranchListPanelProps> = ({ onBranchDoubleClick }) => {
     const { t } = useTranslation();
     const [data, setData] = useState<BranchListData | null>(null);
-    const [isLoading, setIsLoading] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
     const treeRef = useRef<BasicTreeViewRef>(null);
 
     const [expandedIds, setExpandedIds] = usePersistedState('branchList.expandedIds');
@@ -344,9 +344,25 @@ export const BranchListPanel: React.FC<BranchListPanelProps> = ({ onBranchDouble
         }
         return undefined;
     }, []);
-
-    if (!data && isLoading) return <div className={styles.container}>Loading branches...</div>;
-    if (!data) return <div className={styles.container}>No data</div>;
+    const renderTreeContent = () => {
+        if (!data && isLoading) return null;
+        if (!data) return <div className={styles.noData}>No data</div>;
+        return (
+            <BasicTreeView
+                ref={treeRef}
+                nodes={treeNodes}
+                expandedIds={effectiveExpandedIds}
+                selectedId={selectedId ?? undefined}
+                onToggle={handleToggle}
+                onSelect={handleSelect}
+                onDoubleClick={handleDoubleClick}
+                renderLabel={renderLabel}
+                renderTrailing={renderTrailing}
+                getContextData={getContextData}
+                baseIndent={8}
+            />
+        );
+    };
 
     return (
         <div className={styles.container}>
@@ -375,19 +391,7 @@ export const BranchListPanel: React.FC<BranchListPanelProps> = ({ onBranchDouble
             </div>
 
             <div className={styles.treeContainer}>
-                <BasicTreeView
-                    ref={treeRef}
-                    nodes={treeNodes}
-                    expandedIds={effectiveExpandedIds}
-                    selectedId={selectedId ?? undefined}
-                    onToggle={handleToggle}
-                    onSelect={handleSelect}
-                    onDoubleClick={handleDoubleClick}
-                    renderLabel={renderLabel}
-                    renderTrailing={renderTrailing}
-                    getContextData={getContextData}
-                    baseIndent={8}
-                />
+                {renderTreeContent()}
             </div>
         </div>
     );

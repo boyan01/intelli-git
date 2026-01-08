@@ -155,7 +155,7 @@ export const LogListPanel: React.FC<LogListPanelProps> = ({
     }, [handleRowClick, isNarrowMode, startShowTimer, hoveredHash]);
 
     // Compute graph data
-    const graph = useMemo(() => computeGraph(commits), [commits]);
+    const graph = useMemo(() => computeGraph(commits, hasMore), [commits, hasMore]);
 
     useEffect(() => {
         if (!containerRef.current) return;

@@ -54,7 +54,7 @@ interface SuspendedConnection {
     isDashed?: boolean;
 }
 
-export function computeGraph(commits: LogCommit[]): Map<string, GraphNode> {
+export function computeGraph(commits: LogCommit[], hasMore: boolean = true): Map<string, GraphNode> {
     const graph = new Map<string, GraphNode>();
     const lanes: (LaneInfo | null)[] = [];
     const commitIndexMap = new Map<string, number>();
@@ -379,6 +379,16 @@ export function computeGraph(commits: LogCommit[]): Map<string, GraphNode> {
             }
         } else {
             parentHashes.forEach((parentHash, i) => {
+                const parentExists = commitIndexMap.has(parentHash);
+
+                // Skip if list is finalized and parent is not in the list
+                if (!hasMore && !parentExists) {
+                    if (i === 0) {
+                        lanes[myLaneIndex] = null;
+                    }
+                    return;
+                }
+
                 if (i === 0) {
                     lanes[myLaneIndex] = {
                         targetHash: parentHash,

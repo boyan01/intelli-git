@@ -463,23 +463,39 @@ export class GitService {
     }
 
     /**
-     * Get ahead/behind count for a specific local branch relative to its upstream.
+     * Get ahead/behind info for ALL local branches in a single git call.
      */
-    public async getBranchAheadBehind(branchName: string): Promise<{ ahead: number; behind: number; upstream?: string }> {
+    public async getAllBranchesAheadBehind(): Promise<Map<string, { ahead: number; behind: number; upstream?: string }>> {
+        const result = new Map<string, { ahead: number; behind: number; upstream?: string }>();
         try {
-            // Get upstream tracking branch
-            const upstream = await this.git.raw(['rev-parse', '--abbrev-ref', `${branchName}@{u}`]).catch(() => '');
-            if (!upstream.trim()) {
-                return { ahead: 0, behind: 0 };
+            const output = await this.git.raw([
+                'for-each-ref',
+                '--format=%(refname:short)%00%(upstream:short)%00%(upstream:track)',
+                'refs/heads'
+            ]);
+
+            for (const line of output.trim().split('\n')) {
+                if (!line) continue;
+                const [branch, upstream, track] = line.split('\0');
+
+                let ahead = 0, behind = 0;
+                if (track) {
+                    const aheadMatch = track.match(/ahead (\d+)/);
+                    const behindMatch = track.match(/behind (\d+)/);
+                    if (aheadMatch) ahead = parseInt(aheadMatch[1], 10);
+                    if (behindMatch) behind = parseInt(behindMatch[1], 10);
+                }
+
+                result.set(branch, {
+                    ahead,
+                    behind,
+                    upstream: upstream || undefined
+                });
             }
-
-            const result = await this.git.raw(['rev-list', '--left-right', '--count', `${branchName}...${branchName}@{u}`]);
-            const [ahead, behind] = result.trim().split(/\s+/).map(n => parseInt(n, 10));
-
-            return { ahead: ahead || 0, behind: behind || 0, upstream: upstream.trim() };
         } catch {
-            return { ahead: 0, behind: 0 };
+            // ignore
         }
+        return result;
     }
 
     public async createBranch(branchName: string): Promise<void> {
@@ -854,21 +870,22 @@ export class GitService {
     };
 
     public getBranchListData = async (): Promise<BranchListData> => {
-        const branches = await this.getBranches();
-        const groupedRemote = await this.getGroupedRemoteBranches();
-        const tags = await this.getTags();
+        const [branches, groupedRemote, tags, aheadBehindMap] = await Promise.all([
+            this.getBranches(),
+            this.getGroupedRemoteBranches(),
+            this.getTags(),
+            this.getAllBranchesAheadBehind()
+        ]);
 
-        const localBranchesInfo = await Promise.all(
-            branches.all.map(async (branchName) => {
-                const info = await this.getBranchAheadBehind(branchName);
-                return {
-                    name: branchName,
-                    ahead: info.ahead,
-                    behind: info.behind,
-                    upstream: info.upstream
-                };
-            })
-        );
+        const localBranchesInfo = branches.all.map((branchName) => {
+            const info = aheadBehindMap.get(branchName) || { ahead: 0, behind: 0 };
+            return {
+                name: branchName,
+                ahead: info.ahead,
+                behind: info.behind,
+                upstream: info.upstream
+            };
+        });
 
         return {
             currentBranch: branches.current,
