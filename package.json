@@ -263,6 +263,8 @@
     }
   },
   "scripts": {
+    "clean": "rm -rf out",
+    "package:dev": "node scripts/package-dev.js",
     "vscode:prepublish": "npm run compile",
     "build:webview": "cd webview-ui && npm run build",
     "compile": "npm run build:webview && tsc -p ./",
