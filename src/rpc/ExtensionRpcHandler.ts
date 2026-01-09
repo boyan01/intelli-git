@@ -83,7 +83,8 @@ export class ExtensionRpcHandler {
                 getAuthors: this.gitService.getAuthors,
                 getCurrentUser: this.gitService.getCurrentUser,
                 getWorkspaceState: this.getWorkspaceState,
-                updateWorkspaceState: this.updateWorkspaceState
+                updateWorkspaceState: this.updateWorkspaceState,
+                getUnpushedCommits: this.getUnpushedCommits
             }
         )
     }
@@ -554,5 +555,10 @@ export class ExtensionRpcHandler {
 
     updateWorkspaceState = async <T>(key: string, value: T): Promise<void> => {
         await this.context.workspaceState.update(key, value);
+    };
+
+    getUnpushedCommits = async (): Promise<string[]> => {
+        const unpushed = await this.gitService.getUnpushedCommits();
+        return Array.from(unpushed);
     };
 }

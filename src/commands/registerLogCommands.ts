@@ -129,4 +129,60 @@ export function registerLogCommands(
             }
         })
     );
+
+    // Undo Commit (reset --soft to parent)
+    context.subscriptions.push(
+        vscode.commands.registerCommand('intelli-git.log.undoCommit', async (arg) => {
+            const hash = getCommitHash(arg);
+            if (!hash) return;
+
+            // Check if commit is pushed to remote
+            const isPushed = await gitService.isCommitPushed(hash);
+            if (isPushed) {
+                vscode.window.showWarningMessage(
+                    vscode.l10n.t('Cannot undo commit {0}: it has already been pushed to remote.', hash)
+                );
+                return;
+            }
+
+            if (await confirmAction(
+                vscode.l10n.t('Undo commit {0}?\n\nThe changes will be kept in your working directory.', hash),
+                vscode.l10n.t('Undo Commit')
+            )) {
+                try {
+                    // Reset to parent commit, keeping changes staged
+                    await gitService.reset('soft', `${hash}~1`);
+                    vscode.window.showInformationMessage(vscode.l10n.t('Commit {0} undone. Changes are now staged.', hash));
+                } catch (e: any) {
+                    vscode.window.showErrorMessage(vscode.l10n.t('Undo commit failed: {0}', e.message));
+                }
+            }
+        })
+    );
+
+    // Edit Commit Message (reword)
+    context.subscriptions.push(
+        vscode.commands.registerCommand('intelli-git.log.editMessage', async (arg) => {
+            const hash = getCommitHash(arg);
+            if (!hash) return;
+
+            // Get current commit message
+            const currentMessage = await gitService.getCommitMessage(hash);
+
+            const newMessage = await vscode.window.showInputBox({
+                prompt: vscode.l10n.t('Edit commit message'),
+                value: currentMessage,
+                placeHolder: vscode.l10n.t('New commit message')
+            });
+
+            if (newMessage && newMessage !== currentMessage) {
+                try {
+                    await gitService.rewordCommit(hash, newMessage);
+                    vscode.window.showInformationMessage(vscode.l10n.t('Commit message updated.'));
+                } catch (e: any) {
+                    vscode.window.showErrorMessage(vscode.l10n.t('Failed to edit commit message: {0}', e.message));
+                }
+            }
+        })
+    );
 }

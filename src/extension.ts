@@ -3,7 +3,7 @@ import { CommitViewProvider, GitLogViewProvider, PushPanel, StashContentProvider
 import { GitService } from './services/GitService';
 import { ChangelistService } from './services/ChangelistService';
 import { BranchStatusBar, GitLogStatusBar } from './ui';
-import { registerStashCommands, registerNavigationCommands, registerBranchCommands, registerLogCommands } from './commands';
+import { registerStashCommands, registerNavigationCommands, registerBranchCommands, registerLogCommands, registerChangelistCommands } from './commands';
 import { initLogger, log } from './utils/logger';
 
 export function activate(context: vscode.ExtensionContext) {
@@ -56,6 +56,7 @@ export function activate(context: vscode.ExtensionContext) {
     registerNavigationCommands(context, gitService, branchStatusBar, gitLogProvider);
     registerBranchCommands(context, gitService, provider);
     registerLogCommands(context, gitService);
+    registerChangelistCommands(context, gitService, changelistService, provider);
 
     context.subscriptions.push(branchStatusBar);
     context.subscriptions.push(gitLogStatusBar);

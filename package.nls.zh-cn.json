@@ -20,5 +20,20 @@
   "intelli-git.commands.branch.merge.title": "合并到当前",
   "intelli-git.commands.branch.rename.title": "重命名...",
   "intelli-git.commands.branch.delete.title": "删除...",
-  "intelli-git.commands.branch.pull.title": "拉取"
+  "intelli-git.commands.branch.pull.title": "拉取",
+  "intelli-git.commands.changelist.openFile.title": "打开文件",
+  "intelli-git.commands.changelist.showDiff.title": "显示差异",
+  "intelli-git.commands.changelist.rollback.title": "回滚",
+  "intelli-git.commands.changelist.stash.title": "贮藏",
+  "intelli-git.commands.changelist.delete.title": "从磁盘删除",
+  "intelli-git.commands.changelist.moveToChangelist.title": "移动到变更列表...",
+  "intelli-git.commands.log.resetSoft.title": "重置当前分支到此提交 (Soft)",
+  "intelli-git.commands.log.resetMixed.title": "重置当前分支到此提交 (Mixed)",
+  "intelli-git.commands.log.resetHard.title": "重置当前分支到此提交 (Hard)",
+  "intelli-git.commands.log.checkout.title": "检出提交",
+  "intelli-git.commands.log.createBranch.title": "创建分支...",
+  "intelli-git.commands.log.cherryPick.title": "遴选提交",
+  "intelli-git.commands.log.revert.title": "还原提交",
+  "intelli-git.commands.log.undoCommit.title": "撤销提交",
+  "intelli-git.commands.log.editMessage.title": "修改提交信息..."
 }

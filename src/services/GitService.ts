@@ -307,13 +307,19 @@ export class GitService {
 
     public async commit(message: string, files?: string[]): Promise<void> {
         if (files && files.length > 0) {
-            await this.git.commit(message, files);
+            // Stage files first (required for unversioned files)
+            await this.git.add(files);
+            await this.git.commit(message);
         } else {
             await this.git.commit(message);
         }
     }
 
     public async commitAmend(message?: string, files?: string[]): Promise<void> {
+        if (files && files.length > 0) {
+            await this.git.add(files);
+        }
+
         const options: string[] = ['--amend'];
         if (message) {
             options.push('-m', message);
@@ -321,11 +327,7 @@ export class GitService {
             options.push('--no-edit');
         }
 
-        if (files && files.length > 0) {
-            await this.git.commit([...options, ...files]);
-        } else {
-            await this.git.commit(options);
-        }
+        await this.git.commit(options);
     }
 
     public async getLastCommitMessage(): Promise<string> {
@@ -334,6 +336,63 @@ export class GitService {
             return log.latest?.message || '';
         } catch {
             return '';
+        }
+    }
+
+    /**
+     * Get the commit message for a specific commit.
+     */
+    public async getCommitMessage(hash: string): Promise<string> {
+        try {
+            const result = await this.git.raw(['log', '-1', '--format=%B', hash]);
+            return result.trim();
+        } catch {
+            return '';
+        }
+    }
+
+    /**
+     * Reword a commit message.
+     * For HEAD: uses --amend
+     * For others: uses interactive rebase with automated editor scripts
+     */
+    public async rewordCommit(hash: string, newMessage: string): Promise<void> {
+        const headHash = await this.git.revparse(['HEAD']);
+
+        // For HEAD commit, use --amend
+        if (headHash.trim() === hash) {
+            await this.git.raw(['commit', '--amend', '-m', newMessage]);
+            return;
+        }
+
+        // For other commits, use interactive rebase
+        const shortHash = hash.substring(0, 7);
+        const fs = await import('fs');
+        const os = await import('os');
+        const path = await import('path');
+
+        // Create temp file for the new message
+        const tempDir = os.tmpdir();
+        const msgFile = path.join(tempDir, `git-reword-msg-${Date.now()}.txt`);
+        fs.writeFileSync(msgFile, newMessage);
+
+        try {
+            // GIT_SEQUENCE_EDITOR: change 'pick <hash>' to 'reword <hash>'
+            // GIT_EDITOR: cat the new message file to replace the commit message
+            const env = {
+                ...process.env,
+                GIT_SEQUENCE_EDITOR: `sed -i '' 's/^pick ${shortHash}/reword ${shortHash}/'`,
+                GIT_EDITOR: `cp "${msgFile}"`
+            };
+
+            await this.git.env(env).raw(['rebase', '-i', `${hash}^`, '--autostash']);
+        } finally {
+            // Clean up temp file
+            try {
+                fs.unlinkSync(msgFile);
+            } catch {
+                // Ignore cleanup errors
+            }
         }
     }
 
@@ -459,6 +518,21 @@ export class GitService {
             return { ahead: ahead || 0, behind: behind || 0 };
         } catch {
             return { ahead: 0, behind: 0 };
+        }
+    }
+
+    /**
+     * Get list of unpushed commit hashes (commits in local but not in upstream).
+     */
+    public async getUnpushedCommits(): Promise<Set<string>> {
+        try {
+            // Get commits that are in HEAD but not in upstream
+            const result = await this.git.raw(['rev-list', '@{u}..HEAD']);
+            const hashes = result.trim().split('\n').filter(h => h.length > 0);
+            return new Set(hashes);
+        } catch {
+            // No upstream or error, return empty set
+            return new Set();
         }
     }
 
@@ -945,6 +1019,20 @@ export class GitService {
             await this.git.revert(commit, ['--no-edit']);
         } catch (e: any) {
             throw e;
+        }
+    }
+
+    /**
+     * Check if a commit has been pushed to any remote branch.
+     */
+    public async isCommitPushed(commit: string): Promise<boolean> {
+        try {
+            // Check if commit exists on any remote branch
+            const result = await this.git.branch(['-r', '--contains', commit]);
+            return result.all.length > 0;
+        } catch {
+            // If command fails, assume not pushed
+            return false;
         }
     }
 

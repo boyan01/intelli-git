@@ -181,10 +181,6 @@ export function CommitView({ rebaseStatus }: CommitViewProps) {
                             activeFile={activeFile}
                             onToggleFile={toggleFile}
                             onToggleCollapse={() => toggleGroupCollapse(group.id)}
-                            onRollback={(files) => rpc.rollback(files)}
-                            onStash={(files) => rpc.stash({ files })}
-                            onDelete={(files) => rpc.deleteFiles(files)}
-                            onMoveToChangelist={(files) => rpc.promptCreateChangelist(files[0])}
                         />
                     ))
                 )}

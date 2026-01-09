@@ -17,6 +17,7 @@
     "Fetch": "获取(Fetch)",
     "{{count}} Incoming Commits\nClick to Update Project": "{{count}} 个传入提交\n点击更新项目",
     "Open File": "打开文件",
+    "Show Diff": "显示差异",
     "Delete from Disk": "从磁盘删除",
     "Move to Changelist...": "移动到变更列表...",
     "Select All": "全选",

@@ -123,31 +123,63 @@
       },
       {
         "command": "intelli-git.log.resetSoft",
-        "title": "Reset Current Branch to Here (Soft)"
+        "title": "%intelli-git.commands.log.resetSoft.title%"
       },
       {
         "command": "intelli-git.log.resetMixed",
-        "title": "Reset Current Branch to Here (Mixed)"
+        "title": "%intelli-git.commands.log.resetMixed.title%"
       },
       {
         "command": "intelli-git.log.resetHard",
-        "title": "Reset Current Branch to Here (Hard)"
+        "title": "%intelli-git.commands.log.resetHard.title%"
       },
       {
         "command": "intelli-git.log.checkout",
-        "title": "Checkout Commit"
+        "title": "%intelli-git.commands.log.checkout.title%"
       },
       {
         "command": "intelli-git.log.createBranch",
-        "title": "Create Branch..."
+        "title": "%intelli-git.commands.log.createBranch.title%"
       },
       {
         "command": "intelli-git.log.cherryPick",
-        "title": "Cherry-pick"
+        "title": "%intelli-git.commands.log.cherryPick.title%"
       },
       {
         "command": "intelli-git.log.revert",
-        "title": "Revert Commit"
+        "title": "%intelli-git.commands.log.revert.title%"
+      },
+      {
+        "command": "intelli-git.log.undoCommit",
+        "title": "%intelli-git.commands.log.undoCommit.title%"
+      },
+      {
+        "command": "intelli-git.log.editMessage",
+        "title": "%intelli-git.commands.log.editMessage.title%"
+      },
+      {
+        "command": "intelli-git.changelist.openFile",
+        "title": "%intelli-git.commands.changelist.openFile.title%"
+      },
+      {
+        "command": "intelli-git.changelist.showDiff",
+        "title": "%intelli-git.commands.changelist.showDiff.title%"
+      },
+      {
+        "command": "intelli-git.changelist.rollback",
+        "title": "%intelli-git.commands.changelist.rollback.title%"
+      },
+      {
+        "command": "intelli-git.changelist.stash",
+        "title": "%intelli-git.commands.changelist.stash.title%"
+      },
+      {
+        "command": "intelli-git.changelist.delete",
+        "title": "%intelli-git.commands.changelist.delete.title%"
+      },
+      {
+        "command": "intelli-git.changelist.moveToChangelist",
+        "title": "%intelli-git.commands.changelist.moveToChangelist.title%"
       }
     ],
     "menus": {
@@ -255,9 +287,49 @@
           "group": "3_danger@2"
         },
         {
+          "command": "intelli-git.log.undoCommit",
+          "when": "webviewSection == 'gitLogCommit' && isLatestUnpushed == true",
+          "group": "3_danger@3"
+        },
+        {
+          "command": "intelli-git.log.editMessage",
+          "when": "webviewSection == 'gitLogCommit' && isUnpushed == true",
+          "group": "4_edit"
+        },
+        {
           "command": "intelli-git.copyCommitHash",
           "when": "webviewSection == 'gitLogCommit'",
           "group": "1_cutcopypaste"
+        },
+        {
+          "command": "intelli-git.changelist.openFile",
+          "when": "webviewSection == 'changelistFile'",
+          "group": "navigation@1"
+        },
+        {
+          "command": "intelli-git.changelist.showDiff",
+          "when": "webviewSection == 'changelistFile'",
+          "group": "navigation@2"
+        },
+        {
+          "command": "intelli-git.changelist.rollback",
+          "when": "webviewSection == 'changelistFile'",
+          "group": "1_modification@1"
+        },
+        {
+          "command": "intelli-git.changelist.stash",
+          "when": "webviewSection == 'changelistFile'",
+          "group": "1_modification@2"
+        },
+        {
+          "command": "intelli-git.changelist.delete",
+          "when": "webviewSection == 'changelistFile'",
+          "group": "2_danger"
+        },
+        {
+          "command": "intelli-git.changelist.moveToChangelist",
+          "when": "webviewSection == 'changelistFile'",
+          "group": "3_other"
         }
       ]
     }

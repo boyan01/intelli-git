@@ -324,8 +324,8 @@ export class BranchPicker {
                     title: vscode.l10n.t('Switching to {0}...', branch),
                     cancellable: false
                 },
-                async () => {
-                    await this._performCheckout(branch, isRemote);
+                async (progress) => {
+                    await this._performCheckout(branch, isRemote, false, progress);
                 }
             );
             vscode.commands.executeCommand('intelli-git.refresh');
@@ -338,9 +338,25 @@ export class BranchPicker {
         }
     }
 
-    private async _performCheckout(branch: string, isRemote?: boolean, force: boolean = false) {
+    private async _performCheckout(
+        branch: string,
+        isRemote?: boolean,
+        force: boolean = false,
+        progress?: vscode.Progress<{ message?: string }>
+    ) {
         if (isRemote) {
-            await this.gitService.checkoutRemoteBranch(branch, force);
+            const parts = branch.split('/');
+            const remote = parts[0];
+            const localBranchName = parts.slice(1).join('/');
+
+            const localBranches = await this.gitService.getBranches();
+            if (localBranches.all.includes(localBranchName)) {
+                progress?.report({ message: vscode.l10n.t('Pulling {0}...', localBranchName) });
+                await this.gitService.switchBranch(localBranchName, force);
+                await this.gitService.pull();
+            } else {
+                await this.gitService.checkoutRemoteBranch(branch, force);
+            }
         } else {
             await this.gitService.switchBranch(branch, force);
         }

@@ -1,7 +1,8 @@
-import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
+import React, { useMemo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { BranchListData, LocalBranchInfo } from '../../../../shared/messages';
 import { rpc } from '../../lib/rpc_client';
+import { useRpcData } from '../../hooks/useRpcData';
 import { usePersistedState } from '../../hooks/usePersistedState';
 import { BasicTreeView, type TreeNode, type BasicTreeViewRef } from '../common/BasicTreeView';
 import { BranchStatus } from '../common/BranchStatus';
@@ -21,33 +22,25 @@ interface BranchListPanelProps {
     onBranchDoubleClick?: (branch: string) => void;
 }
 
+const emptyBranchListData: BranchListData = {
+    currentBranch: '',
+    localBranches: [],
+    localBranchesInfo: [],
+    remoteBranches: {},
+    tags: []
+};
+
 export const BranchListPanel: React.FC<BranchListPanelProps> = ({ onBranchDoubleClick }) => {
     const { t } = useTranslation();
-    const [data, setData] = useState<BranchListData | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
+    const { data, loading: isLoading } = useRpcData(
+        () => rpc.getBranchListData(),
+        { initialValue: emptyBranchListData }
+    );
     const treeRef = useRef<BasicTreeViewRef>(null);
 
     const [expandedIds, setExpandedIds] = usePersistedState('branchList.expandedIds');
     const [selectedId, setSelectedId] = usePersistedState('branchList.selectedId');
     const [filterText, setFilterText] = usePersistedState('branchList.filterText');
-
-    useEffect(() => {
-        loadData();
-        const interval = setInterval(loadData, 30000);
-        return () => clearInterval(interval);
-    }, []);
-
-    const loadData = async () => {
-        setIsLoading(true);
-        try {
-            const listData = await rpc.getBranchListData();
-            setData(listData);
-        } catch (e) {
-            console.error('Failed to load branch list', e);
-        } finally {
-            setIsLoading(false);
-        }
-    };
 
     const handleToggle = useCallback((id: string, expanded: boolean) => {
         setExpandedIds(prev => {

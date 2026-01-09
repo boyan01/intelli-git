@@ -134,6 +134,7 @@ export interface ExtensionMethods {
     getCurrentUser: () => Promise<string>;
     getWorkspaceState: <T>(key: string) => Promise<T | undefined>;
     updateWorkspaceState: <T>(key: string, value: T) => Promise<void>;
+    getUnpushedCommits: () => Promise<string[]>;
 }
 
 export interface CommitState {

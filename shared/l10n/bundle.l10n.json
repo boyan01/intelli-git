@@ -17,6 +17,7 @@
     "Fetch": "Fetch",
     "{{count}} Incoming Commits\nClick to Update Project": "{{count}} Incoming Commits\nClick to Update Project",
     "Open File": "Open File",
+    "Show Diff": "Show Diff",
     "Delete from Disk": "Delete from Disk",
     "Move to Changelist...": "Move to Changelist...",
     "Select All": "Select All",

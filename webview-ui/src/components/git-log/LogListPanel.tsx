@@ -115,6 +115,8 @@ export const LogListPanel: React.FC<LogListPanelProps> = ({
         commits,
         loading,
         hasMore,
+        unpushedCommits,
+        latestUnpushedHash,
         loadMore,
         setFilters
     } = useLogCommitLoader();
@@ -269,7 +271,9 @@ export const LogListPanel: React.FC<LogListPanelProps> = ({
                                             webviewSection: 'gitLogCommit',
                                             hash: commit.hash,
                                             shortHash: commit.shortHash,
-                                            subject: commit.subject
+                                            subject: commit.subject,
+                                            isUnpushed: unpushedCommits.has(commit.hash),
+                                            isLatestUnpushed: commit.hash === latestUnpushedHash
                                         })}
                                     >
                                         <div className={styles.graphCol} style={{ width: rowGraphWidth }}>
