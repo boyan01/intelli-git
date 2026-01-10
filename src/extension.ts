@@ -74,7 +74,8 @@ export function activate(context: vscode.ExtensionContext) {
             clearTimeout(refreshTimeout);
         }
         refreshTimeout = setTimeout(() => {
-            provider.refresh();
+            provider.rpc?.refresh();
+            gitLogProvider.rpc?.refresh();
             branchStatusBar.update();
             gitLogStatusBar.update();
         }, 200);

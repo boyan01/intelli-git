@@ -59,7 +59,7 @@ export function registerChangelistCommands(
                 if (confirm === 'Rollback') {
                     try {
                         await gitService.rollbackFiles([args.path]);
-                        provider.refresh();
+                        provider.rpc?.refresh();
                     } catch (e) {
                         vscode.window.showErrorMessage(i18n.t('extension.rollbackFailed', `${e}`));
                     }
@@ -77,7 +77,7 @@ export function registerChangelistCommands(
                 try {
                     await gitService.stash(message, [args.path]);
                     vscode.window.showInformationMessage(i18n.t('extension.stashSuccess'));
-                    provider.refresh();
+                    provider.rpc?.refresh();
                 } catch (e) {
                     vscode.window.showErrorMessage(i18n.t('extension.stashFailed', `${e}`));
                 }
@@ -99,7 +99,7 @@ export function registerChangelistCommands(
                         try {
                             const uri = vscode.Uri.file(`${workspaceRoot}/${args.path}`);
                             await vscode.workspace.fs.delete(uri, { recursive: false, useTrash: true });
-                            provider.refresh();
+                            provider.rpc?.refresh();
                         } catch (e) {
                             vscode.window.showErrorMessage(i18n.t('extension.deleteFailed', `${e}`));
                         }
@@ -139,14 +139,14 @@ export function registerChangelistCommands(
                             const newId = await changelistService.createChangelist(newName);
                             if (newId) {
                                 await changelistService.moveFiles([args.path], newId);
-                                provider.refresh();
+                                provider.rpc?.refresh();
                             }
                         }
                     } else {
                         const target = changelists.find(cl => cl.name === selected.label);
                         if (target) {
                             await changelistService.moveFiles([args.path], target.id);
-                            provider.refresh();
+                            provider.rpc?.refresh();
                         }
                     }
                 }

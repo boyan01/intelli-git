@@ -64,6 +64,10 @@ export abstract class BaseWebviewProvider {
     protected abstract getTitle(): string;
     protected abstract getInitialRoute(): string | undefined;
 
+    public get rpc() {
+        return this._rpc?.proxy;
+    }
+
     public dispose(): void {
         this._disposables.forEach(d => d.dispose());
         this._disposables = [];

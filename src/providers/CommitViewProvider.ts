@@ -61,8 +61,4 @@ export class CommitViewProvider extends BaseWebviewProvider implements vscode.We
 
         this._disposables.push(activeEditorListener);
     }
-
-    public refresh() {
-        this._rpc?.proxy.refresh();
-    }
 }
