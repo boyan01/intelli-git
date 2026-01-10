@@ -36,13 +36,13 @@
     color: var(--vscode-list-activeSelectionForeground);
 }
 
-/* Focus outline (can be on selected or context-menu target) */
-.node.focused {
+/* Focus outline (only when tree has focus) */
+.root:focus-within .node.focused {
     outline: 1px solid var(--vscode-list-focusOutline, var(--vscode-focusBorder));
     outline-offset: -1px;
 }
 
-.node.focused:not(.selected):hover {
+.root:focus-within .node.focused:not(.selected):hover {
     background-color: transparent;
 }
 

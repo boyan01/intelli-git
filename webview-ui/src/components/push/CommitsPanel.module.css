@@ -190,13 +190,13 @@
     color: var(--vscode-list-activeSelectionForeground);
 }
 
-/* Focus outline (can be on selected or context-menu target) */
-.focused {
+/* Focus outline (only when list has focus) */
+.commitsList:focus-within .focused {
     outline: 1px solid var(--vscode-list-focusOutline, var(--vscode-focusBorder));
     outline-offset: -1px;
 }
 
-.focused:not(.selected):hover {
+.commitsList:focus-within .focused:not(.selected):hover {
     background-color: transparent;
 }
 
