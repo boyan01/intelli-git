@@ -72,6 +72,7 @@ function BasicTreeViewInner<T>(
     } = props;
 
     const rootRef = useRef<HTMLDivElement>(null);
+    const [focusedId, setFocusedId] = useState<string | null>(null);
 
     const [internalExpandedIds, setInternalExpandedIds] = useState<Set<string>>(() => {
         if (controlledExpandedIds) return controlledExpandedIds;
@@ -126,10 +127,11 @@ function BasicTreeViewInner<T>(
         return (
             <div key={node.id} className={styles.nodeWrapper}>
                 <div
-                    className={`${styles.node} ${isSelected ? styles.selected : ''}`}
+                    className={`${styles.node} ${isSelected ? styles.selected : ''} ${focusedId === node.id ? styles.focused : ''}`}
                     style={{ paddingLeft: `${baseIndent + depth * indent}px` }}
                     onClick={(e) => {
                         e.stopPropagation();
+                        setFocusedId(node.id);
                         if (isLeaf) {
                             onSelect?.(node);
                         } else {
@@ -140,7 +142,10 @@ function BasicTreeViewInner<T>(
                         e.stopPropagation();
                         onDoubleClick?.(node);
                     }}
-                    onContextMenu={(e) => onContextMenu?.(e, node)}
+                    onContextMenu={(e) => {
+                        setFocusedId(node.id);
+                        onContextMenu?.(e, node);
+                    }}
                     {...(contextData ? { 'data-vscode-context': JSON.stringify(contextData) } : {})}
                 >
                     <div
@@ -185,7 +190,7 @@ function BasicTreeViewInner<T>(
                 )}
             </div>
         );
-    }, [expandedIds, selectedId, toggleNode, onSelect, onDoubleClick, onContextMenu, renderLabel, renderTrailing, getContextData, renderLeading, baseIndent, indent]);
+    }, [expandedIds, selectedId, focusedId, toggleNode, onSelect, onDoubleClick, onContextMenu, renderLabel, renderTrailing, getContextData, renderLeading, baseIndent, indent]);
 
     return (
         <div ref={rootRef} className={styles.root} tabIndex={0}>

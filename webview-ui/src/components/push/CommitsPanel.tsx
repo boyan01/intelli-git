@@ -29,6 +29,7 @@ export function CommitsPanel({
 }: CommitsPanelProps) {
     const [isRemoteDropdownOpen, setIsRemoteDropdownOpen] = useState(false);
     const [isBranchEditing, setIsBranchEditing] = useState(false);
+    const [focusedHash, setFocusedHash] = useState<string | null>(null);
     const [branchInputValue, setBranchInputValue] = useState(currentRemoteBranch);
     const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(0);
     const [showSuggestions, setShowSuggestions] = useState(true);
@@ -240,9 +241,13 @@ export function CommitsPanel({
                 {commits.map((commit) => (
                     <div
                         key={commit.hash}
-                        className={`${styles.commitItem} ${selectedCommitHashes.includes(commit.hash) ? styles.selected : ''}`}
+                        className={`${styles.commitItem} ${selectedCommitHashes.includes(commit.hash) ? styles.selected : ''} ${focusedHash === commit.hash ? styles.focused : ''}`}
                         data-vscode-context={JSON.stringify({ webviewSection: 'commitItem', hash: commit.hash })}
-                        onClick={(e) => handleCommitClick(e, commit.hash)}
+                        onClick={(e) => {
+                            setFocusedHash(commit.hash);
+                            handleCommitClick(e, commit.hash);
+                        }}
+                        onContextMenu={() => setFocusedHash(commit.hash)}
                     >
                         <div className={styles.commitMessage} title={commit.subject}>{commit.subject}</div>
                     </div>

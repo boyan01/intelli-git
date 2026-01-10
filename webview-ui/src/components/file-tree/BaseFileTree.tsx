@@ -142,7 +142,37 @@ const buildTree = (files: FileStatus[]): TreeNode<FileNodeData>[] => {
     };
     processNodes(root);
 
-    return root;
+    // Compact single-child folders (e.g., src/components instead of separate layers)
+    const compactFolders = (nodes: TreeNode<FileNodeData>[]): TreeNode<FileNodeData>[] => {
+        return nodes.map(node => {
+            if (!node.children || node.children.length === 0) {
+                return node;
+            }
+
+            // First, recursively compact children
+            node.children = compactFolders(node.children);
+
+            // Check if this folder has exactly one child and that child is also a folder
+            let children = node.children;
+            while (
+                children.length === 1 &&
+                children[0].children &&
+                children[0].children.length > 0
+            ) {
+                const child = children[0];
+                // Merge: combine labels with "/"
+                node.label = `${node.label}/${child.label}`;
+                node.id = child.id;
+                node.data = child.data;
+                node.children = child.children;
+                children = child.children!;
+            }
+
+            return node;
+        });
+    };
+
+    return compactFolders(root);
 };
 
 export const BaseFileTree = React.forwardRef<BaseFileTreeRef, BaseFileTreeProps>(({

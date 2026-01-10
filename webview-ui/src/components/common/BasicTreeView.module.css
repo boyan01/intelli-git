@@ -34,8 +34,16 @@
 .root:focus-within .node.selected {
     background-color: var(--vscode-list-activeSelectionBackground);
     color: var(--vscode-list-activeSelectionForeground);
+}
+
+/* Focus outline (can be on selected or context-menu target) */
+.node.focused {
     outline: 1px solid var(--vscode-list-focusOutline, var(--vscode-focusBorder));
     outline-offset: -1px;
+}
+
+.node.focused:not(.selected):hover {
+    background-color: transparent;
 }
 
 .twistie {

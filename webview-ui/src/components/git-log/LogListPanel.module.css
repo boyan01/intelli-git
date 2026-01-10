@@ -42,13 +42,36 @@
     background-color: var(--vscode-list-hoverBackground);
 }
 
+/* Inactive selection (when list loses focus) */
 .selected {
-    background-color: var(--vscode-list-activeSelectionBackground) !important;
-    color: var(--vscode-list-activeSelectionForeground) !important;
+    background-color: var(--vscode-list-inactiveSelectionBackground);
+    color: var(--vscode-list-inactiveSelectionForeground, inherit);
+}
+
+/* Active selection (when list has focus) */
+.list:focus .selected,
+.list:focus-within .selected {
+    background-color: var(--vscode-list-activeSelectionBackground);
+    color: var(--vscode-list-activeSelectionForeground);
 }
 
 .selected:hover {
-    background-color: var(--vscode-list-activeSelectionBackground) !important;
+    background-color: var(--vscode-list-inactiveSelectionBackground);
+}
+
+.list:focus .selected:hover,
+.list:focus-within .selected:hover {
+    background-color: var(--vscode-list-activeSelectionBackground);
+}
+
+/* Focus outline (can be on selected or context-menu target) */
+.focused {
+    outline: 1px solid var(--vscode-list-focusOutline, var(--vscode-focusBorder));
+    outline-offset: -1px;
+}
+
+.focused:not(.selected):hover {
+    background-color: transparent;
 }
 
 .selected .hash {

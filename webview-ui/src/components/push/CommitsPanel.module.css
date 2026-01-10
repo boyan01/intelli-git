@@ -190,6 +190,16 @@
     color: var(--vscode-list-activeSelectionForeground);
 }
 
+/* Focus outline (can be on selected or context-menu target) */
+.focused {
+    outline: 1px solid var(--vscode-list-focusOutline, var(--vscode-focusBorder));
+    outline-offset: -1px;
+}
+
+.focused:not(.selected):hover {
+    background-color: transparent;
+}
+
 .commitHash {
     font-family: var(--vscode-editor-font-family, monospace);
     font-size: 11px;

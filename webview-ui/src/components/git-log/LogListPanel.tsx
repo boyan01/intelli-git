@@ -33,6 +33,7 @@ export const LogListPanel: React.FC<LogListPanelProps> = ({
     const [scrollTop, setScrollTop] = useState(0);
     const [clientHeight, setClientHeight] = useState(0);
     const [hoveredHash, setHoveredHash] = useState<string | null>(null);
+    const [focusedHash, setFocusedHash] = useState<string | null>(null);
     const [isClosing, setIsClosing] = useState(false);
     const [isPanelLocked, setIsPanelLocked] = useState(false);
     const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -263,10 +264,14 @@ export const LogListPanel: React.FC<LogListPanelProps> = ({
                                 return (
                                     <div
                                         key={commit.hash}
-                                        className={`${styles.row} ${!isBlink && selected ? styles.selected : ''} ${isBlink ? styles.blink : ''}`}
-                                        onClick={(e) => handleRowClickWithHover(e, commit)}
+                                        className={`${styles.row} ${!isBlink && selected ? styles.selected : ''} ${isBlink ? styles.blink : ''} ${focusedHash === commit.hash ? styles.focused : ''}`}
+                                        onClick={(e) => {
+                                            setFocusedHash(commit.hash);
+                                            handleRowClickWithHover(e, commit);
+                                        }}
                                         onMouseEnter={() => handleRowMouseEnter(commit.hash, selected)}
                                         onMouseLeave={handleRowMouseLeave}
+                                        onContextMenu={() => setFocusedHash(commit.hash)}
                                         data-vscode-context={JSON.stringify({
                                             webviewSection: 'gitLogCommit',
                                             hash: commit.hash,
