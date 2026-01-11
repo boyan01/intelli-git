@@ -7,12 +7,36 @@ interface GraphColumnProps {
     graphWidth: number;
     rowIndex: number;
     onJumpToCommit?: (hash: string) => void;
+    isSelected?: boolean;
+    isHovered?: boolean;
+    hasFocus?: boolean;
 }
 
 export const CELL_WIDTH = 16;
 
+// Determine stroke color based on row state
+const getStrokeColor = (isSelected: boolean, isHovered: boolean, hasFocus: boolean): string => {
+    if (isSelected) {
+        return hasFocus
+            ? 'var(--vscode-list-activeSelectionBackground)'
+            : 'var(--vscode-list-inactiveSelectionBackground)';
+    }
+    if (isHovered) {
+        return 'var(--vscode-list-hoverBackground)';
+    }
+    return 'var(--vscode-sideBar-background)';
+};
 
-export const GraphColumn: React.FC<GraphColumnProps> = ({ node, rowHeight, graphWidth, rowIndex, onJumpToCommit }) => {
+export const GraphColumn: React.FC<GraphColumnProps> = ({
+    node,
+    rowHeight,
+    graphWidth,
+    rowIndex,
+    onJumpToCommit,
+    isSelected = false,
+    isHovered = false,
+    hasFocus = false
+}) => {
     const DOT_RADIUS = 5;
     const STROKE_WIDTH = 3;
 
@@ -95,7 +119,7 @@ export const GraphColumn: React.FC<GraphColumnProps> = ({ node, rowHeight, graph
                 cy={rowHeight / 2}
                 r={DOT_RADIUS}
                 fill={node.color}
-                stroke="var(--vscode-editor-background)"
+                stroke={getStrokeColor(isSelected, isHovered, hasFocus)}
                 strokeWidth={STROKE_WIDTH}
             />
         </svg>
