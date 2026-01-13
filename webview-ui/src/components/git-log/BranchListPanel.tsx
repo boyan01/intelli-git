@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback, useRef } from 'react';
+import React, { useMemo, useCallback, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { BranchListData, LocalBranchInfo } from '../../../../shared/messages';
 import { rpc } from '../../lib/rpc_client';
@@ -34,13 +34,24 @@ export const BranchListPanel: React.FC<BranchListPanelProps> = ({ onBranchDouble
     const { t } = useTranslation();
     const { data, loading: isLoading } = useRpcData(
         () => rpc.getBranchListData(),
-        { initialValue: emptyBranchListData }
+        { initialValue: emptyBranchListData, cacheKey: 'gitLog.branchListData' }
     );
     const treeRef = useRef<BasicTreeViewRef>(null);
 
     const [expandedIds, setExpandedIds] = usePersistedState('branchList.expandedIds');
     const [selectedId, setSelectedId] = usePersistedState('branchList.selectedId');
     const [filterText, setFilterText] = usePersistedState('branchList.filterText');
+    const [cachedScrollTop, setCachedScrollTop] = usePersistedState('branchList.scrollTop');
+    const treeContainerRef = useRef<HTMLDivElement>(null);
+    const hasRestoredScroll = useRef(false);
+
+    // Restore scroll position after data loads
+    useEffect(() => {
+        if (!hasRestoredScroll.current && treeContainerRef.current && cachedScrollTop > 0 && data) {
+            treeContainerRef.current.scrollTop = cachedScrollTop;
+            hasRestoredScroll.current = true;
+        }
+    }, [data, cachedScrollTop]);
 
     const handleToggle = useCallback((id: string, expanded: boolean) => {
         setExpandedIds(prev => {
@@ -383,7 +394,11 @@ export const BranchListPanel: React.FC<BranchListPanelProps> = ({ onBranchDouble
                 </button>
             </div>
 
-            <div className={styles.treeContainer}>
+            <div
+                ref={treeContainerRef}
+                className={styles.treeContainer}
+                onScroll={(e) => setCachedScrollTop(e.currentTarget.scrollTop)}
+            >
                 {renderTreeContent()}
             </div>
         </div>

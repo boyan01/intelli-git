@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
-import { vscode } from '../lib/vscode';
+import { getStoredState, updateStoredState } from '../lib/stateCache';
+import type { FileStatus, BranchInfo, BranchListData, LogCommit } from '@shared/messages';
 
 /**
  * Schema defining all persistable state keys and their types.
@@ -12,7 +13,9 @@ export interface PersistedStateSchema {
     'commit.message': string;
     'commit.amend': boolean;
     'commit.selectedFiles': Set<string>;
-    'commit.collapsedGroups': Set<string>;
+    'commit.expandedIds': Set<string>;
+    'commit.files': FileStatus[];
+    'commit.branchInfo': BranchInfo;
 
     // Push View
     'push.splitSize': number;
@@ -33,6 +36,23 @@ export interface PersistedStateSchema {
     'branchList.selectedBranch': string | null;
     'branchList.selectedId': string | null;
     'branchList.filterText': string;
+    'branchList.scrollTop': number;
+
+    // Git Log View
+    'gitLog.branchListData': BranchListData;
+    'gitLog.filter.branch': string;
+    'gitLog.filter.search': string;
+    'gitLog.filter.regexMode': boolean;
+    'gitLog.filter.caseSensitive': boolean;
+    'gitLog.filter.authors': string[];
+    'gitLog.filter.paths': string[];
+    'gitLog.filter.since': string | undefined;
+    'gitLog.filter.until': string | undefined;
+    'gitLog.commits': LogCommit[];
+    'gitLog.scrollTop': number;
+    'gitLog.selectedHashes': string[];
+    'gitLog.branchSplitRatio': number;
+    'gitLog.detailsSplitRatio': number;
 }
 
 export const stateDefaults: PersistedStateSchema = {
@@ -42,7 +62,9 @@ export const stateDefaults: PersistedStateSchema = {
     'commit.message': '',
     'commit.amend': false,
     'commit.selectedFiles': new Set(),
-    'commit.collapsedGroups': new Set(),
+    'commit.expandedIds': new Set(),
+    'commit.files': [],
+    'commit.branchInfo': { current: '', all: [], ahead: 0, behind: 0, rebaseStatus: 'none' },
 
     // Push View
     'push.splitSize': 300,
@@ -63,25 +85,30 @@ export const stateDefaults: PersistedStateSchema = {
     'branchList.selectedBranch': null,
     'branchList.selectedId': null,
     'branchList.filterText': '',
+    'branchList.scrollTop': 0,
+
+    // Git Log View
+    'gitLog.branchListData': {
+        currentBranch: '',
+        localBranches: [],
+        localBranchesInfo: [],
+        remoteBranches: {},
+        tags: []
+    },
+    'gitLog.filter.branch': 'all',
+    'gitLog.filter.search': '',
+    'gitLog.filter.regexMode': false,
+    'gitLog.filter.caseSensitive': false,
+    'gitLog.filter.authors': [],
+    'gitLog.filter.paths': [],
+    'gitLog.filter.since': undefined,
+    'gitLog.filter.until': undefined,
+    'gitLog.commits': [],
+    'gitLog.scrollTop': 0,
+    'gitLog.selectedHashes': [],
+    'gitLog.branchSplitRatio': 0,
+    'gitLog.detailsSplitRatio': 0.68,
 };
-
-type StoredState = Record<string, unknown>;
-
-let stateCache: StoredState | null = null;
-
-function getStoredState(): StoredState {
-    if (stateCache === null) {
-        stateCache = vscode.getState<StoredState>() ?? {};
-    }
-    return stateCache;
-}
-
-function updateStoredState(key: string, value: unknown): void {
-    const state = getStoredState();
-    state[key] = value;
-    stateCache = state;
-    vscode.setState(state);
-}
 
 function serialize<K extends keyof PersistedStateSchema>(
     _key: K,

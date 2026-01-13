@@ -7,6 +7,7 @@ import styles from './GitLogView.module.css';
 import { useState, useCallback, useEffect, useRef } from 'react';
 import type { CommitDetails } from '../../../../shared/messages';
 import { rpc } from '../../lib/rpc_client';
+import { usePersistedState } from '../../hooks/usePersistedState';
 
 const NARROW_THRESHOLD = 800;
 
@@ -16,6 +17,9 @@ export function GitLogView() {
     const [branchFilter, setBranchFilter] = useState<string | undefined>(undefined);
     const [commitDetails, setCommitDetails] = useState<CommitDetails | undefined>(undefined);
     const [isNarrowMode, setIsNarrowMode] = useState(false);
+
+    const [branchSplitRatio, setBranchSplitRatio] = usePersistedState('gitLog.branchSplitRatio');
+    const [detailsSplitRatio, setDetailsSplitRatio] = usePersistedState('gitLog.detailsSplitRatio');
 
     const handleBranchDoubleClick = useCallback((branch: string) => {
         setBranchFilter(branch);
@@ -66,6 +70,8 @@ export function GitLogView() {
                 direction="horizontal"
                 defaultSize={200}
                 minSize={0}
+                ratio={branchSplitRatio}
+                onRatioChange={setBranchSplitRatio}
                 first={<BranchListPanel onBranchDoubleClick={handleBranchDoubleClick} />}
                 second={
                     isNarrowMode ? (
@@ -75,6 +81,8 @@ export function GitLogView() {
                             direction="horizontal"
                             defaultRatio={0.68}
                             minSize={200}
+                            ratio={detailsSplitRatio}
+                            onRatioChange={setDetailsSplitRatio}
                             first={logListPanel}
                             second={commitDetailsPanel}
                         />

@@ -10,6 +10,10 @@ export interface SplitPaneProps {
     secondDefaultSize?: number;
     /** 0-1 ratio, takes precedence over defaultSize */
     defaultRatio?: number;
+    /** Controlled ratio (0-1) */
+    ratio?: number;
+    /** Callback when ratio changes */
+    onRatioChange?: (ratio: number) => void;
     minSize?: number;
     maxSize?: number;
     className?: string;
@@ -24,16 +28,24 @@ export function SplitPane({
     defaultSize = 200,
     secondDefaultSize,
     defaultRatio,
+    ratio: controlledRatio,
+    onRatioChange,
     minSize = 50,
     maxSize,
     className = ''
 }: SplitPaneProps) {
     const containerRef = useRef<HTMLDivElement>(null);
     // Store ratio (0-1) instead of pixel size
-    const [ratio, setRatio] = useState<number | null>(() => {
+    const [internalRatio, setInternalRatio] = useState<number | null>(() => {
+        if (controlledRatio !== undefined && controlledRatio > 0) return controlledRatio;
         if (defaultRatio !== undefined) return defaultRatio;
         return null;
     });
+    const ratio = (controlledRatio !== undefined && controlledRatio > 0) ? controlledRatio : internalRatio;
+    const setRatio = useCallback((newRatio: number) => {
+        setInternalRatio(newRatio);
+        onRatioChange?.(newRatio);
+    }, [onRatioChange]);
     const isDragging = useRef(false);
     const startPos = useRef(0);
     const startRatio = useRef(0);

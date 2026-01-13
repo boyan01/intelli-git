@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useMemo } from 'react';
 import type { LogCommit, LogOptions } from '../../../../../shared/messages';
 import { rpc } from '../../../lib/rpc_client';
 import { LONG_DISTANCE_THRESHOLD } from '../graphUtils';
+import { getCachedValue, updateStoredState } from '../../../lib/stateCache';
 
 interface UseLogCommitLoaderResult {
     commits: LogCommit[];
@@ -15,11 +16,36 @@ interface UseLogCommitLoaderResult {
 
 const BATCH_SIZE = 50 + LONG_DISTANCE_THRESHOLD;
 
+// Build initial filters from cached values to match FilterToolbar's initial state
+function getInitialFilters(): Partial<LogOptions> {
+    const branch = getCachedValue('gitLog.filter.branch', 'all');
+    const search = getCachedValue('gitLog.filter.search', '');
+    const regexMode = getCachedValue('gitLog.filter.regexMode', false);
+    const caseSensitive = getCachedValue('gitLog.filter.caseSensitive', false);
+    const authors = getCachedValue('gitLog.filter.authors', [] as string[]);
+    const paths = getCachedValue('gitLog.filter.paths', [] as string[]);
+    const since = getCachedValue('gitLog.filter.since', undefined as string | undefined);
+    const until = getCachedValue('gitLog.filter.until', undefined as string | undefined);
+
+    return {
+        branch: branch === 'all' ? undefined : branch,
+        search: search || undefined,
+        regexMode: regexMode || undefined,
+        caseSensitive: caseSensitive || undefined,
+        authors: authors.length > 0 ? authors : undefined,
+        paths: paths.length > 0 ? paths : undefined,
+        since,
+        until
+    };
+}
+
 export const useLogCommitLoader = (): UseLogCommitLoaderResult => {
-    const [commits, setCommits] = useState<LogCommit[]>([]);
+    const [commits, setCommits] = useState<LogCommit[]>(() =>
+        getCachedValue('gitLog.commits', [])
+    );
     const [loading, setLoading] = useState(false);
     const [hasMore, setHasMore] = useState(true);
-    const [filters, setFilters] = useState<Partial<LogOptions>>({});
+    const [filters, setFilters] = useState<Partial<LogOptions>>(getInitialFilters);
     // Store as array to preserve order (first = latest unpushed)
     const [unpushedList, setUnpushedList] = useState<string[]>([]);
 
@@ -52,7 +78,11 @@ export const useLogCommitLoader = (): UseLogCommitLoaderResult => {
                 setHasMore(true);
             }
 
-            setCommits(prev => reset ? newCommits : [...prev, ...newCommits]);
+            setCommits(prev => {
+                const result = reset ? newCommits : [...prev, ...newCommits];
+                updateStoredState('gitLog.commits', result);
+                return result;
+            });
         } catch (error) {
             console.error('Failed to load logs', error);
         } finally {

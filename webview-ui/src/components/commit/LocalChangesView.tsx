@@ -52,7 +52,10 @@ function RebaseIndicator({ status }: { status: 'interactive' | 'merging' }) {
 export function LocalChangesView() {
     const { t } = useTranslation();
     const [activeTab, setActiveTab] = usePersistedState('commit.activeTab');
-    const { data: branches } = useRpcData(() => rpc.getBranchInfo(), { initialValue: defaultBranchInfo });
+    const { data: branches } = useRpcData(() => rpc.getBranchInfo(), {
+        initialValue: defaultBranchInfo,
+        cacheKey: 'commit.branchInfo'
+    });
 
     const isRebasing = branches.rebaseStatus && branches.rebaseStatus !== 'none';
 

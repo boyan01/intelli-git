@@ -1,20 +1,29 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import type { LogCommit } from '../../../../../shared/messages';
 
 interface UseCommitSelectionProps {
     commits: LogCommit[];
     onSelectionChange?: (commits: string[]) => void;
     scrollToRow?: (index: number) => void;
+    initialSelection?: string[];
+    onSelectionPersist?: (selection: string[]) => void;
 }
 
 export const useCommitSelection = ({
     commits,
     onSelectionChange,
-    scrollToRow
+    scrollToRow,
+    initialSelection,
+    onSelectionPersist
 }: UseCommitSelectionProps) => {
-    const [selectedCommits, setSelectedCommits] = useState<string[]>([]);
+    const [selectedCommits, setSelectedCommits] = useState<string[]>(initialSelection || []);
     const [blinkHash, setBlinkHash] = useState<string | null>(null);
-    const lastSelectedRef = useRef<string | null>(null);
+    const lastSelectedRef = useRef<string | null>(initialSelection?.[0] || null);
+
+    // Persist selection changes
+    useEffect(() => {
+        onSelectionPersist?.(selectedCommits);
+    }, [selectedCommits, onSelectionPersist]);
 
     const isSelected = useCallback((hash: string) => selectedCommits.includes(hash), [selectedCommits]);
 

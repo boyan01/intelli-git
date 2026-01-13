@@ -5,13 +5,18 @@ import { useTranslation } from 'react-i18next';
 
 interface DateFilterProps {
     onChange: (dates: { since?: string; until?: string }) => void;
+    initialSince?: string;
+    initialUntil?: string;
 }
 
-export const DateFilter: React.FC<DateFilterProps> = ({ onChange }) => {
+export const DateFilter: React.FC<DateFilterProps> = ({ onChange, initialSince, initialUntil }) => {
     const { t } = useTranslation();
-    const [filterType, setFilterType] = useState<'all' | '24h' | '7d' | 'custom'>('all');
-    const [customSince, setCustomSince] = useState('');
-    const [customUntil, setCustomUntil] = useState('');
+    const [filterType, setFilterType] = useState<'all' | '24h' | '7d' | 'custom'>(() => {
+        if (initialSince || initialUntil) return 'custom';
+        return 'all';
+    });
+    const [customSince, setCustomSince] = useState(initialSince || '');
+    const [customUntil, setCustomUntil] = useState(initialUntil || '');
     const [showMenu, setShowMenu] = useState(false);
     const [showPopup, setShowPopup] = useState(false);
 

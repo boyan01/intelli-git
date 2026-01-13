@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import type { LogOptions } from '../../../../../shared/messages';
 import { rpc } from '../../../lib/rpc_client';
 import styles from './FilterToolbar.module.css';
@@ -6,6 +6,7 @@ import { DateFilter } from './DateFilter';
 import { UserFilter } from './UserFilter';
 import { logger } from '@/lib/log';
 import { useTranslation } from 'react-i18next';
+import { usePersistedState } from '../../../hooks/usePersistedState';
 
 interface FilterToolbarProps {
     onFilterChange: (options: Partial<LogOptions>) => void;
@@ -14,14 +15,14 @@ interface FilterToolbarProps {
 
 export const FilterToolbar: React.FC<FilterToolbarProps> = ({ onFilterChange, externalBranch }) => {
     const { t } = useTranslation();
-    const [branch, setBranch] = useState('all');
-    const [search, setSearch] = useState('');
-    const [regexMode, setRegexMode] = useState(false);
-    const [caseSensitive, setCaseSensitive] = useState(false);
-    const [authors, setAuthors] = useState<string[]>([]);
-    const [paths, setPaths] = useState<string[]>([]);
-    const [since, setSince] = useState<string | undefined>();
-    const [until, setUntil] = useState<string | undefined>();
+    const [branch, setBranch] = usePersistedState('gitLog.filter.branch');
+    const [search, setSearch] = usePersistedState('gitLog.filter.search');
+    const [regexMode, setRegexMode] = usePersistedState('gitLog.filter.regexMode');
+    const [caseSensitive, setCaseSensitive] = usePersistedState('gitLog.filter.caseSensitive');
+    const [authors, setAuthors] = usePersistedState('gitLog.filter.authors');
+    const [paths, setPaths] = usePersistedState('gitLog.filter.paths');
+    const [since, setSince] = usePersistedState('gitLog.filter.since');
+    const [until, setUntil] = usePersistedState('gitLog.filter.until');
 
     // Sync external branch
     useEffect(() => {
@@ -139,9 +140,9 @@ export const FilterToolbar: React.FC<FilterToolbarProps> = ({ onFilterChange, ex
             </button>
 
             {/* User filter */}
-            <UserFilter onChange={authors => setAuthors(authors ?? [])} />
+            <UserFilter onChange={authors => setAuthors(authors ?? [])} initialAuthors={authors} />
 
-            <DateFilter onChange={handleDateChange} />
+            <DateFilter onChange={handleDateChange} initialSince={since} initialUntil={until} />
 
             {/* Path filter */}
             <button

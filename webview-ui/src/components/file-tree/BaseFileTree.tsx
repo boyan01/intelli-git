@@ -27,8 +27,9 @@ export interface BaseFileTreeProps {
     activeFile?: string | null;
     readonly?: boolean;
     rootLabel?: string;
-    isCollapsed?: boolean;
-    onToggleCollapse?: () => void;
+    rootId?: string;
+    expandedIds?: Set<string>;
+    onToggle?: (id: string, expanded: boolean) => void;
     onToggleFile?: (path: string, checked: boolean) => void;
     onFileClick?: (path: string, status?: string) => void;
     onFileDoubleClick?: (path: string, status?: string) => void;
@@ -182,8 +183,9 @@ export const BaseFileTree = React.forwardRef<BaseFileTreeRef, BaseFileTreeProps>
     activeFile,
     readonly = false,
     rootLabel,
-    isCollapsed = false,
-    onToggleCollapse,
+    rootId = '__root__',
+    expandedIds,
+    onToggle,
     onToggleFile,
     onFileClick,
     onFileDoubleClick,
@@ -215,7 +217,7 @@ export const BaseFileTree = React.forwardRef<BaseFileTreeRef, BaseFileTreeProps>
         if (rootLabel) {
             const totalFiles = result.reduce((sum, n) => sum + countFiles(n), 0);
             result = [{
-                id: '__root__',
+                id: rootId,
                 label: rootLabel,
                 data: {
                     path: '',
@@ -223,11 +225,11 @@ export const BaseFileTree = React.forwardRef<BaseFileTreeRef, BaseFileTreeProps>
                     isRoot: true,
                     fileCount: totalFiles
                 },
-                children: isCollapsed ? [] : result
+                children: result
             }];
         }
         return result;
-    }, [items, viewMode, rootLabel, isCollapsed]);
+    }, [items, viewMode, rootLabel, rootId]);
 
     React.useLayoutEffect(() => {
         computeSelection(nodes, selectedFiles);
@@ -236,14 +238,10 @@ export const BaseFileTree = React.forwardRef<BaseFileTreeRef, BaseFileTreeProps>
 
 
     const handleNodeClick = useCallback((node: TreeNode<FileNodeData>) => {
-        if (node.data?.isRoot) {
-            onToggleCollapse?.();
-            return;
-        }
         if (node.data?.isFile) {
             onFileClick?.(node.data.path, node.data.status);
         }
-    }, [onFileClick, onToggleCollapse]);
+    }, [onFileClick]);
 
     const handleNodeDoubleClick = useCallback((node: TreeNode<FileNodeData>) => {
         if (node.data?.isFile) {
@@ -360,6 +358,8 @@ export const BaseFileTree = React.forwardRef<BaseFileTreeRef, BaseFileTreeProps>
         <BasicTreeView
             ref={ref}
             nodes={nodes}
+            expandedIds={expandedIds}
+            onToggle={onToggle}
             defaultExpandAll={true}
             selectedId={activeFile || undefined}
             onSelect={handleNodeClick}

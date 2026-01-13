@@ -715,45 +715,13 @@ export class GitService {
 
     public async getRebaseStatus(): Promise<'none' | 'interactive' | 'merging'> {
         try {
-            // Check for rebase/merge directories
-            // .git/rebase-merge exists during interactive rebase
-            // .git/rebase-apply exists during standard rebase
-            // OR use git status
-            const statusSummary = await this.git.status();
-
-            if (statusSummary.current === 'HEAD' && statusSummary.tracking === null) {
-                // Often indicates detached HEAD functionality, possibly rebase
+            const statusText = await this.git.raw(['status']);
+            if (statusText.includes('interactive rebase in progress') || statusText.includes('rebase in progress')) {
+                return 'interactive';
             }
-
-            // Simple-git doesn't explicitly flag "rebase interactive", but we can infer or use raw
-            try {
-                // Check if rebase directory exists (cannot depend on fs directly easily without path, use git rev-parse --git-dir)
-                // Using raw command to check status text or looking for specific files is safer via git
-                const gitDir = await this.git.revparse(['--git-dir']);
-
-                // We'll rely on fs access via vscode (pass fs or check via hacks? no, we have workspaceRoot)
-                // Let's use `git status` output text as the user showed in the issue
-                // "interactive rebase in progress"
-
-                // Actually simple-git status result might have info?
-                // Unfortunately no standard property.
-                // Let's parse `git status` short output? No, that's what .status() does.
-
-                // Let's use raw git status to check
-                const statusText = await this.git.raw(['status']);
-                if (statusText.includes('interactive rebase in progress')) {
-                    return 'interactive';
-                }
-                if (statusText.includes('rebase in progress')) {
-                    return 'interactive'; // Treat as interactive for UI purposes (show abort)
-                }
-                if (statusText.includes('You have unmerged paths')) {
-                    return 'merging';
-                }
-            } catch {
-                // ignore
+            if (statusText.includes('You have unmerged paths')) {
+                return 'merging';
             }
-
             return 'none';
         } catch {
             return 'none';
@@ -930,9 +898,11 @@ export class GitService {
     };
 
     public getRpcBranchInfo = async (): Promise<BranchInfo> => {
-        const branches = await this.getBranches();
-        const branchStatus = await this.getBranchStatus();
-        const rebaseStatus = await this.getRebaseStatus();
+        const [branches, branchStatus, rebaseStatus] = await Promise.all([
+            this.getBranches(),
+            this.getBranchStatus(),
+            this.getRebaseStatus()
+        ]);
 
         return {
             current: branches.current,

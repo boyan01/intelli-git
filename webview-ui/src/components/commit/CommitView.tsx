@@ -64,14 +64,17 @@ export function CommitView({ rebaseStatus }: CommitViewProps) {
     const { t } = useTranslation();
 
     // Data State
-    const { data: files, loading } = useRpcData(() => rpc.getStatus(), { initialValue: [] as FileStatus[] });
+    const { data: files, loading } = useRpcData(() => rpc.getStatus(), {
+        initialValue: [] as FileStatus[],
+        cacheKey: 'commit.files'
+    });
     const changelists = useMemo(() => buildChangelists(files), [files]);
     const [activeFile, setActiveFile] = useState<string | null>(null);
 
     // Persisted UI State
     const [viewMode, setViewMode] = usePersistedState('commit.viewMode');
     const [selectedFiles, setSelectedFiles] = usePersistedState('commit.selectedFiles');
-    const [collapsedGroups, setCollapsedGroups] = usePersistedState('commit.collapsedGroups');
+    const [expandedIds, setExpandedIds] = usePersistedState('commit.expandedIds');
     const [commitMessage, setCommitMessage] = usePersistedState('commit.message');
     const [amend, setAmend] = usePersistedState('commit.amend');
 
@@ -95,14 +98,14 @@ export function CommitView({ rebaseStatus }: CommitViewProps) {
         });
     }, [setSelectedFiles]);
 
-    const toggleGroupCollapse = useCallback((groupId: string) => {
-        setCollapsedGroups(prev => {
+    const handleToggle = useCallback((id: string, expanded: boolean) => {
+        setExpandedIds(prev => {
             const next = new Set(prev);
-            if (next.has(groupId)) next.delete(groupId);
-            else next.add(groupId);
+            if (expanded) next.add(id);
+            else next.delete(id);
             return next;
         });
-    }, [setCollapsedGroups]);
+    }, [setExpandedIds]);
 
     const fileStats = useMemo(() => {
         let added = 0;
@@ -163,26 +166,31 @@ export function CommitView({ rebaseStatus }: CommitViewProps) {
                 viewMode={viewMode}
                 selectedFiles={selectedFiles}
                 onViewModeChange={setViewMode}
-                onExpandAll={() => setCollapsedGroups(new Set())}
-                onCollapseAll={() => setCollapsedGroups(new Set(changelists.map(g => g.id)))}
+                onExpandAll={() => {
+                    const allIds = new Set(expandedIds);
+                    changelists.forEach(g => allIds.add(`__root__${g.id}`));
+                    setExpandedIds(allIds);
+                }}
+                onCollapseAll={() => {
+                    const newIds = new Set(expandedIds);
+                    changelists.forEach(g => newIds.delete(`__root__${g.id}`));
+                    setExpandedIds(newIds);
+                }}
             />
 
             <div className={styles.fileListContainer}>
                 {changelists.length === 0 ? (
                     loading ? null : <div className={styles.emptyState}>{t('No changes')}</div>
                 ) : (
-                    changelists.map(group => (
-                        <ChangelistTree
-                            key={group.id}
-                            group={group}
-                            viewMode={viewMode}
-                            selectedFiles={selectedFiles}
-                            isCollapsed={collapsedGroups.has(group.id)}
-                            activeFile={activeFile}
-                            onToggleFile={toggleFile}
-                            onToggleCollapse={() => toggleGroupCollapse(group.id)}
-                        />
-                    ))
+                    <ChangelistTree
+                        groups={changelists}
+                        viewMode={viewMode}
+                        selectedFiles={selectedFiles}
+                        expandedIds={expandedIds}
+                        activeFile={activeFile}
+                        onToggle={handleToggle}
+                        onToggleFile={toggleFile}
+                    />
                 )}
             </div>
 

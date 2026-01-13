@@ -145,12 +145,16 @@ const AuthorInputPopup: React.FC<AuthorInputPopupProps> = ({
 
 interface UserFilterProps {
     onChange: (authors: string[] | undefined) => void;
+    initialAuthors?: string[];
 }
 
-export const UserFilter: React.FC<UserFilterProps> = ({ onChange }) => {
+export const UserFilter: React.FC<UserFilterProps> = ({ onChange, initialAuthors }) => {
     const { t } = useTranslation();
-    const [filterType, setFilterType] = useState<'all' | 'me' | 'custom'>('all');
-    const [appliedValue, setAppliedValue] = useState('');
+    const [filterType, setFilterType] = useState<'all' | 'me' | 'custom'>(() => {
+        if (initialAuthors && initialAuthors.length > 0) return 'custom';
+        return 'all';
+    });
+    const [appliedValue, setAppliedValue] = useState(() => initialAuthors?.join('\n') || '');
     const [showMenu, setShowMenu] = useState(false);
     const [showPopup, setShowPopup] = useState(false);
     const [allAuthors, setAllAuthors] = useState<string[]>([]);

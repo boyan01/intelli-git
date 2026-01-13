@@ -9,6 +9,7 @@ import { useLogCommitLoader } from './hooks/useLogCommitLoader';
 import { useCommitSelection } from './hooks/useCommitSelection';
 import { formatRelativeDate } from '../../utils/dateUtils';
 import { CommitDetailsView } from '../common/CommitDetailsView';
+import { usePersistedState } from '../../hooks/usePersistedState';
 import type { CommitDetails } from '../../../../shared/messages';
 
 interface LogListPanelProps {
@@ -30,7 +31,9 @@ export const LogListPanel: React.FC<LogListPanelProps> = ({
     commitDetails
 }) => {
     const containerRef = useRef<HTMLDivElement>(null);
-    const [scrollTop, setScrollTop] = useState(0);
+    const [cachedScrollTop, setCachedScrollTop] = usePersistedState('gitLog.scrollTop');
+    const hasRestoredScroll = useRef(false);
+    const [scrollTop, setScrollTop] = useState(cachedScrollTop);
     const [clientHeight, setClientHeight] = useState(0);
     const [hoveredHash, setHoveredHash] = useState<string | null>(null);
     const [focusedHash, setFocusedHash] = useState<string | null>(null);
@@ -134,6 +137,8 @@ export const LogListPanel: React.FC<LogListPanelProps> = ({
         containerRef.current.scrollTop = Math.max(0, index * ROW_HEIGHT - centerOffset);
     }, [clientHeight]);
 
+    const [cachedSelectedHashes, setCachedSelectedHashes] = usePersistedState('gitLog.selectedHashes');
+
     const {
         lastSelectedRef,
         blinkHash,
@@ -144,7 +149,9 @@ export const LogListPanel: React.FC<LogListPanelProps> = ({
     } = useCommitSelection({
         commits,
         onSelectionChange,
-        scrollToRow
+        scrollToRow,
+        initialSelection: cachedSelectedHashes,
+        onSelectionPersist: setCachedSelectedHashes
     });
 
     const handleRowClickWithHover = useCallback((e: React.MouseEvent, commit: Parameters<typeof handleRowClick>[1]) => {
@@ -173,9 +180,18 @@ export const LogListPanel: React.FC<LogListPanelProps> = ({
         return () => observer.disconnect();
     }, []);
 
+    // Restore scroll position after component mounts and has cached commits
+    useEffect(() => {
+        if (!hasRestoredScroll.current && containerRef.current && cachedScrollTop > 0 && commits.length > 0) {
+            containerRef.current.scrollTop = cachedScrollTop;
+            hasRestoredScroll.current = true;
+        }
+    }, [commits.length, cachedScrollTop]);
+
     const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
         const target = e.currentTarget;
         setScrollTop(target.scrollTop);
+        setCachedScrollTop(target.scrollTop);
 
         // Preload when less than 30 rows remain (LONG_DISTANCE_THRESHOLD)
         const visibleEndRow = Math.ceil((target.scrollTop + target.clientHeight) / ROW_HEIGHT);
