@@ -523,6 +523,7 @@ export class GitService {
 
     /**
      * Get list of unpushed commit hashes (commits in local but not in upstream).
+     * For branches without upstream, returns commits not reachable from any remote.
      */
     public async getUnpushedCommits(): Promise<Set<string>> {
         try {
@@ -531,8 +532,14 @@ export class GitService {
             const hashes = result.trim().split('\n').filter(h => h.length > 0);
             return new Set(hashes);
         } catch {
-            // No upstream or error, return empty set
-            return new Set();
+            // No upstream configured (e.g., new branch), get commits not in any remote
+            try {
+                const result = await this.git.raw(['log', 'HEAD', '--not', '--remotes', '--format=%H']);
+                const hashes = result.trim().split('\n').filter(h => h.length > 0);
+                return new Set(hashes);
+            } catch {
+                return new Set();
+            }
         }
     }
 
