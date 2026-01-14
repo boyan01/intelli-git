@@ -4,7 +4,7 @@
     height: 22px;
     padding: 0 8px;
     background-color: var(--vscode-titleBar-activeBackground);
-    gap: 4px;
+    gap: 2px;
 }
 
 .searchBox {
@@ -15,9 +15,9 @@
     border-radius: 2px;
     padding: 0 4px;
     flex: 1;
-    max-width: 140px;
+    max-width: 120px;
     height: 18px;
-    gap: 2px;
+    gap: 1px;
 }
 
 .searchInput {
@@ -68,13 +68,13 @@
     border: none;
     color: var(--vscode-foreground);
     cursor: pointer;
-    padding: 0 4px;
+    padding: 0 3px;
     font-size: 11px;
     white-space: nowrap;
     height: 18px;
     border-radius: 2px;
     outline: none;
-    gap: 2px;
+    gap: 1px;
 }
 
 .filterButton:hover {
@@ -127,14 +127,24 @@
 
 .icon {
     flex-shrink: 0;
+    margin-left: 2px;
 }
 
 .iconSmall {
     font-size: 10px;
+    opacity: 0.7;
 }
 
 .iconMedium {
-    font-size: 12px;
+    font-size: 11px;
+    opacity: 0.7;
+    border-radius: 2px;
+    padding: 1px;
+}
+
+.iconMedium:hover {
+    opacity: 1;
+    background-color: var(--vscode-toolbar-hoverBackground);
 }
 
 .buttonLabel {

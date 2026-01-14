@@ -65,7 +65,6 @@ export const FilterMenu: React.FC<FilterMenuProps> = ({
                 {active ? (
                     <span
                         className={`codicon codicon-close ${styles.icon} ${styles.iconMedium}`}
-                        style={{ marginLeft: 4 }}
                         onClick={(e) => {
                             e.stopPropagation();
                             onClear();

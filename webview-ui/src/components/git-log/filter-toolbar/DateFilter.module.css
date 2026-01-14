@@ -12,12 +12,13 @@
     border: none;
     color: var(--vscode-foreground);
     cursor: pointer;
-    padding: 2px 6px;
-    font-size: 12px;
+    padding: 0 3px;
+    font-size: 11px;
     white-space: nowrap;
-    height: 22px;
+    height: 18px;
     border-radius: 2px;
     outline: none;
+    gap: 1px;
 }
 
 .filterButton:hover {
@@ -30,14 +31,24 @@
 
 .icon {
     flex-shrink: 0;
+    margin-left: 2px;
 }
 
 .iconSmall {
     font-size: 10px;
+    opacity: 0.7;
 }
 
 .iconMedium {
-    font-size: 12px;
+    font-size: 11px;
+    opacity: 0.7;
+    border-radius: 2px;
+    padding: 1px;
+}
+
+.iconMedium:hover {
+    opacity: 1;
+    background-color: var(--vscode-toolbar-hoverBackground);
 }
 
 .dropdownMenu {
