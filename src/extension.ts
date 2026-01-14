@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { CommitViewProvider, GitLogViewProvider, PushPanel, StashContentProvider, RevisionContentProvider } from './providers';
 import { GitService } from './services/GitService';
+import { createGitWatcher } from './services/GitRepositoryWatcher';
 import { ChangelistService } from './services/ChangelistService';
 import { BranchStatusBar, GitLogStatusBar } from './ui';
 import { registerStashCommands, registerNavigationCommands, registerBranchCommands, registerLogCommands, registerChangelistCommands } from './commands';
@@ -61,31 +62,22 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(branchStatusBar);
     context.subscriptions.push(gitLogStatusBar);
 
-    // File watcher for auto-refresh
-    const watcher = vscode.workspace.createFileSystemWatcher('**/*');
-    let refreshTimeout: NodeJS.Timeout | undefined;
-
-    const triggerRefresh = (uri?: vscode.Uri) => {
-        if (uri && (/\/\.git\//.test(uri.path) || uri.path.endsWith('/.git'))) {
-            return;
-        }
-
-        if (refreshTimeout) {
-            clearTimeout(refreshTimeout);
-        }
-        refreshTimeout = setTimeout(() => {
-            provider.rpc?.refresh();
-            gitLogProvider.rpc?.refresh();
-            branchStatusBar.update();
-            gitLogStatusBar.update();
-        }, 200);
+    const triggerRefresh = () => {
+        provider.rpc?.refresh();
+        gitLogProvider.rpc?.refresh();
+        branchStatusBar.update();
+        gitLogStatusBar.update();
     };
 
-    watcher.onDidChange(triggerRefresh);
-    watcher.onDidCreate(triggerRefresh);
-    watcher.onDidDelete(triggerRefresh);
+    // Git watcher: uses VS Code Git extension API, falls back to FileSystemWatcher
+    createGitWatcher(context, workspaceRoot).then(watcher => {
+        context.subscriptions.push(watcher.onChange(triggerRefresh));
+        context.subscriptions.push(watcher);
+    });
 
-    context.subscriptions.push(watcher);
+    // GitService triggers refresh on Git state changes (commit, reset, reword, etc.)
+    context.subscriptions.push(gitService.onDidChange(triggerRefresh));
+    context.subscriptions.push(gitService);
 
     context.subscriptions.push(
         vscode.workspace.onDidChangeWorkspaceFolders(() => {

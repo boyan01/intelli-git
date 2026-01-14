@@ -1,17 +1,35 @@
 import simpleGit, { SimpleGit, StatusResult } from 'simple-git';
+import * as vscode from 'vscode';
 import { BranchInfo, LogCommit, LogOptions, CommitDetails, RefInfo, FileStatus, CommitFile, PushInitState, PushCommitsData, BranchListData, GitStatusCode } from '../../shared/messages';
 import { log } from '../utils/logger';
 import * as fs from 'fs';
 import * as path from 'path';
 
 
-export class GitService {
+export class GitService implements vscode.Disposable {
     private git: SimpleGit;
     private _workspaceRoot: string;
+    private _onDidChange = new vscode.EventEmitter<void>();
+
+    /**
+     * Fired when Git state changes (commit, reset, branch switch, etc.)
+     */
+    public readonly onDidChange = this._onDidChange.event;
 
     constructor(workspaceRoot: string) {
         this._workspaceRoot = workspaceRoot;
         this.git = simpleGit(workspaceRoot);
+    }
+
+    /**
+     * Notify listeners that Git state has changed.
+     */
+    private fireChange() {
+        this._onDidChange.fire();
+    }
+
+    public dispose() {
+        this._onDidChange.dispose();
     }
 
     public getWorkspaceRoot(): string {
@@ -307,27 +325,45 @@ export class GitService {
 
     public async commit(message: string, files?: string[]): Promise<void> {
         if (files && files.length > 0) {
+            // Filter out files that no longer exist in current git status
+            const currentStatus = await this.getStatus();
+            const validPaths = new Set(currentStatus.map(f => f.path));
+            const filesToCommit = files.filter(f => validPaths.has(f));
+
+            if (filesToCommit.length === 0) {
+                throw new Error('No valid files to commit');
+            }
+
             // Stage files first (required for unversioned files)
-            await this.git.add(files);
+            await this.git.add(filesToCommit);
             await this.git.commit(message);
         } else {
             await this.git.commit(message);
         }
+        this.fireChange();
     }
 
     public async commitAmend(message?: string, files?: string[]): Promise<void> {
         if (files && files.length > 0) {
-            await this.git.add(files);
+            // Filter out files that no longer exist in current git status
+            const currentStatus = await this.getStatus();
+            const validPaths = new Set(currentStatus.map(f => f.path));
+            const filesToStage = files.filter(f => validPaths.has(f));
+
+            if (filesToStage.length > 0) {
+                await this.git.add(filesToStage);
+            }
         }
 
-        const options: string[] = ['--amend'];
+        const args: string[] = ['commit', '--amend'];
         if (message) {
-            options.push('-m', message);
+            args.push('-m', message);
         } else {
-            options.push('--no-edit');
+            args.push('--no-edit');
         }
 
-        await this.git.commit(options);
+        await this.git.raw(args);
+        this.fireChange();
     }
 
     public async getLastCommitMessage(): Promise<string> {
@@ -362,6 +398,7 @@ export class GitService {
         // For HEAD commit, use --amend
         if (headHash.trim() === hash) {
             await this.git.raw(['commit', '--amend', '-m', newMessage]);
+            this.fireChange();
             return;
         }
 
@@ -386,6 +423,7 @@ export class GitService {
             };
 
             await this.git.env(env).raw(['rebase', '-i', `${hash}^`, '--autostash']);
+            this.fireChange();
         } finally {
             // Clean up temp file
             try {
@@ -979,11 +1017,13 @@ export class GitService {
 
     public async reset(mode: 'soft' | 'mixed' | 'hard', commit: string): Promise<void> {
         await this.git.reset([`--${mode}`, commit]);
+        this.fireChange();
     }
 
     public async cherryPick(commit: string): Promise<void> {
         try {
             await this.git.raw(['cherry-pick', commit]);
+            this.fireChange();
         } catch (e: any) {
             // handle conflict or error
             throw e;
@@ -994,6 +1034,7 @@ export class GitService {
         try {
             // --no-edit to avoid launching editor
             await this.git.revert(commit, ['--no-edit']);
+            this.fireChange();
         } catch (e: any) {
             throw e;
         }
@@ -1015,6 +1056,7 @@ export class GitService {
 
     public async checkoutCommit(commit: string): Promise<void> {
         await this.git.checkout(commit);
+        this.fireChange();
     }
 
     public getLog = async (options: LogOptions): Promise<LogCommit[]> => {

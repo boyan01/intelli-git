@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import type { LogCommit, LogOptions } from '../../../../../shared/messages';
-import { rpc } from '../../../lib/rpc_client';
+import { rpc, rpcEvents } from '../../../lib/rpc_client';
 import { LONG_DISTANCE_THRESHOLD } from '../graphUtils';
 import { getCachedValue, updateStoredState } from '../../../lib/stateCache';
 
@@ -93,6 +93,13 @@ export const useLogCommitLoader = (): UseLogCommitLoaderResult => {
     useEffect(() => {
         loadMore(true);
     }, [filters]);
+
+    // Subscribe to refresh events to reload commits when Git state changes
+    useEffect(() => {
+        return rpcEvents.refresh.subscribe(() => {
+            loadMore(true);
+        });
+    }, [loadMore]);
 
     return {
         commits,
