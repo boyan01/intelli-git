@@ -111,6 +111,21 @@ export function CommitView({ rebaseStatus }: CommitViewProps) {
         });
     }, [setExpandedIds]);
 
+    // Clean up selectedFiles when files are removed from changelists
+    useEffect(() => {
+        const allPaths = new Set<string>();
+        changelists.forEach(group => group.items.forEach(file => allPaths.add(file.path)));
+
+        const invalidPaths = Array.from(selectedFiles).filter(path => !allPaths.has(path));
+        if (invalidPaths.length > 0) {
+            setSelectedFiles(prev => {
+                const next = new Set(prev);
+                invalidPaths.forEach(path => next.delete(path));
+                return next;
+            });
+        }
+    }, [changelists, selectedFiles, setSelectedFiles]);
+
     const fileStats = useMemo(() => {
         let added = 0;
         let modified = 0;
