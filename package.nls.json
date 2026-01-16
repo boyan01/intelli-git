@@ -21,6 +21,8 @@
   "intelli-git.commands.branch.rename.title": "Rename...",
   "intelli-git.commands.branch.delete.title": "Delete...",
   "intelli-git.commands.branch.pull.title": "Pull",
+  "intelli-git.commands.branch.push.title": "Push",
+  "intelli-git.commands.branch.update.title": "Update",
   "intelli-git.commands.changelist.openFile.title": "Open File",
   "intelli-git.commands.changelist.showDiff.title": "Show Diff",
   "intelli-git.commands.changelist.rollback.title": "Rollback",

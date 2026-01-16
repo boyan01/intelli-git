@@ -139,3 +139,10 @@
 .aheadBehind .codicon {
     font-size: 10px;
 }
+
+/* Drag and drop */
+.node.dragOver {
+    background-color: var(--vscode-list-dropBackground);
+    outline: 1px dashed var(--vscode-focusBorder);
+    outline-offset: -1px;
+}

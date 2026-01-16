@@ -147,18 +147,23 @@ export const BranchListPanel: React.FC<BranchListPanelProps> = ({ onBranchDouble
         const convertToTreeNodes = (nodes: Map<string, TempNode>, depth: number): TreeNode<BranchNodeData>[] => {
             const entries = Array.from(nodes.entries());
 
-            // Sort: folders first, then priority branches, then alphabetical
+            // Sort: priority branches first, then folders, then other branches alphabetically
             entries.sort(([aKey, aNode], [bKey, bNode]) => {
+                const aIsPriority = aNode.isLeaf && PRIORITY_BRANCHES.includes(aKey.toLowerCase());
+                const bIsPriority = bNode.isLeaf && PRIORITY_BRANCHES.includes(bKey.toLowerCase());
+
+                // Priority branches always come first
+                if (aIsPriority && !bIsPriority) return -1;
+                if (!aIsPriority && bIsPriority) return 1;
+
+                // Among priority branches, sort by defined order
+                if (aIsPriority && bIsPriority) {
+                    return PRIORITY_BRANCHES.indexOf(aKey.toLowerCase()) - PRIORITY_BRANCHES.indexOf(bKey.toLowerCase());
+                }
+
+                // Folders before non-priority branches
                 if (!aNode.isLeaf && bNode.isLeaf) return -1;
                 if (aNode.isLeaf && !bNode.isLeaf) return 1;
-
-                if (aNode.isLeaf && bNode.isLeaf) {
-                    const aIndex = PRIORITY_BRANCHES.indexOf(aKey.toLowerCase());
-                    const bIndex = PRIORITY_BRANCHES.indexOf(bKey.toLowerCase());
-                    if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex;
-                    if (aIndex !== -1) return -1;
-                    if (bIndex !== -1) return 1;
-                }
 
                 return aKey.localeCompare(bKey);
             });
@@ -171,10 +176,11 @@ export const BranchListPanel: React.FC<BranchListPanelProps> = ({ onBranchDouble
 
                 if (node.isLeaf) {
                     const branchInfo = type === 'local' ? getBranchInfo(node.path) : undefined;
+                    const upstreamInfo = branchInfo?.upstream ? ` → ${branchInfo.upstream}` : '';
                     return {
                         id: nodeId,
                         label: node.name,
-                        title: fullPath,
+                        title: `${fullPath}${upstreamInfo}`,
                         icon: type === 'tag' ? 'tag' : 'git-branch',
                         data: {
                             type,
@@ -327,10 +333,12 @@ export const BranchListPanel: React.FC<BranchListPanelProps> = ({ onBranchDouble
         if (!node.data || node.data.type === 'folder') return undefined;
 
         if (node.data.type === 'local') {
+            const hasUpstream = !!node.data.branchInfo?.upstream;
             return {
                 webviewSection: 'localBranch',
                 branchName: node.data.fullPath,
-                fullBranchName: node.data.fullPath
+                fullBranchName: node.data.fullPath,
+                hasUpstream
             };
         }
         if (node.data.type === 'remote') {

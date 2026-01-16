@@ -122,6 +122,14 @@
         "title": "%intelli-git.commands.branch.pull.title%"
       },
       {
+        "command": "intelli-git.branch.push",
+        "title": "%intelli-git.commands.branch.push.title%"
+      },
+      {
+        "command": "intelli-git.branch.update",
+        "title": "%intelli-git.commands.branch.update.title%"
+      },
+      {
         "command": "intelli-git.log.resetSoft",
         "title": "%intelli-git.commands.log.resetSoft.title%"
       },
@@ -250,6 +258,16 @@
           "command": "intelli-git.branch.delete",
           "when": "webviewSection == 'localBranch'",
           "group": "3_danger"
+        },
+        {
+          "command": "intelli-git.branch.push",
+          "when": "webviewSection == 'localBranch'",
+          "group": "1_actions@3"
+        },
+        {
+          "command": "intelli-git.branch.update",
+          "when": "webviewSection == 'localBranch' && hasUpstream == true",
+          "group": "1_actions@4"
         },
         {
           "command": "intelli-git.log.checkout",

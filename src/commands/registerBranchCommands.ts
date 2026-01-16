@@ -161,4 +161,52 @@ export function registerBranchCommands(
             }
         })
     );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand('intelli-git.branch.push', async (arg) => {
+            const branch = getBranchName(arg);
+            if (!branch) return;
+
+            try {
+                const remotes = await gitService.getRemotes();
+                const remote = remotes.length > 0 ? remotes[0] : 'origin';
+                await gitService.push(remote, branch);
+
+                // Auto-set upstream if not already set
+                const upstream = await gitService.getUpstreamBranch(branch);
+                if (!upstream) {
+                    try {
+                        await gitService.setUpstreamBranch(remote, branch);
+                    } catch {
+                        // Ignore upstream set errors
+                    }
+                }
+
+                vscode.window.showInformationMessage(vscode.l10n.t('Pushed {0} to {1}', branch, remote));
+            } catch (error: any) {
+                vscode.window.showErrorMessage(vscode.l10n.t('Failed to push: {0}', error.message));
+            }
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand('intelli-git.branch.update', async (arg) => {
+            const branch = getBranchName(arg);
+            if (!branch) return;
+
+            try {
+                const currentBranch = (await gitService.getBranches()).current;
+
+                if (branch === currentBranch) {
+                    await gitService.pull();
+                    vscode.window.showInformationMessage(vscode.l10n.t('Updated current branch'));
+                } else {
+                    await gitService.fetch();
+                    vscode.window.showInformationMessage(vscode.l10n.t('Fetched updates for {0}', branch));
+                }
+            } catch (error: any) {
+                vscode.window.showErrorMessage(vscode.l10n.t('Failed to update: {0}', error.message));
+            }
+        })
+    );
 }

@@ -81,6 +81,10 @@ export function CommitView({ rebaseStatus }: CommitViewProps) {
     // Non-persisted state
     const [isGenerating, setIsGenerating] = useState(false);
 
+    const { data: workspaceRoot } = useRpcData(() => rpc.getWorkspaceRoot(), {
+        initialValue: ''
+    });
+
     // Active file subscription
     useEffect(() => {
         const unsubActiveFile = rpcEvents.activeFileChange.subscribe(({ path }) => {
@@ -190,6 +194,7 @@ export function CommitView({ rebaseStatus }: CommitViewProps) {
                         activeFile={activeFile}
                         onToggle={handleToggle}
                         onToggleFile={toggleFile}
+                        workspaceRoot={workspaceRoot}
                     />
                 )}
             </div>

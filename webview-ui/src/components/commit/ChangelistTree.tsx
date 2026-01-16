@@ -15,6 +15,7 @@ export interface ChangelistTreeProps {
     onToggle?: (id: string, expanded: boolean) => void;
     onToggleFile: (path: string, checked: boolean) => void;
     readonly?: boolean;
+    workspaceRoot?: string;
 }
 
 export interface ChangelistTreeRef {
@@ -165,6 +166,16 @@ const buildTree = (files: FileStatus[]): TreeNode<FileNodeData>[] => {
     return compactFolders(root);
 };
 
+// Helper to recursively prefix node IDs with group ID
+const prefixNodes = (nodes: TreeNode<FileNodeData>[], prefix: string): TreeNode<FileNodeData>[] => {
+    return nodes.map(node => ({
+        ...node,
+        id: `${prefix}/${node.id}`,
+        data: node.data,
+        children: node.children ? prefixNodes(node.children, prefix) : undefined
+    }));
+};
+
 export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTreeProps>(({
     groups,
     viewMode,
@@ -173,7 +184,8 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
     activeFile,
     onToggle,
     onToggleFile,
-    readonly = false
+    readonly = false,
+    workspaceRoot
 }, ref) => {
     const treeRef = useRef<BasicTreeViewRef>(null);
     const [, forceUpdate] = React.useReducer(x => x + 1, 0);
@@ -200,10 +212,8 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
                     }))
                     .sort((a, b) => a.label.localeCompare(b.label));
             } else {
-                children = buildTree(group.items).map(node => ({
-                    ...node,
-                    id: `${group.id}/${node.id}`
-                }));
+                // Use buildTree and recursively prefix IDs
+                children = prefixNodes(buildTree(group.items), group.id);
             }
 
             const totalFiles = children.reduce((sum, n) => sum + countFiles(n), 0);
@@ -228,13 +238,21 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
 
     const handleNodeClick = useCallback((node: TreeNode<FileNodeData>) => {
         if (node.data?.isFile) {
-            rpc.openFile({ path: node.data.path, preserveFocus: true });
+            if (node.data.status === 'D') {
+                rpc.openDiff(node.data.path);
+            } else {
+                rpc.openFile({ path: node.data.path, preserveFocus: true });
+            }
         }
     }, []);
 
     const handleNodeDoubleClick = useCallback((node: TreeNode<FileNodeData>) => {
         if (node.data?.isFile) {
-            rpc.openFile({ path: node.data.path, preserveFocus: false });
+            if (node.data.status === 'D') {
+                rpc.openDiff(node.data.path);
+            } else {
+                rpc.openFile({ path: node.data.path, preserveFocus: false });
+            }
         }
     }, []);
 
@@ -287,7 +305,7 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
         const showPath = viewMode === 'list' && isFile;
 
         return (
-            <div className={styles.fileItemContent}>
+            <div className={styles.fileItemContent} data-drag-label="true">
                 {isFile ? (
                     <>
                         {(status === 'C' || status === 'U') ? (
@@ -295,7 +313,7 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
                         ) : (
                             <span
                                 className={styles.fileIconSvg}
-                                style={{ color: getFileIcon(node.label).color }}
+                                style={{ color: statusColor || getFileIcon(node.label).color }}
                                 dangerouslySetInnerHTML={{ __html: getFileIcon(node.label).svg }}
                             />
                         )}
@@ -333,6 +351,66 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
         };
     }, []);
 
+    // Drag: allow dragging from unversioned group (including root)
+    const isDraggable = useCallback((node: TreeNode<FileNodeData>) => {
+        const nodeId = node.id;
+        // Allow root node and all children
+        return nodeId === '__root__unversioned' || nodeId.startsWith('unversioned/');
+    }, []);
+
+    // Drop: allow dropping on default changelist root or any of its children
+    const isDropTarget = useCallback((node: TreeNode<FileNodeData>) => {
+        return node.id === '__root__default' || node.id.startsWith('default/');
+    }, []);
+
+    // Always highlight the root node when dragging over any child
+    const getDropTargetRootId = useCallback((node: TreeNode<FileNodeData>) => {
+        if (node.id === '__root__default' || node.id.startsWith('default/')) {
+            return '__root__default';
+        }
+        return null;
+    }, []);
+
+    // Handle drop: stage the files (git add)
+    const handleDrop = useCallback((draggedNode: TreeNode<FileNodeData>, targetNode: TreeNode<FileNodeData>) => {
+        console.log('Drop detected', draggedNode.id, '->', targetNode.id);
+        const paths = getAllFilePaths(draggedNode);
+        if (paths.length > 0) {
+            rpc.stageFiles(paths);
+        }
+    }, []);
+
+    // Provide native file drag data (text/uri-list)
+    const getDragData = useCallback((node: TreeNode<FileNodeData>): Record<string, string> => {
+        const paths = getAllFilePaths(node);
+        if (paths.length === 0) return {};
+
+        const root = workspaceRoot || '';
+
+        // Calculate absolute paths and file URIs
+        const absPaths = paths.map(p => root ? (root.endsWith('/') ? root + p : root + '/' + p) : p);
+        const fileUris = absPaths.map(p => `file://${encodeURI(p)}`);
+
+        const uriList = fileUris.join('\r\n');
+        const plainText = absPaths.join('\n');
+
+        return {
+            'text/uri-list': uriList,
+            'text/plain': plainText,
+            'application/vnd.code.uri-list': uriList,
+            'codefiles': JSON.stringify(absPaths),
+            'resourceurls': JSON.stringify(fileUris)
+        };
+    }, [workspaceRoot]);
+
+    // Get label info for drag image
+    const getDragLabel = useCallback((node: TreeNode<FileNodeData>) => {
+        return {
+            label: node.label,
+            count: node.data?.fileCount
+        };
+    }, []);
+
     return (
         <BasicTreeView
             ref={treeRef}
@@ -349,6 +427,12 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
             getContextData={getContextData}
             indent={16}
             baseIndent={8}
+            isDraggable={isDraggable}
+            isDropTarget={isDropTarget}
+            getDropTargetRootId={getDropTargetRootId}
+            onDrop={handleDrop}
+            getDragData={getDragData}
+            getDragLabel={getDragLabel}
         />
     );
 });

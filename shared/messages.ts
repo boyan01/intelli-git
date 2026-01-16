@@ -105,6 +105,7 @@ export interface ExtensionMethods {
     getStashFiles: (index: number) => Promise<CommitFile[]>;
     commit: (params: { message: string; amend: boolean; files: string[]; push?: boolean }) => Promise<void>;
     stage: (path: string) => Promise<void>;
+    stageFiles: (paths: string[]) => Promise<void>;
     unstage: (path: string) => Promise<void>;
     stageAll: () => Promise<void>;
     unstageAll: () => Promise<void>;
@@ -135,6 +136,7 @@ export interface ExtensionMethods {
     getWorkspaceState: <T>(key: string) => Promise<T | undefined>;
     updateWorkspaceState: <T>(key: string, value: T) => Promise<void>;
     getUnpushedCommits: () => Promise<string[]>;
+    getWorkspaceRoot: () => Promise<string>;
 }
 
 export interface CommitState {

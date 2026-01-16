@@ -55,6 +55,7 @@ export class ExtensionRpcHandler {
                 getStashFiles: this.gitService.getStashFilesAsCommitFiles,
                 commit: this.commit,
                 stage: this.stage,
+                stageFiles: this.stageFiles,
                 unstage: this.unstage,
                 stageAll: this.stageAll,
                 unstageAll: this.unstageAll,
@@ -84,7 +85,8 @@ export class ExtensionRpcHandler {
                 getCurrentUser: this.gitService.getCurrentUser,
                 getWorkspaceState: this.getWorkspaceState,
                 updateWorkspaceState: this.updateWorkspaceState,
-                getUnpushedCommits: this.getUnpushedCommits
+                getUnpushedCommits: this.getUnpushedCommits,
+                getWorkspaceRoot: async () => this.gitService.getWorkspaceRoot()
             }
         )
     }
@@ -94,10 +96,22 @@ export class ExtensionRpcHandler {
         const branches = await this.gitService.getBranches();
         const currentBranch = branches.current;
 
+        // Check if upstream was set before push
+        const hadUpstream = await this.gitService.getUpstreamBranch();
+
         if (params.force) {
             await this.gitService.forcePush(params.remote, `${currentBranch}:${params.branch}`);
         } else {
             await this.gitService.push(params.remote, `${currentBranch}:${params.branch}`);
+        }
+
+        // Auto-set upstream if not previously set and pushing to same-named branch
+        if (!hadUpstream && params.branch === currentBranch) {
+            try {
+                await this.gitService.setUpstreamBranch(params.remote, params.branch);
+            } catch (e) {
+                console.error('Failed to set upstream:', e);
+            }
         }
 
         if (params.pushTags) {
@@ -291,6 +305,12 @@ export class ExtensionRpcHandler {
 
     stage = async (filePath: string): Promise<void> => {
         await this.gitService.stageFile(filePath);
+    };
+
+    stageFiles = async (filePaths: string[]): Promise<void> => {
+        for (const path of filePaths) {
+            await this.gitService.stageFile(path);
+        }
     };
 
     unstage = async (filePath: string): Promise<void> => {

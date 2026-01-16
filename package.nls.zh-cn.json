@@ -21,6 +21,8 @@
   "intelli-git.commands.branch.rename.title": "重命名...",
   "intelli-git.commands.branch.delete.title": "删除...",
   "intelli-git.commands.branch.pull.title": "拉取",
+  "intelli-git.commands.branch.push.title": "推送",
+  "intelli-git.commands.branch.update.title": "更新",
   "intelli-git.commands.changelist.openFile.title": "打开文件",
   "intelli-git.commands.changelist.showDiff.title": "显示差异",
   "intelli-git.commands.changelist.rollback.title": "回滚",

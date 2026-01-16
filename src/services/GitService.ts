@@ -438,6 +438,26 @@ export class GitService implements vscode.Disposable {
         await this.git.push(remote, branch);
     }
 
+    /**
+     * Set upstream tracking branch for the current branch.
+     */
+    public async setUpstreamBranch(remote: string, remoteBranch: string): Promise<void> {
+        await this.git.raw(['branch', '--set-upstream-to', `${remote}/${remoteBranch}`]);
+    }
+
+    /**
+     * Get the upstream branch for a local branch.
+     */
+    public async getUpstreamBranch(localBranch?: string): Promise<string | null> {
+        try {
+            const branchArg = localBranch ? localBranch : 'HEAD';
+            const result = await this.git.raw(['rev-parse', '--abbrev-ref', `${branchArg}@{upstream}`]);
+            return result.trim() || null;
+        } catch {
+            return null;
+        }
+    }
+
     public async pull(): Promise<void> {
         await this.git.pull();
     }
