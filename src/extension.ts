@@ -14,7 +14,7 @@ export function activate(context: vscode.ExtensionContext) {
     const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
 
     if (!workspaceRoot) {
-        vscode.window.showWarningMessage('Intelli Git: No workspace opened.');
+        log('Intelli Git: No workspace opened.');
         return;
     }
 

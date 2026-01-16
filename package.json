@@ -350,6 +350,39 @@
           "group": "3_other"
         }
       ]
+    },
+    "configuration": {
+      "title": "Intelli Git",
+      "properties": {
+        "intelli-git.ai.provider": {
+          "type": "string",
+          "default": "copilot",
+          "enum": [
+            "copilot",
+            "anthropic"
+          ],
+          "enumDescriptions": [
+            "%intelli-git.config.ai.provider.copilot%",
+            "%intelli-git.config.ai.provider.anthropic%"
+          ],
+          "description": "%intelli-git.config.ai.provider.description%"
+        },
+        "intelli-git.ai.anthropic.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "%intelli-git.config.ai.anthropic.apiKey.description%"
+        },
+        "intelli-git.ai.anthropic.model": {
+          "type": "string",
+          "default": "",
+          "description": "%intelli-git.config.ai.anthropic.model.description%"
+        },
+        "intelli-git.ai.anthropic.apiUrl": {
+          "type": "string",
+          "default": "",
+          "description": "%intelli-git.config.ai.anthropic.apiUrl.description%"
+        }
+      }
     }
   },
   "scripts": {

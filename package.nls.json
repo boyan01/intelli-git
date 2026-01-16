@@ -37,5 +37,11 @@
   "intelli-git.commands.log.cherryPick.title": "Cherry-pick",
   "intelli-git.commands.log.revert.title": "Revert Commit",
   "intelli-git.commands.log.undoCommit.title": "Undo Commit",
-  "intelli-git.commands.log.editMessage.title": "Edit Commit Message..."
+  "intelli-git.commands.log.editMessage.title": "Edit Commit Message...",
+  "intelli-git.config.ai.provider.description": "AI provider for commit message generation",
+  "intelli-git.config.ai.provider.copilot": "Use built-in GitHub Copilot (requires Copilot extension)",
+  "intelli-git.config.ai.provider.anthropic": "Use Anthropic Claude API (requires API key)",
+  "intelli-git.config.ai.anthropic.apiKey.description": "Anthropic API key for Claude. Get your key from https://console.anthropic.com",
+  "intelli-git.config.ai.anthropic.model.description": "Anthropic Claude model to use",
+  "intelli-git.config.ai.anthropic.apiUrl.description": "Anthropic API URL endpoint"
 }

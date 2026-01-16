@@ -103,8 +103,6 @@
     "extension.changelistNotEmpty": "Changelist '{0}' is not empty. Delete it and move files to default?",
     "extension.enterChangelistName": "Enter new changelist name",
     "extension.newChangelistPlaceholder": "New Changelist",
-    "extension.noChangesForCommitGen": "No changes found for selected files.",
-    "extension.noStagedChangesForCommitGen": "No staged changes to generate commit message for.",
     "extension.noAIModel": "No suitable AI model found. Please ensure GitHub Copilot Chat is installed and enabled.",
     "extension.commitGenPrompt": "Generate a concise commit message based on the following diff. Use the conventional commits format (e.g. feat: ..., fix: ...). Only return the commit message, no explanation, no code blocks",
     "extension.commitFailed": "Commit failed: {0}",
@@ -162,5 +160,8 @@
     "Revert commit {0}?": "Revert commit {0}?",
     "Revert": "Revert",
     "Reverted {0}": "Reverted {0}",
-    "Revert failed: {0}": "Revert failed: {0}"
+    "Revert failed: {0}": "Revert failed: {0}",
+    "extension.anthropicApiKeyMissing": "Anthropic API key is not configured. Please set it in Settings > Intelli Git.",
+    "extension.anthropicApiUrlMissing": "Anthropic API URL is not configured. Please set it in Settings > Intelli Git.",
+    "extension.anthropicRequestFailed": "Anthropic API request failed: {0}"
 }

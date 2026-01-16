@@ -78,9 +78,6 @@ export function CommitView({ rebaseStatus }: CommitViewProps) {
     const [commitMessage, setCommitMessage] = usePersistedState('commit.message');
     const [amend, setAmend] = usePersistedState('commit.amend');
 
-    // Non-persisted state
-    const [isGenerating, setIsGenerating] = useState(false);
-
     const { data: workspaceRoot } = useRpcData(() => rpc.getWorkspaceRoot(), {
         initialValue: ''
     });
@@ -149,35 +146,7 @@ export function CommitView({ rebaseStatus }: CommitViewProps) {
         return { added, modified, deleted };
     }, [changelists, selectedFiles]);
 
-    const handleCommit = async (push: boolean) => {
-        const files = Array.from(selectedFiles);
-        if (files.length === 0 && !amend) {
-            return;
-        }
-        try {
-            await rpc.commit({
-                message: commitMessage,
-                files: files,
-                amend: amend,
-                push: push
-            });
-            setCommitMessage('');
-        } catch (e) {
-            console.error('Commit failed:', e);
-        }
-    };
 
-    const handleGenerateMessage = async () => {
-        setIsGenerating(true);
-        try {
-            const message = await rpc.generateCommitMessage(Array.from(selectedFiles));
-            setCommitMessage(message);
-        } catch (e) {
-            console.error('Failed to generate message', e);
-        } finally {
-            setIsGenerating(false);
-        }
-    };
 
     return (
         <div className={styles.commitView}>
@@ -231,14 +200,12 @@ export function CommitView({ rebaseStatus }: CommitViewProps) {
                 <CommitForm
                     message={commitMessage}
                     amend={amend}
+                    selectedFiles={selectedFiles}
                     addedCount={fileStats.added}
                     modifiedCount={fileStats.modified}
                     deletedCount={fileStats.deleted}
                     onMessageChange={setCommitMessage}
                     onAmendChange={setAmend}
-                    onCommit={handleCommit}
-                    isGenerating={isGenerating}
-                    onGenerate={handleGenerateMessage}
                 />
             )}
         </div>

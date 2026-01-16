@@ -37,5 +37,11 @@
   "intelli-git.commands.log.cherryPick.title": "遴选提交",
   "intelli-git.commands.log.revert.title": "还原提交",
   "intelli-git.commands.log.undoCommit.title": "撤销提交",
-  "intelli-git.commands.log.editMessage.title": "修改提交信息..."
+  "intelli-git.commands.log.editMessage.title": "修改提交信息...",
+  "intelli-git.config.ai.provider.description": "用于生成提交信息的 AI 提供商",
+  "intelli-git.config.ai.provider.copilot": "使用内置 GitHub Copilot（需安装 Copilot 扩展）",
+  "intelli-git.config.ai.provider.anthropic": "使用 Anthropic Claude API（需配置 API Key）",
+  "intelli-git.config.ai.anthropic.apiKey.description": "Anthropic API Key，请从 https://console.anthropic.com 获取",
+  "intelli-git.config.ai.anthropic.model.description": "要使用的 Anthropic Claude 模型",
+  "intelli-git.config.ai.anthropic.apiUrl.description": "Anthropic API URL 端点"
 }

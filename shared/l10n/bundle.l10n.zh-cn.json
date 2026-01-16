@@ -162,5 +162,8 @@
     "Revert commit {0}?": "还原 (Revert) 提交 {0}?",
     "Revert": "还原",
     "Reverted {0}": "已还原 {0}",
-    "Revert failed: {0}": "还原失败: {0}"
+    "Revert failed: {0}": "还原失败: {0}",
+    "extension.anthropicApiKeyMissing": "Anthropic API Key 未配置。请在 设置 > Intelli Git 中配置。",
+    "extension.anthropicApiUrlMissing": "Anthropic API URL 未配置。请在 设置 > Intelli Git 中配置。",
+    "extension.anthropicRequestFailed": "Anthropic API 请求失败: {0}"
 }

@@ -4,7 +4,9 @@ import { RpcPeer } from '../../shared/rpc';
 import type { WebviewMethods, ExtensionMethods, CommitFile, CommitState, PushCommitsData, PushInitState, ChangelistGroup, BranchInfo, StashItem, BranchListData, LogCommit, LogOptions, CommitDetails } from '../../shared/messages';
 import { GitService } from '../services/GitService';
 import { ChangelistService } from '../services/ChangelistService';
+import { AnthropicService } from '../services/AnthropicService';
 import { i18n } from '../utils/i18n';
+import { log } from 'src/utils/logger';
 
 export interface ExtensionRpcHandlerOptions {
     context: vscode.ExtensionContext;
@@ -23,12 +25,14 @@ export class ExtensionRpcHandler {
     private changelistService?: ChangelistService;
     private onDispose: () => void;
     private _lastRebaseStatus?: string;
+    private anthropicService: AnthropicService;
 
     constructor(options: ExtensionRpcHandlerOptions) {
         this.context = options.context;
         this.gitService = options.gitService;
         this.changelistService = options.changelistService;
         this.onDispose = options.onDispose || (() => { });
+        this.anthropicService = new AnthropicService();
     }
 
     log = (message: string): Promise<void> => {
@@ -522,8 +526,6 @@ export class ExtensionRpcHandler {
     };
 
     generateCommitMessage = async (files?: string[]): Promise<string> => {
-        if (!this.gitService) return '';
-
         try {
             let diff = '';
             if (files && files.length > 0) {
@@ -533,22 +535,10 @@ export class ExtensionRpcHandler {
             }
 
             if (!diff) {
-                const message = files && files.length > 0
-                    ? i18n.t('extension.noChangesForCommitGen')
-                    : i18n.t('extension.noStagedChangesForCommitGen');
-                vscode.window.showInformationMessage(message);
                 return '';
             }
 
-            let [model] = await vscode.lm.selectChatModels({ vendor: 'copilot' });
-            if (!model) {
-                const models = await vscode.lm.selectChatModels();
-                if (models.length > 0) model = models[0];
-            }
-
-            if (!model) {
-                throw new Error(i18n.t('extension.noAIModel'));
-            }
+            const model = await this.getAIModel();
 
             const messages = [
                 vscode.LanguageModelChatMessage.User(i18n.t('extension.commitGenPrompt')),
@@ -563,11 +553,35 @@ export class ExtensionRpcHandler {
             }
             return fullMessage.trim();
         } catch (e) {
-            console.error('Error generating commit message:', e);
-            vscode.window.showErrorMessage(i18n.t('extension.commitGenFailed', `${e}`));
+            console.log('Error generating commit message:', e);
             throw e;
         }
     };
+
+    private async getAIModel(): Promise<vscode.LanguageModelChat> {
+        const provider = vscode.workspace.getConfiguration('intelli-git.ai').get<string>('provider', 'copilot');
+
+        if (provider === 'anthropic') {
+            const model = this.anthropicService.getModel();
+            if (!model) {
+                throw new Error(i18n.t('extension.anthropicApiUrlMissing'));
+            }
+            return model;
+        }
+
+        // Default: use Copilot
+        let [model] = await vscode.lm.selectChatModels({ vendor: 'copilot' });
+        if (!model) {
+            const models = await vscode.lm.selectChatModels();
+            if (models.length > 0) model = models[0];
+        }
+
+        if (!model) {
+            throw new Error(i18n.t('extension.noAIModel'));
+        }
+
+        return model;
+    }
 
     getWorkspaceState = async <T>(key: string): Promise<T | undefined> => {
         return this.context.workspaceState.get<T>(key);
