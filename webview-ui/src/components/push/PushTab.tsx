@@ -5,6 +5,7 @@ import { CommitsList } from './CommitsList';
 import { PushCommitDetails } from './PushCommitDetails';
 import { PushFooter } from './PushFooter';
 import { SplitPane } from '../common/SplitPane';
+import { usePersistedState } from '../../hooks/usePersistedState';
 import styles from './PushTab.module.css';
 
 export function PushTab() {
@@ -19,7 +20,10 @@ export function PushTab() {
     const [remoteBranches, setRemoteBranches] = useState<string[]>([]);
     const [selectedRemote, setSelectedRemote] = useState<string>('');
     const [selectedRemoteBranch, setSelectedRemoteBranch] = useState<string>('');
-    const [isLoading, setIsLoading] = useState(true);
+
+    const [lastLocalBranch, setLastLocalBranch] = usePersistedState('push.lastLocalBranch');
+    const [lastRemote, setLastRemote] = usePersistedState('push.lastRemote');
+    const [lastRemoteBranch, setLastRemoteBranch] = usePersistedState('push.lastRemoteBranch');
 
     useEffect(() => {
         const loadInitData = async () => {
@@ -28,13 +32,19 @@ export function PushTab() {
                 setLocalBranch(data.localBranch);
                 setRemotes(data.remotes);
 
-                if (data.remotes.length > 0) {
+                // Use cached remote if branch hasn't changed and cached value is valid
+                const branchUnchanged = data.localBranch === lastLocalBranch;
+                const cachedRemoteValid = branchUnchanged && lastRemote && data.remotes.includes(lastRemote);
+
+                if (cachedRemoteValid) {
+                    setSelectedRemote(lastRemote);
+                } else if (data.remotes.length > 0) {
                     setSelectedRemote(data.remotes[0]);
                 }
-                setIsLoading(false);
+
+                setLastLocalBranch(data.localBranch);
             } catch (error) {
                 console.error('Failed to load push init state:', error);
-                setIsLoading(false);
             }
         };
         loadInitData();
@@ -48,7 +58,13 @@ export function PushTab() {
                 const branches = await rpc.getRemoteBranches(selectedRemote);
                 setRemoteBranches(branches);
 
-                if (branches.includes(localBranch)) {
+                // Use cached branch if branch hasn't changed and cached value is valid
+                const branchUnchanged = localBranch === lastLocalBranch;
+                const cachedBranchValid = branchUnchanged && lastRemoteBranch && branches.includes(lastRemoteBranch);
+
+                if (cachedBranchValid) {
+                    setSelectedRemoteBranch(lastRemoteBranch);
+                } else if (branches.includes(localBranch)) {
                     setSelectedRemoteBranch(localBranch);
                 } else if (branches.length > 0) {
                     setSelectedRemoteBranch(branches[0]);
@@ -62,6 +78,19 @@ export function PushTab() {
 
         loadRemoteBranches();
     }, [selectedRemote, localBranch]);
+
+    // Persist selection changes
+    useEffect(() => {
+        if (selectedRemote) {
+            setLastRemote(selectedRemote);
+        }
+    }, [selectedRemote]);
+
+    useEffect(() => {
+        if (selectedRemoteBranch) {
+            setLastRemoteBranch(selectedRemoteBranch);
+        }
+    }, [selectedRemoteBranch]);
 
     useEffect(() => {
         if (!selectedRemote || !selectedRemoteBranch) return;
@@ -97,10 +126,6 @@ export function PushTab() {
             setIsPushing(false);
         }
     };
-
-    if (isLoading) {
-        return <div className={styles.loadingOverlay}><div className={styles.loadingSpinner}></div></div>;
-    }
 
     return (
         <div className={styles.pushContainer}>

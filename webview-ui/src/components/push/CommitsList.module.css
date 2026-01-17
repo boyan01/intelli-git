@@ -1,0 +1,255 @@
+.commitsPanel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 200px;
+    overflow: hidden;
+}
+
+.commitsHeader {
+    padding: 4px 8px;
+    background-color: var(--vscode-sideBarSectionHeader-background);
+}
+
+.commitsHeaderClickable {
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+.commitsHeaderClickable:hover {
+    background-color: var(--vscode-list-hoverBackground);
+}
+
+.headerSelected {
+    background-color: var(--vscode-list-activeSelectionBackground);
+}
+
+.branchFlow {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    min-height: 22px;
+}
+
+.localBranch {
+    color: var(--vscode-foreground);
+    max-width: 140px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.arrow {
+    color: var(--vscode-descriptionForeground);
+    margin: 0 2px;
+}
+
+.separator {
+    color: var(--vscode-descriptionForeground);
+}
+
+/* Inline highlight style - foreground color only */
+.inlineHighlight {
+    color: var(--vscode-textLink-foreground);
+    cursor: pointer;
+    transition: opacity 0.15s ease;
+    white-space: nowrap;
+}
+
+.inlineHighlight:hover {
+    opacity: 0.75;
+    text-decoration: underline;
+}
+
+/* Remote dropdown */
+.remoteDropdown {
+    position: relative;
+}
+
+.dropdownMenu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    margin-top: 2px;
+    background-color: var(--vscode-dropdown-background);
+    border: 1px solid var(--vscode-dropdown-border);
+    border-radius: 3px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+    z-index: 100;
+    min-width: 80px;
+    overflow: hidden;
+}
+
+.dropdownItem {
+    padding: 4px 10px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.dropdownItem:hover {
+    background-color: var(--vscode-list-hoverBackground);
+}
+
+.dropdownItemSelected {
+    background-color: var(--vscode-list-activeSelectionBackground);
+    color: var(--vscode-list-activeSelectionForeground);
+}
+
+/* Branch editing mode */
+.branchEditWrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex: 1;
+}
+
+.branchInput {
+    background: var(--vscode-input-background);
+    color: var(--vscode-input-foreground);
+    border: none;
+    padding: 2px 6px;
+    border-radius: 3px;
+    flex: 1;
+    min-width: 0;
+    font-size: 12px;
+    outline: none;
+}
+
+.branchInput:focus {
+    border-color: var(--vscode-focusBorder);
+}
+
+.newBadge {
+    background-color: var(--vscode-badge-background);
+    color: var(--vscode-badge-foreground);
+    font-size: 9px;
+    padding: 0 2px;
+    border-radius: 2px;
+    text-transform: uppercase;
+    font-weight: 500;
+    letter-spacing: 0.2px;
+    flex-shrink: 0;
+}
+
+/* Suggestions dropdown */
+.suggestionsDropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    margin-top: 2px;
+    background-color: var(--vscode-dropdown-background);
+    border: 1px solid var(--vscode-dropdown-border);
+    border-radius: 3px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+    z-index: 100;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.suggestionItem {
+    padding: 4px 8px;
+    cursor: pointer;
+    font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.suggestionItem:hover {
+    background-color: var(--vscode-list-hoverBackground);
+}
+
+.suggestionItemSelected {
+    background-color: var(--vscode-list-activeSelectionBackground);
+    color: var(--vscode-list-activeSelectionForeground);
+}
+
+/* Commits list */
+.commitsList {
+    flex: 1;
+    overflow-y: auto;
+    outline: none;
+}
+
+.commitItem {
+    padding: 4px 20px;
+    cursor: pointer;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.commitItem:hover {
+    background-color: var(--vscode-list-hoverBackground);
+}
+
+/* Inactive selection (when list loses focus) */
+.selected {
+    background-color: var(--vscode-list-inactiveSelectionBackground);
+    color: var(--vscode-list-inactiveSelectionForeground, inherit);
+}
+
+/* Active selection (when list has focus) */
+.commitsList:focus .selected,
+.commitsList:focus-within .selected {
+    background-color: var(--vscode-list-activeSelectionBackground);
+    color: var(--vscode-list-activeSelectionForeground);
+}
+
+.selected:hover {
+    background-color: var(--vscode-list-inactiveSelectionBackground);
+}
+
+.commitsList:focus .selected:hover,
+.commitsList:focus-within .selected:hover {
+    background-color: var(--vscode-list-activeSelectionBackground);
+}
+
+/* Focus outline (only when list has focus) */
+.commitsList:focus .focused,
+.commitsList:focus-within .focused {
+    outline: 1px solid var(--vscode-list-focusOutline, var(--vscode-focusBorder));
+    outline-offset: -1px;
+}
+
+.commitsList:focus .focused:not(.selected):hover,
+.commitsList:focus-within .focused:not(.selected):hover {
+    background-color: transparent;
+}
+
+.commitHash {
+    font-family: var(--vscode-editor-font-family, monospace);
+    font-size: 11px;
+    color: var(--vscode-descriptionForeground);
+    flex-shrink: 0;
+}
+
+.commitMessage {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.commitMeta {
+    display: flex;
+    gap: 8px;
+    font-size: 11px;
+    opacity: 0.8;
+    flex-shrink: 0;
+}
+
+.commitDate {
+    white-space: nowrap;
+}
+
+.commitAuthor {
+    max-width: 100px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}

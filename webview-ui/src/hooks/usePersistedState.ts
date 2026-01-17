@@ -10,6 +10,7 @@ export interface PersistedStateSchema {
     // Commit View
     'commit.viewMode': 'tree' | 'list';
     'commit.activeTab': 'commit' | 'stash' | 'push';
+    'commit.activeTabTimestamp': number;
     'commit.message': string;
     'commit.amend': boolean;
     'commit.selectedFiles': Set<string>;
@@ -19,6 +20,9 @@ export interface PersistedStateSchema {
 
     // Push View
     'push.splitSize': number;
+    'push.lastLocalBranch': string;
+    'push.lastRemote': string;
+    'push.lastRemoteBranch': string;
 
     // Push Commit Details
     'push.details.viewMode': 'tree' | 'list';
@@ -59,6 +63,7 @@ export const stateDefaults: PersistedStateSchema = {
     // Commit View
     'commit.viewMode': 'tree',
     'commit.activeTab': 'commit',
+    'commit.activeTabTimestamp': 0,
     'commit.message': '',
     'commit.amend': false,
     'commit.selectedFiles': new Set(),
@@ -68,6 +73,9 @@ export const stateDefaults: PersistedStateSchema = {
 
     // Push View
     'push.splitSize': 300,
+    'push.lastLocalBranch': '',
+    'push.lastRemote': '',
+    'push.lastRemoteBranch': '',
 
     // Push Commit Details
     'push.details.viewMode': 'tree',

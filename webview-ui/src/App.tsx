@@ -1,5 +1,5 @@
 import { HashRouter, Routes, Route } from 'react-router-dom';
-import { LocalChangesView } from './components/commit/LocalChangesView';
+import { LocalChangesView } from './components/local-changes/LocalChangesView';
 import { GitLogView } from './components/git-log/GitLogView';
 import './index.css';
 

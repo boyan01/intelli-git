@@ -1,4 +1,5 @@
-import { CommitView } from './CommitView';
+import { useState, useCallback } from 'react';
+import { CommitView } from '../commit/CommitView';
 import { StashView } from '../stash/StashView';
 import { PushTab } from '../push/PushTab';
 import { useTranslation } from 'react-i18next';
@@ -52,11 +53,24 @@ function RebaseIndicator({ status }: { status: 'interactive' | 'merging' }) {
 
 export function LocalChangesView() {
     const { t } = useTranslation();
-    const [activeTab, setActiveTab] = usePersistedState('commit.activeTab');
+    const [persistedTab, setPersistedTab] = usePersistedState('commit.activeTab');
+    const [tabTimestamp, setTabTimestamp] = usePersistedState('commit.activeTabTimestamp');
     const { data: branches } = useRpcData(() => rpc.getBranchInfo(), {
         initialValue: defaultBranchInfo,
         cacheKey: 'commit.branchInfo'
     });
+
+    // Determine initial tab: use persisted value only if set within 10 seconds
+    const [activeTab, setActiveTabState] = useState<'commit' | 'stash' | 'push'>(() => {
+        const elapsed = Date.now() - tabTimestamp;
+        return elapsed > 10000 ? 'commit' : persistedTab;
+    });
+
+    const setActiveTab = useCallback((tab: 'commit' | 'stash' | 'push') => {
+        setActiveTabState(tab);
+        setPersistedTab(tab);
+        setTabTimestamp(Date.now());
+    }, [setPersistedTab, setTabTimestamp]);
 
     const isRebasing = branches.rebaseStatus && branches.rebaseStatus !== 'none';
 
