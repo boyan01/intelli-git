@@ -1,12 +1,11 @@
-.pushPanel {
+.pushContainer {
     display: flex;
     flex-direction: column;
-    height: 100vh;
-    background: var(--vscode-sideBar-background);
+    flex: 1;
+    overflow: hidden;
 }
 
-.pushMain {
-    display: flex;
+.splitContainer {
     flex: 1;
     overflow: hidden;
 }
@@ -19,6 +18,7 @@
     border-top: 1px solid var(--vscode-panel-border);
     background: var(--vscode-sideBar-background);
     gap: 12px;
+    flex-shrink: 0;
 }
 
 .footerLeft {
@@ -51,12 +51,17 @@
     height: 24px;
 }
 
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
 .btnPrimary {
     background: var(--vscode-button-background);
     color: var(--vscode-button-foreground);
 }
 
-.btnPrimary:hover {
+.btnPrimary:hover:not(:disabled) {
     background: var(--vscode-button-hoverBackground);
 }
 
@@ -65,7 +70,7 @@
     color: var(--vscode-button-secondaryForeground);
 }
 
-.btnSecondary:hover {
+.btnSecondary:hover:not(:disabled) {
     background: var(--vscode-button-secondaryHoverBackground);
 }
 
@@ -114,7 +119,7 @@
 }
 
 .loadingOverlay {
-    position: fixed;
+    position: absolute;
     top: 0;
     left: 0;
     right: 0;

@@ -10,6 +10,8 @@
   "intelli-git.commands.showBranchPicker.title": "Intelli: 切换分支",
   "intelli-git.commands.focusCommitView.title": "Intelli: 聚焦提交视图",
   "intelli-git.commands.copyCommitHash.title": "复制提交哈希",
+  "intelli-git.commands.copyAuthorEmail.title": "复制作者邮箱",
+  "intelli-git.commands.sendAuthorEmail.title": "发送邮件给作者",
   "intelli-git.commands.stashPop.title": "弹出",
   "intelli-git.commands.stashApply.title": "应用",
   "intelli-git.commands.stashDrop.title": "删除",

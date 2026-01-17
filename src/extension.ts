@@ -62,6 +62,23 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(branchStatusBar);
     context.subscriptions.push(gitLogStatusBar);
 
+    // Register Author Context Menu Commands
+    context.subscriptions.push(
+        vscode.commands.registerCommand('intelli-git.copyAuthorEmail', async (args) => {
+            if (args && args.email) {
+                await vscode.env.clipboard.writeText(args.email);
+            }
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand('intelli-git.sendAuthorEmail', (args) => {
+            if (args && args.email) {
+                vscode.env.openExternal(vscode.Uri.parse(`mailto:${args.email}`));
+            }
+        })
+    );
+
     const triggerRefresh = () => {
         provider.rpc?.refresh();
         gitLogProvider.rpc?.refresh();

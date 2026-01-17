@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import type { CommitDetails } from '@shared/messages';
-import styles from './CommitsPanel.module.css';
+import styles from './CommitsList.module.css';
 
-interface CommitsPanelProps {
+interface CommitsListProps {
     commits: CommitDetails[];
     localBranch: string;
     currentRemote: string;
@@ -15,7 +15,7 @@ interface CommitsPanelProps {
     onRemoteBranchChange: (branch: string) => void;
 }
 
-export function CommitsPanel({
+export function CommitsList({
     commits,
     localBranch,
     currentRemote,
@@ -26,7 +26,7 @@ export function CommitsPanel({
     onSelectCommits,
     onRemoteChange,
     onRemoteBranchChange
-}: CommitsPanelProps) {
+}: CommitsListProps) {
     const [isRemoteDropdownOpen, setIsRemoteDropdownOpen] = useState(false);
     const [isBranchEditing, setIsBranchEditing] = useState(false);
     const [focusedHash, setFocusedHash] = useState<string | null>(null);
@@ -237,7 +237,7 @@ export function CommitsPanel({
                     )}
                 </div>
             </div>
-            <div className={styles.commitsList}>
+            <div className={styles.commitsList} tabIndex={0}>
                 {commits.map((commit) => (
                     <div
                         key={commit.hash}

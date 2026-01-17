@@ -1,5 +1,6 @@
 import { CommitView } from './CommitView';
 import { StashView } from '../stash/StashView';
+import { PushTab } from '../push/PushTab';
 import { useTranslation } from 'react-i18next';
 import { usePersistedState } from '../../hooks/usePersistedState';
 import { useRpcData } from '../../hooks/useRpcData';
@@ -75,6 +76,12 @@ export function LocalChangesView() {
                     >
                         {t('Stash')}
                     </button>
+                    <button
+                        className={`${styles.tab} ${activeTab === 'push' ? styles.active : ''}`}
+                        onClick={() => setActiveTab('push')}
+                    >
+                        {t('Push')}
+                    </button>
                 </div>
                 <div className={styles.tabsRight}>
                     <button className={styles.iconBtn} title={t('Fetch')} onClick={() => rpc.fetch()}>
@@ -103,6 +110,7 @@ export function LocalChangesView() {
             <div className={styles.content}>
                 {activeTab === 'commit' && <CommitView rebaseStatus={branches?.rebaseStatus} />}
                 {activeTab === 'stash' && <StashView />}
+                {activeTab === 'push' && <PushTab />}
             </div>
         </div>
     );

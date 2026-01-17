@@ -188,6 +188,14 @@
       {
         "command": "intelli-git.changelist.moveToChangelist",
         "title": "%intelli-git.commands.changelist.moveToChangelist.title%"
+      },
+      {
+        "command": "intelli-git.copyAuthorEmail",
+        "title": "%intelli-git.commands.copyAuthorEmail.title%"
+      },
+      {
+        "command": "intelli-git.sendAuthorEmail",
+        "title": "%intelli-git.commands.sendAuthorEmail.title%"
       }
     ],
     "menus": {
@@ -348,6 +356,16 @@
           "command": "intelli-git.changelist.moveToChangelist",
           "when": "webviewSection == 'changelistFile'",
           "group": "3_other"
+        },
+        {
+          "command": "intelli-git.copyAuthorEmail",
+          "when": "webviewSection == 'authorName'",
+          "group": "1_modification@1"
+        },
+        {
+          "command": "intelli-git.sendAuthorEmail",
+          "when": "webviewSection == 'authorName'",
+          "group": "1_modification@2"
         }
       ]
     },

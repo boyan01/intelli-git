@@ -9,7 +9,7 @@ import type { FileStatus, BranchInfo, BranchListData, LogCommit } from '@shared/
 export interface PersistedStateSchema {
     // Commit View
     'commit.viewMode': 'tree' | 'list';
-    'commit.activeTab': 'commit' | 'stash';
+    'commit.activeTab': 'commit' | 'stash' | 'push';
     'commit.message': string;
     'commit.amend': boolean;
     'commit.selectedFiles': Set<string>;
