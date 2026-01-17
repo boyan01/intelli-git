@@ -1,68 +1,81 @@
-import { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import styles from './PushTab.module.css';
+import styles from './PushFooter.module.css';
 
-interface PushFooterProps {
-    pushTags: boolean;
-    onPushTagsChange: (checked: boolean) => void;
-    onPush: () => void;
-    onForcePush: () => void;
+export interface PushFooterProps {
+    commitCount: number;
     isPushing: boolean;
+    pushTags: boolean;
+    onPush: (force: boolean) => void;
+    onPushTagsChange: (value: boolean) => void;
 }
 
-export function PushFooter({
+export const PushFooter: React.FC<PushFooterProps> = ({
+    commitCount,
+    isPushing,
     pushTags,
-    onPushTagsChange,
     onPush,
-    onForcePush,
-    isPushing
-}: PushFooterProps) {
+    onPushTagsChange
+}) => {
     const { t } = useTranslation();
-    const [isForcePushExpanded, setIsForcePushExpanded] = useState(false);
+    const [showPushOptions, setShowPushOptions] = useState(false);
+    const menuRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+            if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+                setShowPushOptions(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
 
     return (
-        <div className={styles.pushFooter}>
-            <div className={styles.footerLeft}>
-                <div className={styles.pushTagsGroup}>
-                    <label>
-                        <input
-                            type="checkbox"
-                            checked={pushTags}
-                            onChange={e => onPushTagsChange(e.target.checked)}
-                        />
+        <div className={styles.footer} style={{ position: 'relative' }} ref={menuRef}>
+            <button
+                className={styles.pushBtn}
+                onClick={() => onPush(false)}
+                disabled={isPushing || commitCount === 0}
+            >
+                {isPushing ? (
+                    <>
+                        <i className="codicon codicon-sync codicon-modifier-spin" />
+                        {' '}{t('Pushing...')}
+                    </>
+                ) : (
+                    t('Push {{count}} Commits', { count: commitCount })
+                )}
+            </button>
+            <button
+                className={styles.pushOptionsBtn}
+                onClick={() => setShowPushOptions(!showPushOptions)}
+            >
+                <span>{t('Push Options')}</span>
+                <i className={`codicon codicon-chevron-${showPushOptions ? 'up' : 'down'}`} />
+            </button>
+
+            {showPushOptions && (
+                <div className={styles.pushOptionsMenu}>
+                    <div
+                        className={styles.dropdownItem}
+                        onClick={() => onPushTagsChange(!pushTags)}
+                    >
+                        <i className={`codicon ${pushTags ? 'codicon-check' : 'codicon-blank'}`} />
                         {t('Push Tags')}
-                    </label>
-                </div>
-            </div>
-            <div className={styles.footerRight}>
-                <div className={styles.btnSplit} style={{ position: 'relative' }}>
-                    <button
-                        className={`${styles.btn} ${styles.btnPrimary} ${styles.btnMain}`}
-                        onClick={onPush}
-                        disabled={isPushing}
+                    </div>
+                    <div
+                        className={styles.dropdownItem}
+                        onClick={() => {
+                            onPush(true);
+                            setShowPushOptions(false);
+                        }}
                     >
-                        {t('Push')}
-                    </button>
-                    <button
-                        className={`${styles.btn} ${styles.btnPrimary} ${styles.btnDropdown}`}
-                        onClick={() => setIsForcePushExpanded(!isForcePushExpanded)}
-                        disabled={isPushing}
-                    >
-                        <i className="codicon codicon-chevron-down"></i>
-                    </button>
-                    {isForcePushExpanded && (
-                        <div className={styles.dropdownMenu} style={{ display: 'block', bottom: '100%', top: 'auto' }}>
-                            <div className={styles.dropdownItem} onClick={() => {
-                                onForcePush();
-                                setIsForcePushExpanded(false);
-                            }}>
-                                <i className="codicon codicon-warning icon"></i>
-                                <span>{t('Force Push')}</span>
-                            </div>
-                        </div>
-                    )}
+                        <i className="codicon codicon-warning" />
+                        {t('Force Push')}
+                    </div>
                 </div>
-            </div>
+            )}
         </div>
     );
-}
+};

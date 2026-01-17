@@ -92,13 +92,13 @@ export interface ExtensionMethods {
     log(message: string): Promise<void>;
     getPushInitState: () => Promise<PushInitState>;
     getRemoteBranches: (remote: string) => Promise<string[]>;
-    getPushCommits: (params: { remote: string; branch: string }) => Promise<PushCommitsData>;
+    getPushCommits: (params: { remote: string; branch: string; limit?: number; skip?: number }) => Promise<PushCommitsData>;
     getCommitFiles: (hash: string) => Promise<CommitFile[]>;
     getMultiCommitFiles: (hashes: string[]) => Promise<CommitFile[]>;
     push: (params: { force: boolean; pushTags: boolean; remote: string; branch: string }) => Promise<void>;
     openDiff: (path: string) => Promise<void>;
     closeWebView: () => Promise<void>;
-    openCommitDiff: (params: { path: string; leftRef: string; rightRef: string }) => Promise<void>;
+    openCommitDiff: (params: { path: string; leftRef: string; rightRef: string; preserveFocus?: boolean }) => Promise<void>;
     getStatus: () => Promise<FileStatus[]>;
     getBranchInfo: () => Promise<BranchInfo>;
     getStashList: () => Promise<StashItem[]>;
@@ -154,11 +154,12 @@ export interface PushInitState {
 
 export interface PushCommitsData {
     commits: CommitDetails[];
-    files: CommitFile[];
+    hasMore: boolean;
+    totalCount: number;
 }
 
 export interface WebviewMethods {
-    activeFileChange: (params: { path: string }) => void;
+    activeFileChange: (params: { path: string; commitHash?: string }) => void;
     refresh: () => void;
 }
 

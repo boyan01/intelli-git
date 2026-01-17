@@ -325,18 +325,26 @@ export class GitService implements vscode.Disposable {
 
     public async commit(message: string, files?: string[]): Promise<void> {
         if (files && files.length > 0) {
-            // Filter out files that no longer exist in current git status
             const currentStatus = await this.getStatus();
-            const validPaths = new Set(currentStatus.map(f => f.path));
-            const filesToCommit = files.filter(f => validPaths.has(f));
+            const statusMap = new Map(currentStatus.map(f => [f.path, f]));
+            const filesToCommit = files.filter(f => statusMap.has(f));
 
             if (filesToCommit.length === 0) {
                 throw new Error('No valid files to commit');
             }
 
-            // Stage files first (required for unversioned files)
-            await this.git.add(filesToCommit);
-            await this.git.commit(message);
+            // Only add files that are not yet staged
+            const filesToAdd = filesToCommit.filter(f => {
+                const status = statusMap.get(f);
+                return status && !status.staged;
+            });
+
+            if (filesToAdd.length > 0) {
+                await this.git.add(filesToAdd);
+            }
+
+            // Commit only the specified files
+            await this.git.commit(message, filesToCommit);
         } else {
             await this.git.commit(message);
         }
@@ -345,13 +353,18 @@ export class GitService implements vscode.Disposable {
 
     public async commitAmend(message?: string, files?: string[]): Promise<void> {
         if (files && files.length > 0) {
-            // Filter out files that no longer exist in current git status
             const currentStatus = await this.getStatus();
-            const validPaths = new Set(currentStatus.map(f => f.path));
-            const filesToStage = files.filter(f => validPaths.has(f));
+            const statusMap = new Map(currentStatus.map(f => [f.path, f]));
+            const validFiles = files.filter(f => statusMap.has(f));
 
-            if (filesToStage.length > 0) {
-                await this.git.add(filesToStage);
+            // Only add files that are not yet staged
+            const filesToAdd = validFiles.filter(f => {
+                const status = statusMap.get(f);
+                return status && !status.staged;
+            });
+
+            if (filesToAdd.length > 0) {
+                await this.git.add(filesToAdd);
             }
         }
 
@@ -698,35 +711,53 @@ export class GitService implements vscode.Disposable {
     public async getCommitsToPush(
         localBranch: string,
         remote: string,
-        remoteBranch: string
+        remoteBranch: string,
+        options: { maxCount?: number; skip?: number } = {}
     ): Promise<CommitDetails[]> {
         try {
             const hasRemoteBranch = await this._remoteBranchExists(remote, remoteBranch);
 
             if (hasRemoteBranch) {
-                const log = await this.git.log({
-                    from: `${remote}/${remoteBranch}`,
-                    to: localBranch
-                });
+                const args: string[] = ['log'];
 
-                return log.all.map(commit => ({
-                    hash: commit.hash,
-                    shortHash: commit.hash.substring(0, 8),
-                    subject: commit.message,
-                    authorName: commit.author_name,
-                    date: commit.date,
-                    authorEmail: commit.author_email,
-                    body: '',
-                    files: [],
-                    stats: { additions: 0, deletions: 0 },
-                    parentHashes: [],
-                    containingBranches: [],
-                    refs: [],
-                    filteredAncestors: []
-                }));
+                if (options.maxCount) {
+                    args.push(`--max-count=${options.maxCount}`);
+                }
+
+                if (options.skip) {
+                    args.push(`--skip=${options.skip}`);
+                }
+
+                args.push('--format=%H%x00%h%x00%s%x00%an%x00%aI%x00%ae');
+                args.push(`${remote}/${remoteBranch}..${localBranch}`);
+
+                const result = await this.git.raw(args);
+
+                if (!result.trim()) {
+                    return [];
+                }
+
+                return result.trim().split('\n').map(line => {
+                    const [hash, shortHash, subject, authorName, date, authorEmail] = line.split('\x00');
+                    return {
+                        hash,
+                        shortHash,
+                        subject,
+                        authorName,
+                        date,
+                        authorEmail,
+                        body: '',
+                        files: [],
+                        stats: { additions: 0, deletions: 0 },
+                        parentHashes: [],
+                        containingBranches: [],
+                        refs: [],
+                        filteredAncestors: []
+                    };
+                });
             } else {
                 // New remote branch: get commits not reachable from any remote
-                return this._getCommitsNotInRemote(localBranch, 20);
+                return this._getCommitsNotInRemote(localBranch, options.maxCount ?? 20, options.skip);
             }
         } catch (e) {
             console.error('Error getting commits to push:', e);
@@ -734,23 +765,50 @@ export class GitService implements vscode.Disposable {
         }
     }
 
-    private async _getCommitsNotInRemote(branch: string, maxCount: number): Promise<CommitDetails[]> {
+    public async getCommitsToPushCount(
+        localBranch: string,
+        remote: string,
+        remoteBranch: string
+    ): Promise<number> {
         try {
-            const result = await this.git.raw([
+            const hasRemoteBranch = await this._remoteBranchExists(remote, remoteBranch);
+
+            if (hasRemoteBranch) {
+                const count = await this.git.raw(['rev-list', '--count', `${remote}/${remoteBranch}..${localBranch}`]);
+                return parseInt(count.trim(), 10);
+            } else {
+                // For new branch, count all commits not in any remote
+                const count = await this.git.raw(['rev-list', '--count', localBranch, '--not', '--remotes']);
+                return parseInt(count.trim(), 10);
+            }
+        } catch {
+            return 0;
+        }
+    }
+
+    private async _getCommitsNotInRemote(branch: string, maxCount: number, skip?: number): Promise<CommitDetails[]> {
+        try {
+            const args = [
                 'log',
                 branch,
                 '--not',
                 '--remotes',
                 `--max-count=${maxCount}`,
-                '--format=%H|%h|%s|%an|%aI|%ae'
-            ]);
+                '--format=%H%x00%h%x00%s%x00%an%x00%aI%x00%ae'
+            ];
+
+            if (skip) {
+                args.push(`--skip=${skip}`);
+            }
+
+            const result = await this.git.raw(args);
 
             if (!result.trim()) {
                 return [];
             }
 
             return result.trim().split('\n').map(line => {
-                const [hash, shortHash, subject, authorName, date, authorEmail] = line.split('|');
+                const [hash, shortHash, subject, authorName, date, authorEmail] = line.split('\x00');
                 return {
                     hash,
                     shortHash,
@@ -967,24 +1025,37 @@ export class GitService implements vscode.Disposable {
             .map(b => b.substring(prefix.length));
     };
 
-    public getPushCommits = async (params: { remote: string; branch: string }): Promise<PushCommitsData> => {
+    public getPushCommits = async (params: { remote: string; branch: string; limit?: number; skip?: number }): Promise<PushCommitsData> => {
         const branches = await this.getBranches();
         const currentBranch = branches.current;
 
-        const commits = await this.getCommitsToPush(
-            currentBranch,
-            params.remote,
-            params.branch
+        const limit = params.limit ?? 20;
+        const skip = params.skip ?? 0;
+
+        const [totalCount, commits] = await Promise.all([
+            this.getCommitsToPushCount(currentBranch, params.remote, params.branch),
+            this.getCommitsToPush(
+                currentBranch,
+                params.remote,
+                params.branch,
+                { maxCount: limit, skip }
+            )
+        ]);
+
+        // Fetch files for each commit
+        const commitsWithFiles = await Promise.all(
+            commits.map(async (commit) => {
+                const files = await this.getCommitFiles(commit.hash);
+                return { ...commit, files };
+            })
         );
 
-        let files: CommitFile[] = [];
-        if (commits.length > 0) {
-            files = await this.getCommitFiles(commits[0].hash);
-        }
+        const hasMore = (skip + commits.length) < totalCount;
 
         return {
-            commits: commits,
-            files: files
+            commits: commitsWithFiles,
+            hasMore,
+            totalCount
         };
     };
 

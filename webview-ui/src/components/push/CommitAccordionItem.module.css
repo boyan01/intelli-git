@@ -1,0 +1,228 @@
+.commitItem {
+    border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.commitHeader {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 6px 8px;
+    cursor: pointer;
+    user-select: none;
+    transition: background-color 0.1s ease;
+    outline: none;
+}
+
+.commitHeader:not(.commitHeaderExpanded):hover {
+    background-color: var(--vscode-list-hoverBackground);
+}
+
+/* Selected / Expanded state - VS Code native selection style */
+.commitHeaderExpanded {
+    background-color: var(--vscode-list-activeSelectionBackground);
+    color: var(--vscode-list-activeSelectionForeground);
+}
+
+.commitHeaderExpanded .commitMessage,
+.commitHeaderExpanded .commitDate,
+.commitHeaderExpanded .commitMeta {
+    color: var(--vscode-list-activeSelectionForeground);
+}
+
+/* Focus state */
+.commitHeader:focus {
+    outline: 1px solid var(--vscode-focusBorder);
+    outline-offset: -1px;
+}
+
+/* Commit Icon (rotates when expanded) */
+.commitIcon {
+    color: var(--vscode-gitDecoration-addedResourceForeground, #89d185);
+    flex-shrink: 0;
+    margin-top: 2px;
+    transition: transform 0.15s ease;
+}
+
+.commitIconExpanded {
+    transform: rotate(90deg);
+}
+
+.commitHeaderExpanded .commitIcon {
+    color: var(--vscode-list-activeSelectionForeground);
+}
+
+.commitHeaderContent {
+    flex: 1;
+    min-width: 0;
+}
+
+.commitTitleRow {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.commitMessage {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--vscode-foreground);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+}
+
+.commitDate {
+    font-size: 11px;
+    color: var(--vscode-descriptionForeground);
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.commitMeta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    color: var(--vscode-descriptionForeground);
+    margin-top: 2px;
+}
+
+.commitMetaDot {
+    opacity: 0.5;
+}
+
+/* Commit Expanded Content - distinct background */
+.commitContent {
+    background-color: var(--vscode-sideBarSectionHeader-background);
+    border-left: 3px solid var(--vscode-list-activeSelectionBackground);
+    padding-bottom: 8px;
+    animation: slideDown 0.15s ease-out;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.commitDetails {
+    padding: 8px 28px;
+    border-bottom: 1px dashed var(--vscode-panel-border);
+}
+
+.commitBody {
+    font-size: 12px;
+    color: var(--vscode-descriptionForeground);
+    line-height: 1.5;
+    margin-bottom: 8px;
+    white-space: pre-wrap;
+}
+
+.commitDetailsMeta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    font-size: 11px;
+    color: var(--vscode-descriptionForeground);
+}
+
+.commitDetailsMeta span {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.commitFiles {
+    padding-left: 16px;
+}
+
+/* File Tree Header */
+.filesHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 12px 6px 0;
+    border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.filesCount {
+    font-size: 11px;
+    color: var(--vscode-descriptionForeground);
+    font-weight: 500;
+}
+
+.filesActions {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.iconBtn {
+    background: transparent;
+    border: none;
+    color: var(--vscode-icon-foreground);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.iconBtn:hover {
+    background-color: var(--vscode-toolbar-hoverBackground);
+}
+
+.commitDateToggle {
+    cursor: pointer;
+    user-select: none;
+    transition: color 0.1s ease;
+}
+
+.commitDateToggle:hover {
+    color: var(--vscode-textLink-foreground);
+}
+
+
+.authorText {
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: block;
+}
+
+.loadingWrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 24px;
+    color: var(--vscode-descriptionForeground);
+    font-size: 13px;
+    background: var(--vscode-sideBar-background);
+    border-top: 1px solid var(--vscode-sideBarSectionHeader-border);
+}
+
+.loadingWrapper i {
+    font-size: 16px;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}

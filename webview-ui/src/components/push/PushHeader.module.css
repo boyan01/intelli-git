@@ -1,0 +1,240 @@
+/* Main Header Container */
+.headerContainer {
+    display: flex;
+    flex-direction: column;
+    padding: 8px 12px;
+    gap: 10px;
+    border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.headerTitleRow {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    /* margin-bottom: 4px; */
+}
+
+.iconBtn {
+    padding: 2px;
+    border-radius: 3px;
+    cursor: pointer;
+    color: var(--vscode-icon-foreground);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
+}
+
+.iconBtn:hover {
+    background-color: var(--vscode-toolbar-hoverBackground);
+}
+
+/* Branch Row (Horizontal) */
+.branchRow {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 4px;
+    padding: 0;
+}
+
+.pushTargetLabel {
+    font-size: 10px;
+    color: var(--vscode-descriptionForeground);
+    text-transform: uppercase;
+    font-weight: bold;
+    letter-spacing: 0.05em;
+}
+
+/* Unified Font Style for Remote/Branch text */
+.unifiedFont {
+    font-size: 13px;
+    font-family: var(--vscode-editor-font-family);
+    line-height: 1.4;
+}
+
+/* Branch Name (Local & Shared Typography) */
+.branchName {
+    composes: unifiedFont;
+    font-weight: 600;
+    color: var(--vscode-foreground);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 200px;
+}
+
+.arrowRow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--vscode-descriptionForeground);
+    font-size: 12px;
+    opacity: 0.8;
+}
+
+/* Remote Branch Wrapper */
+.remoteWrapper {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    flex: 1;
+    gap: 8px;
+}
+
+/* Remote Display (Non-editing state) */
+.remoteDisplay {
+    display: flex;
+    align-items: center;
+    overflow: visible;
+    position: relative;
+    /* Ensure height aligns with input */
+    height: 22px;
+    /* Match inlineEditWrapper box model to prevent shift */
+    padding: 0 4px;
+    border: 1px solid transparent;
+    border-radius: 2px;
+}
+
+.remotePart {
+    composes: unifiedFont;
+    color: var(--vscode-textLink-foreground);
+    cursor: pointer;
+}
+
+.remotePart:hover {
+    color: var(--vscode-textLink-activeForeground);
+    text-decoration: underline;
+}
+
+.branchPart {
+    composes: unifiedFont;
+    font-weight: 600;
+    color: var(--vscode-textLink-foreground);
+    cursor: pointer;
+}
+
+.branchPart:hover {
+    color: var(--vscode-textLink-activeForeground);
+    text-decoration: underline;
+}
+
+.separator {
+    composes: unifiedFont;
+    color: var(--vscode-descriptionForeground);
+    opacity: 0.6;
+    margin: 0;
+    /* Removed margin to match simple text rendering in edit mode */
+    flex-shrink: 0;
+}
+
+/* Remote Dropdown */
+.remoteDropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    min-width: 120px;
+    margin-top: 4px;
+    background-color: var(--vscode-dropdown-background);
+    border: 1px solid var(--vscode-dropdown-border);
+    border-radius: 2px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
+    z-index: 200;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.clickable {
+    cursor: pointer;
+}
+
+/* Inline Edit */
+.inlineEditWrapper {
+    display: flex;
+    align-items: center;
+    position: relative;
+    background: var(--vscode-input-background);
+    border: 1px solid var(--vscode-input-border);
+    border-radius: 2px;
+    padding: 0 4px;
+    height: 22px;
+    max-width: 100%;
+}
+
+.inlineEditWrapper:focus-within {
+    border-color: var(--vscode-focusBorder);
+}
+
+.remotePrefix {
+    composes: unifiedFont;
+    color: var(--vscode-descriptionForeground);
+    white-space: pre;
+    user-select: none;
+}
+
+.inlineInput {
+    composes: unifiedFont;
+    font-weight: 600;
+    border: none;
+    background: transparent;
+    color: var(--vscode-input-foreground);
+    outline: none;
+    padding: 0;
+    min-width: 60px;
+    width: auto;
+    flex: 1;
+}
+
+.inputStack {
+    position: relative;
+    flex: 1;
+    display: flex;
+    min-width: 0;
+}
+
+.suggestionsList {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    min-width: 100%;
+    margin-top: 2px;
+    background-color: var(--vscode-dropdown-background);
+    border: 1px solid var(--vscode-dropdown-border);
+    border-radius: 2px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
+    z-index: 100;
+    max-height: 150px;
+    overflow-y: auto;
+}
+
+.suggestionItem {
+    padding: 4px 8px;
+    cursor: pointer;
+    font-size: 11px;
+    white-space: nowrap;
+}
+
+.suggestionItem:hover {
+    background-color: var(--vscode-list-hoverBackground);
+}
+
+.suggestionItemSelected {
+    background-color: var(--vscode-list-activeSelectionBackground);
+    color: var(--vscode-list-activeSelectionForeground);
+}
+
+.newBadge {
+    background-color: var(--vscode-badge-background);
+    color: var(--vscode-badge-foreground);
+    font-size: 9px;
+    padding: 0 4px;
+    border-radius: 2px;
+    text-transform: uppercase;
+    font-weight: 600;
+    min-width: 20px;
+    text-align: center;
+    line-height: 14px;
+    height: 14px;
+    display: inline-block;
+}

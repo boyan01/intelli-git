@@ -137,11 +137,13 @@ export class ExtensionRpcHandler {
         this.onDispose();
     };
 
-    openCommitDiff = async (params: { path: string; leftRef: string; rightRef: string }): Promise<void> => {
+    openCommitDiff = async (params: { path: string; leftRef: string; rightRef: string; preserveFocus?: boolean }): Promise<void> => {
         const leftUri = vscode.Uri.parse(`intelli-git-revision://load/${params.path}?${JSON.stringify({ ref: params.leftRef })}`);
         const rightUri = vscode.Uri.parse(`intelli-git-revision://load/${params.path}?${JSON.stringify({ ref: params.rightRef })}`);
         const title = `${path.basename(params.path)} (${params.leftRef.substring(0, 7)} ↔ ${params.rightRef.substring(0, 7)})`;
-        vscode.commands.executeCommand('vscode.diff', leftUri, rightUri, title);
+        vscode.commands.executeCommand('vscode.diff', leftUri, rightUri, title, {
+            preserveFocus: params.preserveFocus ?? false
+        });
     };
 
     pickPaths = async (): Promise<string[] | undefined> => {
@@ -295,14 +297,9 @@ export class ExtensionRpcHandler {
                 const branches = await this.gitService.getBranches();
                 if (branches.current) {
                     await this.gitService.push('origin', branches.current);
-                    vscode.window.showInformationMessage(i18n.t('extension.pushSuccess', 'origin', branches.current));
                 }
-            } else {
-                vscode.window.showInformationMessage(i18n.t('extension.commitSuccess'));
             }
-
         } catch (e) {
-            vscode.window.showErrorMessage(i18n.t('extension.commitFailed', `${e}`));
             throw e;
         }
     };

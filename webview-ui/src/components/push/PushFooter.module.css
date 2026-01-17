@@ -1,0 +1,76 @@
+.footer {
+    padding: 10px 12px;
+    border-top: 1px solid var(--vscode-panel-border);
+    background-color: var(--vscode-sideBar-background);
+    flex-shrink: 0;
+}
+
+.pushBtn {
+    width: 100%;
+    padding: 8px 16px;
+    background-color: var(--vscode-button-background);
+    color: var(--vscode-button-foreground);
+    border: none;
+    border-radius: 3px;
+    font-size: 13px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: background-color 0.15s ease;
+}
+
+.pushBtn:hover:not(:disabled) {
+    background-color: var(--vscode-button-hoverBackground);
+}
+
+.pushBtn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.pushOptionsBtn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    width: 100%;
+    margin-top: 8px;
+    padding: 4px 8px;
+    background: transparent;
+    border: none;
+    color: var(--vscode-descriptionForeground);
+    cursor: pointer;
+    font-size: 11px;
+    transition: color 0.15s ease;
+}
+
+.pushOptionsBtn:hover {
+    color: var(--vscode-foreground);
+}
+
+.pushOptionsMenu {
+    position: absolute;
+    bottom: 100%;
+    left: 0;
+    right: 0;
+    margin-bottom: 8px;
+    background-color: var(--vscode-dropdown-background);
+    border: 1px solid var(--vscode-dropdown-border);
+    border-radius: 3px;
+    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.25);
+    z-index: 100;
+    padding: 8px 0;
+}
+
+.dropdownItem {
+    padding: 6px 12px;
+    cursor: pointer;
+    font-size: 12px;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.dropdownItem:hover {
+    background-color: var(--vscode-list-hoverBackground);
+}

@@ -18,7 +18,7 @@ class EventStream<T> {
 }
 
 export const rpcEvents = {
-    activeFileChange: new EventStream<{ path: string }>(),
+    activeFileChange: new EventStream<{ path: string; commitHash?: string }>(),
     refresh: new EventStream<void>(),
 };
 
