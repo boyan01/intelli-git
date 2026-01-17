@@ -201,8 +201,20 @@ export function registerBranchCommands(
                     await gitService.pull();
                     vscode.window.showInformationMessage(vscode.l10n.t('Updated current branch'));
                 } else {
-                    await gitService.fetch();
-                    vscode.window.showInformationMessage(vscode.l10n.t('Fetched updates for {0}', branch));
+                    const result = await gitService.updateBranch(branch, false);
+                    if (result === 'diverged') {
+                        const confirm = await vscode.window.showWarningMessage(
+                            vscode.l10n.t('Branch {0} has diverged from remote. Force update will discard local commits.', branch),
+                            { modal: true },
+                            vscode.l10n.t('Force Update')
+                        );
+                        if (confirm === vscode.l10n.t('Force Update')) {
+                            await gitService.updateBranch(branch, true);
+                            vscode.window.showInformationMessage(vscode.l10n.t('Force updated {0}', branch));
+                        }
+                    } else {
+                        vscode.window.showInformationMessage(vscode.l10n.t('Updated {0}', branch));
+                    }
                 }
             } catch (error: any) {
                 vscode.window.showErrorMessage(vscode.l10n.t('Failed to update: {0}', error.message));

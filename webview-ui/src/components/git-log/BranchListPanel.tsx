@@ -333,7 +333,15 @@ export const BranchListPanel: React.FC<BranchListPanelProps> = ({ onBranchDouble
         if (!node.data || node.data.type === 'folder') return undefined;
 
         if (node.data.type === 'local') {
-            const hasUpstream = !!node.data.branchInfo?.upstream;
+            const upstream = node.data.branchInfo?.upstream;
+            // Check if upstream remote branch actually exists
+            let hasUpstream = false;
+            if (upstream && data?.remoteBranches) {
+                const [remote, ...branchParts] = upstream.split('/');
+                const branchName = branchParts.join('/');
+                const remoteBranchList = data.remoteBranches[remote];
+                hasUpstream = remoteBranchList?.includes(branchName) ?? false;
+            }
             return {
                 webviewSection: 'localBranch',
                 branchName: node.data.fullPath,
@@ -355,7 +363,7 @@ export const BranchListPanel: React.FC<BranchListPanelProps> = ({ onBranchDouble
             };
         }
         return undefined;
-    }, []);
+    }, [data?.remoteBranches]);
     const renderTreeContent = () => {
         if (!data && isLoading) return null;
         if (!data) return <div className={styles.noData}>No data</div>;

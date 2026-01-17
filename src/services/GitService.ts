@@ -557,6 +557,32 @@ export class GitService implements vscode.Disposable {
         await this.git.fetch(['--all', '--prune']);
     }
 
+    /**
+     * Update a non-current local branch to match its remote tracking branch.
+     * Uses `git fetch origin branch:branch` syntax.
+     * @param branch Local branch name to update
+     * @param force If true, force overwrite local branch even if it has diverged
+     * @returns 'success' | 'diverged' indicating the result
+     */
+    public async updateBranch(branch: string, force: boolean = false): Promise<'success' | 'diverged'> {
+        const remotes = await this.getRemotes();
+        const remote = remotes.length > 0 ? remotes[0] : 'origin';
+
+        try {
+            if (force) {
+                await this.git.fetch([remote, `+${branch}:${branch}`]);
+            } else {
+                await this.git.fetch([remote, `${branch}:${branch}`]);
+            }
+            return 'success';
+        } catch (e: any) {
+            if (e.message && e.message.includes('non-fast-forward')) {
+                return 'diverged';
+            }
+            throw e;
+        }
+    }
+
     public async getIncomingCommitsCount(): Promise<number> {
         try {
             const count = await this.git.raw(['rev-list', '--count', 'HEAD..@{u}']);
