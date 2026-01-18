@@ -1,5 +1,5 @@
 import React, { useMemo, useCallback, useRef } from 'react';
-import type { ChangelistGroup, FileStatus } from '@shared/messages';
+import type { ChangelistGroup, FileStatus, LastCommitInfo } from '@shared/messages';
 import { BasicTreeView } from '../common/BasicTreeView';
 import type { TreeNode, BasicTreeViewRef } from '../common/BasicTreeView';
 import { getFileIcon } from '../../lib/fileIcons';
@@ -16,6 +16,7 @@ export interface ChangelistTreeProps {
     onToggleFile: (path: string, checked: boolean) => void;
     readonly?: boolean;
     workspaceRoot?: string;
+    amendCommit?: LastCommitInfo | null;
 }
 
 export interface ChangelistTreeRef {
@@ -29,6 +30,8 @@ interface FileNodeData {
     path: string;
     isFile: boolean;
     isRoot?: boolean;
+    isAmendCommit?: boolean;
+    isAmendFile?: boolean;
     status?: string;
     fileCount: number;
     selectedStatus?: SelectionStatus;
@@ -185,7 +188,8 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
     onToggle,
     onToggleFile,
     readonly = false,
-    workspaceRoot
+    workspaceRoot,
+    amendCommit
 }, ref) => {
     const treeRef = useRef<BasicTreeViewRef>(null);
     const [, forceUpdate] = React.useReducer(x => x + 1, 0);
@@ -196,7 +200,10 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
     }));
 
     const nodes = useMemo(() => {
-        return groups.map(group => {
+        const result: TreeNode<FileNodeData>[] = [];
+
+        // Add changelist groups first
+        groups.forEach(group => {
             let children: TreeNode<FileNodeData>[];
             if (viewMode === 'list') {
                 children = group.items
@@ -212,12 +219,11 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
                     }))
                     .sort((a, b) => a.label.localeCompare(b.label));
             } else {
-                // Use buildTree and recursively prefix IDs
                 children = prefixNodes(buildTree(group.items), group.id);
             }
 
             const totalFiles = children.reduce((sum, n) => sum + countFiles(n), 0);
-            return {
+            result.push({
                 id: `__root__${group.id}`,
                 label: group.name,
                 data: {
@@ -227,9 +233,39 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
                     fileCount: totalFiles
                 },
                 children
-            } as TreeNode<FileNodeData>;
+            });
         });
-    }, [groups, viewMode]);
+
+        // Add amend commit node at the bottom
+        if (amendCommit) {
+            const amendChildren: TreeNode<FileNodeData>[] = amendCommit.files.map(f => ({
+                id: `amend/${f.path}`,
+                label: f.path.split('/').pop() || f.path,
+                data: {
+                    path: f.path,
+                    isFile: true,
+                    isAmendFile: true,
+                    status: f.status,
+                    fileCount: 1
+                }
+            }));
+
+            result.push({
+                id: '__root__amend',
+                label: amendCommit.subject,
+                data: {
+                    path: '',
+                    isFile: false,
+                    isRoot: true,
+                    isAmendCommit: true,
+                    fileCount: amendCommit.files.length
+                },
+                children: amendChildren
+            });
+        }
+
+        return result;
+    }, [groups, viewMode, amendCommit]);
 
     React.useLayoutEffect(() => {
         computeSelection(nodes, selectedFiles);
@@ -263,6 +299,8 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
     }, [readonly, onToggleFile]);
 
     const renderLeading = useCallback((node: TreeNode<FileNodeData>) => {
+        // Don't show checkbox for amend commit nodes
+        if (node.data?.isAmendCommit || node.data?.isAmendFile) return null;
         if (readonly || !onToggleFile) return null;
 
         const status = node.data?.selectedStatus ?? 'none';
@@ -294,6 +332,7 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
         const status = node.data?.status;
         const isDeleted = status === 'D';
         const statusColor = getStatusColor(status);
+        const isAmendFile = node.data?.isAmendFile;
 
         const statusClass = status === 'M' ? styles.statusM :
             status === 'A' ? styles.statusA :
@@ -302,7 +341,7 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
                         status === '?' ? styles.statusUntracked :
                             status === '!' ? styles.statusIgnored : '';
 
-        const showPath = viewMode === 'list' && isFile;
+        const showPath = viewMode === 'list' && (isFile || isAmendFile);
 
         return (
             <div className={styles.fileItemContent} data-drag-label="true">
@@ -328,6 +367,11 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
                         {showPath && (
                             <span className={styles.fileDirPath}>{getDirPath(node.data!.path)}</span>
                         )}
+                    </>
+                ) : node.data?.isAmendCommit ? (
+                    <>
+                        <span className={`codicon codicon-git-commit ${styles.icon}`}></span>
+                        <span className={styles.name} style={{ fontStyle: 'italic' }}>{node.label}</span>
                     </>
                 ) : node.data?.isRoot ? (
                     <span className={styles.name}>{node.label}</span>

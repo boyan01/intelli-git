@@ -51,7 +51,6 @@
     color: var(--vscode-input-foreground);
     border: 1px solid var(--vscode-input-border);
     border-radius: 4px;
-    font-family: var(--vscode-editor-font-family);
     opacity: 0.9;
 }
 

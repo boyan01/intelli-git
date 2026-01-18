@@ -37,6 +37,14 @@ export interface CommitFile {
     status: GitStatusCode;
 }
 
+export interface LastCommitInfo {
+    hash: string;
+    shortHash: string;
+    subject: string;
+    message: string;
+    files: CommitFile[];
+}
+
 export interface PushConfig {
     currentBranch: string;
     remote: string;
@@ -137,6 +145,7 @@ export interface ExtensionMethods {
     updateWorkspaceState: <T>(key: string, value: T) => Promise<void>;
     getUnpushedCommits: () => Promise<string[]>;
     getWorkspaceRoot: () => Promise<string>;
+    getLastCommitInfo: () => Promise<LastCommitInfo | null>;
 }
 
 export interface CommitState {

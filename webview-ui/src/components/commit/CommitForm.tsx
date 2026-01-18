@@ -1,7 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import styles from './CommitForm.module.css';
 import { rpc } from '../../lib/rpc_client';
+
+interface CommitOptions {
+    push: boolean;
+    signOff: boolean;
+}
 
 interface CommitFormProps {
     message: string;
@@ -27,6 +32,16 @@ export const CommitForm: React.FC<CommitFormProps> = ({
     const { t } = useTranslation();
     const [isGenerating, setIsGenerating] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    const [options, setOptions] = useState<CommitOptions>({
+        push: false,
+        signOff: false
+    });
+    const dropdownRef = useRef<HTMLDivElement>(null);
+
+    const toggleOption = (key: keyof CommitOptions) => {
+        setOptions(prev => ({ ...prev, [key]: !prev[key] }));
+    };
 
     const handleGenerateMessage = async () => {
         setError(null);
@@ -42,7 +57,7 @@ export const CommitForm: React.FC<CommitFormProps> = ({
         }
     };
 
-    const handleCommit = async (push: boolean) => {
+    const handleCommit = async () => {
         setError(null);
         const files = Array.from(selectedFiles);
         if (files.length === 0 && !amend) {
@@ -50,10 +65,10 @@ export const CommitForm: React.FC<CommitFormProps> = ({
         }
         try {
             await rpc.commit({
-                message: message,
+                message: options.signOff ? `${message}\n\nSigned-off-by: ` : message,
                 files: files,
                 amend: amend,
-                push: push
+                push: options.push
             });
             onMessageChange('');
         } catch (e) {
@@ -61,6 +76,38 @@ export const CommitForm: React.FC<CommitFormProps> = ({
             setError(t('Commit failed: {{message}}', { message: errMsg }));
         }
     };
+
+    const getButtonState = () => {
+        if (amend && options.push) {
+            return {
+                text: t('Amend & Push'),
+                variant: 'primary' as const,
+                icon: 'codicon-repo-push'
+            };
+        }
+        if (amend) {
+            return {
+                text: t('Amend'),
+                variant: 'secondary' as const,
+                icon: 'codicon-edit'
+            };
+        }
+        if (options.push) {
+            return {
+                text: t('Commit & Push'),
+                variant: 'primary' as const,
+                icon: 'codicon-repo-push'
+            };
+        }
+        return {
+            text: t('Commit'),
+            variant: 'primary' as const,
+            icon: 'codicon-check'
+        };
+    };
+
+    const btnState = getButtonState();
+    const isDisabled = (selectedFiles.size === 0 && !amend) || !message.trim();
 
     return (
         <div className={styles.commitSection}>
@@ -73,7 +120,7 @@ export const CommitForm: React.FC<CommitFormProps> = ({
                             onChange={(e) => onAmendChange(e.target.checked)}
                             className={styles.amendInput}
                         />
-                        <span>{t('Amend(M)')}</span>
+                        <span>{t('Amend')}</span>
                     </label>
 
                     <button
@@ -118,24 +165,65 @@ export const CommitForm: React.FC<CommitFormProps> = ({
             )}
 
             <div className={styles.footerActions}>
-                <div className={styles.actionsLeft}>
+                <div
+                    className={styles.splitButton}
+                    ref={dropdownRef}
+                    onBlur={(e) => {
+                        if (!dropdownRef.current?.contains(e.relatedTarget as Node)) {
+                            setIsDropdownOpen(false);
+                        }
+                    }}
+                >
                     <button
-                        className={`${styles.btn} ${styles.btnPrimary}`}
-                        onClick={() => handleCommit(false)}
+                        className={`${styles.mainBtn} ${styles[btnState.variant]}`}
+                        onClick={handleCommit}
+                        disabled={isDisabled}
                     >
-                        {t('Commit(I)')}
+                        <i className={`codicon ${btnState.icon}`} />
+                        <span>{btnState.text}</span>
                     </button>
+
                     <button
-                        className={`${styles.btn} ${styles.btnSecondary}`}
-                        onClick={() => handleCommit(true)}
+                        className={`${styles.optionsBtn} ${styles[btnState.variant]} ${isDisabled ? styles.optionsBtnDisabled : ''}`}
+                        onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                        aria-label={t('Commit Options')}
                     >
-                        {t('Commit & Push(P)...')}
+                        <i className={`codicon codicon-chevron-up ${styles.chevron} ${isDropdownOpen ? styles.chevronOpen : ''}`} />
                     </button>
-                </div>
-                <div className={styles.actionsRight}>
-                    <button className={styles.iconBtn} title={t('Settings')}>
-                        <i className="codicon codicon-settings-gear"></i>
-                    </button>
+
+                    {isDropdownOpen && (
+                        <div className={styles.dropdown}>
+                            <div className={styles.dropdownHeader}>
+                                {t('Commit Options')}
+                            </div>
+
+                            <button
+                                className={styles.dropdownItem}
+                                onClick={() => toggleOption('push')}
+                            >
+                                <div className={styles.itemContent}>
+                                    <i className="codicon codicon-repo-push" />
+                                    <span>{t('Push after Commit')}</span>
+                                </div>
+                                <span className={styles.checkIcon}>
+                                    {options.push && <i className="codicon codicon-check" />}
+                                </span>
+                            </button>
+
+                            <button
+                                className={styles.dropdownItem}
+                                onClick={() => toggleOption('signOff')}
+                            >
+                                <div className={styles.itemContent}>
+                                    <i className="codicon codicon-verified" />
+                                    <span>{t('Sign Off')}</span>
+                                </div>
+                                <span className={styles.checkIcon}>
+                                    {options.signOff && <i className="codicon codicon-check" />}
+                                </span>
+                            </button>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>

@@ -90,7 +90,8 @@ export class ExtensionRpcHandler {
                 getWorkspaceState: this.getWorkspaceState,
                 updateWorkspaceState: this.updateWorkspaceState,
                 getUnpushedCommits: this.getUnpushedCommits,
-                getWorkspaceRoot: async () => this.gitService.getWorkspaceRoot()
+                getWorkspaceRoot: async () => this.gitService.getWorkspaceRoot(),
+                getLastCommitInfo: async () => this.gitService.getLastCommitInfo()
             }
         )
     }

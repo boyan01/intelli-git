@@ -8,7 +8,7 @@ import { usePersistedState } from '../../hooks/usePersistedState';
 import { useRpcData } from '../../hooks/useRpcData';
 import styles from './CommitView.module.css';
 import { rpc, rpcEvents } from '../../lib/rpc_client';
-import type { ChangelistGroup, BranchInfo, FileStatus } from '@shared/messages';
+import type { ChangelistGroup, BranchInfo, FileStatus, LastCommitInfo } from '@shared/messages';
 
 interface CommitViewProps {
     rebaseStatus?: BranchInfo['rebaseStatus'];
@@ -89,6 +89,30 @@ export function CommitView({ rebaseStatus }: CommitViewProps) {
         });
         return () => unsubActiveFile();
     }, []);
+
+    // Last commit info for amend
+    const [lastCommitInfo, setLastCommitInfo] = useState<LastCommitInfo | null>(null);
+    const [savedMessage, setSavedMessage] = useState<string>('');
+
+    useEffect(() => {
+        if (amend) {
+            // Save current message before replacing with last commit message
+            setSavedMessage(commitMessage);
+            rpc.getLastCommitInfo().then(info => {
+                setLastCommitInfo(info);
+                if (info) {
+                    setCommitMessage(info.message);
+                }
+            });
+        } else {
+            setLastCommitInfo(null);
+            // Restore saved message when un-checking amend
+            if (savedMessage !== undefined) {
+                setCommitMessage(savedMessage);
+                setSavedMessage('');
+            }
+        }
+    }, [amend]);
 
     const toggleFile = useCallback((path: string, checked: boolean) => {
         setSelectedFiles(prev => {
@@ -179,6 +203,7 @@ export function CommitView({ rebaseStatus }: CommitViewProps) {
                         onToggle={handleToggle}
                         onToggleFile={toggleFile}
                         workspaceRoot={workspaceRoot}
+                        amendCommit={lastCommitInfo}
                     />
                 )}
             </div>

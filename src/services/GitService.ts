@@ -388,6 +388,33 @@ export class GitService implements vscode.Disposable {
         }
     }
 
+    public async getLastCommitInfo(): Promise<{
+        hash: string;
+        shortHash: string;
+        subject: string;
+        message: string;
+        files: CommitFile[];
+    } | null> {
+        try {
+            const log = await this.git.log({ maxCount: 1 });
+            if (!log.latest) return null;
+
+            const hash = log.latest.hash;
+            const files = await this.getCommitFiles(hash);
+            const message = log.latest.message || '';
+
+            return {
+                hash,
+                shortHash: hash.substring(0, 7),
+                subject: message.split('\n')[0],
+                message,
+                files
+            };
+        } catch {
+            return null;
+        }
+    }
+
     /**
      * Get the commit message for a specific commit.
      */
