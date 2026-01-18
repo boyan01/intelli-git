@@ -5,72 +5,173 @@
     flex-shrink: 0;
 }
 
-.pushBtn {
+/* Split Button Container */
+.splitButton {
+    position: relative;
+    display: inline-flex;
     width: 100%;
-    padding: 8px 16px;
-    background-color: var(--vscode-button-background);
-    color: var(--vscode-button-foreground);
-    border: none;
     border-radius: 3px;
-    font-size: 13px;
-    cursor: pointer;
-    font-weight: 500;
-    transition: background-color 0.15s ease;
+    overflow: visible;
 }
 
-.pushBtn:hover:not(:disabled) {
-    background-color: var(--vscode-button-hoverBackground);
-}
-
-.pushBtn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
-.pushOptionsBtn {
+/* Main action button */
+.mainBtn {
+    flex: 1;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 4px;
-    width: 100%;
-    margin-top: 8px;
-    padding: 4px 8px;
-    background: transparent;
+    gap: 6px;
+    padding: 8px 16px;
     border: none;
-    color: var(--vscode-descriptionForeground);
+    border-radius: 3px 0 0 3px;
+    font-size: 13px;
+    font-weight: 500;
     cursor: pointer;
-    font-size: 11px;
-    transition: color 0.15s ease;
+    transition: background-color 0.15s ease, opacity 0.15s ease;
 }
 
-.pushOptionsBtn:hover {
-    color: var(--vscode-foreground);
+.mainBtn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
 }
 
-.pushOptionsMenu {
+/* Options trigger button */
+.optionsBtn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 10px;
+    border: none;
+    border-left: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 0 3px 3px 0;
+    cursor: pointer;
+    transition: background-color 0.15s ease, filter 0.15s ease;
+}
+
+.optionsBtn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.optionsBtn:hover:not(:disabled) {
+    filter: brightness(0.9);
+}
+
+/* Button variants */
+.primary {
+    background-color: var(--vscode-button-background);
+    color: var(--vscode-button-foreground);
+}
+
+.primary:hover:not(:disabled) {
+    background-color: var(--vscode-button-hoverBackground);
+}
+
+.danger {
+    background-color: var(--vscode-inputValidation-errorBackground, #5a1d1d);
+    color: var(--vscode-inputValidation-errorForeground, #fff);
+}
+
+.danger:hover:not(:disabled) {
+    filter: brightness(1.1);
+}
+
+.success {
+    background-color: var(--vscode-testing-iconPassed, #4caf50);
+    color: #fff;
+}
+
+/* Chevron animation */
+.chevron {
+    transition: transform 0.2s ease;
+    transform: rotate(180deg);
+}
+
+.chevronOpen {
+    transform: rotate(0deg);
+}
+
+/* Dropdown menu */
+.dropdown {
     position: absolute;
     bottom: 100%;
-    left: 0;
     right: 0;
+    width: auto;
+    min-width: 180px;
     margin-bottom: 8px;
     background-color: var(--vscode-dropdown-background);
     border: 1px solid var(--vscode-dropdown-border);
-    border-radius: 3px;
-    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.25);
+    border-radius: 4px;
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.3);
     z-index: 100;
-    padding: 8px 0;
+    overflow: hidden;
+}
+
+.dropdownHeader {
+    padding: 8px 12px 6px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--vscode-descriptionForeground);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
 .dropdownItem {
-    padding: 6px 12px;
-    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 8px 12px;
+    background: transparent;
+    border: none;
+    color: var(--vscode-foreground);
     font-size: 12px;
-    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color 0.1s ease;
+}
+
+.dropdownItem:hover {
+    background-color: var(--vscode-list-hoverBackground);
+}
+
+.itemContent {
     display: flex;
     align-items: center;
     gap: 8px;
 }
 
-.dropdownItem:hover {
-    background-color: var(--vscode-list-hoverBackground);
+.itemContent .codicon {
+    color: var(--vscode-descriptionForeground);
+}
+
+.dropdownItem:hover .itemContent .codicon {
+    color: var(--vscode-foreground);
+}
+
+.ciLabel {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--vscode-descriptionForeground);
+}
+
+.dropdownDivider {
+    margin: 4px 0;
+    border-top: 1px solid var(--vscode-dropdown-border);
+}
+
+/* Danger item styling */
+.dangerItem {
+    background-color: var(--vscode-inputValidation-errorBackground, rgba(255, 0, 0, 0.1));
+}
+
+.dangerItem:hover {
+    background-color: var(--vscode-inputValidation-errorBackground, rgba(255, 0, 0, 0.15));
+}
+
+.dangerIcon {
+    color: var(--vscode-errorForeground, #f14c4c) !important;
 }

@@ -447,8 +447,12 @@ export class GitService implements vscode.Disposable {
         }
     }
 
-    public async push(remote: string, branch: string): Promise<void> {
-        await this.git.push(remote, branch);
+    public async push(remote: string, branch: string, options?: { noVerify?: boolean }): Promise<void> {
+        const args: string[] = [];
+        if (options?.noVerify) {
+            args.push('--no-verify');
+        }
+        await this.git.push(remote, branch, args);
     }
 
     /**
@@ -963,8 +967,12 @@ export class GitService implements vscode.Disposable {
         return Array.from(fileMap.values());
     };
 
-    public async forcePush(remote: string, branch: string): Promise<void> {
-        await this.git.push(remote, branch, ['--force']);
+    public async forcePush(remote: string, branch: string, options?: { noVerify?: boolean }): Promise<void> {
+        const args: string[] = ['--force'];
+        if (options?.noVerify) {
+            args.push('--no-verify');
+        }
+        await this.git.push(remote, branch, args);
     }
 
     public async pushTags(remote: string): Promise<void> {

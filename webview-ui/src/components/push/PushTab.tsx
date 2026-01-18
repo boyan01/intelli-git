@@ -9,7 +9,7 @@ import type { BaseFileTreeRef } from '../file-tree/BaseFileTree';
 import { ViewModeToggle } from '../common/ViewModeToggle';
 import { PushHeader } from './PushHeader';
 import { CommitAccordionItem } from './CommitAccordionItem';
-import { PushFooter } from './PushFooter';
+import { PushFooter, type PushOptions } from './PushFooter';
 import styles from './PushTab.module.css';
 
 type ViewMode = 'commits' | 'changes';
@@ -25,7 +25,6 @@ export function PushTab() {
     const [hasMore, setHasMore] = useState(false);
     const [isLoadingMore, setIsLoadingMore] = useState(false);
     const [isPushing, setIsPushing] = useState(false);
-    const [pushTags, setPushTags] = useState(false);
 
     // Branch selection state
     const [localBranch, setLocalBranch] = useState<string>('');
@@ -161,12 +160,13 @@ export function PushTab() {
         setSelectedRemoteBranch(branch);
     }, []);
 
-    const handlePush = async (force: boolean) => {
+    const handlePush = async (options: PushOptions) => {
         setIsPushing(true);
         try {
             await rpc.push({
-                force,
-                pushTags,
+                force: options.force,
+                pushTags: options.tags,
+                noVerify: options.noVerify,
                 remote: selectedRemote,
                 branch: selectedRemoteBranch
             });
@@ -363,9 +363,7 @@ export function PushTab() {
             <PushFooter
                 commitCount={totalCommits}
                 isPushing={isPushing}
-                pushTags={pushTags}
                 onPush={handlePush}
-                onPushTagsChange={setPushTags}
             />
 
             {/* Loading Overlay */}

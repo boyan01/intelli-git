@@ -96,17 +96,21 @@ export class ExtensionRpcHandler {
     }
 
 
-    push = async (params: { force: boolean; pushTags: boolean; remote: string; branch: string }): Promise<void> => {
+    push = async (params: { force: boolean; pushTags: boolean; noVerify?: boolean; remote: string; branch: string }): Promise<void> => {
         const branches = await this.gitService.getBranches();
         const currentBranch = branches.current;
 
         // Check if upstream was set before push
         const hadUpstream = await this.gitService.getUpstreamBranch();
 
+        const pushOptions = {
+            noVerify: params.noVerify
+        };
+
         if (params.force) {
-            await this.gitService.forcePush(params.remote, `${currentBranch}:${params.branch}`);
+            await this.gitService.forcePush(params.remote, `${currentBranch}:${params.branch}`, pushOptions);
         } else {
-            await this.gitService.push(params.remote, `${currentBranch}:${params.branch}`);
+            await this.gitService.push(params.remote, `${currentBranch}:${params.branch}`, pushOptions);
         }
 
         // Auto-set upstream if not previously set and pushing to same-named branch
