@@ -13,36 +13,88 @@
     height: 30px;
     background: transparent;
     border-bottom: 1px solid var(--vscode-panel-border);
+    position: relative;
 }
 
 .tabsLeft,
 .tabsRight {
     display: flex;
     align-items: center;
+    gap: 0;
+    position: relative;
+    height: 100%;
+}
+
+.tabsRight {
     gap: 4px;
 }
 
 .tab {
-    padding: 4px 12px;
+    height: 100%;
+    padding: 0 8px;
     background: transparent;
     border: none;
     color: var(--vscode-foreground);
-    font-size: 12px;
     cursor: pointer;
-    border-radius: 3px;
     opacity: 0.7;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    transition: opacity 0.2s ease, gap 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    outline: none;
+    gap: 0;
 }
 
 .tab:hover:not(:disabled) {
-    background: var(--vscode-toolbar-hoverBackground);
+    background: transparent;
     opacity: 1;
 }
 
 .tab.active {
-    background: var(--vscode-list-activeSelectionBackground);
-    color: var(--vscode-list-activeSelectionForeground);
-    font-weight: 500;
+    background: transparent;
+    color: var(--vscode-foreground);
     opacity: 1;
+    gap: 6px;
+}
+
+.tab.active i {
+    color: var(--vscode-foreground);
+}
+
+.titleWrapper {
+    display: grid;
+    grid-template-columns: 0fr;
+    transition: grid-template-columns 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.tab.active .titleWrapper {
+    grid-template-columns: 1fr;
+}
+
+.tabTitle {
+    overflow: hidden;
+    white-space: nowrap;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    min-width: 0;
+    /* Important for grid item shrinking */
+    font-size: 10px;
+    font-weight: 500;
+}
+
+.tab.active .tabTitle {
+    opacity: 1;
+}
+
+.activeIndicator {
+    position: absolute;
+    bottom: -1px;
+    height: 2px;
+    background-color: var(--vscode-activityBar-activeBorder, var(--vscode-focusBorder));
+    transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    pointer-events: none;
+    z-index: 10;
 }
 
 .tab:disabled {
