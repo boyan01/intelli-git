@@ -10,6 +10,7 @@ export interface PushHeaderProps {
     remotes: string[];
     remoteBranches: string[];
     viewMode: 'commits' | 'changes';
+    isLoading?: boolean;
     onToggleView: () => void;
     onRemoteChange: (remote: string) => void;
     onRemoteBranchChange: (branch: string) => void;
@@ -21,6 +22,7 @@ export const PushHeader: React.FC<PushHeaderProps> = ({
     remotes,
     remoteBranches,
     viewMode,
+    isLoading = false,
     onToggleView,
     onRemoteChange,
     onRemoteBranchChange
@@ -29,45 +31,45 @@ export const PushHeader: React.FC<PushHeaderProps> = ({
 
 
     const [isRemoteDropdownOpen, setIsRemoteDropdownOpen] = useState(false);
-    const [isBranchEditing, setIsBranchEditing] = useState(false);
-    const [branchInputValue, setBranchInputValue] = useState(selectedRemoteBranch);
-    const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(0);
+    const [isEditingBranch, setIsEditingBranch] = useState(false);
+    const [editValue, setEditValue] = useState(selectedRemoteBranch);
+    const [highlightedIndex, setHighlightedIndex] = useState(0);
     const [showSuggestions, setShowSuggestions] = useState(true);
 
-    const remoteDropdownRef = useRef<HTMLDivElement>(null);
-    const branchInputRef = useRef<HTMLInputElement>(null);
-    const branchEditRef = useRef<HTMLDivElement>(null);
+    const remoteRef = useRef<HTMLDivElement>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
+    const editWrapperRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        setBranchInputValue(selectedRemoteBranch);
+        setEditValue(selectedRemoteBranch);
     }, [selectedRemoteBranch]);
 
     useEffect(() => {
-        if (isBranchEditing && branchInputRef.current) {
-            branchInputRef.current.focus();
-            branchInputRef.current.select();
+        if (isEditingBranch && inputRef.current) {
+            inputRef.current.focus();
+            inputRef.current.select();
         }
-    }, [isBranchEditing]);
+    }, [isEditingBranch]);
 
     useEffect(() => {
-        const handleClickOutside = (e: MouseEvent) => {
-            if (remoteDropdownRef.current && !remoteDropdownRef.current.contains(e.target as Node)) {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (remoteRef.current && !remoteRef.current.contains(event.target as Node)) {
                 setIsRemoteDropdownOpen(false);
             }
-            if (branchEditRef.current && !branchEditRef.current.contains(e.target as Node)) {
-                if (isBranchEditing) {
-                    handleBranchConfirm();
+            if (editWrapperRef.current && !editWrapperRef.current.contains(event.target as Node)) {
+                if (isEditingBranch) {
+                    handleCommitEdit();
                 }
             }
         };
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, [isBranchEditing, branchInputValue]);
+    }, [isEditingBranch, editValue]);
 
-    const isNewBranch = selectedRemoteBranch.trim() !== '' && !remoteBranches.includes(selectedRemoteBranch);
+    const isNewBranch = !isLoading && selectedRemoteBranch.trim() !== '' && !remoteBranches.includes(selectedRemoteBranch);
 
     const filteredBranches = remoteBranches.filter(b =>
-        b.toLowerCase().includes(branchInputValue.toLowerCase())
+        b.toLowerCase().includes(editValue.toLowerCase())
     );
 
     const handleRemoteSelect = (remote: string) => {
@@ -75,15 +77,15 @@ export const PushHeader: React.FC<PushHeaderProps> = ({
         setIsRemoteDropdownOpen(false);
     };
 
-    const handleBranchConfirm = () => {
-        const trimmed = branchInputValue.trim();
+    const handleCommitEdit = () => {
+        const trimmed = editValue.trim();
         if (trimmed && trimmed !== selectedRemoteBranch) {
             onRemoteBranchChange(trimmed);
         } else {
-            setBranchInputValue(selectedRemoteBranch);
+            setEditValue(selectedRemoteBranch);
         }
-        setIsBranchEditing(false);
-        setSelectedSuggestionIndex(0);
+        setIsEditingBranch(false);
+        setHighlightedIndex(0);
         setShowSuggestions(true);
     };
 
@@ -91,27 +93,29 @@ export const PushHeader: React.FC<PushHeaderProps> = ({
         if (e.key === 'ArrowDown') {
             e.preventDefault();
             if (showSuggestions && filteredBranches.length > 0) {
-                setSelectedSuggestionIndex(prev =>
+                setHighlightedIndex(prev =>
                     prev < filteredBranches.length - 1 ? prev + 1 : prev
                 );
             }
         } else if (e.key === 'ArrowUp') {
             e.preventDefault();
             if (showSuggestions && filteredBranches.length > 0) {
-                setSelectedSuggestionIndex(prev => prev > 0 ? prev - 1 : 0);
+                setHighlightedIndex(prev => prev > 0 ? prev - 1 : 0);
             }
         } else if (e.key === 'Enter') {
             e.preventDefault();
-            if (showSuggestions && filteredBranches.length > 0 && filteredBranches[selectedSuggestionIndex]) {
-                setBranchInputValue(filteredBranches[selectedSuggestionIndex]);
-                setShowSuggestions(false);
+            if (showSuggestions && filteredBranches.length > 0 && filteredBranches[highlightedIndex]) {
+                onRemoteBranchChange(filteredBranches[highlightedIndex]);
+                setIsEditingBranch(false);
+                setHighlightedIndex(0);
+                setShowSuggestions(true);
             } else {
-                handleBranchConfirm();
+                handleCommitEdit();
             }
         } else if (e.key === 'Escape') {
-            setBranchInputValue(selectedRemoteBranch);
-            setIsBranchEditing(false);
-            setSelectedSuggestionIndex(0);
+            setEditValue(selectedRemoteBranch);
+            setIsEditingBranch(false);
+            setHighlightedIndex(0);
             setShowSuggestions(true);
         }
     };
@@ -139,10 +143,10 @@ export const PushHeader: React.FC<PushHeaderProps> = ({
 
             {/* Remote Branch (Target) */}
             <div className={styles.remoteWrapper}>
-                {!isBranchEditing ? (
+                {!isEditingBranch ? (
                     <div
                         className={styles.remoteDisplay}
-                        ref={remoteDropdownRef}
+                        ref={remoteRef}
                     >
                         {/* Remote Part (Click to Select Remote) */}
                         <span
@@ -158,7 +162,7 @@ export const PushHeader: React.FC<PushHeaderProps> = ({
                         {/* Branch Part (Click to Edit Branch) */}
                         <span
                             className={styles.branchPart}
-                            onClick={() => setIsBranchEditing(true)}
+                            onClick={() => setIsEditingBranch(true)}
                             title={t('Edit Branch')}
                         >
                             {truncateBranch(selectedRemoteBranch, 20)}
@@ -180,24 +184,24 @@ export const PushHeader: React.FC<PushHeaderProps> = ({
                         )}
                     </div>
                 ) : (
-                    <div className={styles.inlineEditWrapper} ref={branchEditRef}>
+                    <div className={styles.inlineEditWrapper} ref={editWrapperRef}>
                         <span className={styles.remotePrefix}>{selectedRemote}/</span>
                         <div className={styles.inputStack}>
                             <input
-                                ref={branchInputRef}
+                                ref={inputRef}
                                 type="text"
                                 className={styles.inlineInput}
-                                value={branchInputValue}
+                                value={editValue}
                                 onChange={(e) => {
-                                    setBranchInputValue(e.target.value);
-                                    setSelectedSuggestionIndex(0);
+                                    setEditValue(e.target.value);
+                                    setHighlightedIndex(0);
                                     setShowSuggestions(true);
                                 }}
                                 onKeyDown={handleBranchKeyDown}
                                 onBlur={() => {
                                     setTimeout(() => {
-                                        if (document.activeElement !== branchInputRef.current) {
-                                            handleBranchConfirm();
+                                        if (document.activeElement !== inputRef.current) {
+                                            handleCommitEdit();
                                         }
                                     }, 150);
                                 }}
@@ -207,11 +211,12 @@ export const PushHeader: React.FC<PushHeaderProps> = ({
                                     {filteredBranches.slice(0, 5).map((branch, idx) => (
                                         <div
                                             key={branch}
-                                            className={`${styles.suggestionItem} ${idx === selectedSuggestionIndex ? styles.suggestionItemSelected : ''}`}
+                                            className={`${styles.suggestionItem} ${idx === highlightedIndex ? styles.suggestionItemSelected : ''}`}
                                             onMouseDown={() => {
-                                                setBranchInputValue(branch);
-                                                setShowSuggestions(false);
-                                                handleBranchConfirm();
+                                                onRemoteBranchChange(branch);
+                                                setIsEditingBranch(false);
+                                                setHighlightedIndex(0);
+                                                setShowSuggestions(true);
                                             }}
                                         >
                                             {branch}

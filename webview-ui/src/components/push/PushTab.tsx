@@ -9,7 +9,7 @@ import type { BaseFileTreeRef } from '../file-tree/BaseFileTree';
 import { ViewModeToggle } from '../common/ViewModeToggle';
 import { PushHeader } from './PushHeader';
 import { CommitAccordionItem } from './CommitAccordionItem';
-import { PushFooter, type PushOptions } from './PushFooter';
+import { PushFooter, type PushOptions, type PushStatus } from './PushFooter';
 import styles from './PushTab.module.css';
 
 type ViewMode = 'commits' | 'changes';
@@ -24,7 +24,8 @@ export function PushTab() {
     const [totalCommits, setTotalCommits] = useState(0);
     const [hasMore, setHasMore] = useState(false);
     const [isLoadingMore, setIsLoadingMore] = useState(false);
-    const [isPushing, setIsPushing] = useState(false);
+    const [pushStatus, setPushStatus] = useState<PushStatus>('idle');
+    const [pushError, setPushError] = useState<string | null>(null);
 
     // Branch selection state
     const [localBranch, setLocalBranch] = useState<string>('');
@@ -49,62 +50,82 @@ export function PushTab() {
     const scrollAreaRef = useRef<HTMLDivElement>(null);
     const treeRef = useRef<BaseFileTreeRef>(null);
 
-    // Load initial data
+    const [isRemoteBranchesLoading, setIsRemoteBranchesLoading] = useState(false);
+
+    // Initial load
     useEffect(() => {
-        const loadInitData = async () => {
+        (async () => {
             try {
                 const initState = await rpc.getPushInitState();
-                setLocalBranch(initState.localBranch);
+
+                // Set remotes
                 setRemotes(initState.remotes);
 
-                // Only reset selections when local branch has changed
-                const branchChanged = lastLocalBranch && lastLocalBranch !== initState.localBranch;
+                // Determine initial selection
+                // 1. If we have persisted values and they are valid, use them
+                // 2. Otherwise default to first remote and current branch
 
+                // Current local branch
+                setLocalBranch(initState.localBranch);
 
+                if (lastLocalBranch && lastLocalBranch === initState.localBranch) {
+                    // Same local branch as last time, try to restore remote/branch
+                    // But optimize verification - if we have remotes, check if saved remote is still valid
+                    if (lastRemote && initState.remotes.includes(lastRemote)) {
+                        setSelectedRemote(lastRemote);
+                    } else {
+                        setSelectedRemote(initState.remotes[0] || 'origin');
+                    }
 
-                if (branchChanged) {
-                    // Branch changed, use defaults
-                    setSelectedRemote(initState.remotes[0] || 'origin');
-                    setSelectedRemoteBranch(initState.localBranch);
+                    if (lastRemoteBranch) {
+                        setSelectedRemoteBranch(lastRemoteBranch);
+                    } else {
+                        setSelectedRemoteBranch(initState.localBranch);
+                    }
                 } else {
-                    // Same branch (or first time), restore previous selections
-                    const remote = (lastRemote && initState.remotes.includes(lastRemote))
+                    // Different local branch or first time
+                    // Default to 'origin' (or first remote) and same branch name
+                    const defaultRemote = lastRemote && initState.remotes.includes(lastRemote)
                         ? lastRemote
-                        : initState.remotes[0] || 'origin';
-                    setSelectedRemote(remote);
+                        : (initState.remotes[0] || 'origin');
+
+                    setSelectedRemote(defaultRemote);
                     setSelectedRemoteBranch(lastRemoteBranch || initState.localBranch);
                 }
             } catch (error) {
                 console.error('Failed to load push init state:', error);
             }
-        };
-        loadInitData();
+        })();
     }, []);
 
     // Load remote branches when remote changes
     useEffect(() => {
         if (!selectedRemote) return;
 
-        const loadRemoteBranches = async () => {
+        (async () => {
+            setIsRemoteBranchesLoading(true);
             try {
                 const branches = await rpc.getRemoteBranches(selectedRemote);
                 setRemoteBranches(branches);
 
-                // Only auto-set if no selection exists yet
+                // If we don't have a selected remote branch yet, or if the current choice isn't in the list
+                // we might want to auto-select. But usually we want to keep what user typed or current local branch name.
+                // So here we primarily update the suggestions list.
+
                 if (!selectedRemoteBranch) {
                     if (localBranch && branches.includes(localBranch)) {
                         setSelectedRemoteBranch(localBranch);
                     } else if (branches.length > 0) {
+                        // Optional: select first available, or keep empty
                         setSelectedRemoteBranch(branches[0]);
                     }
                 }
-                // If selectedRemoteBranch exists (from persistence or user selection), keep it
             } catch (error) {
                 console.error('Failed to load remote branches:', error);
+            } finally {
+                setIsRemoteBranchesLoading(false);
             }
-        };
-
-        loadRemoteBranches();
+        })();
     }, [selectedRemote, localBranch]);
 
     // Persist branch selection
@@ -161,7 +182,8 @@ export function PushTab() {
     }, []);
 
     const handlePush = async (options: PushOptions) => {
-        setIsPushing(true);
+        setPushError(null);
+        setPushStatus('pushing');
         try {
             await rpc.push({
                 force: options.force,
@@ -170,10 +192,36 @@ export function PushTab() {
                 remote: selectedRemote,
                 branch: selectedRemoteBranch
             });
+            setPushStatus('success');
+
+            // Refresh commits after successful push
+            const data = await rpc.getPushCommits({
+                remote: selectedRemote,
+                branch: selectedRemoteBranch,
+                limit: PAGE_SIZE,
+                skip: 0
+            });
+            setCommits(data.commits);
+            setHasMore(data.hasMore);
+            setTotalCommits(data.totalCount);
+
+            // Refetch remote branches to update "NEW" status
+            try {
+                setIsRemoteBranchesLoading(true);
+                const branches = await rpc.getRemoteBranches(selectedRemote);
+                setRemoteBranches(branches);
+            } catch (error) {
+                console.error('Failed to refresh remote branches:', error);
+            } finally {
+                setIsRemoteBranchesLoading(false);
+            }
+
+            // Reset to idle after 2 seconds
+            setTimeout(() => setPushStatus('idle'), 2000);
         } catch (e) {
-            console.error('Push failed', e);
-        } finally {
-            setIsPushing(false);
+            const errMsg = e instanceof Error ? e.message : String(e);
+            setPushError(t('Push failed: {{message}}', { message: errMsg }));
+            setPushStatus('error');
         }
     };
 
@@ -271,7 +319,8 @@ export function PushTab() {
                 remotes={remotes}
                 remoteBranches={remoteBranches}
                 viewMode={viewMode}
-                onToggleView={() => setViewMode(v => v === 'commits' ? 'changes' : 'commits')}
+                isLoading={isRemoteBranchesLoading}
+                onToggleView={() => setViewMode(m => m === 'commits' ? 'changes' : 'commits')}
                 onRemoteChange={handleRemoteChange}
                 onRemoteBranchChange={handleRemoteBranchChange}
             />
@@ -362,12 +411,11 @@ export function PushTab() {
             {/* Footer */}
             <PushFooter
                 commitCount={totalCommits}
-                isPushing={isPushing}
+                pushStatus={pushStatus}
+                error={pushError}
                 onPush={handlePush}
+                onDismissError={() => setPushError(null)}
             />
-
-            {/* Loading Overlay */}
-            {isPushing && <div className={styles.loadingOverlay} />}
         </div>
     );
 }

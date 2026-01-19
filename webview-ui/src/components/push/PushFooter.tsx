@@ -8,16 +8,22 @@ export interface PushOptions {
     noVerify: boolean;
 }
 
+export type PushStatus = 'idle' | 'pushing' | 'success' | 'error';
+
 export interface PushFooterProps {
     commitCount: number;
-    isPushing: boolean;
+    pushStatus: PushStatus;
+    error: string | null;
     onPush: (options: PushOptions) => void;
+    onDismissError: () => void;
 }
 
 export const PushFooter: React.FC<PushFooterProps> = ({
     commitCount,
-    isPushing,
+    pushStatus,
+    error,
     onPush,
+    onDismissError,
 }) => {
     const { t } = useTranslation();
     const [isOpen, setIsOpen] = useState(false);
@@ -37,6 +43,13 @@ export const PushFooter: React.FC<PushFooterProps> = ({
     };
 
     const getButtonState = () => {
+        if (pushStatus === 'success') {
+            return {
+                text: t('Push Completed'),
+                variant: 'success' as const,
+                icon: 'codicon-check'
+            };
+        }
         if (options.force) {
             return {
                 text: t('Force Push'),
@@ -59,10 +72,24 @@ export const PushFooter: React.FC<PushFooterProps> = ({
     };
 
     const btnState = getButtonState();
-    const isDisabled = isPushing || commitCount === 0;
+    const isPushing = pushStatus === 'pushing';
+    const isDisabled = isPushing || pushStatus === 'success' || commitCount === 0;
 
     return (
         <div className={styles.footer}>
+            {error && (
+                <div className={styles.errorMessage}>
+                    <i className="codicon codicon-warning" />
+                    <span>{error}</span>
+                    <button
+                        className={styles.dismissBtn}
+                        onClick={onDismissError}
+                        title={t('Dismiss')}
+                    >
+                        <i className="codicon codicon-close" />
+                    </button>
+                </div>
+            )}
             <div
                 className={styles.splitButton}
                 ref={dropdownRef}
