@@ -35,6 +35,7 @@ interface FileNodeData {
     status?: string;
     fileCount: number;
     selectedStatus?: SelectionStatus;
+    error?: boolean;
 }
 
 const getDirPath = (fullPath: string): string => {
@@ -110,7 +111,8 @@ const buildTree = (files: FileStatus[]): TreeNode<FileNodeData>[] => {
                         path: currentPath,
                         isFile: isLast,
                         status: isLast ? file.status : undefined,
-                        fileCount: 0
+                        fileCount: 0,
+                        error: isLast ? file.error : undefined
                     },
                     children: isLast ? undefined : []
                 };
@@ -317,7 +319,8 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
     }, [readonly, onToggleFile, handleToggleFile]);
 
     const renderTrailing = useCallback((node: TreeNode<FileNodeData>) => {
-        if (!node.data?.isFile && node.data?.fileCount !== undefined) {
+        // Only show count for root nodes (Change Groups), not for folders
+        if (node.data?.isRoot && node.data?.fileCount !== undefined) {
             return (
                 <span className={styles.fileCount} style={{ marginLeft: 0 }}>
                     {node.data.fileCount}
@@ -331,7 +334,8 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
         const isFile = node.data?.isFile;
         const status = node.data?.status;
         const isDeleted = status === 'D';
-        const statusColor = getStatusColor(status);
+        const isError = node.data?.error;
+        const statusColor = isError ? 'var(--vscode-list-errorForeground)' : getStatusColor(status);
         const isAmendFile = node.data?.isAmendFile;
 
         const statusClass = status === 'M' ? styles.statusM :

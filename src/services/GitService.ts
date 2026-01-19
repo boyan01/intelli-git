@@ -130,9 +130,26 @@ export class GitService implements vscode.Disposable {
                 }
             });
 
+
+
         } catch (e) {
             console.error('Error getting status:', e);
         }
+
+        // Check for diagnostics errors
+        files.forEach(file => {
+            try {
+                const absPath = path.join(this._workspaceRoot, file.path);
+                const uri = vscode.Uri.file(absPath);
+                const diagnostics = vscode.languages.getDiagnostics(uri);
+                const hasError = diagnostics.some(d => d.severity === vscode.DiagnosticSeverity.Error);
+                if (hasError) {
+                    file.error = true;
+                }
+            } catch (e) {
+                // Ignore errors checking diagnostics
+            }
+        });
 
         return files.sort((a, b) => a.path.localeCompare(b.path));
     }

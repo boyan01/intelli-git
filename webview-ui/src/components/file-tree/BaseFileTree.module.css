@@ -129,7 +129,7 @@
 }
 
 .statusUntracked {
-    color: #E98F89;
+    color: var(--vscode-gitDecoration-untrackedResourceForeground);
 }
 
 .statusIgnored {

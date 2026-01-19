@@ -9,6 +9,7 @@ export interface FileStatus {
     path: string;
     status: GitStatusCode;
     staged: boolean;
+    error?: boolean;
 }
 
 export interface ChangelistGroup {

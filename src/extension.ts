@@ -102,6 +102,13 @@ export function activate(context: vscode.ExtensionContext) {
             gitLogStatusBar.update();
         })
     );
+
+    // Watch for diagnostic changes to update file error status in changelist
+    context.subscriptions.push(
+        vscode.languages.onDidChangeDiagnostics(() => {
+            triggerRefresh();
+        })
+    );
 }
 
 export function deactivate() { }
