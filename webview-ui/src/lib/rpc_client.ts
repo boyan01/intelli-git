@@ -4,7 +4,7 @@ import type { ExtensionMethods, WebviewMethods } from '@shared/messages';
 
 type Listener<T> = (data: T) => void;
 
-class EventStream<T> {
+export class EventStream<T> {
     private listeners: Set<Listener<T>> = new Set();
 
     subscribe(listener: Listener<T>): () => void {

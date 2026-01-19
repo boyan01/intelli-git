@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import styles from './PushFooter.module.css';
+import { rpc } from '@/lib/rpc_client';
 
 export interface PushOptions {
     force: boolean;
@@ -12,21 +13,21 @@ export type PushStatus = 'idle' | 'pushing' | 'success' | 'error';
 
 export interface PushFooterProps {
     commitCount: number;
-    pushStatus: PushStatus;
-    error: string | null;
-    onPush: (options: PushOptions) => void;
-    onDismissError: () => void;
+    selectedRemote: string;
+    selectedRemoteBranch: string;
+    onPushComplete: () => void;
 }
 
 export const PushFooter: React.FC<PushFooterProps> = ({
     commitCount,
-    pushStatus,
-    error,
-    onPush,
-    onDismissError,
+    selectedRemote,
+    selectedRemoteBranch,
+    onPushComplete,
 }) => {
     const { t } = useTranslation();
     const [isOpen, setIsOpen] = useState(false);
+    const [pushStatus, setPushStatus] = useState<PushStatus>('idle');
+    const [error, setError] = useState<string | null>(null);
     const [options, setOptions] = useState<PushOptions>({
         force: false,
         tags: false,
@@ -39,8 +40,31 @@ export const PushFooter: React.FC<PushFooterProps> = ({
     };
 
     const handlePush = async () => {
-        onPush(options);
+        if (!selectedRemote || !selectedRemoteBranch) return;
+
+        setError(null);
+        setPushStatus('pushing');
+        try {
+            await rpc.push({
+                force: options.force,
+                pushTags: options.tags,
+                noVerify: options.noVerify,
+                remote: selectedRemote,
+                branch: selectedRemoteBranch
+            });
+            setPushStatus('success');
+            onPushComplete();
+
+            // Reset to idle after 2 seconds
+            setTimeout(() => setPushStatus('idle'), 2000);
+        } catch (e) {
+            const errMsg = e instanceof Error ? e.message : String(e);
+            setError(errMsg);
+            setPushStatus('error');
+        }
     };
+
+    const onDismissError = () => setError(null);
 
     const getButtonState = () => {
         if (pushStatus === 'success') {

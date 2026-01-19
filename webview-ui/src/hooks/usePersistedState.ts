@@ -20,9 +20,11 @@ export interface PersistedStateSchema {
 
     // Push View
     'push.splitSize': number;
-    'push.lastLocalBranch': string;
-    'push.lastRemote': string;
-    'push.lastRemoteBranch': string;
+    'push.branchSelection': {
+        localBranch: string;
+        remote: string;
+        remoteBranch: string;
+    };
 
     // Push Commit Details
     'push.details.viewMode': 'tree' | 'list';
@@ -73,9 +75,11 @@ export const stateDefaults: PersistedStateSchema = {
 
     // Push View
     'push.splitSize': 300,
-    'push.lastLocalBranch': '',
-    'push.lastRemote': '',
-    'push.lastRemoteBranch': '',
+    'push.branchSelection': {
+        localBranch: '',
+        remote: '',
+        remoteBranch: ''
+    },
 
     // Push Commit Details
     'push.details.viewMode': 'tree',

@@ -7,6 +7,7 @@ interface UseRpcDataOptions<T, K extends keyof PersistedStateSchema | undefined 
     initialValue: T;
     refreshOnEvent?: boolean;
     cacheKey?: K;
+    deps?: React.DependencyList;
 }
 
 /**
@@ -23,7 +24,7 @@ export function useRpcData<T, K extends keyof PersistedStateSchema | undefined =
     fetcher: () => Promise<T>,
     options: UseRpcDataOptions<T, K>
 ) {
-    const { initialValue, refreshOnEvent = true, cacheKey } = options;
+    const { initialValue, refreshOnEvent = true, cacheKey, deps = [] } = options;
     const fetcherRef = useRef(fetcher);
     fetcherRef.current = fetcher;
 
@@ -57,7 +58,7 @@ export function useRpcData<T, K extends keyof PersistedStateSchema | undefined =
         if (refreshOnEvent) {
             return rpcEvents.refresh.subscribe(load);
         }
-    }, [load, refreshOnEvent]);
+    }, [load, refreshOnEvent, ...deps]);
 
     return { data, loading, error, reload: load };
 }

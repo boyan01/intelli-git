@@ -1,12 +1,11 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { RpcPeer } from '../../shared/rpc';
-import type { WebviewMethods, ExtensionMethods, CommitFile, CommitState, PushCommitsData, PushInitState, ChangelistGroup, BranchInfo, StashItem, BranchListData, LogCommit, LogOptions, CommitDetails } from '../../shared/messages';
+import type { WebviewMethods, ExtensionMethods } from '../../shared/messages';
 import { GitService } from '../services/GitService';
 import { ChangelistService } from '../services/ChangelistService';
 import { AnthropicService } from '../services/AnthropicService';
 import { i18n } from '../utils/i18n';
-import { log } from 'src/utils/logger';
 
 export interface ExtensionRpcHandlerOptions {
     context: vscode.ExtensionContext;

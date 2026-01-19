@@ -6,6 +6,8 @@ trigger: always_on
 
 This guide outlines the coding standards and best practices for the Intelli Git project. It is designed to ensure consistency across the codebase and guide future development by AI agents and human developers.
 
+ATTENTION: 所有回复、思考过程及任务清单，必须使用简体中文。
+
 ## 1. Project Structure
 
 The project is a VS Code Extension with a webview-based UI.

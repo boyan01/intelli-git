@@ -497,6 +497,7 @@ export class GitService implements vscode.Disposable {
             args.push('--no-verify');
         }
         await this.git.push(remote, branch, args);
+        this.fireChange();
     }
 
     /**
@@ -776,7 +777,7 @@ export class GitService implements vscode.Disposable {
                     args.push(`--skip=${options.skip}`);
                 }
 
-                args.push('--format=%H%x00%h%x00%s%x00%an%x00%aI%x00%ae');
+                args.push('--format=%H%x00%h%x00%s%x00%an%x00%aI%x00%ae%x00%P');
                 args.push(`${remote}/${remoteBranch}..${localBranch}`);
 
                 const result = await this.git.raw(args);
@@ -786,7 +787,7 @@ export class GitService implements vscode.Disposable {
                 }
 
                 return result.trim().split('\n').map(line => {
-                    const [hash, shortHash, subject, authorName, date, authorEmail] = line.split('\x00');
+                    const [hash, shortHash, subject, authorName, date, authorEmail, parentsStr] = line.split('\x00');
                     return {
                         hash,
                         shortHash,
@@ -797,7 +798,7 @@ export class GitService implements vscode.Disposable {
                         body: '',
                         files: [],
                         stats: { additions: 0, deletions: 0 },
-                        parentHashes: [],
+                        parentHashes: parentsStr ? parentsStr.split(' ') : [],
                         containingBranches: [],
                         refs: [],
                         filteredAncestors: []
@@ -842,7 +843,8 @@ export class GitService implements vscode.Disposable {
                 '--not',
                 '--remotes',
                 `--max-count=${maxCount}`,
-                '--format=%H%x00%h%x00%s%x00%an%x00%aI%x00%ae'
+                `--max-count=${maxCount}`,
+                '--format=%H%x00%h%x00%s%x00%an%x00%aI%x00%ae%x00%P'
             ];
 
             if (skip) {
@@ -856,7 +858,7 @@ export class GitService implements vscode.Disposable {
             }
 
             return result.trim().split('\n').map(line => {
-                const [hash, shortHash, subject, authorName, date, authorEmail] = line.split('\x00');
+                const [hash, shortHash, subject, authorName, date, authorEmail, parentsStr] = line.split('\x00');
                 return {
                     hash,
                     shortHash,
@@ -867,7 +869,7 @@ export class GitService implements vscode.Disposable {
                     body: '',
                     files: [],
                     stats: { additions: 0, deletions: 0 },
-                    parentHashes: [],
+                    parentHashes: parentsStr ? parentsStr.split(' ') : [],
                     containingBranches: [],
                     refs: [],
                     filteredAncestors: []
@@ -1063,9 +1065,12 @@ export class GitService implements vscode.Disposable {
     public getPushInitState = async (): Promise<PushInitState> => {
         const branches = await this.getBranches();
         const remotes = await this.getRemotes();
+        const upstream = await this.getUpstreamBranch(branches.current);
+
         return {
             localBranch: branches.current,
-            remotes: remotes.length > 0 ? remotes : ['origin']
+            remotes: remotes.length > 0 ? remotes : ['origin'],
+            upstream: upstream ?? undefined
         };
     };
 

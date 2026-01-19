@@ -1,18 +1,17 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useCallback } from 'react';
+import { rpc } from '@/lib/rpc_client';
 import { useTranslation } from 'react-i18next';
 import type { CommitDetails, FileStatus } from '@shared/messages';
 import { BaseFileTree } from '../file-tree/BaseFileTree';
 import type { BaseFileTreeRef } from '../file-tree/BaseFileTree';
 import { ViewModeToggle } from '../common/ViewModeToggle';
+import { formatRelativeDate } from '../../utils/dateUtils';
 import styles from './CommitAccordionItem.module.css';
 
 export interface CommitAccordionItemProps {
     commit: CommitDetails;
     isExpanded: boolean;
     onToggle: () => void;
-    onFileClick: (path: string) => void;
-    onFileDoubleClick: (path: string) => void;
-    formatRelativeDate: (dateStr: string) => string;
     fileViewMode: 'tree' | 'list';
     onFileViewModeChange: (mode: 'tree' | 'list') => void;
     activeFile: { path: string; commitHash?: string } | null;
@@ -22,9 +21,6 @@ export const CommitAccordionItem: React.FC<CommitAccordionItemProps> = ({
     commit,
     isExpanded,
     onToggle,
-    onFileClick,
-    onFileDoubleClick,
-    formatRelativeDate,
     fileViewMode,
     onFileViewModeChange,
     activeFile
@@ -32,6 +28,23 @@ export const CommitAccordionItem: React.FC<CommitAccordionItemProps> = ({
     const { t } = useTranslation();
     const treeRef = useRef<BaseFileTreeRef>(null);
     const [showRelativeTime, setShowRelativeTime] = useState(true);
+
+    const handleOpenFile = useCallback((path: string, preserveFocus: boolean) => {
+        const file = commit.files.find(f => f.path === path);
+        if (!file) return;
+
+        const parentHash = commit.parentHashes.length > 0 ? commit.parentHashes[0] : '';
+        let leftRef = parentHash;
+        let rightRef = commit.hash;
+
+        if (file.status.startsWith('A')) {
+            leftRef = '';
+        } else if (file.status.startsWith('D')) {
+            rightRef = '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
+        }
+
+        rpc.openCommitDiff({ path, leftRef, rightRef, preserveFocus });
+    }, [commit]);
 
     // Only highlight if commitHash matches this commit's hash
     const activeFilePath = activeFile && activeFile.commitHash === commit.hash
@@ -133,11 +146,11 @@ export const CommitAccordionItem: React.FC<CommitAccordionItemProps> = ({
                             items={fileItems}
                             viewMode={fileViewMode}
                             readonly={true}
-                            onFileClick={onFileClick}
+                            onFileClick={(path) => handleOpenFile(path, true)}
                             selectedFiles={new Set()}
                             activeFile={activeFilePath}
                             onToggleFile={() => { }}
-                            onFileDoubleClick={onFileDoubleClick}
+                            onFileDoubleClick={(path) => handleOpenFile(path, false)}
                         />
                     </div>
                 </div>

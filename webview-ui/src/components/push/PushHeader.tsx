@@ -66,7 +66,8 @@ export const PushHeader: React.FC<PushHeaderProps> = ({
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [isEditingBranch, editValue]);
 
-    const isNewBranch = !isLoading && selectedRemoteBranch.trim() !== '' && !remoteBranches.includes(selectedRemoteBranch);
+    const targetBranch = isEditingBranch ? editValue : selectedRemoteBranch;
+    const isNewBranch = !isLoading && targetBranch.trim() !== '' && !remoteBranches.includes(targetBranch);
 
     const filteredBranches = remoteBranches.filter(b =>
         b.toLowerCase().includes(editValue.toLowerCase())

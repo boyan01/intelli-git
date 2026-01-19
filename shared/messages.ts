@@ -46,14 +46,6 @@ export interface LastCommitInfo {
     files: CommitFile[];
 }
 
-export interface PushConfig {
-    currentBranch: string;
-    remote: string;
-    remoteBranch: string;
-    remotes: string[];
-    remoteBranches: string[];
-}
-
 export interface RefInfo {
     name: string;
     type: 'local' | 'remote' | 'tag' | 'head';
@@ -76,12 +68,6 @@ export interface CommitDetails {
 }
 
 export type LogCommit = CommitDetails;
-
-export interface PushData {
-    commits: CommitDetails[];
-    files: CommitFile[];
-    config: PushConfig;
-}
 
 export interface LogOptions {
     branch?: string;
@@ -149,17 +135,11 @@ export interface ExtensionMethods {
     getLastCommitInfo: () => Promise<LastCommitInfo | null>;
 }
 
-export interface CommitState {
-    changelists: ChangelistGroup[];
-    branches: BranchInfo;
-    incomingCommits: number;
-    stashList: StashItem[];
-    recentCommitMessage?: string;
-}
 
 export interface PushInitState {
     localBranch: string;
     remotes: string[];
+    upstream?: string;
 }
 
 export interface PushCommitsData {
