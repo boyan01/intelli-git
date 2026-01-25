@@ -119,7 +119,7 @@ export class AnthropicLanguageModel implements vscode.LanguageModelChat {
 
             const requestBody = JSON.stringify({
                 model: this.id,
-                max_tokens: 10240000,
+                max_tokens: 1024,
                 messages
             });
 
