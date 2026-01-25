@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { GitService } from '../services/GitService';
 import { BranchStatusBar } from '../ui/BranchStatusBar';
-import { PushPanel } from '../providers/PushPanel';
+import { CommitViewProvider } from '../providers/CommitViewProvider';
 import { GitLogViewProvider } from '../providers/GitLogViewProvider';
 
 /**
@@ -11,7 +11,8 @@ export function registerNavigationCommands(
     context: vscode.ExtensionContext,
     gitService: GitService,
     branchStatusBar: BranchStatusBar,
-    gitLogProvider: GitLogViewProvider
+    gitLogProvider: GitLogViewProvider,
+    commitViewProvider: CommitViewProvider
 ): void {
     context.subscriptions.push(
         vscode.commands.registerCommand('intelli-git.refresh', () => {
@@ -21,11 +22,7 @@ export function registerNavigationCommands(
 
     context.subscriptions.push(
         vscode.commands.registerCommand('intelli-git.push', () => {
-            PushPanel.createOrShow({
-                extensionUri: context.extensionUri,
-                context,
-                gitService
-            });
+            commitViewProvider.showPushTab();
         })
     );
 

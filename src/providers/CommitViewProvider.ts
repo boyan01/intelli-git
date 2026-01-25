@@ -14,6 +14,13 @@ export class CommitViewProvider extends BaseWebviewProvider implements vscode.We
         return 'Commit';
     }
 
+    public showPushTab() {
+        if (this._view) {
+            this._view.show();
+            this._rpc?.proxy.switchTab('push');
+        }
+    }
+
     protected getInitialRoute(): string | undefined {
         return undefined;
     }

@@ -152,6 +152,7 @@ export interface PushCommitsData {
 export interface WebviewMethods {
     activeFileChange: (params: { path: string; commitHash?: string }) => void;
     refresh: () => void;
+    switchTab: (tab: 'commit' | 'stash' | 'push') => void;
 }
 
 export interface LocalBranchInfo {

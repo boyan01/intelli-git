@@ -20,6 +20,7 @@ export class EventStream<T> {
 export const rpcEvents = {
     activeFileChange: new EventStream<{ path: string; commitHash?: string }>(),
     refresh: new EventStream<void>(),
+    switchTab: new EventStream<'commit' | 'stash' | 'push'>(),
 };
 
 const _rpc = new RpcPeer<ExtensionMethods, WebviewMethods>({
@@ -31,6 +32,7 @@ export const rpc = _rpc.proxy;
 _rpc.registerAll({
     activeFileChange: (params) => rpcEvents.activeFileChange.emit(params),
     refresh: () => rpcEvents.refresh.emit(),
+    switchTab: (tab) => rpcEvents.switchTab.emit(tab),
 });
 
 window.addEventListener('message', (event) => {

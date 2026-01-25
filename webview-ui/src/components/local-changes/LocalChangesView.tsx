@@ -1,11 +1,11 @@
-import { useState, useCallback, useRef, useLayoutEffect } from 'react';
+import { useState, useCallback, useRef, useLayoutEffect, useEffect } from 'react';
 import { CommitView } from '../commit/CommitView';
 import { StashView } from '../stash/StashView';
 import { PushTab } from '../push/PushTab';
 import { useTranslation } from 'react-i18next';
 import { usePersistedState } from '../../hooks/usePersistedState';
 import { useRpcData } from '../../hooks/useRpcData';
-import { rpc } from '../../lib/rpc_client';
+import { rpc, rpcEvents } from '../../lib/rpc_client';
 import type { BranchInfo } from '@shared/messages';
 import { BranchStatus } from '../common/BranchStatus';
 import styles from './LocalChangesView.module.css';
@@ -120,6 +120,12 @@ export function LocalChangesView() {
             observer.disconnect();
         };
     }, [activeTab]);
+
+    useEffect(() => {
+        return rpcEvents.switchTab.subscribe((tab) => {
+            setActiveTab(tab);
+        });
+    }, [setActiveTab]);
 
     const isRebasing = branches.rebaseStatus && branches.rebaseStatus !== 'none';
 

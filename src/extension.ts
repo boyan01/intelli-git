@@ -54,7 +54,7 @@ export function activate(context: vscode.ExtensionContext) {
 
     // Register commands
     registerStashCommands(context, gitService, provider);
-    registerNavigationCommands(context, gitService, branchStatusBar, gitLogProvider);
+    registerNavigationCommands(context, gitService, branchStatusBar, gitLogProvider, provider);
     registerBranchCommands(context, gitService, provider);
     registerLogCommands(context, gitService);
     registerChangelistCommands(context, gitService, changelistService, provider);
