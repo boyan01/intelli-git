@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { rpc } from '../../lib/rpc_client';
 import styles from './BranchStatus.module.css';
@@ -17,6 +17,7 @@ export const BranchStatus: React.FC<BranchStatusProps> = ({
     onPush
 }) => {
     const { t } = useTranslation();
+    const [isLoading, setIsLoading] = useState(false);
     const isSynced = (ahead || 0) === 0 && (behind || 0) === 0;
 
     return (
@@ -67,13 +68,22 @@ export const BranchStatus: React.FC<BranchStatusProps> = ({
             {isSynced && (
                 <div
                     className={`${styles.section} ${styles.synced}`}
-                    onClick={(e) => {
+                    onClick={async (e) => {
                         e.stopPropagation();
-                        rpc.fetch();
+                        if (isLoading) return;
+
+                        setIsLoading(true);
+                        try {
+                            await rpc.fetch();
+                        } catch (error) {
+                            rpc.showErrorMessage(String(error));
+                        } finally {
+                            setIsLoading(false);
+                        }
                     }}
-                    title={t('Fetch')}
+                    title={isLoading ? t('Fetching...') : t('Fetch')}
                 >
-                    <i className={`codicon codicon-refresh ${styles.statusIcon}`} />
+                    <i className={`codicon ${isLoading ? 'codicon-loading codicon-modifier-spin' : 'codicon-refresh'} ${styles.statusIcon}`} />
                 </div>
             )}
         </div>

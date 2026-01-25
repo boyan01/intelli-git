@@ -133,6 +133,7 @@ export interface ExtensionMethods {
     getUnpushedCommits: () => Promise<string[]>;
     getWorkspaceRoot: () => Promise<string>;
     getLastCommitInfo: () => Promise<LastCommitInfo | null>;
+    showErrorMessage: (message: string) => Promise<void>;
 }
 
 

@@ -90,7 +90,8 @@ export class ExtensionRpcHandler {
                 updateWorkspaceState: this.updateWorkspaceState,
                 getUnpushedCommits: this.getUnpushedCommits,
                 getWorkspaceRoot: async () => this.gitService.getWorkspaceRoot(),
-                getLastCommitInfo: async () => this.gitService.getLastCommitInfo()
+                getLastCommitInfo: async () => this.gitService.getLastCommitInfo(),
+                showErrorMessage: this.showErrorMessage
             }
         )
     }
@@ -435,24 +436,16 @@ export class ExtensionRpcHandler {
     };
 
     fetch = async (): Promise<void> => {
-        await vscode.window.withProgress({
-            location: vscode.ProgressLocation.Notification,
-            title: i18n.t('extension.fetching'),
-            cancellable: true
-        }, async (progress, token) => {
-            try {
-                await this.gitService.fetch();
-                if (!token.isCancellationRequested) {
-                    vscode.window.showInformationMessage(i18n.t('extension.fetchSuccess'));
-                }
-            } catch (e) {
-                if (!token.isCancellationRequested) {
-                    vscode.window.showErrorMessage(i18n.t('extension.fetchFailed', `${e}`));
-                }
-            } finally {
+        try {
+            await this.gitService.fetch();
+        } catch (e) {
+            console.error('Fetch failed:', e);
+            throw e;
+        }
+    };
 
-            }
-        });
+    showErrorMessage = async (message: string): Promise<void> => {
+        vscode.window.showErrorMessage(message);
     };
 
     pickBranch = async (): Promise<void> => {
