@@ -114,10 +114,15 @@ export const PushHeader: React.FC<PushHeaderProps> = ({
                 handleCommitEdit();
             }
         } else if (e.key === 'Escape') {
-            setEditValue(selectedRemoteBranch);
-            setIsEditingBranch(false);
-            setHighlightedIndex(0);
-            setShowSuggestions(true);
+            if (showSuggestions && filteredBranches.length > 0) {
+                e.preventDefault();
+                setShowSuggestions(false);
+            } else {
+                setEditValue(selectedRemoteBranch);
+                setIsEditingBranch(false);
+                setHighlightedIndex(0);
+                setShowSuggestions(true);
+            }
         }
     };
 

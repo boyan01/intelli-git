@@ -114,7 +114,7 @@ export function usePushBranches() {
                 setSelectedRemoteBranch(remoteBranches[0]);
             }
         }
-    }, [remoteBranches, selectedRemote, initState.localBranch, selectedRemoteBranch]);
+    }, [remoteBranches, selectedRemote, initState.localBranch]);
 
 
     // 7. Save Selection Persistence
