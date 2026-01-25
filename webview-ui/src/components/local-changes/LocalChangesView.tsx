@@ -166,24 +166,25 @@ export function LocalChangesView() {
                     </button>
                 </div>
                 <div className={styles.tabsRight}>
-                    <button className={styles.iconBtn} title={t('Fetch')} onClick={() => rpc.fetch()}>
-                        <i className="codicon codicon-cloud-download"></i>
-                    </button>
-
                     {branches?.current && (
-                        <div
-                            className={`${styles.branchIndicator} ${isRebasing ? styles.rebaseActive : ''}`}
-                            onClick={() => rpc.pickBranch()}
-                            title={isRebasing
-                                ? `Rebase in progress (${branches.rebaseStatus})`
-                                : t('Switch Branch')}
-                        >
-                            {isRebasing ? (
+                        isRebasing ? (
+                            <div
+                                className={`${styles.branchIndicator} ${styles.rebaseActive}`}
+                                onClick={() => rpc.pickBranch()}
+                                title={`Rebase in progress (${branches.rebaseStatus})`}
+                            >
                                 <RebaseIndicator status={branches.rebaseStatus as 'interactive' | 'merging'} />
-                            ) : (
-                                <BranchStatus current={branches.current} ahead={branches.ahead} behind={branches.behind} />
-                            )}
-                        </div>
+                            </div>
+                        ) : (
+                            <div style={{ marginRight: '4px' }}>
+                                <BranchStatus
+                                    current={branches.current}
+                                    ahead={branches.ahead}
+                                    behind={branches.behind}
+                                    onPush={() => setActiveTab('push')}
+                                />
+                            </div>
+                        )
                     )}
 
                 </div>
@@ -194,6 +195,6 @@ export function LocalChangesView() {
                 {activeTab === 'stash' && <StashView />}
                 {activeTab === 'push' && <PushTab />}
             </div>
-        </div>
+        </div >
     );
 }

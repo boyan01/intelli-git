@@ -663,7 +663,14 @@ export class GitService implements vscode.Disposable {
 
             return { ahead: ahead || 0, behind: behind || 0 };
         } catch {
-            return { ahead: 0, behind: 0 };
+            // If upstream is not configured, we can still calculate ahead by checking commits not in any remote
+            try {
+                // Get count of commits in HEAD but not in any remote
+                const aheadCount = await this.git.raw(['rev-list', '--count', 'HEAD', '--not', '--remotes']);
+                return { ahead: parseInt(aheadCount.trim(), 10) || 0, behind: 0 };
+            } catch {
+                return { ahead: 0, behind: 0 };
+            }
         }
     }
 
