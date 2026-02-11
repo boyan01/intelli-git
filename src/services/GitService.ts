@@ -9,6 +9,8 @@ import * as path from 'path';
 export class GitService implements vscode.Disposable {
     private git: SimpleGit;
     private _workspaceRoot: string;
+    private _gitRoot: string;
+    private _initPromise: Promise<void>;
     private _onDidChange = new vscode.EventEmitter<void>();
 
     /**
@@ -18,7 +20,43 @@ export class GitService implements vscode.Disposable {
 
     constructor(workspaceRoot: string) {
         this._workspaceRoot = workspaceRoot;
+        this._gitRoot = workspaceRoot;
         this.git = simpleGit(workspaceRoot);
+        this._initPromise = this.initialize();
+    }
+
+    private async initialize() {
+        try {
+            const root = await this.git.revparse(['--show-toplevel']);
+            if (root && root.trim()) {
+                this._gitRoot = path.normalize(root.trim());
+                // If git root is different, re-init simple-git to run from git root
+                if (this._gitRoot !== this._workspaceRoot) {
+                    this.git = simpleGit(this._gitRoot);
+                }
+            }
+        } catch (e) {
+            console.error('Failed to resolve git root, assuming workspace root:', e);
+        }
+    }
+
+    private toRepoPath(filePath: string): string {
+        if (this._gitRoot === this._workspaceRoot) {
+            return filePath;
+        }
+        return path.relative(this._gitRoot, path.join(this._workspaceRoot, filePath));
+    }
+
+    private toWorkspacePath(repoPath: string): string | null {
+        if (this._gitRoot === this._workspaceRoot) {
+            return repoPath;
+        }
+        const absPath = path.join(this._gitRoot, repoPath);
+        const rel = path.relative(this._workspaceRoot, absPath);
+        if (rel.startsWith('..') || path.isAbsolute(rel)) {
+            return null;
+        }
+        return rel;
     }
 
     /**
@@ -37,81 +75,81 @@ export class GitService implements vscode.Disposable {
     }
 
     public getStatus = async (): Promise<FileStatus[]> => {
+        await this._initPromise;
         const files: FileStatus[] = [];
 
         try {
             const status: StatusResult = await this.git.status();
 
-            status.staged.forEach(file => {
-                files.push({
-                    path: file,
-                    status: 'A',
-                    staged: true
-                });
-            });
+            const addFile = (repoPath: string, statusCode: GitStatusCode, staged: boolean) => {
+                const wsPath = this.toWorkspacePath(repoPath);
+                if (wsPath) {
+                    files.push({
+                        path: wsPath,
+                        status: statusCode,
+                        staged: staged
+                    });
+                }
+            };
+
+            status.staged.forEach(file => addFile(file, 'A', true));
 
             status.modified.forEach(file => {
                 const isStaged = status.staged.includes(file);
                 if (!isStaged) {
-                    files.push({
-                        path: file,
-                        status: 'M',
-                        staged: false
-                    });
+                    addFile(file, 'M', false);
                 }
             });
 
             status.deleted.forEach(file => {
                 const isStaged = status.staged.includes(file);
                 if (!isStaged) {
+                    addFile(file, 'D', false);
+                }
+            });
+
+            status.not_added.forEach(file => addFile(file, '?', false));
+
+            status.renamed.forEach(renamed => {
+                const wsPath = this.toWorkspacePath(renamed.to);
+                if (wsPath) {
                     files.push({
-                        path: file,
-                        status: 'D',
-                        staged: false
+                        path: wsPath,
+                        status: 'R',
+                        staged: true
                     });
                 }
             });
 
-            status.not_added.forEach(file => {
-                files.push({
-                    path: file,
-                    status: '?',
-                    staged: false
-                });
-            });
-
-            status.renamed.forEach(renamed => {
-                files.push({
-                    path: renamed.to,
-                    status: 'R',
-                    staged: true
-                });
-            });
-
             status.conflicted.forEach(file => {
-                files.push({
-                    path: file,
-                    status: 'C',
-                    staged: true // Conflicts are typically considered staged/in-index
-                });
+                const wsPath = this.toWorkspacePath(file);
+                if (wsPath) {
+                    files.push({
+                        path: wsPath,
+                        status: 'C',
+                        staged: true
+                    });
+                }
             });
 
             // Also check raw status for 'U' (Unmerged) which simple-git might map differently
-            // We'll rely on simple-git's .conflicted array first, but if indexStatus has 'U', handle it.
             const indexStatus = await this.git.diff(['--cached', '--name-status']);
             indexStatus.split('\n').forEach(line => {
                 if (!line) return;
-                const [statusCode, filePath] = line.split('\t');
-                const existing = files.find(f => f.path === filePath);
+                const [statusCode, repoPath] = line.split('\t');
+                const wsPath = this.toWorkspacePath(repoPath);
+                if (!wsPath) return;
+
+                const existing = files.find(f => f.path === wsPath);
 
                 // If it's a conflict
                 if ((statusCode === 'U' || statusCode.startsWith('U') || statusCode.endsWith('U'))) {
                     if (existing) {
                         existing.status = 'C';
                         existing.staged = true;
-                    } else if (filePath) {
+                    } else if (wsPath) {
                         files.push({
-                            path: filePath,
+                            path: wsPath,
                             status: 'C',
                             staged: true
                         });
@@ -119,9 +157,9 @@ export class GitService implements vscode.Disposable {
                     return;
                 }
 
-                if (!existing && filePath) {
+                if (!existing && wsPath) {
                     files.push({
-                        path: filePath,
+                        path: wsPath,
                         status: statusCode as GitStatusCode,
                         staged: true
                     });
@@ -130,8 +168,6 @@ export class GitService implements vscode.Disposable {
                 }
             });
 
-
-
         } catch (e) {
             console.error('Error getting status:', e);
         }
@@ -139,6 +175,7 @@ export class GitService implements vscode.Disposable {
         // Check for diagnostics errors
         files.forEach(file => {
             try {
+                // file.path is workspace relative
                 const absPath = path.join(this._workspaceRoot, file.path);
                 const uri = vscode.Uri.file(absPath);
                 const diagnostics = vscode.languages.getDiagnostics(uri);
@@ -176,22 +213,37 @@ export class GitService implements vscode.Disposable {
     }
 
     public async stageFile(filePath: string): Promise<void> {
-        await this.git.add(filePath);
+        await this._initPromise;
+        await this.git.add(this.toRepoPath(filePath));
     }
 
     public async unstageFile(filePath: string): Promise<void> {
-        await this.git.reset(['HEAD', '--', filePath]);
+        await this._initPromise;
+        await this.git.reset(['HEAD', '--', this.toRepoPath(filePath)]);
     }
 
     public async stageAll(): Promise<void> {
-        await this.git.add('-A');
+        await this._initPromise;
+        if (this._gitRoot === this._workspaceRoot) {
+            await this.git.add('-A');
+        } else {
+            const rel = path.relative(this._gitRoot, this._workspaceRoot);
+            await this.git.add(['-A', rel]);
+        }
     }
 
     public async unstageAll(): Promise<void> {
-        await this.git.reset(['HEAD']);
+        await this._initPromise;
+        if (this._gitRoot === this._workspaceRoot) {
+            await this.git.reset(['HEAD']);
+        } else {
+            const rel = path.relative(this._gitRoot, this._workspaceRoot);
+            await this.git.reset(['HEAD', '--', rel]);
+        }
     }
 
     public async stash(message?: string, files?: string[], includeUntracked: boolean = false): Promise<void> {
+        await this._initPromise;
         const args = ['push'];
         if (includeUntracked) {
             args.push('-u');
@@ -200,18 +252,25 @@ export class GitService implements vscode.Disposable {
             args.push('-m', message);
         }
         if (files && files.length > 0) {
-            args.push('--', ...files);
+            args.push('--', ...files.map(f => this.toRepoPath(f)));
+        } else if (this._gitRoot !== this._workspaceRoot) {
+            // Scope stash to workspace if possible, or just stash all
+            // git stash push pathspec
+            const rel = path.relative(this._gitRoot, this._workspaceRoot);
+            args.push('--', rel);
         }
         await this.git.stash(args);
     }
 
     public async rollbackFiles(files: string[]): Promise<void> {
+        await this._initPromise;
         if (!files || files.length === 0) {
             return;
         }
 
         try {
             // We need to know the status of these files to decide how to rollback
+            // getStatus returns workspace-relative paths
             const allFiles = await this.getStatus();
 
             // Group files by action needed
@@ -235,19 +294,19 @@ export class GitService implements vscode.Disposable {
                 }
             }
 
-            // Execute actions
+            // Execute actions using repo paths
             if (toCheckout.length > 0) {
-                await this.git.checkout(['HEAD', '--', ...toCheckout]);
+                await this.git.checkout(['HEAD', '--', ...toCheckout.map(f => this.toRepoPath(f))]);
             }
 
             if (toReset.length > 0) {
                 // Just unstage, keep the file as untracked
-                await this.git.reset(['HEAD', '--', ...toReset]);
+                await this.git.reset(['HEAD', '--', ...toReset.map(f => this.toRepoPath(f))]);
             }
 
             if (toClean.length > 0) {
                 // Remove untracked files
-                await this.git.clean('f', ['-d', '--', ...toClean]);
+                await this.git.clean('f', ['-d', '--', ...toClean.map(f => this.toRepoPath(f))]);
             }
         } catch (e) {
             console.error('Rollback failed:', e);
@@ -341,6 +400,7 @@ export class GitService implements vscode.Disposable {
     }
 
     public async commit(message: string, files?: string[]): Promise<void> {
+        await this._initPromise;
         if (files && files.length > 0) {
             const currentStatus = await this.getStatus();
             const statusMap = new Map(currentStatus.map(f => [f.path, f]));
@@ -357,11 +417,11 @@ export class GitService implements vscode.Disposable {
             });
 
             if (filesToAdd.length > 0) {
-                await this.git.add(filesToAdd);
+                await this.git.add(filesToAdd.map(f => this.toRepoPath(f)));
             }
 
             // Commit only the specified files
-            await this.git.commit(message, filesToCommit);
+            await this.git.commit(message, filesToCommit.map(f => this.toRepoPath(f)));
         } else {
             await this.git.commit(message);
         }
@@ -369,6 +429,7 @@ export class GitService implements vscode.Disposable {
     }
 
     public async commitAmend(message?: string, files?: string[]): Promise<void> {
+        await this._initPromise;
         if (files && files.length > 0) {
             const currentStatus = await this.getStatus();
             const statusMap = new Map(currentStatus.map(f => [f.path, f]));
@@ -381,7 +442,7 @@ export class GitService implements vscode.Disposable {
             });
 
             if (filesToAdd.length > 0) {
-                await this.git.add(filesToAdd);
+                await this.git.add(filesToAdd.map(f => this.toRepoPath(f)));
             }
         }
 
@@ -538,6 +599,7 @@ export class GitService implements vscode.Disposable {
      * For untracked files, reads the file content directly.
      */
     public async getDiffForFiles(files: string[]): Promise<string> {
+        await this._initPromise;
         if (!files || files.length === 0) {
             return '';
         }
@@ -564,7 +626,8 @@ export class GitService implements vscode.Disposable {
                 // git diff HEAD -- files...
                 // This shows changes in working directory (and index) vs HEAD
                 try {
-                    const trackedDiff = await this.git.diff(['HEAD', '--', ...trackedFiles]);
+                    const repoFiles = trackedFiles.map(f => this.toRepoPath(f));
+                    const trackedDiff = await this.git.diff(['HEAD', '--', ...repoFiles]);
                     diffOutput += trackedDiff;
                 } catch (e) {
                     console.error('Error getting diff for tracked files:', e);
@@ -994,8 +1057,10 @@ export class GitService implements vscode.Disposable {
             const lines = result.split('\n').filter(l => l.trim());
             return lines.map(line => {
                 const [status, ...pathParts] = line.split('\t');
+                const repoPath = pathParts.join('\t');
+                const wsPath = this.toWorkspacePath(repoPath);
                 return {
-                    path: pathParts.join('\t'),
+                    path: wsPath || repoPath, // Best effort: return workspace path if possible, else repo path (might correspond to file outside workspace)
                     status: status as GitStatusCode
                 };
             });
@@ -1333,9 +1398,9 @@ export class GitService implements vscode.Disposable {
 
             // Path filtering: supports multiple paths
             if (options.paths && options.paths.length > 0) {
-                args.push('--', ...options.paths);
+                args.push('--', ...options.paths.map(p => this.toRepoPath(p)));
             } else if (options.fileFilter) {
-                args.push('--', options.fileFilter);
+                args.push('--', this.toRepoPath(options.fileFilter));
             }
 
             log('[getLog] git', args.join(' '));
