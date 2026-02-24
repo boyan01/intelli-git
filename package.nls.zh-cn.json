@@ -45,5 +45,13 @@
   "intelli-git.config.ai.provider.anthropic": "使用 Anthropic Claude API（需配置 API Key）",
   "intelli-git.config.ai.anthropic.apiKey.description": "Anthropic API Key，请从 https://console.anthropic.com 获取",
   "intelli-git.config.ai.anthropic.model.description": "要使用的 Anthropic Claude 模型",
-  "intelli-git.config.ai.anthropic.apiUrl.description": "Anthropic API URL 端点"
+  "intelli-git.config.ai.anthropic.apiUrl.description": "Anthropic API URL 端点",
+  "intelli-git.config.ai.provider.google": "使用 Google AI API（需配置 API Key）",
+  "intelli-git.config.ai.google.apiKey.description": "Google AI Studio API Key",
+  "intelli-git.config.ai.google.model.description": "要使用的 Google Gemini 模型",
+  "intelli-git.config.ai.google.apiUrl.description": "Google AI API URL 端点",
+  "intelli-git.config.ai.provider.custom": "使用 OpenAI 兼容 API（例如 OpenRouter, OneAPI 或本地 Ollama）",
+  "intelli-git.config.ai.custom.apiKey.description": "自定义服务的 API Key（如果是本地 Ollama 可留空）",
+  "intelli-git.config.ai.custom.model.description": "要使用的模型名称（例如 gpt-4, llama3, anthropic/claude-3-opus）",
+  "intelli-git.config.ai.custom.apiUrl.description": "自定义 API 服务端点（例如 https://openrouter.ai/api/v1 或 http://127.0.0.1:11434/v1）"
 }

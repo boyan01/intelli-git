@@ -32,7 +32,8 @@ export function showOutputChannel(): void {
 }
 
 function formatMessage(...args: unknown[]): string {
-    return args.map(arg =>
+    const timestamp = new Date().toISOString();
+    return `[${timestamp}] ` + args.map(arg =>
         typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
     ).join(' ');
 }

@@ -5,7 +5,10 @@ import type { WebviewMethods, ExtensionMethods } from '../../shared/messages';
 import { GitService } from '../services/GitService';
 import { ChangelistService } from '../services/ChangelistService';
 import { AnthropicService } from '../services/AnthropicService';
+import { GoogleAiService } from '../services/GoogleAiService';
+import { OpenAiService } from '../services/CustomOpenAiService';
 import { i18n } from '../utils/i18n';
+import { AiProvider } from '../services/ai';
 
 export interface ExtensionRpcHandlerOptions {
     context: vscode.ExtensionContext;
@@ -24,14 +27,12 @@ export class ExtensionRpcHandler {
     private changelistService?: ChangelistService;
     private onDispose: () => void;
     private _lastRebaseStatus?: string;
-    private anthropicService: AnthropicService;
 
     constructor(options: ExtensionRpcHandlerOptions) {
         this.context = options.context;
         this.gitService = options.gitService;
         this.changelistService = options.changelistService;
         this.onDispose = options.onDispose || (() => { });
-        this.anthropicService = new AnthropicService();
     }
 
     log = (message: string): Promise<void> => {
@@ -553,12 +554,28 @@ export class ExtensionRpcHandler {
     };
 
     private async getAIModel(): Promise<vscode.LanguageModelChat> {
-        const provider = vscode.workspace.getConfiguration('intelli-git.ai').get<string>('provider', 'copilot');
+        const provider = vscode.workspace.getConfiguration('intelli-git.ai').get<string>('provider', AiProvider.Copilot);
 
-        if (provider === 'anthropic') {
-            const model = this.anthropicService.getModel();
+        if (provider === AiProvider.Anthropic) {
+            const model = new AnthropicService().getModel();
             if (!model) {
                 throw new Error(i18n.t('extension.anthropicApiUrlMissing'));
+            }
+            return model;
+        }
+
+        if (provider === AiProvider.Google) {
+            const model = new GoogleAiService().getModel();
+            if (!model) {
+                throw new Error(i18n.t('extension.googleApiKeyMissing'));
+            }
+            return model;
+        }
+
+        if (provider === AiProvider.OpenAi) {
+            const model = new OpenAiService().getModel();
+            if (!model) {
+                throw new Error(i18n.t('extension.noAIModel')); // generic error or specific custom one if added
             }
             return model;
         }

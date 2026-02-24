@@ -377,11 +377,15 @@
           "default": "copilot",
           "enum": [
             "copilot",
-            "anthropic"
+            "anthropic",
+            "google",
+            "custom"
           ],
           "enumDescriptions": [
             "%intelli-git.config.ai.provider.copilot%",
-            "%intelli-git.config.ai.provider.anthropic%"
+            "%intelli-git.config.ai.provider.anthropic%",
+            "%intelli-git.config.ai.provider.google%",
+            "%intelli-git.config.ai.provider.custom%"
           ],
           "description": "%intelli-git.config.ai.provider.description%"
         },
@@ -399,6 +403,36 @@
           "type": "string",
           "default": "",
           "description": "%intelli-git.config.ai.anthropic.apiUrl.description%"
+        },
+        "intelli-git.ai.google.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "%intelli-git.config.ai.google.apiKey.description%"
+        },
+        "intelli-git.ai.google.model": {
+          "type": "string",
+          "default": "gemini-1.5-pro",
+          "description": "%intelli-git.config.ai.google.model.description%"
+        },
+        "intelli-git.ai.google.apiUrl": {
+          "type": "string",
+          "default": "https://generativelanguage.googleapis.com",
+          "description": "%intelli-git.config.ai.google.apiUrl.description%"
+        },
+        "intelli-git.ai.custom.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "%intelli-git.config.ai.custom.apiKey.description%"
+        },
+        "intelli-git.ai.custom.model": {
+          "type": "string",
+          "default": "",
+          "description": "%intelli-git.config.ai.custom.model.description%"
+        },
+        "intelli-git.ai.custom.apiUrl": {
+          "type": "string",
+          "default": "https://api.openai.com/v1",
+          "description": "%intelli-git.config.ai.custom.apiUrl.description%"
         }
       }
     }

@@ -43,5 +43,13 @@
   "intelli-git.config.ai.provider.anthropic": "Use Anthropic Claude API (requires API key)",
   "intelli-git.config.ai.anthropic.apiKey.description": "Anthropic API key for Claude. Get your key from https://console.anthropic.com",
   "intelli-git.config.ai.anthropic.model.description": "Anthropic Claude model to use",
-  "intelli-git.config.ai.anthropic.apiUrl.description": "Anthropic API URL endpoint"
+  "intelli-git.config.ai.anthropic.apiUrl.description": "Anthropic API URL endpoint",
+  "intelli-git.config.ai.provider.google": "Use Google AI API (requires API key)",
+  "intelli-git.config.ai.google.apiKey.description": "Google AI Studio API key.",
+  "intelli-git.config.ai.google.model.description": "Google Gemini model to use",
+  "intelli-git.config.ai.google.apiUrl.description": "Google AI API URL endpoint",
+  "intelli-git.config.ai.provider.custom": "Use Custom OpenAI-Compatible API (e.g. OpenRouter, Ollama)",
+  "intelli-git.config.ai.custom.apiKey.description": "Custom API Key (leave empty for local models like Ollama)",
+  "intelli-git.config.ai.custom.model.description": "Custom model to use (e.g. gpt-4, llama3, anthropic/claude-3-opus)",
+  "intelli-git.config.ai.custom.apiUrl.description": "Custom API Server URL (e.g. https://openrouter.ai/api/v1 or http://127.0.0.1:11434/v1)"
 }
