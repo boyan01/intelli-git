@@ -80,7 +80,7 @@ export class RpcPeer<TRemote = any, TLocal = any> {
                     this.pendingRequests.delete(id);
                     reject(new Error(`RPC timeout for method: ${method}`));
                 }
-            }, 10000);
+            }, 60000);
         });
     }
 

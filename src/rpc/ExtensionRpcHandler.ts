@@ -9,6 +9,7 @@ import { GoogleAiService } from '../services/GoogleAiService';
 import { OpenAiService } from '../services/CustomOpenAiService';
 import { i18n } from '../utils/i18n';
 import { AiProvider } from '../services/ai';
+import { logger } from '../utils/logger';
 
 export interface ExtensionRpcHandlerOptions {
     context: vscode.ExtensionContext;
@@ -35,8 +36,13 @@ export class ExtensionRpcHandler {
         this.onDispose = options.onDispose || (() => { });
     }
 
-    log = (message: string): Promise<void> => {
-        console.log(message);
+    log = (params: { message: string, type?: 'info' | 'error' | 'warn' | 'debug' }): Promise<void> => {
+        const type = params.type || 'info';
+        if (logger[type]) {
+            logger[type](params.message);
+        } else {
+            logger.info(params.message);
+        }
         return Promise.resolve();
     };
 
@@ -120,7 +126,7 @@ export class ExtensionRpcHandler {
             try {
                 await this.gitService.setUpstreamBranch(params.remote, params.branch);
             } catch (e) {
-                console.error('Failed to set upstream:', e);
+                logger.error('Failed to set upstream:', e);
             }
         }
 
@@ -440,7 +446,7 @@ export class ExtensionRpcHandler {
         try {
             await this.gitService.fetch();
         } catch (e) {
-            console.error('Fetch failed:', e);
+            logger.error('Fetch failed:', e);
             throw e;
         }
     };
@@ -540,15 +546,18 @@ export class ExtensionRpcHandler {
                 vscode.LanguageModelChatMessage.User(diff)
             ];
 
+            logger.debug('Generating commit message:', diff.length);
             const response = await model.sendRequest(messages, {}, new vscode.CancellationTokenSource().token);
-            let fullMessage = '';
+            logger.debug('Generating commit message responsed');
 
+            let fullMessage = '';
             for await (const fragment of response.text) {
                 fullMessage += fragment;
             }
+            logger.debug('Generated commit message:', fullMessage);
             return fullMessage.trim();
         } catch (e) {
-            console.log('Error generating commit message:', e);
+            logger.error('Error generating commit message:', e);
             throw e;
         }
     };

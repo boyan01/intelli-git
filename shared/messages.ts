@@ -84,7 +84,7 @@ export interface LogOptions {
 }
 
 export interface ExtensionMethods {
-    log(message: string): Promise<void>;
+    log(params: { message: string; type?: 'info' | 'error' | 'warn' | 'debug' }): Promise<void>;
     getPushInitState: () => Promise<PushInitState>;
     getRemoteBranches: (remote: string) => Promise<string[]>;
     getPushCommits: (params: { remote: string; branch: string; limit?: number; skip?: number }) => Promise<PushCommitsData>;

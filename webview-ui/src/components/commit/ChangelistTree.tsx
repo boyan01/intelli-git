@@ -4,6 +4,7 @@ import { BasicTreeView } from '../common/BasicTreeView';
 import type { TreeNode, BasicTreeViewRef } from '../common/BasicTreeView';
 import { getFileIcon } from '../../lib/fileIcons';
 import { rpc } from '@/lib/rpc_client';
+import { logger } from '@/utils/logger';
 import styles from '../file-tree/BaseFileTree.module.css';
 
 export interface ChangelistTreeProps {
@@ -421,7 +422,7 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
 
     // Handle drop: stage the files (git add)
     const handleDrop = useCallback((draggedNode: TreeNode<FileNodeData>, targetNode: TreeNode<FileNodeData>) => {
-        console.log('Drop detected', draggedNode.id, '->', targetNode.id);
+        logger.info(`Drop detected ${draggedNode.id} -> ${targetNode.id}`);
         const paths = getAllFilePaths(draggedNode);
         if (paths.length > 0) {
             rpc.stageFiles(paths);

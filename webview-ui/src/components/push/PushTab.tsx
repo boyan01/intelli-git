@@ -1,5 +1,6 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
 import { rpcEvents } from '@/lib/rpc_client';
+import { logger } from '@/utils/logger';
 import { useRpcEvent } from '@/hooks/useRpcEvent';
 import { PushHeader } from './PushHeader';
 import { PushFooter } from './PushFooter';
@@ -47,7 +48,7 @@ export function PushTab() {
     // Debug logging for active file changes (optional, preserving previous behavior logic if needed, but reducing boilerplate)
     useEffect(() => {
         if (activeFile) {
-            console.log('Active file changed:', activeFile.path, activeFile.commitHash);
+            logger.info(`Active file changed: ${activeFile.path} ${activeFile.commitHash}`);
         }
     }, [activeFile]);
 

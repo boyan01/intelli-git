@@ -76,7 +76,7 @@ export const FilterToolbar: React.FC<FilterToolbarProps> = ({ onFilterChange, ex
             return;
         }
         const picked = await rpc.pickPaths();
-        logger.log('picked paths:', picked);
+        logger.info('picked paths:', picked);
         if (picked !== undefined) {
             setPaths(picked);
         }

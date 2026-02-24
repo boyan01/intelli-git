@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as https from 'https';
 import * as http from 'http';
 import { i18n } from '../utils/i18n';
+import { logger } from '../utils/logger';
 
 interface GoogleMessagePart {
     text: string;
@@ -225,18 +226,18 @@ export class GoogleLanguageModel implements vscode.LanguageModelChat {
             });
 
             req.on('error', (e) => {
-                console.error(`[GoogleAiService] Request error:`, e.message);
+                logger.error(`[GoogleAiService] Request error:`, e.message);
                 reject(new Error(i18n.t('extension.googleRequestFailed', e.message)));
             });
 
             req.on('timeout', () => {
-                console.error(`[GoogleAiService] Request timeout after ${options.timeout}ms`);
+                logger.error(`[GoogleAiService] Request timeout after ${options.timeout}ms`);
                 req.destroy();
                 reject(new Error(i18n.t('extension.googleRequestFailed', 'Request timeout')));
             });
 
             token?.onCancellationRequested(() => {
-                console.log(`[GoogleAiService] Request cancelled by user before resolving`);
+                logger.info(`[GoogleAiService] Request cancelled by user before resolving`);
                 req.destroy();
             });
 

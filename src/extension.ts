@@ -5,16 +5,16 @@ import { createGitWatcher } from './services/GitRepositoryWatcher';
 import { ChangelistService } from './services/ChangelistService';
 import { BranchStatusBar, GitLogStatusBar } from './ui';
 import { registerStashCommands, registerNavigationCommands, registerBranchCommands, registerLogCommands, registerChangelistCommands } from './commands';
-import { initLogger, log } from './utils/logger';
+import { logger } from './utils/logger';
 
 export function activate(context: vscode.ExtensionContext) {
-    initLogger(context);
-    log('Intelli Git is now active!');
+    logger.initLogger(context);
+    logger.info('Intelli Git is now active!');
 
     const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
 
     if (!workspaceRoot) {
-        log('Intelli Git: No workspace opened.');
+        logger.info('Intelli Git: No workspace opened.');
         return;
     }
 

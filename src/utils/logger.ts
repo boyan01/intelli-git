@@ -2,38 +2,59 @@ import * as vscode from 'vscode';
 
 let outputChannel: vscode.LogOutputChannel | undefined;
 
-export function initLogger(context: vscode.ExtensionContext): void {
+function initLogger(context: vscode.ExtensionContext): void {
     outputChannel = vscode.window.createOutputChannel('Intelli Git', { log: true });
     context.subscriptions.push(outputChannel);
 }
 
-export function log(...args: unknown[]): void {
+function consoleLog(type: 'info' | 'error' | 'warn' | 'debug', ...args: unknown[]): void {
+    const ts = new Date().toISOString();
+    console.log(`[Intelli Git] ${ts} [${type.toLowerCase()}]`, ...args);
+}
+
+function info(...args: unknown[]): void {
+    consoleLog('info', ...args);
+
     const message = formatMessage(...args);
     outputChannel?.info(message);
 }
 
-export function logError(...args: unknown[]): void {
+function error(...args: unknown[]): void {
+    consoleLog('error', ...args);
+
     const message = formatMessage(...args);
     outputChannel?.error(message);
 }
 
-export function logWarn(...args: unknown[]): void {
+function warn(...args: unknown[]): void {
+    consoleLog('warn', ...args);
+
     const message = formatMessage(...args);
     outputChannel?.warn(message);
 }
 
-export function logDebug(...args: unknown[]): void {
+function debug(...args: unknown[]): void {
+    consoleLog('debug', ...args);
+
     const message = formatMessage(...args);
     outputChannel?.debug(message);
 }
 
-export function showOutputChannel(): void {
+function showOutputChannel(): void {
     outputChannel?.show();
 }
 
 function formatMessage(...args: unknown[]): string {
-    const timestamp = new Date().toISOString();
-    return `[${timestamp}] ` + args.map(arg =>
+    return args.map(arg =>
         typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
     ).join(' ');
+}
+
+export const logger = {
+    info,
+    error,
+    warn,
+    debug,
+    showOutputChannel,
+    initLogger,
 }

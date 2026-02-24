@@ -1,7 +1,7 @@
 import simpleGit, { SimpleGit, StatusResult } from 'simple-git';
 import * as vscode from 'vscode';
 import { BranchInfo, LogCommit, LogOptions, CommitDetails, RefInfo, FileStatus, CommitFile, PushInitState, PushCommitsData, BranchListData, GitStatusCode } from '../../shared/messages';
-import { log } from '../utils/logger';
+import { logger } from '../utils/logger';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -317,7 +317,7 @@ export class GitService implements vscode.Disposable {
     public getStashList = async (): Promise<Array<{ index: number, message: string, branch: string }>> => {
         try {
             const result = await this.git.stashList();
-            log('simple-git stashList result:', JSON.stringify(result));
+            logger.info('simple-git stashList result:', JSON.stringify(result));
             return result.all.map((item, index) => {
                 // Parse branch from message: "On <branch>: <message>" or "WIP on <branch>: ..."
                 const match = item.message?.match(/^(?:WIP )?[oO]n ([^:]+):/);
@@ -1032,7 +1032,7 @@ export class GitService implements vscode.Disposable {
                 gitDir = path.join(this._workspaceRoot, gitDir);
             }
 
-            log('rebaseMergeMsg gitDir', gitDir);
+            logger.info('rebaseMergeMsg gitDir', gitDir);
 
             const rebaseMergeMsg = path.join(gitDir, 'rebase-merge', 'message');
             const rebaseApplyMsg = path.join(gitDir, 'rebase-apply', 'msg');
@@ -1319,16 +1319,16 @@ export class GitService implements vscode.Disposable {
             let searchAsHash: string | null = null;
             if (options.search) {
                 const isHexPattern = /^[0-9a-fA-F]{7,40}$/.test(options.search);
-                log('[getLog] search:', options.search, 'isHexPattern:', isHexPattern);
+                logger.info('[getLog] search:', options.search, 'isHexPattern:', isHexPattern);
                 if (isHexPattern) {
                     try {
                         const resolved = await this.git.revparse([options.search]);
-                        log('[getLog] revparse result:', resolved);
+                        logger.info('[getLog] revparse result:', resolved);
                         if (resolved && resolved.trim()) {
                             searchAsHash = resolved.trim();
                         }
                     } catch (e) {
-                        log('[getLog] revparse error:', e);
+                        logger.info('[getLog] revparse error:', e);
                     }
                 }
             }
@@ -1403,7 +1403,7 @@ export class GitService implements vscode.Disposable {
                 args.push('--', this.toRepoPath(options.fileFilter));
             }
 
-            log('[getLog] git', args.join(' '));
+            logger.info('[getLog] git', args.join(' '));
             const result = await this.git.raw(args);
 
             if (!result) return [];

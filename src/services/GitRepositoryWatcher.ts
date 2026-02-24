@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { log } from '../utils/logger';
+import { logger } from '../utils/logger';
 
 // Types for VS Code Git extension API
 interface GitExtension {
@@ -47,7 +47,7 @@ export class VSCodeGitWatcher implements vscode.Disposable {
     private async initialize(context: vscode.ExtensionContext) {
         const gitExtension = vscode.extensions.getExtension<GitExtension>('vscode.git');
         if (!gitExtension) {
-            log('VS Code Git extension not found, will use fallback watcher');
+            logger.info('VS Code Git extension not found, will use fallback watcher');
             return;
         }
 
@@ -68,9 +68,9 @@ export class VSCodeGitWatcher implements vscode.Disposable {
             );
 
             this._isActive = true;
-            log('VSCodeGitWatcher initialized successfully');
+            logger.info('VSCodeGitWatcher initialized successfully');
         } catch (e) {
-            log('Failed to initialize VSCodeGitWatcher:', e);
+            logger.info('Failed to initialize VSCodeGitWatcher:', e);
         }
     }
 
@@ -112,7 +112,7 @@ export class FileSystemGitWatcher implements vscode.Disposable {
         this.disposables.push(watcher);
 
         this.disposables.push(this.onChangeEmitter);
-        log('FileSystemGitWatcher initialized as fallback');
+        logger.info('FileSystemGitWatcher initialized as fallback');
     }
 
     private handleChange = (uri: vscode.Uri) => {
