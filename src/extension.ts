@@ -7,7 +7,7 @@ import { BranchStatusBar, GitLogStatusBar } from './ui';
 import { registerStashCommands, registerNavigationCommands, registerBranchCommands, registerLogCommands, registerChangelistCommands } from './commands';
 import { logger } from './utils/logger';
 
-export function activate(context: vscode.ExtensionContext) {
+export async function activate(context: vscode.ExtensionContext) {
     logger.initLogger(context);
     logger.info('Intelli Git is now active!');
 
@@ -19,7 +19,7 @@ export function activate(context: vscode.ExtensionContext) {
     }
 
     // Initialize services
-    const gitService = new GitService(workspaceRoot);
+    const gitService = await GitService.create(workspaceRoot);
     const changelistService = new ChangelistService(context);
 
     // Initialize providers

@@ -10,7 +10,6 @@ export class GitService implements vscode.Disposable {
     private git: SimpleGit;
     private _workspaceRoot: string;
     private _gitRoot: string;
-    private _initPromise: Promise<void>;
     private _onDidChange = new vscode.EventEmitter<void>();
 
     /**
@@ -18,26 +17,31 @@ export class GitService implements vscode.Disposable {
      */
     public readonly onDidChange = this._onDidChange.event;
 
-    constructor(workspaceRoot: string) {
+    constructor(workspaceRoot: string, gitRoot: string, git: SimpleGit) {
         this._workspaceRoot = workspaceRoot;
-        this._gitRoot = workspaceRoot;
-        this.git = simpleGit(workspaceRoot);
-        this._initPromise = this.initialize();
+        this._gitRoot = gitRoot;
+        this.git = git;
     }
 
-    private async initialize() {
+    public static async create(workspaceRoot: string): Promise<GitService> {
+        const tempGit = simpleGit(workspaceRoot);
+        let gitRoot = workspaceRoot;
+        let finalGit = tempGit;
+
         try {
-            const root = await this.git.revparse(['--show-toplevel']);
+            const root = await tempGit.revparse(['--show-toplevel']);
             if (root && root.trim()) {
-                this._gitRoot = path.normalize(root.trim());
+                gitRoot = path.normalize(root.trim());
                 // If git root is different, re-init simple-git to run from git root
-                if (this._gitRoot !== this._workspaceRoot) {
-                    this.git = simpleGit(this._gitRoot);
+                if (gitRoot !== workspaceRoot) {
+                    finalGit = simpleGit(gitRoot);
                 }
             }
         } catch (e) {
             console.error('Failed to resolve git root, assuming workspace root:', e);
         }
+
+        return new GitService(workspaceRoot, gitRoot, finalGit);
     }
 
     private toRepoPath(filePath: string): string {
@@ -75,7 +79,6 @@ export class GitService implements vscode.Disposable {
     }
 
     public getStatus = async (): Promise<FileStatus[]> => {
-        await this._initPromise;
         const files: FileStatus[] = [];
 
         try {
@@ -213,17 +216,14 @@ export class GitService implements vscode.Disposable {
     }
 
     public async stageFile(filePath: string): Promise<void> {
-        await this._initPromise;
         await this.git.add(this.toRepoPath(filePath));
     }
 
     public async unstageFile(filePath: string): Promise<void> {
-        await this._initPromise;
         await this.git.reset(['HEAD', '--', this.toRepoPath(filePath)]);
     }
 
     public async stageAll(): Promise<void> {
-        await this._initPromise;
         if (this._gitRoot === this._workspaceRoot) {
             await this.git.add('-A');
         } else {
@@ -233,7 +233,6 @@ export class GitService implements vscode.Disposable {
     }
 
     public async unstageAll(): Promise<void> {
-        await this._initPromise;
         if (this._gitRoot === this._workspaceRoot) {
             await this.git.reset(['HEAD']);
         } else {
@@ -243,7 +242,6 @@ export class GitService implements vscode.Disposable {
     }
 
     public async stash(message?: string, files?: string[], includeUntracked: boolean = false): Promise<void> {
-        await this._initPromise;
         const args = ['push'];
         if (includeUntracked) {
             args.push('-u');
@@ -263,7 +261,6 @@ export class GitService implements vscode.Disposable {
     }
 
     public async rollbackFiles(files: string[]): Promise<void> {
-        await this._initPromise;
         if (!files || files.length === 0) {
             return;
         }
@@ -359,7 +356,7 @@ export class GitService implements vscode.Disposable {
         try {
             // Use git diff stash@{n}^1..stash@{n} -- <path> to get the diff of the stash against its parent
             // This avoids "Too many revisions specified" error with git stash show
-            return await this.git.raw(['diff', `stash@{${index}}^1..stash@{${index}}`, '--', filePath]);
+            return await this.git.raw(['diff', `stash@{${index}}^1..stash@{${index}}`, '--', this.toRepoPath(filePath)]);
         } catch (e) {
             console.error('getStashFileDiff error:', e);
             return '';
@@ -368,7 +365,8 @@ export class GitService implements vscode.Disposable {
 
     public async getFileContent(ref: string, relativePath: string): Promise<string> {
         try {
-            return await this.git.show([`${ref}:${relativePath}`]);
+            const repoPath = this.toRepoPath(relativePath);
+            return await this.git.show([`${ref}:${repoPath}`]);
         } catch (e: any) {
             // If file doesn't exist in the revision (e.g. Added file), return empty string
             if (e.message && (e.message.includes('does not exist') || e.message.includes('exists on disk'))) {
@@ -400,7 +398,6 @@ export class GitService implements vscode.Disposable {
     }
 
     public async commit(message: string, files?: string[]): Promise<void> {
-        await this._initPromise;
         if (files && files.length > 0) {
             const currentStatus = await this.getStatus();
             const statusMap = new Map(currentStatus.map(f => [f.path, f]));
@@ -429,7 +426,6 @@ export class GitService implements vscode.Disposable {
     }
 
     public async commitAmend(message?: string, files?: string[]): Promise<void> {
-        await this._initPromise;
         if (files && files.length > 0) {
             const currentStatus = await this.getStatus();
             const statusMap = new Map(currentStatus.map(f => [f.path, f]));
@@ -599,7 +595,6 @@ export class GitService implements vscode.Disposable {
      * For untracked files, reads the file content directly.
      */
     public async getDiffForFiles(files: string[]): Promise<string> {
-        await this._initPromise;
         if (!files || files.length === 0) {
             return '';
         }
@@ -912,7 +907,6 @@ export class GitService implements vscode.Disposable {
                 branch,
                 '--not',
                 '--remotes',
-                `--max-count=${maxCount}`,
                 `--max-count=${maxCount}`,
                 '--format=%H%x00%h%x00%s%x00%an%x00%aI%x00%ae%x00%P'
             ];
@@ -1306,7 +1300,6 @@ export class GitService implements vscode.Disposable {
     }
 
     public getLog = async (options: LogOptions): Promise<LogCommit[]> => {
-
         try {
             const args = ['log', '--date=iso'];
 
