@@ -170,7 +170,10 @@ export function CommitView({ rebaseStatus }: CommitViewProps) {
         return { added, modified, deleted };
     }, [changelists, selectedFiles]);
 
-
+    const handleCommitSuccess = useCallback(() => {
+        setSavedMessage('');
+        setAmend(false);
+    }, [setAmend]);
 
     return (
         <div className={styles.commitView}>
@@ -231,6 +234,7 @@ export function CommitView({ rebaseStatus }: CommitViewProps) {
                     deletedCount={fileStats.deleted}
                     onMessageChange={setCommitMessage}
                     onAmendChange={setAmend}
+                    onCommitSuccess={handleCommitSuccess}
                 />
             )}
         </div>

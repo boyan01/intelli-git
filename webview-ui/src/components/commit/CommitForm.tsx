@@ -17,6 +17,7 @@ interface CommitFormProps {
     deletedCount?: number;
     onMessageChange: (msg: string) => void;
     onAmendChange: (amend: boolean) => void;
+    onCommitSuccess?: () => void;
 }
 
 export const CommitForm: React.FC<CommitFormProps> = ({
@@ -27,7 +28,8 @@ export const CommitForm: React.FC<CommitFormProps> = ({
     modifiedCount = 0,
     deletedCount = 0,
     onMessageChange,
-    onAmendChange
+    onAmendChange,
+    onCommitSuccess
 }) => {
     const { t } = useTranslation();
     const [isGenerating, setIsGenerating] = useState(false);
@@ -71,6 +73,7 @@ export const CommitForm: React.FC<CommitFormProps> = ({
                 push: options.push
             });
             onMessageChange('');
+            onCommitSuccess?.();
         } catch (e) {
             const errMsg = e instanceof Error ? e.message : String(e);
             setError(t('Commit failed: {{message}}', { message: errMsg }));
