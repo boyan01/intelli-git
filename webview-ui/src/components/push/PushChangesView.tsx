@@ -46,7 +46,12 @@ export const PushChangesView: React.FC<PushChangesViewProps> = ({
         const fileMap = new Map<string, FileStatus>();
         commits.forEach(commit => {
             commit.files.forEach(f => {
-                fileMap.set(f.path, { path: f.path, status: f.status, staged: false });
+                fileMap.set(f.path, { 
+                    path: f.path, 
+                    displayPath: f.displayPath,
+                    status: f.status, 
+                    staged: false 
+                });
             });
         });
         return Array.from(fileMap.values());

@@ -44,6 +44,7 @@ type SelectionStatus = 'all' | 'partial' | 'none';
 
 interface FileNodeData {
     path: string;
+    displayPath?: string;
     isFile: boolean;
     isRoot?: boolean;
     status?: string;
@@ -94,20 +95,22 @@ const buildTree = (files: FileStatus[]): TreeNode<FileNodeData>[] => {
     const map = new Map<string, TreeNode<FileNodeData>>();
 
     files.forEach(file => {
-        const parts = file.path.split('/');
-        let currentPath = '';
+        const displayPath = file.displayPath || file.path;
+        const parts = displayPath.split('/');
+        let currentDisplayPath = '';
 
         parts.forEach((part, index) => {
             const isLast = index === parts.length - 1;
-            const parentPath = currentPath;
-            currentPath = currentPath ? `${currentPath}/${part}` : part;
+            const parentDisplayPath = currentDisplayPath;
+            currentDisplayPath = currentDisplayPath ? `${currentDisplayPath}/${part}` : part;
 
-            if (!map.has(currentPath)) {
+            if (!map.has(currentDisplayPath)) {
                 const node: TreeNode<FileNodeData> = {
-                    id: currentPath,
+                    id: isLast ? file.path : currentDisplayPath,
                     label: part,
                     data: {
-                        path: currentPath,
+                        path: isLast ? file.path : currentDisplayPath,
+                        displayPath: isLast ? displayPath : currentDisplayPath,
                         isFile: isLast,
                         status: isLast ? file.status : undefined,
                         fileCount: 0
@@ -115,12 +118,12 @@ const buildTree = (files: FileStatus[]): TreeNode<FileNodeData>[] => {
                     children: isLast ? undefined : []
                 };
 
-                map.set(currentPath, node);
+                map.set(currentDisplayPath, node);
 
                 if (index === 0) {
                     root.push(node);
                 } else {
-                    const parent = map.get(parentPath);
+                    const parent = map.get(parentDisplayPath);
                     if (parent && parent.children) {
                         parent.children.push(node);
                     }
@@ -201,9 +204,10 @@ export const BaseFileTree = React.forwardRef<BaseFileTreeRef, BaseFileTreeProps>
             result = items
                 .map(f => ({
                     id: f.path,
-                    label: f.path.split('/').pop() || f.path,
+                    label: (f.displayPath || f.path).split('/').pop() || f.path,
                     data: {
                         path: f.path,
+                        displayPath: f.displayPath, // Pass this along
                         isFile: true,
                         status: f.status,
                         fileCount: 1
@@ -329,7 +333,7 @@ export const BaseFileTree = React.forwardRef<BaseFileTreeRef, BaseFileTreeProps>
                         </span>
 
                         {showPath && (
-                            <span className={styles.fileDirPath}>{getDirPath(node.data!.path)}</span>
+                            <span className={styles.fileDirPath}>{getDirPath(node.data?.displayPath || node.data!.path)}</span>
                         )}
                     </>
                 ) : node.data?.isRoot ? (

@@ -53,6 +53,7 @@ export const CommitAccordionItem: React.FC<CommitAccordionItemProps> = ({
 
     const fileItems: FileStatus[] = commit.files ? commit.files.map(f => ({
         path: f.path,
+        displayPath: f.displayPath,
         status: f.status,
         staged: false
     })) : [];

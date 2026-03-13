@@ -85,6 +85,7 @@ export function StashView() {
 
     const fileItems: FileStatus[] = files.map(f => ({
         path: f.path,
+        displayPath: f.displayPath,
         status: f.status,
         staged: false
     }));

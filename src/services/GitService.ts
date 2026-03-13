@@ -44,14 +44,14 @@ export class GitService implements vscode.Disposable {
         return new GitService(workspaceRoot, gitRoot, finalGit);
     }
 
-    private toRepoPath(filePath: string): string {
+    public toRepoPath(filePath: string): string {
         if (this._gitRoot === this._workspaceRoot) {
             return filePath;
         }
         return path.relative(this._gitRoot, path.join(this._workspaceRoot, filePath));
     }
 
-    private toWorkspacePath(repoPath: string): string | null {
+    public toWorkspacePath(repoPath: string): string | null {
         if (this._gitRoot === this._workspaceRoot) {
             return repoPath;
         }
@@ -332,17 +332,20 @@ export class GitService implements vscode.Disposable {
         }
     }
 
-    public async getStashFiles(index: number): Promise<Array<{ path: string, status: string }>> {
+    public getStashFiles = async (index: number): Promise<CommitFile[]> => {
         try {
             const result = await this.git.raw(['stash', 'show', '--name-status', `stash@{${index}}`]);
-            const files: Array<{ path: string, status: string }> = [];
+            const files: CommitFile[] = [];
             for (const line of result.split('\n')) {
                 if (!line.trim()) continue;
                 const parts = line.split('\t');
                 if (parts.length >= 2) {
+                    const repoPath = parts[1];
+                    const wsPath = this.toWorkspacePath(repoPath);
                     files.push({
-                        status: parts[0],
-                        path: parts[1]
+                        status: parts[0] as GitStatusCode,
+                        path: repoPath,
+                        displayPath: wsPath || repoPath
                     });
                 }
             }
@@ -356,7 +359,7 @@ export class GitService implements vscode.Disposable {
         try {
             // Use git diff stash@{n}^1..stash@{n} -- <path> to get the diff of the stash against its parent
             // This avoids "Too many revisions specified" error with git stash show
-            return await this.git.raw(['diff', `stash@{${index}}^1..stash@{${index}}`, '--', this.toRepoPath(filePath)]);
+            return await this.git.raw(['diff', `stash@{${index}}^1..stash@{${index}}`, '--', filePath]);
         } catch (e) {
             console.error('getStashFileDiff error:', e);
             return '';
@@ -365,14 +368,13 @@ export class GitService implements vscode.Disposable {
 
     public async getFileContent(ref: string, relativePath: string): Promise<string> {
         try {
-            const repoPath = this.toRepoPath(relativePath);
-            return await this.git.show([`${ref}:${repoPath}`]);
+            return await this.git.show([`${ref}:${relativePath}`]);
         } catch (e: any) {
             // If file doesn't exist in the revision (e.g. Added file), return empty string
             if (e.message && (e.message.includes('does not exist') || e.message.includes('exists on disk'))) {
                 return '';
             }
-            console.error('getFileContent error:', e);
+            console.error('getFileContent error:', e, 'ref:', ref, 'path:', relativePath);
             return '';
         }
     }
@@ -1054,7 +1056,8 @@ export class GitService implements vscode.Disposable {
                 const repoPath = pathParts.join('\t');
                 const wsPath = this.toWorkspacePath(repoPath);
                 return {
-                    path: wsPath || repoPath, // Best effort: return workspace path if possible, else repo path (might correspond to file outside workspace)
+                    path: repoPath,
+                    displayPath: wsPath || repoPath,
                     status: status as GitStatusCode
                 };
             });

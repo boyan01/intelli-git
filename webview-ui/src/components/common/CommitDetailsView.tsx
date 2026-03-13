@@ -84,6 +84,7 @@ export const CommitDetailsView: React.FC<CommitDetailsViewProps> = ({
     const fileItems: FileStatus[] = useMemo(() => {
         return files.map(f => ({
             path: f.path,
+            displayPath: f.displayPath,
             status: f.status,
             staged: false
         }));

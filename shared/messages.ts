@@ -7,6 +7,7 @@ export type GitStatusCode = 'A' | 'M' | 'D' | 'R' | 'C' | 'U' | '?';
 
 export interface FileStatus {
     path: string;
+    displayPath?: string;
     status: GitStatusCode;
     staged: boolean;
     error?: boolean;
@@ -35,6 +36,7 @@ export interface StashItem {
 
 export interface CommitFile {
     path: string;
+    displayPath?: string;
     status: GitStatusCode;
 }
 
