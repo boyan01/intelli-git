@@ -346,6 +346,37 @@ export class BranchPicker {
 
             const localBranches = await this.gitService.getBranches();
             if (localBranches.all.includes(localBranchName)) {
+                // Check if local branch is ahead of remote
+                const aheadCount = await this.gitService.getCommitsToPushCount(localBranchName, remote, localBranchName);
+                if (aheadCount > 0) {
+                    const action = await vscode.window.showWarningMessage(
+                        vscode.l10n.t('Checkout Remote Branch'),
+                        {
+                            modal: true,
+                            detail: vscode.l10n.t('Local branch {0} has {1} commits not in {2}.', localBranchName, aheadCount, branch)
+                        },
+                        vscode.l10n.t('Rebase'),
+                        vscode.l10n.t('Delete Local Commits'),
+                        vscode.l10n.t('Cancel')
+                    );
+
+                    if (action === vscode.l10n.t('Cancel') || !action) {
+                        return;
+                    }
+
+                    if (action === vscode.l10n.t('Rebase')) {
+                        progress?.report({ message: vscode.l10n.t('Rebasing {0} onto {1}...', localBranchName, branch) });
+                        await this.gitService.switchBranch(localBranchName, force);
+                        await this.gitService.rebaseOnto(branch);
+                        return;
+                    } else if (action === vscode.l10n.t('Delete Local Commits')) {
+                        progress?.report({ message: vscode.l10n.t('Resetting {0} to {1}...', localBranchName, branch) });
+                        await this.gitService.switchBranch(localBranchName, force);
+                        await this.gitService.reset('hard', branch);
+                        return;
+                    }
+                }
+
                 progress?.report({ message: vscode.l10n.t('Pulling {0}...', localBranchName) });
                 await this.gitService.switchBranch(localBranchName, force);
                 await this.gitService.pull();

@@ -186,5 +186,11 @@
     "Sign Off": "签名",
     "Amend": "修正",
     "Amend & Push": "修正并推送",
-    "Commit & Push": "提交并推送"
+    "Commit & Push": "提交并推送",
+    "Checkout Remote Branch": "检出远程分支",
+    "Local branch {0} has {1} commits not in {2}.": "本地分支 {0} 有 {1} 个提交不在 {2} 中。",
+    "Delete Local Commits": "删除本地提交",
+    "Rebase": "变基",
+    "Rebasing {0} onto {1}...": "正在将 {0} 变基到 {1}...",
+    "Resetting {0} to {1}...": "正在将 {0} 重置到 {1}..."
 }

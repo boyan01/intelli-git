@@ -172,5 +172,11 @@
     "Updated {0}": "Updated {0}",
     "Force updated {0}": "Force updated {0}",
     "Branch {0} has diverged from remote. Force update will discard local commits.": "Branch {0} has diverged from remote. Force update will discard local commits.",
-    "Force Update": "Force Update"
+    "Force Update": "Force Update",
+    "Checkout Remote Branch": "Checkout Remote Branch",
+    "Local branch {0} has {1} commits not in {2}.": "Local branch {0} has {1} commits not in {2}.",
+    "Delete Local Commits": "Delete Local Commits",
+    "Rebase": "Rebase",
+    "Rebasing {0} onto {1}...": "Rebasing {0} onto {1}...",
+    "Resetting {0} to {1}...": "Resetting {0} to {1}..."
 }
