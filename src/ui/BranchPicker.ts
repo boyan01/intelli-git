@@ -60,7 +60,6 @@ export class BranchPicker {
                 quickPick.busy = true;
                 try {
                     await this.gitService.fetch();
-                    vscode.window.showInformationMessage(vscode.l10n.t('Fetched from remote.'));
                     await updatePickerState();
                 } catch (e) {
                     vscode.window.showErrorMessage(vscode.l10n.t('Fetch failed: {0}', String(e)));
@@ -96,7 +95,6 @@ export class BranchPicker {
                     quickPick.busy = true;
                     try {
                         await this.gitService.deleteBranches(branchesToDelete, true);
-                        vscode.window.showInformationMessage(vscode.l10n.t('Deleted {0} branches.', branchesToDelete.length));
                         await updatePickerState();
                     } catch (e) {
                         vscode.window.showErrorMessage(vscode.l10n.t('Failed to delete branches: {0}', String(e)));
@@ -269,7 +267,6 @@ export class BranchPicker {
                     await this.gitService.fetch();
                 }
             );
-            vscode.window.showInformationMessage(vscode.l10n.t('Fetched from remote.'));
         } catch (e) {
             vscode.window.showErrorMessage(vscode.l10n.t('Fetch failed: {0}', String(e)));
         }
@@ -287,7 +284,6 @@ export class BranchPicker {
                     await this.gitService.pull();
                 }
             );
-            vscode.window.showInformationMessage(vscode.l10n.t('Project updated.'));
             vscode.commands.executeCommand('intelli-git.refresh');
         } catch (e) {
             vscode.window.showErrorMessage(vscode.l10n.t('Update failed: {0}', String(e)));
@@ -309,7 +305,6 @@ export class BranchPicker {
 
         try {
             await this.gitService.createBranch(branchName);
-            vscode.window.showInformationMessage(vscode.l10n.t('Created and switched to branch: {0}', branchName));
             vscode.commands.executeCommand('intelli-git.refresh');
         } catch (e) {
             vscode.window.showErrorMessage(vscode.l10n.t('Failed to create branch: {0}', String(e)));
@@ -451,7 +446,6 @@ export class BranchPicker {
 
         try {
             await this.gitService.renameBranch(branch, newName);
-            vscode.window.showInformationMessage(vscode.l10n.t('Renamed branch {0} to {1}', branch, newName));
             vscode.commands.executeCommand('intelli-git.refresh');
         } catch (e) {
             vscode.window.showErrorMessage(vscode.l10n.t('Failed to rename branch: {0}', String(e)));

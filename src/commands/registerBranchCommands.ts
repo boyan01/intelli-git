@@ -65,7 +65,6 @@ export function registerBranchCommands(
 
             try {
                 await gitService.createBranchFrom(newBranchName, sourceBranch);
-                vscode.window.showInformationMessage(vscode.l10n.t('Created branch {0} from {1}', newBranchName, sourceBranch));
             } catch (error: any) {
                 vscode.window.showErrorMessage(vscode.l10n.t('Failed to create branch: {0}', error.message));
             }
@@ -155,7 +154,6 @@ export function registerBranchCommands(
 
             try {
                 await gitService.pullWithMerge(remote, branch);
-                vscode.window.showInformationMessage(vscode.l10n.t('Pulled {0}/{1}', remote, branch));
             } catch (error: any) {
                 vscode.window.showErrorMessage(vscode.l10n.t('Failed to pull: {0}', error.message));
             }
@@ -181,8 +179,6 @@ export function registerBranchCommands(
                         // Ignore upstream set errors
                     }
                 }
-
-                vscode.window.showInformationMessage(vscode.l10n.t('Pushed {0} to {1}', branch, remote));
             } catch (error: any) {
                 vscode.window.showErrorMessage(vscode.l10n.t('Failed to push: {0}', error.message));
             }
@@ -199,7 +195,6 @@ export function registerBranchCommands(
 
                 if (branch === currentBranch) {
                     await gitService.pull();
-                    vscode.window.showInformationMessage(vscode.l10n.t('Updated current branch'));
                 } else {
                     const result = await gitService.updateBranch(branch, false);
                     if (result === 'diverged') {
@@ -210,10 +205,7 @@ export function registerBranchCommands(
                         );
                         if (confirm === vscode.l10n.t('Force Update')) {
                             await gitService.updateBranch(branch, true);
-                            vscode.window.showInformationMessage(vscode.l10n.t('Force updated {0}', branch));
                         }
-                    } else {
-                        vscode.window.showInformationMessage(vscode.l10n.t('Updated {0}', branch));
                     }
                 }
             } catch (error: any) {

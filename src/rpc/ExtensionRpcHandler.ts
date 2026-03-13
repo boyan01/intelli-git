@@ -133,10 +133,6 @@ export class ExtensionRpcHandler {
         if (params.pushTags) {
             await this.gitService.pushTags(params.remote);
         }
-
-        vscode.window.showInformationMessage(
-            i18n.t('extension.pushSuccess', params.remote, params.branch)
-        );
     };
 
     openDiff = async (filePath: string): Promise<void> => {
@@ -435,8 +431,6 @@ export class ExtensionRpcHandler {
     pull = async (): Promise<void> => {
         try {
             await this.gitService.pull();
-            vscode.window.showInformationMessage(i18n.t('extension.pullSuccess'));
-
         } catch (e) {
             vscode.window.showErrorMessage(i18n.t('extension.pullFailed', `${e}`));
         }

@@ -76,7 +76,6 @@ export function registerChangelistCommands(
                 });
                 try {
                     await gitService.stash(message, [args.path]);
-                    vscode.window.showInformationMessage(i18n.t('extension.stashSuccess'));
                     provider.rpc?.refresh();
                 } catch (e) {
                     vscode.window.showErrorMessage(i18n.t('extension.stashFailed', `${e}`));

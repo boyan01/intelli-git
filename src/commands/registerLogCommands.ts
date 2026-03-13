@@ -209,7 +209,6 @@ export function registerLogCommands(
 
                         applied = true;
                         await gitService.rewordCommit(hash, newMessage);
-                        vscode.window.showInformationMessage(vscode.l10n.t('Commit message updated.'));
                     } catch (e: any) {
                         vscode.window.showErrorMessage(vscode.l10n.t('Failed to edit commit message: {0}', e.message));
                     }
@@ -266,7 +265,6 @@ export function registerLogCommands(
 
                 try {
                     await gitService.rewordCommit(hash, newMessage);
-                    vscode.window.showInformationMessage(vscode.l10n.t('Commit message updated.'));
                 } catch (e: any) {
                     vscode.window.showErrorMessage(vscode.l10n.t('Failed to edit commit message: {0}', e.message));
                 }
