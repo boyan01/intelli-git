@@ -10,6 +10,7 @@ export interface FileStatus {
     displayPath?: string;
     status: GitStatusCode;
     staged: boolean;
+    inactive?: boolean;
     error?: boolean;
 }
 
@@ -113,14 +114,9 @@ export interface ExtensionMethods {
     switchBranch: (branch: string) => Promise<void>;
     pull: () => Promise<void>;
     fetch: () => Promise<void>;
-    createChangelist: (name: string) => Promise<void>;
     pickBranch: () => Promise<void>;
     continueRebase: (params: { message?: string; files?: string[] }) => Promise<void>;
     abortRebase: () => Promise<void>;
-    moveFiles: (params: { files: string[]; targetListId: string }) => Promise<void>;
-    deleteChangelist: (id: string) => Promise<void>;
-    renameChangelist: (params: { id: string; name: string }) => Promise<void>;
-    promptCreateChangelist: (file?: string) => Promise<void>;
     openFile: (params: { path: string; preserveFocus?: boolean }) => Promise<void>;
     openStashDiff: (params: { index: number; path: string }) => Promise<void>;
     getBranchListData: () => Promise<BranchListData>;

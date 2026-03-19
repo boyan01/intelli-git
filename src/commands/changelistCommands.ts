@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { GitService } from '../services/GitService';
-import { ChangelistService } from '../services/ChangelistService';
+import { InactiveChangesService } from '../services/InactiveChangesService';
 import { CommitViewProvider } from '../providers/CommitViewProvider';
 import { i18n } from '../utils/i18n';
 
@@ -16,7 +16,7 @@ interface ChangelistFileContext {
 export function registerChangelistCommands(
     context: vscode.ExtensionContext,
     gitService: GitService,
-    changelistService: ChangelistService,
+    inactiveChangesService: InactiveChangesService,
     provider: CommitViewProvider
 ): void {
     context.subscriptions.push(
@@ -109,46 +109,27 @@ export function registerChangelistCommands(
     );
 
     context.subscriptions.push(
-        vscode.commands.registerCommand('intelli-git.changelist.moveToChangelist', async (args: ChangelistFileContext) => {
+        vscode.commands.registerCommand('intelli-git.changelist.markInactive', async (args: ChangelistFileContext) => {
             if (args?.path) {
-                const changelists = changelistService.getChangelists();
+                await inactiveChangesService.markInactive([args.path]);
 
-                const items: vscode.QuickPickItem[] = [
-                    { label: '$(add) ' + i18n.t('extension.newChangelistPlaceholder'), description: '' }
-                ];
-
-                changelists.forEach(cl => {
-                    items.push({
-                        label: cl.name,
-                        description: `${cl.files.length} files`
-                    });
-                });
-
-                const selected = await vscode.window.showQuickPick(items, {
-                    placeHolder: vscode.l10n.t('Move to Changelist...')
-                });
-
-                if (selected) {
-                    if (selected.label.startsWith('$(add)')) {
-                        const newName = await vscode.window.showInputBox({
-                            prompt: i18n.t('extension.enterChangelistName'),
-                            placeHolder: i18n.t('extension.newChangelistPlaceholder')
-                        });
-                        if (newName) {
-                            const newId = await changelistService.createChangelist(newName);
-                            if (newId) {
-                                await changelistService.moveFiles([args.path], newId);
-                                provider.rpc?.refresh();
-                            }
-                        }
-                    } else {
-                        const target = changelists.find(cl => cl.name === selected.label);
-                        if (target) {
-                            await changelistService.moveFiles([args.path], target.id);
-                            provider.rpc?.refresh();
-                        }
-                    }
+                // Keep inactive files out of commit index.
+                const status = await gitService.getStatus();
+                const target = status.find(file => file.path === args.path);
+                if (target?.staged) {
+                    await gitService.unstageFile(args.path);
                 }
+
+                provider.rpc?.refresh();
+            }
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand('intelli-git.changelist.markActive', async (args: ChangelistFileContext) => {
+            if (args?.path) {
+                await inactiveChangesService.markActive([args.path]);
+                provider.rpc?.refresh();
             }
         })
     );

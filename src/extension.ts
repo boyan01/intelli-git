@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import { CommitViewProvider, GitLogViewProvider, PushPanel, StashContentProvider, RevisionContentProvider } from './providers';
 import { GitService } from './services/GitService';
 import { createGitWatcher } from './services/GitRepositoryWatcher';
-import { ChangelistService } from './services/ChangelistService';
+import { InactiveChangesService } from './services/InactiveChangesService';
 import { BranchStatusBar, GitLogStatusBar } from './ui';
 import { registerStashCommands, registerNavigationCommands, registerBranchCommands, registerLogCommands, registerChangelistCommands } from './commands';
 import { logger } from './utils/logger';
@@ -20,14 +20,14 @@ export async function activate(context: vscode.ExtensionContext) {
 
     // Initialize services
     const gitService = await GitService.create(workspaceRoot);
-    const changelistService = new ChangelistService(context);
+    const inactiveChangesService = new InactiveChangesService(context);
 
     // Initialize providers
     const providerOptions = {
         extensionUri: context.extensionUri,
         context,
         gitService,
-        changelistService
+        inactiveChangesService
     };
     const provider = new CommitViewProvider(providerOptions);
     const gitLogProvider = new GitLogViewProvider(providerOptions);
@@ -57,7 +57,7 @@ export async function activate(context: vscode.ExtensionContext) {
     registerNavigationCommands(context, gitService, branchStatusBar, gitLogProvider, provider);
     registerBranchCommands(context, gitService, provider);
     registerLogCommands(context, gitService);
-    registerChangelistCommands(context, gitService, changelistService, provider);
+    registerChangelistCommands(context, gitService, inactiveChangesService, provider);
 
     context.subscriptions.push(branchStatusBar);
     context.subscriptions.push(gitLogStatusBar);

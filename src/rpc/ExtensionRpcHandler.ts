@@ -1,9 +1,9 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { RpcPeer } from '../../shared/rpc';
-import type { WebviewMethods, ExtensionMethods } from '../../shared/messages';
+import type { WebviewMethods, ExtensionMethods, FileStatus } from '../../shared/messages';
 import { GitService } from '../services/GitService';
-import { ChangelistService } from '../services/ChangelistService';
+import { InactiveChangesService } from '../services/InactiveChangesService';
 import { AnthropicService } from '../services/AnthropicService';
 import { GoogleAiService } from '../services/GoogleAiService';
 import { OpenAiService } from '../services/CustomOpenAiService';
@@ -14,7 +14,7 @@ import { logger } from '../utils/logger';
 export interface ExtensionRpcHandlerOptions {
     context: vscode.ExtensionContext;
     gitService: GitService;
-    changelistService?: ChangelistService;
+    inactiveChangesService?: InactiveChangesService;
     onDispose?: () => void;
 }
 
@@ -25,14 +25,14 @@ export interface ExtensionRpcHandlerOptions {
 export class ExtensionRpcHandler {
     private context: vscode.ExtensionContext;
     private gitService: GitService;
-    private changelistService?: ChangelistService;
+    private inactiveChangesService?: InactiveChangesService;
     private onDispose: () => void;
     private _lastRebaseStatus?: string;
 
     constructor(options: ExtensionRpcHandlerOptions) {
         this.context = options.context;
         this.gitService = options.gitService;
-        this.changelistService = options.changelistService;
+        this.inactiveChangesService = options.inactiveChangesService;
         this.onDispose = options.onDispose || (() => { });
     }
 
@@ -59,7 +59,7 @@ export class ExtensionRpcHandler {
                 openDiff: this.openDiff,
                 closeWebView: this.closeWebView,
                 openCommitDiff: this.openCommitDiff,
-                getStatus: this.gitService.getStatus,
+                getStatus: this.getStatus,
                 getBranchInfo: this.gitService.getRpcBranchInfo,
                 getStashList: this.gitService.getStashList,
                 getStashFiles: this.gitService.getStashFilesAsCommitFiles,
@@ -76,14 +76,9 @@ export class ExtensionRpcHandler {
                 switchBranch: this.switchBranch,
                 pull: this.pull,
                 fetch: this.fetch,
-                createChangelist: this.createChangelist,
                 pickBranch: this.pickBranch,
                 continueRebase: this.continueRebase,
                 abortRebase: this.abortRebase,
-                moveFiles: this.moveFiles,
-                deleteChangelist: this.deleteChangelist,
-                renameChangelist: this.renameChangelist,
-                promptCreateChangelist: this.promptCreateChangelist,
                 openFile: this.openFile,
                 openStashDiff: this.openStashDiff,
                 getBranchListData: this.gitService.getBranchListData,
@@ -133,6 +128,16 @@ export class ExtensionRpcHandler {
         if (params.pushTags) {
             await this.gitService.pushTags(params.remote);
         }
+    };
+
+    getStatus = async (): Promise<FileStatus[]> => {
+        const status = await this.gitService.getStatus();
+        const inactiveSet = new Set(this.inactiveChangesService?.getInactiveFiles() || []);
+        this.inactiveChangesService?.syncWithStatus(status.map(file => file.path));
+        return status.map(file => ({
+            ...file,
+            inactive: inactiveSet.has(file.path)
+        }));
     };
 
     openDiff = async (filePath: string): Promise<void> => {
@@ -470,53 +475,6 @@ export class ExtensionRpcHandler {
 
         } catch (e) {
             vscode.window.showErrorMessage(i18n.t('extension.abortRebaseFailed', `${e}`));
-        }
-    };
-
-    createChangelist = async (name: string): Promise<void> => {
-        await this.changelistService?.createChangelist(name);
-
-    };
-
-    moveFiles = async (params: { files: string[]; targetListId: string }): Promise<void> => {
-        await this.changelistService?.moveFiles(params.files, params.targetListId);
-
-    };
-
-    deleteChangelist = async (id: string): Promise<void> => {
-        const list = this.changelistService?.getChangelistById(id);
-        if (list && list.files.length > 0) {
-            const answer = await vscode.window.showWarningMessage(
-                i18n.t('extension.changelistNotEmpty', list.name),
-                { modal: true },
-                'Delete'
-            );
-            if (answer === 'Delete') {
-                await this.changelistService?.removeChangelist(id);
-
-            }
-        } else {
-            await this.changelistService?.removeChangelist(id);
-
-        }
-    };
-
-    renameChangelist = async (params: { id: string; name: string }): Promise<void> => {
-        await this.changelistService?.renameChangelist(params.id, params.name);
-
-    };
-
-    promptCreateChangelist = async (file?: string): Promise<void> => {
-        const newName = await vscode.window.showInputBox({
-            prompt: i18n.t('extension.enterChangelistName'),
-            placeHolder: i18n.t('extension.newChangelistPlaceholder')
-        });
-        if (newName) {
-            const newId = await this.changelistService?.createChangelist(newName);
-            if (file && newId) {
-                await this.changelistService?.moveFiles([file], newId);
-            }
-
         }
     };
 

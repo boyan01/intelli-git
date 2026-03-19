@@ -31,9 +31,11 @@ interface FileNodeData {
     path: string;
     isFile: boolean;
     isRoot?: boolean;
+    isInactiveGroup?: boolean;
     isAmendCommit?: boolean;
     isAmendFile?: boolean;
     status?: string;
+    inactive?: boolean;
     fileCount: number;
     selectedStatus?: SelectionStatus;
     error?: boolean;
@@ -217,6 +219,7 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
                             path: f.path,
                             isFile: true,
                             status: f.status,
+                            inactive: f.inactive,
                             fileCount: 1
                         }
                     }))
@@ -233,6 +236,7 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
                     path: '',
                     isFile: false,
                     isRoot: true,
+                    isInactiveGroup: group.id === 'inactive-changes',
                     fileCount: totalFiles
                 },
                 children
@@ -297,6 +301,7 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
 
     const handleToggleFile = useCallback((node: TreeNode<FileNodeData>, checked: boolean) => {
         if (readonly || !onToggleFile) return;
+        if (node.id === '__root__inactive-changes' || node.id.startsWith('inactive-changes/')) return;
         const paths = getAllFilePaths(node);
         paths.forEach(path => onToggleFile(path, checked));
     }, [readonly, onToggleFile]);
@@ -304,6 +309,7 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
     const renderLeading = useCallback((node: TreeNode<FileNodeData>) => {
         // Don't show checkbox for amend commit nodes
         if (node.data?.isAmendCommit || node.data?.isAmendFile) return null;
+        if (node.id === '__root__inactive-changes' || node.id.startsWith('inactive-changes/')) return null;
         if (readonly || !onToggleFile) return null;
 
         const status = node.data?.selectedStatus ?? 'none';
@@ -396,26 +402,34 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
             webviewSection: 'changelistFile',
             path: node.data.path,
             status: node.data.status,
+            isInactive: Boolean(node.data.inactive || node.id.startsWith('inactive-changes/')),
             preventDefaultContextMenuItems: true
         };
     }, []);
 
-    // Drag: allow dragging from unversioned group (including root)
+    // Drag: allow dragging from non-staged and non-inactive groups.
     const isDraggable = useCallback((node: TreeNode<FileNodeData>) => {
         const nodeId = node.id;
-        // Allow root node and all children
-        return nodeId === '__root__unversioned' || nodeId.startsWith('unversioned/');
+        if (nodeId.startsWith('inactive-changes/')) return false;
+        if (nodeId.startsWith('staged-changes/')) return false;
+        if (nodeId.startsWith('amend/')) return false;
+        return nodeId.startsWith('changes/') ||
+            nodeId.startsWith('untracked-changes/') ||
+            nodeId.startsWith('conflicting-changes/') ||
+            nodeId === '__root__changes' ||
+            nodeId === '__root__untracked-changes' ||
+            nodeId === '__root__conflicting-changes';
     }, []);
 
-    // Drop: allow dropping on default changelist root or any of its children
+    // Drop: allow dropping on staged group root or any of its children.
     const isDropTarget = useCallback((node: TreeNode<FileNodeData>) => {
-        return node.id === '__root__default' || node.id.startsWith('default/');
+        return node.id === '__root__staged-changes' || node.id.startsWith('staged-changes/');
     }, []);
 
-    // Always highlight the root node when dragging over any child
+    // Always highlight staged root when dragging over staged children.
     const getDropTargetRootId = useCallback((node: TreeNode<FileNodeData>) => {
-        if (node.id === '__root__default' || node.id.startsWith('default/')) {
-            return '__root__default';
+        if (node.id === '__root__staged-changes' || node.id.startsWith('staged-changes/')) {
+            return '__root__staged-changes';
         }
         return null;
     }, []);

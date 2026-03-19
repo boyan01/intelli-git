@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import type { ExtensionMethods, WebviewMethods } from '../../shared/messages';
 import { RpcPeer } from '../../shared/rpc';
 import { GitService } from '../services/GitService';
-import { ChangelistService } from '../services/ChangelistService';
+import { InactiveChangesService } from '../services/InactiveChangesService';
 import { getWebviewHtml } from '../utils/webviewHtml';
 import { createRpc, ExtensionRpcHandler } from '../rpc';
 
@@ -10,7 +10,7 @@ export interface WebviewProviderOptions {
     extensionUri: vscode.Uri;
     context: vscode.ExtensionContext;
     gitService: GitService;
-    changelistService?: ChangelistService;
+    inactiveChangesService?: InactiveChangesService;
 }
 
 /**
@@ -36,7 +36,7 @@ export abstract class BaseWebviewProvider {
         const handler = new ExtensionRpcHandler({
             context: this.options.context,
             gitService: this.options.gitService,
-            changelistService: this.options.changelistService,
+            inactiveChangesService: this.options.inactiveChangesService,
             onDispose: this.getOnDispose()
         });
         handler.registerAll(this._rpc);

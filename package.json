@@ -186,8 +186,12 @@
         "title": "%intelli-git.commands.changelist.delete.title%"
       },
       {
-        "command": "intelli-git.changelist.moveToChangelist",
-        "title": "%intelli-git.commands.changelist.moveToChangelist.title%"
+        "command": "intelli-git.changelist.markInactive",
+        "title": "%intelli-git.commands.changelist.markInactive.title%"
+      },
+      {
+        "command": "intelli-git.changelist.markActive",
+        "title": "%intelli-git.commands.changelist.markActive.title%"
       },
       {
         "command": "intelli-git.copyAuthorEmail",
@@ -353,8 +357,13 @@
           "group": "2_danger"
         },
         {
-          "command": "intelli-git.changelist.moveToChangelist",
-          "when": "webviewSection == 'changelistFile'",
+          "command": "intelli-git.changelist.markInactive",
+          "when": "webviewSection == 'changelistFile' && isInactive != true",
+          "group": "3_other@1"
+        },
+        {
+          "command": "intelli-git.changelist.markActive",
+          "when": "webviewSection == 'changelistFile' && isInactive == true",
           "group": "3_other"
         },
         {

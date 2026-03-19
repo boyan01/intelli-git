@@ -15,43 +15,65 @@ interface CommitViewProps {
 }
 
 function buildChangelists(files: FileStatus[]): ChangelistGroup[] {
-    const conflictedFiles = files.filter(f => f.status === 'C' || f.status === 'U');
-    const trackedFiles = files.filter(f => f.status !== '?' && f.status !== 'C' && f.status !== 'U');
-    const untrackedFiles = files.filter(f => f.status === '?');
+    const inactiveFiles = files.filter(f => f.inactive);
+    const activeFiles = files.filter(f => !f.inactive);
+
+    const changesFiles = activeFiles.filter(f => !f.staged && f.status !== '?' && f.status !== 'C' && f.status !== 'U');
+    const untrackedFiles = activeFiles.filter(f => !f.staged && f.status === '?');
+    const conflictedFiles = activeFiles.filter(f => f.status === 'C' || f.status === 'U');
+    const stagedFiles = activeFiles.filter(f => f.staged && f.status !== 'C' && f.status !== 'U');
 
     const changelists: ChangelistGroup[] = [];
 
-    if (conflictedFiles.length > 0) {
+    if (changesFiles.length > 0) {
         changelists.push({
-            id: 'merge-conflicts',
-            name: 'Merge Conflicts',
+            id: 'changes',
+            name: 'Changes',
             isDefault: false,
-            items: conflictedFiles.map(f => ({ path: f.path, status: f.status, staged: f.staged }))
-        });
-    }
-
-    if (trackedFiles.length > 0) {
-        changelists.push({
-            id: 'default',
-            name: 'Default Changelist',
-            isDefault: true,
-            items: trackedFiles.map(f => ({ path: f.path, status: f.status, staged: f.staged }))
+            items: changesFiles.map(f => ({ path: f.path, status: f.status, staged: f.staged, inactive: f.inactive }))
         });
     }
 
     if (untrackedFiles.length > 0) {
         changelists.push({
-            id: 'unversioned',
-            name: 'Unversioned Files',
+            id: 'untracked-changes',
+            name: 'Untracked Changes',
             isDefault: false,
-            items: untrackedFiles.map(f => ({ path: f.path, status: f.status, staged: f.staged }))
+            items: untrackedFiles.map(f => ({ path: f.path, status: f.status, staged: f.staged, inactive: f.inactive }))
+        });
+    }
+
+    if (conflictedFiles.length > 0) {
+        changelists.push({
+            id: 'conflicting-changes',
+            name: 'Conflicting Changes',
+            isDefault: false,
+            items: conflictedFiles.map(f => ({ path: f.path, status: f.status, staged: f.staged, inactive: f.inactive }))
+        });
+    }
+
+    if (stagedFiles.length > 0) {
+        changelists.push({
+            id: 'staged-changes',
+            name: 'Staged Changes',
+            isDefault: false,
+            items: stagedFiles.map(f => ({ path: f.path, status: f.status, staged: f.staged, inactive: f.inactive }))
+        });
+    }
+
+    if (inactiveFiles.length > 0) {
+        changelists.push({
+            id: 'inactive-changes',
+            name: 'Inactive Changes',
+            isDefault: false,
+            items: inactiveFiles.map(f => ({ path: f.path, status: f.status, staged: f.staged, inactive: f.inactive }))
         });
     }
 
     if (changelists.length === 0) {
         changelists.push({
-            id: 'default',
-            name: 'Default Changelist',
+            id: 'changes',
+            name: 'Changes',
             isDefault: true,
             items: []
         });
@@ -132,12 +154,16 @@ export function CommitView({ rebaseStatus }: CommitViewProps) {
         });
     }, [setExpandedIds]);
 
-    // Clean up selectedFiles when files are removed from changelists
+    // Clean up selectedFiles when files are removed or inactive
     useEffect(() => {
         const allPaths = new Set<string>();
+        const inactivePaths = new Set<string>();
         changelists.forEach(group => group.items.forEach(file => allPaths.add(file.path)));
+        changelists
+            .find(group => group.id === 'inactive-changes')
+            ?.items.forEach(file => inactivePaths.add(file.path));
 
-        const invalidPaths = Array.from(selectedFiles).filter(path => !allPaths.has(path));
+        const invalidPaths = Array.from(selectedFiles).filter(path => !allPaths.has(path) || inactivePaths.has(path));
         if (invalidPaths.length > 0) {
             setSelectedFiles(prev => {
                 const next = new Set(prev);
