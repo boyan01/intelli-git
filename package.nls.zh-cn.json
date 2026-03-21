@@ -34,6 +34,8 @@
   "intelli-git.commands.changelist.markActive.title": "移回 Active 更改",
   "intelli-git.commands.changelist.stage.title": "暂存",
   "intelli-git.commands.changelist.unstage.title": "取消暂存",
+  "intelli-git.commands.changelist.acceptCurrent.title": "接受当前更改",
+  "intelli-git.commands.changelist.acceptIncoming.title": "接受传入更改",
   "intelli-git.commands.log.resetSoft.title": "重置当前分支到此提交 (Soft)",
   "intelli-git.commands.log.resetMixed.title": "重置当前分支到此提交 (Mixed)",
   "intelli-git.commands.log.resetHard.title": "重置当前分支到此提交 (Hard)",

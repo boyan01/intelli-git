@@ -197,3 +197,35 @@
     overflow: hidden;
     gap: 4px;
 }
+
+.resolveAction {
+    width: 18px;
+    height: 18px;
+    border: none;
+    border-radius: 3px;
+    background: var(--vscode-button-secondaryBackground);
+    color: var(--vscode-button-secondaryForeground);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease;
+    flex-shrink: 0;
+}
+
+.resolveAction:hover {
+    background: var(--vscode-button-secondaryHoverBackground);
+}
+
+.resolveAction:focus-visible {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.conflictActions {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}

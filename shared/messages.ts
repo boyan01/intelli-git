@@ -11,6 +11,7 @@ export interface FileStatus {
     status: GitStatusCode;
     staged: boolean;
     inactive?: boolean;
+    resolvedCandidate?: boolean;
     error?: boolean;
 }
 
@@ -117,6 +118,7 @@ export interface ExtensionMethods {
     pickBranch: () => Promise<void>;
     continueRebase: (params: { message?: string; files?: string[] }) => Promise<void>;
     abortRebase: () => Promise<void>;
+    resolveConflict: (params: { path: string; side: 'ours' | 'theirs' }) => Promise<void>;
     openFile: (params: { path: string; preserveFocus?: boolean }) => Promise<void>;
     openStashDiff: (params: { index: number; path: string }) => Promise<void>;
     getBranchListData: () => Promise<BranchListData>;

@@ -1,9 +1,10 @@
 import React, { useMemo, useCallback, useRef } from 'react';
 import type { ChangelistGroup, FileStatus, LastCommitInfo } from '@shared/messages';
+import { useTranslation } from 'react-i18next';
 import { BasicTreeView } from '../common/BasicTreeView';
 import type { TreeNode, BasicTreeViewRef } from '../common/BasicTreeView';
 import { getFileIcon } from '../../lib/fileIcons';
-import { rpc } from '@/lib/rpc_client';
+import { rpc, rpcEvents } from '@/lib/rpc_client';
 import { logger } from '@/utils/logger';
 import styles from '../file-tree/BaseFileTree.module.css';
 
@@ -38,6 +39,7 @@ interface FileNodeData {
     status?: string;
     staged?: boolean;
     inactive?: boolean;
+    resolvedCandidate?: boolean;
     fileCount: number;
     selectedStatus?: SelectionStatus;
     error?: boolean;
@@ -118,6 +120,7 @@ const buildTree = (files: FileStatus[]): TreeNode<FileNodeData>[] => {
                         status: isLast ? file.status : undefined,
                         staged: isLast ? file.staged : undefined,
                         inactive: isLast ? file.inactive : undefined,
+                        resolvedCandidate: isLast ? file.resolvedCandidate : undefined,
                         fileCount: 0,
                         error: isLast ? file.error : undefined
                     },
@@ -200,6 +203,7 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
     workspaceRoot,
     amendCommit
 }, ref) => {
+    const { t } = useTranslation();
     const treeRef = useRef<BasicTreeViewRef>(null);
     const [, forceUpdate] = React.useReducer(x => x + 1, 0);
 
@@ -225,6 +229,7 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
                             status: f.status,
                             staged: f.staged,
                             inactive: f.inactive,
+                            resolvedCandidate: f.resolvedCandidate,
                             fileCount: 1
                         }
                     }))
@@ -339,8 +344,61 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
                 </span>
             );
         }
+
+        const isConflictFile = Boolean(
+            node.data?.isFile &&
+            (node.data.status === 'C' || node.data.status === 'U')
+        );
+
+        if (isConflictFile) {
+            return (
+                <div className={styles.conflictActions}>
+                    <button
+                        type="button"
+                        className={styles.resolveAction}
+                        title={t('Accept Current Change')}
+                        onClick={async (e) => {
+                            e.stopPropagation();
+                            await rpc.resolveConflict({ path: node.data!.path, side: 'ours' });
+                            rpcEvents.refresh.emit();
+                        }}
+                    >
+                        <i className="codicon codicon-arrow-left"></i>
+                    </button>
+
+                    <button
+                        type="button"
+                        className={styles.resolveAction}
+                        title={t('Accept Incoming Change')}
+                        onClick={async (e) => {
+                            e.stopPropagation();
+                            await rpc.resolveConflict({ path: node.data!.path, side: 'theirs' });
+                            rpcEvents.refresh.emit();
+                        }}
+                    >
+                        <i className="codicon codicon-arrow-right"></i>
+                    </button>
+
+                    {node.data?.resolvedCandidate && (
+                        <button
+                            type="button"
+                            className={styles.resolveAction}
+                            title={t('Mark as Resolved')}
+                            onClick={async (e) => {
+                                e.stopPropagation();
+                                await rpc.stage(node.data!.path);
+                                rpcEvents.refresh.emit();
+                            }}
+                        >
+                            <i className="codicon codicon-check"></i>
+                        </button>
+                    )}
+                </div>
+            );
+        }
+
         return null;
-    }, []);
+    }, [t]);
 
     const renderLabel = useCallback((node: TreeNode<FileNodeData>) => {
         const isFile = node.data?.isFile;
@@ -408,6 +466,7 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
             path: node.data.path,
             status: node.data.status,
             isStaged: Boolean(node.data.staged),
+            isConflict: node.data.status === 'C' || node.data.status === 'U',
             isInactive: Boolean(node.data.inactive || node.id.startsWith('inactive-changes/')),
             preventDefaultContextMenuItems: true
         };

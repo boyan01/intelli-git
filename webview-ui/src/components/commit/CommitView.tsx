@@ -30,7 +30,13 @@ function buildChangelists(files: FileStatus[], t: (key: string) => string): Chan
             id: 'staged-changes',
             name: t('Staged Changes'),
             isDefault: false,
-            items: stagedFiles.map(f => ({ path: f.path, status: f.status, staged: f.staged, inactive: f.inactive }))
+            items: stagedFiles.map(f => ({
+                path: f.path,
+                status: f.status,
+                staged: f.staged,
+                inactive: f.inactive,
+                resolvedCandidate: f.resolvedCandidate
+            }))
         });
     }
 
@@ -39,7 +45,13 @@ function buildChangelists(files: FileStatus[], t: (key: string) => string): Chan
             id: 'conflicting-changes',
             name: t('Conflicting Changes'),
             isDefault: false,
-            items: conflictedFiles.map(f => ({ path: f.path, status: f.status, staged: f.staged, inactive: f.inactive }))
+            items: conflictedFiles.map(f => ({
+                path: f.path,
+                status: f.status,
+                staged: f.staged,
+                inactive: f.inactive,
+                resolvedCandidate: f.resolvedCandidate
+            }))
         });
     }
 
@@ -48,7 +60,13 @@ function buildChangelists(files: FileStatus[], t: (key: string) => string): Chan
             id: 'changes',
             name: t('Changes'),
             isDefault: false,
-            items: changesFiles.map(f => ({ path: f.path, status: f.status, staged: f.staged, inactive: f.inactive }))
+            items: changesFiles.map(f => ({
+                path: f.path,
+                status: f.status,
+                staged: f.staged,
+                inactive: f.inactive,
+                resolvedCandidate: f.resolvedCandidate
+            }))
         });
     }
 
@@ -57,7 +75,13 @@ function buildChangelists(files: FileStatus[], t: (key: string) => string): Chan
             id: 'untracked-changes',
             name: t('Untracked Changes'),
             isDefault: false,
-            items: untrackedFiles.map(f => ({ path: f.path, status: f.status, staged: f.staged, inactive: f.inactive }))
+            items: untrackedFiles.map(f => ({
+                path: f.path,
+                status: f.status,
+                staged: f.staged,
+                inactive: f.inactive,
+                resolvedCandidate: f.resolvedCandidate
+            }))
         });
     }
 
@@ -66,7 +90,13 @@ function buildChangelists(files: FileStatus[], t: (key: string) => string): Chan
             id: 'inactive-changes',
             name: t('Inactive Changes'),
             isDefault: false,
-            items: inactiveFiles.map(f => ({ path: f.path, status: f.status, staged: f.staged, inactive: f.inactive }))
+            items: inactiveFiles.map(f => ({
+                path: f.path,
+                status: f.status,
+                staged: f.staged,
+                inactive: f.inactive,
+                resolvedCandidate: f.resolvedCandidate
+            }))
         });
     }
 
@@ -251,8 +281,9 @@ export function CommitView({ rebaseStatus }: CommitViewProps) {
                 )}
             </div>
 
-            {rebaseStatus === 'interactive' ? (
+            {rebaseStatus && rebaseStatus !== 'none' ? (
                 <RebaseForm
+                    mode={rebaseStatus}
                     message={commitMessage}
                     addedCount={fileStats.added}
                     modifiedCount={fileStats.modified}

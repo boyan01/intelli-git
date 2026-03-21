@@ -78,6 +78,20 @@ export class GitService implements vscode.Disposable {
         return this._workspaceRoot;
     }
 
+    private hasConflictMarkers(filePath: string): boolean {
+        try {
+            const absPath = path.join(this._workspaceRoot, filePath);
+            if (!fs.existsSync(absPath)) {
+                return false;
+            }
+
+            const content = fs.readFileSync(absPath, 'utf8');
+            return content.includes('<<<<<<<') && content.includes('=======') && content.includes('>>>>>>>');
+        } catch {
+            return true;
+        }
+    }
+
     public getStatus = async (): Promise<FileStatus[]> => {
         const files: FileStatus[] = [];
 
@@ -178,6 +192,10 @@ export class GitService implements vscode.Disposable {
         // Check for diagnostics errors
         files.forEach(file => {
             try {
+                if (file.status === 'C' || file.status === 'U') {
+                    file.resolvedCandidate = !this.hasConflictMarkers(file.path);
+                }
+
                 // file.path is workspace relative
                 const absPath = path.join(this._workspaceRoot, file.path);
                 const uri = vscode.Uri.file(absPath);
@@ -221,6 +239,22 @@ export class GitService implements vscode.Disposable {
 
     public async unstageFile(filePath: string): Promise<void> {
         await this.git.reset(['HEAD', '--', this.toRepoPath(filePath)]);
+    }
+
+    public async resolveConflict(filePath: string, side: 'ours' | 'theirs'): Promise<void> {
+        const repoPath = this.toRepoPath(filePath);
+        const unmerged = await this.git.raw(['ls-files', '-u', '--', repoPath]);
+        const hasOurs = unmerged.split('\n').some(line => /\s2\t/.test(line));
+        const hasTheirs = unmerged.split('\n').some(line => /\s3\t/.test(line));
+
+        const keepDeleted = side === 'ours' ? !hasOurs : !hasTheirs;
+        if (keepDeleted) {
+            await this.git.raw(['rm', '--', repoPath]);
+            return;
+        }
+
+        await this.git.raw(['checkout', `--${side}`, '--', repoPath]);
+        await this.git.add(repoPath);
     }
 
     public async stageAll(): Promise<void> {
@@ -980,13 +1014,23 @@ export class GitService implements vscode.Disposable {
 
     public async getRebaseStatus(): Promise<'none' | 'interactive' | 'merging'> {
         try {
-            const statusText = await this.git.raw(['status']);
-            if (statusText.includes('interactive rebase in progress') || statusText.includes('rebase in progress')) {
+            const gitDir = (await this.git.revparse(['--git-dir'])).trim();
+            const absoluteGitDir = path.isAbsolute(gitDir)
+                ? gitDir
+                : path.join(this._workspaceRoot, gitDir);
+
+            const rebaseMergeDir = path.join(absoluteGitDir, 'rebase-merge');
+            const rebaseApplyDir = path.join(absoluteGitDir, 'rebase-apply');
+            const mergeHeadFile = path.join(absoluteGitDir, 'MERGE_HEAD');
+
+            if (fs.existsSync(rebaseMergeDir) || fs.existsSync(rebaseApplyDir)) {
                 return 'interactive';
             }
-            if (statusText.includes('You have unmerged paths')) {
+
+            if (fs.existsSync(mergeHeadFile)) {
                 return 'merging';
             }
+
             return 'none';
         } catch {
             return 'none';
@@ -994,10 +1038,18 @@ export class GitService implements vscode.Disposable {
     }
 
     public async abortRebase(): Promise<void> {
+        const status = await this.getRebaseStatus();
+        if (status === 'merging') {
+            await this.git.raw(['merge', '--abort']);
+            return;
+        }
+
         await this.git.rebase(['--abort']);
     }
 
     public async continueRebase(message?: string): Promise<void> {
+        const status = await this.getRebaseStatus();
+
         // If a message is provided, try to update the relevant message file
         if (message) {
             try {
@@ -1015,8 +1067,13 @@ export class GitService implements vscode.Disposable {
             }
         }
 
-        // Use .env() to set GIT_EDITOR for this operation
-        await this.git.env({ ...process.env, GIT_EDITOR: 'true' }).rebase(['--continue']);
+        const gitWithEditorBypass = this.git.env({ ...process.env, GIT_EDITOR: 'true' });
+        if (status === 'merging') {
+            await gitWithEditorBypass.raw(['merge', '--continue']);
+            return;
+        }
+
+        await gitWithEditorBypass.rebase(['--continue']);
     }
 
     public async getRebaseCommitMessage(): Promise<string> {

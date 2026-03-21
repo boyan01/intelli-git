@@ -79,6 +79,7 @@ export class ExtensionRpcHandler {
                 pickBranch: this.pickBranch,
                 continueRebase: this.continueRebase,
                 abortRebase: this.abortRebase,
+                resolveConflict: this.resolveConflict,
                 openFile: this.openFile,
                 openStashDiff: this.openStashDiff,
                 getBranchListData: this.gitService.getBranchListData,
@@ -460,11 +461,43 @@ export class ExtensionRpcHandler {
 
     continueRebase = async (params: { message?: string; files?: string[] }): Promise<void> => {
         try {
+            const currentStatus = await this.getStatus();
+            const unresolvedFiles = currentStatus.filter(
+                file => (file.status === 'C' || file.status === 'U') && !file.resolvedCandidate
+            );
+
+            if (unresolvedFiles.length > 0) {
+                vscode.window.showErrorMessage(i18n.t('extension.resolveConflictsBeforeContinue'));
+                return;
+            }
+
+            const filesToStage = new Set<string>(params.files || []);
+
+            // During merge/rebase continue, once no unmerged entries remain,
+            // auto-stage tracked unresolved->resolved files so Git can continue.
+            currentStatus
+                .filter(file => !file.inactive && !file.staged && file.status !== '?')
+                .forEach(file => filesToStage.add(file.path));
+
+            for (const file of filesToStage) {
+                await this.gitService.stageFile(file);
+            }
+
             await this.gitService.continueRebase(params.message);
             vscode.window.showInformationMessage(i18n.t('extension.rebaseContinued'));
 
         } catch (e) {
-            vscode.window.showErrorMessage(i18n.t('extension.continueRebaseFailed', `${e}`));
+            const errorMessage = `${e}`;
+            if (
+                errorMessage.includes('No changes - did you forget to use') ||
+                errorMessage.includes('mark them as resolved using git add') ||
+                errorMessage.includes('You must edit all merge conflicts')
+            ) {
+                vscode.window.showErrorMessage(i18n.t('extension.stageResolvedFilesBeforeContinue'));
+                return;
+            }
+
+            vscode.window.showErrorMessage(i18n.t('extension.continueRebaseFailed', errorMessage));
         }
     };
 
@@ -475,6 +508,14 @@ export class ExtensionRpcHandler {
 
         } catch (e) {
             vscode.window.showErrorMessage(i18n.t('extension.abortRebaseFailed', `${e}`));
+        }
+    };
+
+    resolveConflict = async (params: { path: string; side: 'ours' | 'theirs' }): Promise<void> => {
+        try {
+            await this.gitService.resolveConflict(params.path, params.side);
+        } catch (e) {
+            vscode.window.showErrorMessage(i18n.t('extension.resolveConflictFailed', `${e}`));
         }
     };
 

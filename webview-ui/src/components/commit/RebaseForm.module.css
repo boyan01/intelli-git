@@ -10,7 +10,9 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+    flex-wrap: wrap;
     padding: 4px 8px;
+    gap: 6px 12px;
 }
 
 .rebaseLabel {
@@ -20,6 +22,13 @@
     font-size: 12px;
     font-weight: bold;
     gap: 4px;
+}
+
+.rebaseHint {
+    width: 100%;
+    font-size: 11px;
+    color: var(--vscode-descriptionForeground);
+    opacity: 0.9;
 }
 
 .stats {

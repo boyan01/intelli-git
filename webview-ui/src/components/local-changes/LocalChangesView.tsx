@@ -19,11 +19,13 @@ const defaultBranchInfo: BranchInfo = {
 };
 
 function RebaseIndicator({ status }: { status: 'interactive' | 'merging' }) {
+    const { t } = useTranslation();
+
     return (
         <>
             <span className="codicon codicon-git-merge" style={{ color: 'var(--vscode-inputValidation-warningForeground)', marginRight: '4px' }}></span>
             <span style={{ fontWeight: 'bold', fontSize: '11px', marginRight: '4px' }}>
-                {status === 'interactive' ? 'Rebasing' : 'Merging'}
+                {status === 'interactive' ? t('Rebasing') : t('Merging')}
             </span>
             <div
                 className={styles.continueBtn}
@@ -31,7 +33,7 @@ function RebaseIndicator({ status }: { status: 'interactive' | 'merging' }) {
                     e.stopPropagation();
                     rpc.continueRebase({});
                 }}
-                title="Continue Rebase/Merge"
+                title={status === 'interactive' ? t('Continue Rebase') : t('Continue Merge')}
             >
                 <span className="codicon codicon-play"></span>
             </div>
@@ -41,7 +43,7 @@ function RebaseIndicator({ status }: { status: 'interactive' | 'merging' }) {
                     e.stopPropagation();
                     rpc.abortRebase();
                 }}
-                title="Abort Rebase/Merge"
+                title={status === 'interactive' ? t('Abort Rebase') : t('Abort Merge')}
             >
                 <span className="codicon codicon-close"></span>
             </div>

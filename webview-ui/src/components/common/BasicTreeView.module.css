@@ -102,6 +102,14 @@
     flex-shrink: 0;
 }
 
+.node:hover .trailing button,
+.node.selected .trailing button,
+.node.focused .trailing button,
+.trailing button:focus-visible {
+    opacity: 1;
+    pointer-events: auto;
+}
+
 .children {
     display: flex;
     flex-direction: column;

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import styles from './RebaseForm.module.css';
 
 interface RebaseFormProps {
+    mode: 'interactive' | 'merging';
     message: string;
     addedCount?: number;
     modifiedCount?: number;
@@ -13,6 +14,7 @@ interface RebaseFormProps {
 }
 
 export const RebaseForm: React.FC<RebaseFormProps> = ({
+    mode,
     message,
     addedCount = 0,
     modifiedCount = 0,
@@ -28,7 +30,10 @@ export const RebaseForm: React.FC<RebaseFormProps> = ({
             <div className={styles.commitToolbar}>
                 <div className={styles.rebaseLabel}>
                     <span className="codicon codicon-git-merge"></span>
-                    <span>Rebase in progress</span>
+                    <span>{mode === 'interactive' ? t('Rebase in progress') : t('Merge in progress')}</span>
+                </div>
+                <div className={styles.rebaseHint}>
+                    {t('Resolve conflicts and stage the resolved files before continuing')}
                 </div>
                 {(addedCount > 0 || modifiedCount > 0 || deletedCount > 0) && (
                     <div className={styles.stats}>
@@ -53,7 +58,7 @@ export const RebaseForm: React.FC<RebaseFormProps> = ({
                         className={`${styles.btn} ${styles.btnPrimary} ${styles.continueBtn}`}
                         onClick={onContinue}
                         disabled={disableContinue}
-                        title={disableContinue ? 'Resolve conflicts before continuing' : ''}
+                        title={disableContinue ? t('Resolve conflicts before continuing') : ''}
                     >
                         <span className={`codicon codicon-play ${styles.icon}`}></span>
                         {t('Continue')}

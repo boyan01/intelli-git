@@ -202,6 +202,14 @@
         "title": "%intelli-git.commands.changelist.unstage.title%"
       },
       {
+        "command": "intelli-git.changelist.acceptCurrent",
+        "title": "%intelli-git.commands.changelist.acceptCurrent.title%"
+      },
+      {
+        "command": "intelli-git.changelist.acceptIncoming",
+        "title": "%intelli-git.commands.changelist.acceptIncoming.title%"
+      },
+      {
         "command": "intelli-git.copyAuthorEmail",
         "title": "%intelli-git.commands.copyAuthorEmail.title%"
       },
@@ -356,32 +364,42 @@
         },
         {
           "command": "intelli-git.changelist.stash",
-          "when": "webviewSection == 'changelistFile'",
+          "when": "webviewSection == 'changelistFile' && isConflict != true",
           "group": "1_modification@2"
         },
         {
           "command": "intelli-git.changelist.delete",
-          "when": "webviewSection == 'changelistFile'",
+          "when": "webviewSection == 'changelistFile' && isConflict != true",
           "group": "2_danger"
         },
         {
           "command": "intelli-git.changelist.stage",
-          "when": "webviewSection == 'changelistFile' && isInactive != true && isStaged != true",
+          "when": "webviewSection == 'changelistFile' && isInactive != true && isStaged != true && isConflict != true",
           "group": "1_modification@0"
         },
         {
           "command": "intelli-git.changelist.unstage",
-          "when": "webviewSection == 'changelistFile' && isStaged == true",
+          "when": "webviewSection == 'changelistFile' && isStaged == true && isConflict != true",
           "group": "1_modification@0"
         },
         {
+          "command": "intelli-git.changelist.acceptCurrent",
+          "when": "webviewSection == 'changelistFile' && isConflict == true",
+          "group": "1_modification@0"
+        },
+        {
+          "command": "intelli-git.changelist.acceptIncoming",
+          "when": "webviewSection == 'changelistFile' && isConflict == true",
+          "group": "1_modification@1"
+        },
+        {
           "command": "intelli-git.changelist.markInactive",
-          "when": "webviewSection == 'changelistFile' && isInactive != true",
+          "when": "webviewSection == 'changelistFile' && isInactive != true && isConflict != true",
           "group": "3_other@1"
         },
         {
           "command": "intelli-git.changelist.markActive",
-          "when": "webviewSection == 'changelistFile' && isInactive == true",
+          "when": "webviewSection == 'changelistFile' && isInactive == true && isConflict != true",
           "group": "3_other"
         },
         {

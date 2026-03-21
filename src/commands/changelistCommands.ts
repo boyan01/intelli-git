@@ -10,6 +10,7 @@ interface ChangelistFileContext {
     status?: string;
     isStaged?: boolean;
     isInactive?: boolean;
+    isConflict?: boolean;
 }
 
 /**
@@ -162,6 +163,36 @@ export function registerChangelistCommands(
                 provider.rpc?.refresh();
             } catch (e) {
                 vscode.window.showErrorMessage(i18n.t('extension.unstageFailed', `${e}`));
+            }
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand('intelli-git.changelist.acceptCurrent', async (args: ChangelistFileContext) => {
+            if (!args?.path || !args.isConflict) {
+                return;
+            }
+
+            try {
+                await gitService.resolveConflict(args.path, 'ours');
+                provider.rpc?.refresh();
+            } catch (e) {
+                vscode.window.showErrorMessage(i18n.t('extension.resolveConflictFailed', `${e}`));
+            }
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand('intelli-git.changelist.acceptIncoming', async (args: ChangelistFileContext) => {
+            if (!args?.path || !args.isConflict) {
+                return;
+            }
+
+            try {
+                await gitService.resolveConflict(args.path, 'theirs');
+                provider.rpc?.refresh();
+            } catch (e) {
+                vscode.window.showErrorMessage(i18n.t('extension.resolveConflictFailed', `${e}`));
             }
         })
     );
