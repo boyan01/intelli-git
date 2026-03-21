@@ -6,6 +6,8 @@ import styles from './CommitToolbar.module.css';
 interface CommitToolbarProps {
     viewMode: 'tree' | 'list';
     selectedFiles: Set<string>;
+    selectedStageablePaths: string[];
+    selectedUnstageablePaths: string[];
     onViewModeChange: (mode: 'tree' | 'list') => void;
     onExpandAll: () => void;
     onCollapseAll: () => void;
@@ -14,6 +16,8 @@ interface CommitToolbarProps {
 export function CommitToolbar({
     viewMode,
     selectedFiles,
+    selectedStageablePaths,
+    selectedUnstageablePaths,
     onViewModeChange,
     onExpandAll,
     onCollapseAll
@@ -34,6 +38,28 @@ export function CommitToolbar({
                 </button>
                 <button className={styles.iconBtn} title={t('Stash')} onClick={() => rpc.stash({ files: Array.from(selectedFiles) })} disabled={selectedFiles.size === 0}>
                     <i className="codicon codicon-archive"></i>
+                </button>
+                <button
+                    className={styles.iconBtn}
+                    title={t('Stage Selected')}
+                    onClick={async () => {
+                        await rpc.stageFiles(selectedStageablePaths);
+                        rpcEvents.refresh.emit();
+                    }}
+                    disabled={selectedStageablePaths.length === 0}
+                >
+                    <i className="codicon codicon-add"></i>
+                </button>
+                <button
+                    className={styles.iconBtn}
+                    title={t('Unstage Selected')}
+                    onClick={async () => {
+                        await Promise.all(selectedUnstageablePaths.map(path => rpc.unstage(path)));
+                        rpcEvents.refresh.emit();
+                    }}
+                    disabled={selectedUnstageablePaths.length === 0}
+                >
+                    <i className="codicon codicon-remove"></i>
                 </button>
                 <div className={styles.toolbarSeparator}></div>
                 <button

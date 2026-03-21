@@ -3,7 +3,7 @@ import type { ChangelistGroup, FileStatus, LastCommitInfo } from '@shared/messag
 import { BasicTreeView } from '../common/BasicTreeView';
 import type { TreeNode, BasicTreeViewRef } from '../common/BasicTreeView';
 import { getFileIcon } from '../../lib/fileIcons';
-import { rpc, rpcEvents } from '@/lib/rpc_client';
+import { rpc } from '@/lib/rpc_client';
 import { logger } from '@/utils/logger';
 import styles from '../file-tree/BaseFileTree.module.css';
 
@@ -333,41 +333,10 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
 
     const renderTrailing = useCallback((node: TreeNode<FileNodeData>) => {
         if (node.data?.isRoot && node.data?.fileCount !== undefined) {
-            const isInactiveGroup = node.data.isInactiveGroup;
-            const isStagedGroup = node.data.isStagedGroup;
-            const paths = node.children ? getAllFilePaths(node) : [];
-
-            const handleAction = async (e: React.MouseEvent, action: 'stage' | 'unstage') => {
-                e.stopPropagation();
-                if (paths.length === 0) return;
-
-                if (action === 'stage') {
-                    await rpc.stageFiles(paths);
-                } else {
-                    await Promise.all(paths.map(path => rpc.unstage(path)));
-                }
-
-                rpcEvents.refresh.emit();
-            };
-
             return (
-                <div className={styles.groupTrailing}>
-                    {!isInactiveGroup && paths.length > 0 && (
-                        <button
-                            type="button"
-                            className={styles.groupAction}
-                            onClick={(e) => handleAction(e, isStagedGroup ? 'unstage' : 'stage')}
-                            title={isStagedGroup ? 'Unstage All' : 'Stage All'}
-                        >
-                            <i className={`codicon ${isStagedGroup ? 'codicon-remove' : 'codicon-add'}`}></i>
-                            <span>{isStagedGroup ? 'Unstage All' : 'Stage All'}</span>
-                        </button>
-                    )}
-
-                    <span className={styles.fileCount} style={{ marginLeft: 0 }}>
-                        {node.data.fileCount}
-                    </span>
-                </div>
+                <span className={styles.fileCount} style={{ marginLeft: 0 }}>
+                    {node.data.fileCount}
+                </span>
             );
         }
         return null;

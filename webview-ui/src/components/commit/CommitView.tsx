@@ -14,7 +14,7 @@ interface CommitViewProps {
     rebaseStatus?: BranchInfo['rebaseStatus'];
 }
 
-function buildChangelists(files: FileStatus[]): ChangelistGroup[] {
+function buildChangelists(files: FileStatus[], t: (key: string) => string): ChangelistGroup[] {
     const inactiveFiles = files.filter(f => f.inactive);
     const activeFiles = files.filter(f => !f.inactive);
 
@@ -25,10 +25,28 @@ function buildChangelists(files: FileStatus[]): ChangelistGroup[] {
 
     const changelists: ChangelistGroup[] = [];
 
+    if (stagedFiles.length > 0) {
+        changelists.push({
+            id: 'staged-changes',
+            name: t('Staged Changes'),
+            isDefault: false,
+            items: stagedFiles.map(f => ({ path: f.path, status: f.status, staged: f.staged, inactive: f.inactive }))
+        });
+    }
+
+    if (conflictedFiles.length > 0) {
+        changelists.push({
+            id: 'conflicting-changes',
+            name: t('Conflicting Changes'),
+            isDefault: false,
+            items: conflictedFiles.map(f => ({ path: f.path, status: f.status, staged: f.staged, inactive: f.inactive }))
+        });
+    }
+
     if (changesFiles.length > 0) {
         changelists.push({
             id: 'changes',
-            name: 'Changes',
+            name: t('Changes'),
             isDefault: false,
             items: changesFiles.map(f => ({ path: f.path, status: f.status, staged: f.staged, inactive: f.inactive }))
         });
@@ -37,34 +55,16 @@ function buildChangelists(files: FileStatus[]): ChangelistGroup[] {
     if (untrackedFiles.length > 0) {
         changelists.push({
             id: 'untracked-changes',
-            name: 'Untracked Changes',
+            name: t('Untracked Changes'),
             isDefault: false,
             items: untrackedFiles.map(f => ({ path: f.path, status: f.status, staged: f.staged, inactive: f.inactive }))
-        });
-    }
-
-    if (conflictedFiles.length > 0) {
-        changelists.push({
-            id: 'conflicting-changes',
-            name: 'Conflicting Changes',
-            isDefault: false,
-            items: conflictedFiles.map(f => ({ path: f.path, status: f.status, staged: f.staged, inactive: f.inactive }))
-        });
-    }
-
-    if (stagedFiles.length > 0) {
-        changelists.push({
-            id: 'staged-changes',
-            name: 'Staged Changes',
-            isDefault: false,
-            items: stagedFiles.map(f => ({ path: f.path, status: f.status, staged: f.staged, inactive: f.inactive }))
         });
     }
 
     if (inactiveFiles.length > 0) {
         changelists.push({
             id: 'inactive-changes',
-            name: 'Inactive Changes',
+            name: t('Inactive Changes'),
             isDefault: false,
             items: inactiveFiles.map(f => ({ path: f.path, status: f.status, staged: f.staged, inactive: f.inactive }))
         });
@@ -73,7 +73,7 @@ function buildChangelists(files: FileStatus[]): ChangelistGroup[] {
     if (changelists.length === 0) {
         changelists.push({
             id: 'changes',
-            name: 'Changes',
+            name: t('Changes'),
             isDefault: true,
             items: []
         });
@@ -90,7 +90,7 @@ export function CommitView({ rebaseStatus }: CommitViewProps) {
         initialValue: [] as FileStatus[],
         cacheKey: 'commit.files'
     });
-    const changelists = useMemo(() => buildChangelists(files), [files]);
+    const changelists = useMemo(() => buildChangelists(files, t), [files, t]);
     const [activeFile, setActiveFile] = useState<string | null>(null);
 
     // Persisted UI State
@@ -196,6 +196,18 @@ export function CommitView({ rebaseStatus }: CommitViewProps) {
         return { added, modified, deleted };
     }, [changelists, selectedFiles]);
 
+    const selectedStageablePaths = useMemo(() => {
+        return files
+            .filter(file => selectedFiles.has(file.path) && !file.inactive && !file.staged)
+            .map(file => file.path);
+    }, [files, selectedFiles]);
+
+    const selectedUnstageablePaths = useMemo(() => {
+        return files
+            .filter(file => selectedFiles.has(file.path) && file.staged)
+            .map(file => file.path);
+    }, [files, selectedFiles]);
+
     const handleCommitSuccess = useCallback(() => {
         setSavedMessage('');
         setAmend(false);
@@ -206,6 +218,8 @@ export function CommitView({ rebaseStatus }: CommitViewProps) {
             <CommitToolbar
                 viewMode={viewMode}
                 selectedFiles={selectedFiles}
+                selectedStageablePaths={selectedStageablePaths}
+                selectedUnstageablePaths={selectedUnstageablePaths}
                 onViewModeChange={setViewMode}
                 onExpandAll={() => {
                     const allIds = new Set(expandedIds);
