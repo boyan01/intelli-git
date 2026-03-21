@@ -30,6 +30,8 @@
   "intelli-git.commands.changelist.delete.title": "Delete from Disk",
   "intelli-git.commands.changelist.markInactive.title": "Mark as Inactive Changes",
   "intelli-git.commands.changelist.markActive.title": "Move to Active Changes",
+  "intelli-git.commands.changelist.stage.title": "Stage",
+  "intelli-git.commands.changelist.unstage.title": "Unstage",
   "intelli-git.commands.log.resetSoft.title": "Reset Current Branch to Here (Soft)",
   "intelli-git.commands.log.resetMixed.title": "Reset Current Branch to Here (Mixed)",
   "intelli-git.commands.log.resetHard.title": "Reset Current Branch to Here (Hard)",

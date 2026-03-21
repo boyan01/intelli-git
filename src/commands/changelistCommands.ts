@@ -8,6 +8,8 @@ interface ChangelistFileContext {
     webviewSection: 'changelistFile';
     path: string;
     status?: string;
+    isStaged?: boolean;
+    isInactive?: boolean;
 }
 
 /**
@@ -130,6 +132,36 @@ export function registerChangelistCommands(
             if (args?.path) {
                 await inactiveChangesService.markActive([args.path]);
                 provider.rpc?.refresh();
+            }
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand('intelli-git.changelist.stage', async (args: ChangelistFileContext) => {
+            if (!args?.path || args.isInactive) {
+                return;
+            }
+
+            try {
+                await gitService.stageFile(args.path);
+                provider.rpc?.refresh();
+            } catch (e) {
+                vscode.window.showErrorMessage(i18n.t('extension.stageFailed', `${e}`));
+            }
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand('intelli-git.changelist.unstage', async (args: ChangelistFileContext) => {
+            if (!args?.path) {
+                return;
+            }
+
+            try {
+                await gitService.unstageFile(args.path);
+                provider.rpc?.refresh();
+            } catch (e) {
+                vscode.window.showErrorMessage(i18n.t('extension.unstageFailed', `${e}`));
             }
         })
     );

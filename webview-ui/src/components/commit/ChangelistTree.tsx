@@ -3,7 +3,7 @@ import type { ChangelistGroup, FileStatus, LastCommitInfo } from '@shared/messag
 import { BasicTreeView } from '../common/BasicTreeView';
 import type { TreeNode, BasicTreeViewRef } from '../common/BasicTreeView';
 import { getFileIcon } from '../../lib/fileIcons';
-import { rpc } from '@/lib/rpc_client';
+import { rpc, rpcEvents } from '@/lib/rpc_client';
 import { logger } from '@/utils/logger';
 import styles from '../file-tree/BaseFileTree.module.css';
 
@@ -32,9 +32,11 @@ interface FileNodeData {
     isFile: boolean;
     isRoot?: boolean;
     isInactiveGroup?: boolean;
+    isStagedGroup?: boolean;
     isAmendCommit?: boolean;
     isAmendFile?: boolean;
     status?: string;
+    staged?: boolean;
     inactive?: boolean;
     fileCount: number;
     selectedStatus?: SelectionStatus;
@@ -114,6 +116,8 @@ const buildTree = (files: FileStatus[]): TreeNode<FileNodeData>[] => {
                         path: currentPath,
                         isFile: isLast,
                         status: isLast ? file.status : undefined,
+                        staged: isLast ? file.staged : undefined,
+                        inactive: isLast ? file.inactive : undefined,
                         fileCount: 0,
                         error: isLast ? file.error : undefined
                     },
@@ -219,6 +223,7 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
                             path: f.path,
                             isFile: true,
                             status: f.status,
+                            staged: f.staged,
                             inactive: f.inactive,
                             fileCount: 1
                         }
@@ -237,6 +242,7 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
                     isFile: false,
                     isRoot: true,
                     isInactiveGroup: group.id === 'inactive-changes',
+                    isStagedGroup: group.id === 'staged-changes',
                     fileCount: totalFiles
                 },
                 children
@@ -326,12 +332,42 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
     }, [readonly, onToggleFile, handleToggleFile]);
 
     const renderTrailing = useCallback((node: TreeNode<FileNodeData>) => {
-        // Only show count for root nodes (Change Groups), not for folders
         if (node.data?.isRoot && node.data?.fileCount !== undefined) {
+            const isInactiveGroup = node.data.isInactiveGroup;
+            const isStagedGroup = node.data.isStagedGroup;
+            const paths = node.children ? getAllFilePaths(node) : [];
+
+            const handleAction = async (e: React.MouseEvent, action: 'stage' | 'unstage') => {
+                e.stopPropagation();
+                if (paths.length === 0) return;
+
+                if (action === 'stage') {
+                    await rpc.stageFiles(paths);
+                } else {
+                    await Promise.all(paths.map(path => rpc.unstage(path)));
+                }
+
+                rpcEvents.refresh.emit();
+            };
+
             return (
-                <span className={styles.fileCount} style={{ marginLeft: 0 }}>
-                    {node.data.fileCount}
-                </span>
+                <div className={styles.groupTrailing}>
+                    {!isInactiveGroup && paths.length > 0 && (
+                        <button
+                            type="button"
+                            className={styles.groupAction}
+                            onClick={(e) => handleAction(e, isStagedGroup ? 'unstage' : 'stage')}
+                            title={isStagedGroup ? 'Unstage All' : 'Stage All'}
+                        >
+                            <i className={`codicon ${isStagedGroup ? 'codicon-remove' : 'codicon-add'}`}></i>
+                            <span>{isStagedGroup ? 'Unstage All' : 'Stage All'}</span>
+                        </button>
+                    )}
+
+                    <span className={styles.fileCount} style={{ marginLeft: 0 }}>
+                        {node.data.fileCount}
+                    </span>
+                </div>
             );
         }
         return null;
@@ -402,6 +438,7 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
             webviewSection: 'changelistFile',
             path: node.data.path,
             status: node.data.status,
+            isStaged: Boolean(node.data.staged),
             isInactive: Boolean(node.data.inactive || node.id.startsWith('inactive-changes/')),
             preventDefaultContextMenuItems: true
         };
