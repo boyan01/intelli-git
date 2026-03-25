@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { i18n } from '../utils/i18n';
 
 interface CopilotModelPickItem extends vscode.QuickPickItem {
     model: vscode.LanguageModelChat;
@@ -12,7 +13,7 @@ export function registerAiCommands(context: vscode.ExtensionContext) {
             const copilotModels = await vscode.lm.selectChatModels({ vendor: 'copilot' });
 
             if (copilotModels.length === 0) {
-                vscode.window.showErrorMessage('No GitHub Copilot models are currently available.');
+                vscode.window.showErrorMessage(i18n.t('extension.noCopilotModelsAvailable'));
                 return;
             }
 
@@ -27,15 +28,15 @@ export function registerAiCommands(context: vscode.ExtensionContext) {
 
                 return {
                     label: model.name || model.id,
-                    description: isCurrent ? 'Current' : undefined,
+                    description: isCurrent ? i18n.t('extension.current') : undefined,
                     detail: details,
                     model
                 };
             });
 
             const selected = await vscode.window.showQuickPick(items, {
-                title: 'Select Copilot Model',
-                placeHolder: 'Choose a GitHub Copilot model for commit message generation',
+                title: i18n.t('extension.selectCopilotModel'),
+                placeHolder: i18n.t('extension.chooseCopilotModelForCommitGen'),
                 matchOnDescription: true,
                 matchOnDetail: true
             });
@@ -50,7 +51,9 @@ export function registerAiCommands(context: vscode.ExtensionContext) {
                 vscode.ConfigurationTarget.Global
             );
 
-            vscode.window.showInformationMessage(`Copilot model set to ${selected.model.name || selected.model.id}`);
+            vscode.window.showInformationMessage(
+                i18n.t('extension.copilotModelSetTo', selected.model.name || selected.model.id)
+            );
         })
     );
 }
