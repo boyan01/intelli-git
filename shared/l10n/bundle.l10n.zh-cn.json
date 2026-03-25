@@ -141,7 +141,6 @@
     "extension.noChangesForCommitGen": "未发现所选文件的更改。",
     "extension.noStagedChangesForCommitGen": "没有暂存的更改用于生成提交信息。",
     "extension.noAIModel": "未找到合适的 AI 模型。请确保已安装并启用 GitHub Copilot Chat。",
-    "extension.commitGenPrompt": "根据以下差异生成简洁的提交信息。使用 conventional commits 格式（如 feat: ..., fix: ...）。只返回提交信息，不要解释，不要代码块",
     "extension.commitFailed": "提交失败: {0}",
     "extension.stashFailed": "贮藏失败: {0}",
     "extension.stashSuccess": "贮藏成功",

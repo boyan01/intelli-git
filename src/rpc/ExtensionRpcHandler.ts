@@ -59,6 +59,10 @@ export class ExtensionRpcHandler {
         );
     }
 
+    private normalizeModelIdentifier(value: string | undefined): string {
+        return (value || '').trim().toLowerCase();
+    }
+
     registerAll(rpc: RpcPeer<WebviewMethods, ExtensionMethods>) {
         rpc.registerAll(
             {
@@ -563,7 +567,9 @@ export class ExtensionRpcHandler {
             const model = await this.getAIModel();
 
             const messages = [
-                vscode.LanguageModelChatMessage.User(i18n.t('extension.commitGenPrompt')),
+                vscode.LanguageModelChatMessage.User(
+                    'Generate a concise commit message based on the following diff. Use the conventional commits format (e.g. feat: ..., fix: ...). Only return the commit message, no explanation, no code blocks.'
+                ),
                 vscode.LanguageModelChatMessage.User(diff)
             ];
 
@@ -611,15 +617,30 @@ export class ExtensionRpcHandler {
         }
 
         // Default: use Copilot
-        let [model] = await vscode.lm.selectChatModels({ vendor: 'copilot' });
-        if (!model) {
-            const models = await vscode.lm.selectChatModels();
-            if (models.length > 0) model = models[0];
+        const preferredCopilotModel = this.normalizeModelIdentifier(
+            vscode.workspace.getConfiguration('intelli-git.ai.copilot').get<string>('model', 'gpt-5-mini')
+        );
+
+        const copilotModels = await vscode.lm.selectChatModels({ vendor: 'copilot' });
+        let model = copilotModels.find(candidate => {
+            const identifiers = [
+                this.normalizeModelIdentifier(candidate.id),
+                this.normalizeModelIdentifier(candidate.name),
+                this.normalizeModelIdentifier(candidate.family)
+            ];
+
+            return identifiers.includes(preferredCopilotModel);
+        });
+
+        if (!model && copilotModels.length > 0) {
+            throw new Error(`The configured GitHub Copilot model "${preferredCopilotModel}" is not currently available. Please select an available model in Intelli Git settings or run "Intelli: Select Copilot Model".`);
         }
 
         if (!model) {
-            throw new Error(i18n.t('extension.noAIModel'));
+            throw new Error('No GitHub Copilot model is currently available. Please ensure GitHub Copilot Chat is installed and enabled.');
         }
+
+        logger.info('Using copilot AI model:', model.id, model.name, model.vendor);
 
         return model;
     }

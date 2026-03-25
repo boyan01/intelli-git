@@ -139,7 +139,6 @@
     "extension.enterChangelistName": "Enter new changelist name",
     "extension.newChangelistPlaceholder": "New Changelist",
     "extension.noAIModel": "No suitable AI model found. Please ensure GitHub Copilot Chat is installed and enabled.",
-    "extension.commitGenPrompt": "Generate a concise commit message based on the following diff. Use the conventional commits format (e.g. feat: ..., fix: ...). Only return the commit message, no explanation, no code blocks",
     "extension.commitFailed": "Commit failed: {0}",
     "extension.stashFailed": "Stash failed: {0}",
     "extension.stashSuccess": "Stash successful",
