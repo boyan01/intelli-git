@@ -127,7 +127,7 @@ export const CommitForm: React.FC<CommitFormProps> = ({
                     </label>
 
                     <button
-                        className={`${styles.iconBtn} ${styles.generateBtn}`}
+                        className={`${styles.iconBtn} ${styles.generateBtn} ${isGenerating ? styles.generateBtnLoading : ''}`}
                         onClick={handleGenerateMessage}
                         disabled={isGenerating || selectedFiles.size === 0}
                         title={t('Generate')}
