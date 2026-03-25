@@ -11,6 +11,11 @@ export interface PushOptions {
 
 export type PushStatus = 'idle' | 'pushing' | 'success' | 'error';
 
+interface PushErrorState {
+    message: string;
+    canPull: boolean;
+}
+
 export interface PushFooterProps {
     commitCount: number;
     selectedRemote: string;
@@ -27,13 +32,31 @@ export const PushFooter: React.FC<PushFooterProps> = ({
     const { t } = useTranslation();
     const [isOpen, setIsOpen] = useState(false);
     const [pushStatus, setPushStatus] = useState<PushStatus>('idle');
-    const [error, setError] = useState<string | null>(null);
+    const [error, setError] = useState<PushErrorState | null>(null);
+    const [isPulling, setIsPulling] = useState(false);
     const [options, setOptions] = useState<PushOptions>({
         force: false,
         tags: false,
         noVerify: false
     });
     const dropdownRef = useRef<HTMLDivElement>(null);
+
+    const parsePushError = (rawMessage: string): PushErrorState => {
+        if (rawMessage.startsWith('PUSH_REJECTED_BEHIND:')) {
+            const behindCount = Number.parseInt(rawMessage.split(':')[1] || '0', 10);
+            return {
+                message: behindCount > 0
+                    ? t('Push blocked: remote branch is ahead by {{count}} commit. Pull first to reconcile changes.', { count: behindCount })
+                    : t('Push blocked: remote branch has new commits. Pull first to reconcile changes.'),
+                canPull: true
+            };
+        }
+
+        return {
+            message: rawMessage,
+            canPull: false
+        };
+    };
 
     const toggleOption = (key: keyof PushOptions) => {
         setOptions(prev => ({ ...prev, [key]: !prev[key] }));
@@ -59,12 +82,23 @@ export const PushFooter: React.FC<PushFooterProps> = ({
             setTimeout(() => setPushStatus('idle'), 2000);
         } catch (e) {
             const errMsg = e instanceof Error ? e.message : String(e);
-            setError(errMsg);
+            setError(parsePushError(errMsg));
             setPushStatus('error');
         }
     };
 
     const onDismissError = () => setError(null);
+
+    const handlePullNow = async () => {
+        setIsPulling(true);
+        try {
+            await rpc.pull();
+            setError(null);
+            setPushStatus('idle');
+        } finally {
+            setIsPulling(false);
+        }
+    };
 
     const getButtonState = () => {
         if (pushStatus === 'success') {
@@ -97,14 +131,25 @@ export const PushFooter: React.FC<PushFooterProps> = ({
 
     const btnState = getButtonState();
     const isPushing = pushStatus === 'pushing';
-    const isDisabled = isPushing || pushStatus === 'success' || commitCount === 0;
+    const isDisabled = isPushing || isPulling || pushStatus === 'success' || commitCount === 0;
 
     return (
         <div className={styles.footer}>
             {error && (
                 <div className={styles.errorMessage}>
                     <i className="codicon codicon-warning" />
-                    <span>{error}</span>
+                    <span>{error.message}</span>
+                    {error.canPull && (
+                        <button
+                            className={styles.actionBtn}
+                            onClick={handlePullNow}
+                            disabled={isPulling}
+                            title={t('Pull latest changes from remote')}
+                        >
+                            <i className={`codicon ${isPulling ? 'codicon-loading codicon-modifier-spin' : 'codicon-arrow-down'}`} />
+                            <span>{isPulling ? t('Pulling...') : t('Pull Now')}</span>
+                        </button>
+                    )}
                     <button
                         className={styles.dismissBtn}
                         onClick={onDismissError}
@@ -138,7 +183,7 @@ export const PushFooter: React.FC<PushFooterProps> = ({
                 <button
                     className={`${styles.optionsBtn} ${styles[btnState.variant]}`}
                     onClick={() => setIsOpen(!isOpen)}
-                    disabled={isPushing}
+                    disabled={isPushing || isPulling}
                     aria-label={t('Push Options')}
                 >
                     <i className={`codicon codicon-chevron-up ${styles.chevron} ${isOpen ? styles.chevronOpen : ''}`} />

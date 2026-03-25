@@ -200,6 +200,29 @@
     word-break: break-word;
 }
 
+.actionBtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    border: 1px solid var(--vscode-button-border, transparent);
+    border-radius: 4px;
+    background: var(--vscode-button-secondaryBackground, transparent);
+    color: var(--vscode-button-secondaryForeground, inherit);
+    cursor: pointer;
+    font-size: 11px;
+    flex-shrink: 0;
+}
+
+.actionBtn:hover:not(:disabled) {
+    background: var(--vscode-button-secondaryHoverBackground, var(--vscode-list-hoverBackground));
+}
+
+.actionBtn:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
 .dismissBtn {
     background: transparent;
     border: none;

@@ -46,6 +46,19 @@ export class ExtensionRpcHandler {
         return Promise.resolve();
     };
 
+    private isBehindPushError(error: unknown): boolean {
+        const message = error instanceof Error ? error.message : String(error);
+        const normalizedMessage = message.toLowerCase();
+
+        return (
+            normalizedMessage.includes('non-fast-forward') ||
+            normalizedMessage.includes('[rejected]') ||
+            normalizedMessage.includes('fetch first') ||
+            normalizedMessage.includes('failed to push some refs') ||
+            normalizedMessage.includes('tip of your current branch is behind')
+        );
+    }
+
     registerAll(rpc: RpcPeer<WebviewMethods, ExtensionMethods>) {
         rpc.registerAll(
             {
@@ -111,23 +124,38 @@ export class ExtensionRpcHandler {
             noVerify: params.noVerify
         };
 
-        if (params.force) {
-            await this.gitService.forcePush(params.remote, `${currentBranch}:${params.branch}`, pushOptions);
-        } else {
-            await this.gitService.push(params.remote, `${currentBranch}:${params.branch}`, pushOptions);
-        }
-
-        // Auto-set upstream if not previously set and pushing to same-named branch
-        if (!hadUpstream && params.branch === currentBranch) {
-            try {
-                await this.gitService.setUpstreamBranch(params.remote, params.branch);
-            } catch (e) {
-                logger.error('Failed to set upstream:', e);
+        try {
+            if (params.force) {
+                await this.gitService.forcePush(params.remote, `${currentBranch}:${params.branch}`, pushOptions);
+            } else {
+                await this.gitService.push(params.remote, `${currentBranch}:${params.branch}`, pushOptions);
             }
-        }
 
-        if (params.pushTags) {
-            await this.gitService.pushTags(params.remote);
+            // Auto-set upstream if not previously set and pushing to same-named branch
+            if (!hadUpstream && params.branch === currentBranch) {
+                try {
+                    await this.gitService.setUpstreamBranch(params.remote, params.branch);
+                } catch (e) {
+                    logger.error('Failed to set upstream:', e);
+                }
+            }
+
+            if (params.pushTags) {
+                await this.gitService.pushTags(params.remote);
+            }
+        } catch (error) {
+            if (!params.force && this.isBehindPushError(error)) {
+                try {
+                    await this.gitService.fetch();
+                } catch (fetchError) {
+                    logger.warn('Fetch after push rejection failed:', fetchError);
+                }
+
+                const branchStatus = await this.gitService.getBranchStatus();
+                throw new Error(`PUSH_REJECTED_BEHIND:${branchStatus.behind || 1}`);
+            }
+
+            throw error;
         }
     };
 
