@@ -34,7 +34,7 @@ export default defineConfig(({ mode }) => {
       outDir: '../extension/out/webview',
       emptyOutDir: true,
       minify: 'esbuild',
-      sourcemap: true,
+      sourcemap: false,
       rollupOptions: {
         output: {
           entryFileNames: 'webview.js',

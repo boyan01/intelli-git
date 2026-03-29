@@ -46,7 +46,7 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
 <body data-vscode-context='{"preventDefaultContextMenuItems": true}'>
     <div id="root"></div>
     ${routeScript}
-    <script nonce="${nonce}" src="${scriptUri}"></script>
+    <script type="module" nonce="${nonce}" src="${scriptUri}"></script>
 </body>
 </html>`;
 }
