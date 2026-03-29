@@ -16,6 +16,8 @@ export default defineConfig({
     chunkSizeWarningLimit: 1000,
     outDir: '../extension/out/webview',
     emptyOutDir: true,
+    minify: 'esbuild',
+    sourcemap: true,
     rollupOptions: {
       output: {
         entryFileNames: 'webview.js',
