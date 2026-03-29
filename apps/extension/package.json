@@ -553,7 +553,7 @@
     "build:webview": "cd ../webview-ui && npm run build",
     "bundle:extension": "esbuild src/extension.ts --bundle --platform=node --format=cjs --outfile=out/extension.js --external:vscode --sourcemap --tsconfig=tsconfig.json",
     "compile": "npm run sync:l10n && npm run build:webview && tsc -p tsconfig.json && tsc-alias -p tsconfig.json && npm run bundle:extension",
-    "watch": "npm run sync:l10n && concurrently \"tsc -watch -p tsconfig.json\" \"tsc-alias --watch -p tsconfig.json\" \"npm run bundle:extension -- --watch\"",
+    "watch": "npm run sync:l10n && concurrently --raw \"tsc -watch -p tsconfig.json\" \"tsc-alias --watch -p tsconfig.json\" \"npm run bundle:extension -- --watch\"",
     "watch:webview": "cd ../webview-ui && npm run watch",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src",
