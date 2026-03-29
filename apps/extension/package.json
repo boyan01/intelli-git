@@ -220,6 +220,30 @@
       {
         "command": "intelli-git.ai.selectCopilotModel",
         "title": "Intelli: Select Copilot Model"
+      },
+      {
+        "command": "intelli-git.log.file.showDiff",
+        "title": "%intelli-git.commands.log.file.showDiff.title%"
+      },
+      {
+        "command": "intelli-git.log.file.compareWithLocal",
+        "title": "%intelli-git.commands.log.file.compareWithLocal.title%"
+      },
+      {
+        "command": "intelli-git.log.file.openRepositoryVersion",
+        "title": "%intelli-git.commands.log.file.openRepositoryVersion.title%"
+      },
+      {
+        "command": "intelli-git.log.file.revertChanges",
+        "title": "%intelli-git.commands.log.file.revertChanges.title%"
+      },
+      {
+        "command": "intelli-git.log.file.cherryPickChanges",
+        "title": "%intelli-git.commands.log.file.cherryPickChanges.title%"
+      },
+      {
+        "command": "intelli-git.log.file.createPatch",
+        "title": "%intelli-git.commands.log.file.createPatch.title%"
       }
     ],
     "menus": {
@@ -415,6 +439,36 @@
           "command": "intelli-git.sendAuthorEmail",
           "when": "webviewSection == 'authorName'",
           "group": "1_modification@2"
+        },
+        {
+          "command": "intelli-git.log.file.showDiff",
+          "when": "webviewSection == 'gitLogCommitFile' && isFile == true",
+          "group": "navigation@1"
+        },
+        {
+          "command": "intelli-git.log.file.compareWithLocal",
+          "when": "webviewSection == 'gitLogCommitFile' && isFile == true",
+          "group": "navigation@2"
+        },
+        {
+          "command": "intelli-git.log.file.openRepositoryVersion",
+          "when": "webviewSection == 'gitLogCommitFile' && isFile == true && status != 'D'",
+          "group": "navigation@3"
+        },
+        {
+          "command": "intelli-git.log.file.revertChanges",
+          "when": "webviewSection == 'gitLogCommitFile'",
+          "group": "1_modification@1"
+        },
+        {
+          "command": "intelli-git.log.file.cherryPickChanges",
+          "when": "webviewSection == 'gitLogCommitFile'",
+          "group": "1_modification@2"
+        },
+        {
+          "command": "intelli-git.log.file.createPatch",
+          "when": "webviewSection == 'gitLogCommitFile'",
+          "group": "1_modification@3"
         }
       ]
     },
@@ -499,7 +553,7 @@
     "build:webview": "cd ../webview-ui && npm run build",
     "bundle:extension": "esbuild src/extension.ts --bundle --platform=node --format=cjs --outfile=out/extension.js --external:vscode --sourcemap --tsconfig=tsconfig.json",
     "compile": "npm run sync:l10n && npm run build:webview && tsc -p tsconfig.json && tsc-alias -p tsconfig.json && npm run bundle:extension",
-    "watch": "npm run sync:l10n && concurrently \"tsc -watch -p tsconfig.json\" \"tsc-alias -watch -p tsconfig.json\" \"npm run bundle:extension -- --watch\"",
+    "watch": "npm run sync:l10n && concurrently \"tsc -watch -p tsconfig.json\" \"tsc-alias --watch -p tsconfig.json\" \"npm run bundle:extension -- --watch\"",
     "watch:webview": "cd ../webview-ui && npm run watch",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src",

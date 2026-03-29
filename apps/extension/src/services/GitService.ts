@@ -4,6 +4,7 @@ import { BranchInfo, LogCommit, LogOptions, CommitDetails, RefInfo, FileStatus, 
 import { logger } from '../utils/logger';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as os from 'os';
 
 
 export class GitService implements vscode.Disposable {
@@ -400,16 +401,41 @@ export class GitService implements vscode.Disposable {
         }
     }
 
-    public async getFileContent(ref: string, relativePath: string): Promise<string> {
+    public async getFileContent(ref: string, repoPath: string): Promise<string> {
         try {
-            return await this.git.show([`${ref}:${relativePath}`]);
+            return await this.git.show([`${ref}:${repoPath}`]);
         } catch (e: any) {
             // If file doesn't exist in the revision (e.g. Added file), return empty string
-            if (e.message && (e.message.includes('does not exist') || e.message.includes('exists on disk'))) {
+            if (e.message && (e.message.includes('broken fragment') || e.message.includes('does not exist') || e.message.includes('exists on disk'))) {
                 return '';
             }
-            console.error('getFileContent error:', e, 'ref:', ref, 'path:', relativePath);
+            console.error('getFileContent error:', e, 'ref:', ref, 'path:', repoPath);
             return '';
+        }
+    }
+
+    public async getFileDiff(ref: string, repoPath: string): Promise<string> {
+        try {
+            // Get the diff of the file in the specific commit (ref^..ref)
+            return await this.git.raw(['diff', `${ref}^..${ref}`, '--', repoPath]);
+        } catch (e) {
+            console.error('getFileDiff error:', e);
+            return '';
+        }
+    }
+
+    public async applyPatch(patch: string, reverse: boolean = false): Promise<void> {
+        const tempPatchFile = path.join(os.tmpdir(), `intelli-git-patch-${Date.now()}.patch`);
+        fs.writeFileSync(tempPatchFile, patch);
+        try {
+            const args = ['apply', '--3way'];
+            if (reverse) {
+                args.push('--reverse');
+            }
+            args.push(tempPatchFile);
+            await this.git.raw(args);
+        } finally {
+            try { fs.unlinkSync(tempPatchFile); } catch { /* ignore */ }
         }
     }
 

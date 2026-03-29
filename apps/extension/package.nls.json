@@ -10,6 +10,8 @@
   "intelli-git.commands.showBranchPicker.title": "Intelli: Switch Branch",
   "intelli-git.commands.focusCommitView.title": "Intelli: Focus Commit View",
   "intelli-git.commands.copyCommitHash.title": "Copy Commit Hash",
+  "intelli-git.commands.copyAuthorEmail.title": "Copy Author Email",
+  "intelli-git.commands.sendAuthorEmail.title": "Send Email to Author",
   "intelli-git.commands.stashPop.title": "Pop",
   "intelli-git.commands.stashApply.title": "Apply",
   "intelli-git.commands.stashDrop.title": "Drop",
@@ -56,5 +58,11 @@
   "intelli-git.config.ai.provider.custom": "Use Custom OpenAI-Compatible API (e.g. OpenRouter, Ollama)",
   "intelli-git.config.ai.custom.apiKey.description": "Custom API Key (leave empty for local models like Ollama)",
   "intelli-git.config.ai.custom.model.description": "Custom model to use (e.g. gpt-4, llama3, anthropic/claude-3-opus)",
-  "intelli-git.config.ai.custom.apiUrl.description": "Custom API Server URL (e.g. https://openrouter.ai/api/v1 or http://127.0.0.1:11434/v1)"
+  "intelli-git.config.ai.custom.apiUrl.description": "Custom API Server URL (e.g. https://openrouter.ai/api/v1 or http://127.0.0.1:11434/v1)",
+  "intelli-git.commands.log.file.showDiff.title": "Show Diff",
+  "intelli-git.commands.log.file.compareWithLocal.title": "Compare with Local",
+  "intelli-git.commands.log.file.openRepositoryVersion.title": "Open Repository Version",
+  "intelli-git.commands.log.file.revertChanges.title": "Revert Selected Changes",
+  "intelli-git.commands.log.file.cherryPickChanges.title": "Cherry-pick Selected Changes",
+  "intelli-git.commands.log.file.createPatch.title": "Create Patch..."
 }

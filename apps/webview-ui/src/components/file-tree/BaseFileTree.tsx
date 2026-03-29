@@ -36,6 +36,7 @@ export interface BaseFileTreeProps {
     onFileContextMenu?: (e: React.MouseEvent, path: string, status?: string) => void;
     onFolderContextMenu?: (e: React.MouseEvent, filePaths: string[]) => void;
     contextMenuSection?: string;
+    contextMenuData?: Record<string, any>;
 }
 
 export type BaseFileTreeRef = BasicTreeViewRef;
@@ -194,7 +195,8 @@ export const BaseFileTree = React.forwardRef<BaseFileTreeRef, BaseFileTreeProps>
     onFileDoubleClick,
     onFileContextMenu,
     onFolderContextMenu,
-    contextMenuSection
+    contextMenuSection,
+    contextMenuData
 }, ref) => {
     const [, forceUpdate] = React.useReducer(x => x + 1, 0);
 
@@ -349,14 +351,16 @@ export const BaseFileTree = React.forwardRef<BaseFileTreeRef, BaseFileTreeProps>
     }, [viewMode]);
 
     const getContextData = useCallback((node: TreeNode<FileNodeData>) => {
-        if (!contextMenuSection || !node.data?.isFile) return undefined;
+        if (!contextMenuSection) return undefined;
         return {
             webviewSection: contextMenuSection,
-            path: node.data.path,
-            status: node.data.status,
+            path: node.data?.path,
+            status: node.data?.status,
+            isFile: node.data?.isFile,
+            ...contextMenuData,
             preventDefaultContextMenuItems: true
         };
-    }, [contextMenuSection]);
+    }, [contextMenuSection, contextMenuData]);
 
     return (
         <BasicTreeView

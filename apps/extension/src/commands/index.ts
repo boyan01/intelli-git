@@ -4,3 +4,4 @@ export { registerBranchCommands } from './registerBranchCommands';
 export { registerLogCommands } from './registerLogCommands';
 export { registerChangelistCommands } from './changelistCommands';
 export { registerAiCommands } from './aiCommands';
+export { registerLogFileCommands } from './registerLogFileCommands';

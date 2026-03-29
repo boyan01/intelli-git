@@ -163,6 +163,11 @@ export const CommitDetailsView: React.FC<CommitDetailsViewProps> = ({
                     activeFile={null}
                     onToggleFile={() => { }}
                     onFileDoubleClick={handleFileClick}
+                    contextMenuSection={selectedHashes.length === 1 ? 'gitLogCommitFile' : undefined}
+                    contextMenuData={selectedHashes.length === 1 ? {
+                        commitHash: selectedHashes[0],
+                        parentHash: commit?.parentHashes?.[0] || ''
+                    } : undefined}
                 />
             </div>
         </div>

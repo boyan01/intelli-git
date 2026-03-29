@@ -4,7 +4,7 @@ import { GitService } from './services/GitService';
 import { createGitWatcher } from './services/GitRepositoryWatcher';
 import { InactiveChangesService } from './services/InactiveChangesService';
 import { BranchStatusBar, GitLogStatusBar } from './ui';
-import { registerStashCommands, registerNavigationCommands, registerBranchCommands, registerLogCommands, registerChangelistCommands, registerAiCommands } from './commands';
+import { registerStashCommands, registerNavigationCommands, registerBranchCommands, registerLogCommands, registerLogFileCommands, registerChangelistCommands, registerAiCommands } from './commands';
 import { logger } from './utils/logger';
 
 export async function activate(context: vscode.ExtensionContext) {
@@ -57,6 +57,7 @@ export async function activate(context: vscode.ExtensionContext) {
     registerNavigationCommands(context, gitService, branchStatusBar, gitLogProvider, provider);
     registerBranchCommands(context, gitService, provider);
     registerLogCommands(context, gitService);
+    registerLogFileCommands(context, gitService);
     registerChangelistCommands(context, gitService, inactiveChangesService, provider);
     registerAiCommands(context);
 
