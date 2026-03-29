@@ -562,22 +562,25 @@
     "vscode:prepublish": "npm run compile",
     "sync:l10n": "node scripts/sync-l10n.js",
     "build:webview": "cd ../webview-ui && npm run build",
-    "bundle:extension": "vite build",
-    "compile": "npm run sync:l10n && npm run build:webview && tsc -p tsconfig.json --noEmit && vite build",
-    "watch": "npm run sync:l10n && concurrently --raw \"tsc -watch -p tsconfig.json --noEmit\" \"vite build --watch\"",
+    "bundle:extension": "node scripts/build-extension.js",
+    "compile": "npm run sync:l10n && npm run build:webview && tsc -p tsconfig.json --noEmit && npm run bundle:extension",
+    "watch": "npm run sync:l10n && concurrently --raw \"tsc -watch -p tsconfig.json --noEmit\" \"node scripts/build-extension.js --watch\"",
     "watch:webview": "cd ../webview-ui && npm run watch",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src",
     "test": "node ./out/apps/extension/test/runTest.js"
   },
+  "dependencies": {
+    "simple-git": "^3.33.0"
+  },
   "devDependencies": {
     "@types/node": "^25.5.0",
-    "@types/vscode": "^1.110.0",
+    "@types/vscode": "^1.100.0",
     "@typescript-eslint/eslint-plugin": "^8.57.2",
     "@typescript-eslint/parser": "^8.57.2",
     "concurrently": "^9.2.1",
+    "esbuild": "^0.27.4",
     "eslint": "^10.1.0",
-    "simple-git": "^3.33.0",
     "typescript": "^6.0.2",
     "vite": "^8.0.3"
   }
