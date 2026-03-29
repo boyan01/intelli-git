@@ -11,7 +11,7 @@ function AppContent() {
     const location = useLocation();
 
     useEffect(() => {
-        const initialRoute = (window as any).initialRoute;
+        const initialRoute = window.initialRoute;
         if (initialRoute && location.pathname !== initialRoute) {
             navigate(initialRoute);
         }

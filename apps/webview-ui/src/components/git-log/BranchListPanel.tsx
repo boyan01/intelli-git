@@ -32,8 +32,9 @@ const emptyBranchListData: BranchListData = {
 
 export const BranchListPanel: React.FC<BranchListPanelProps> = ({ onBranchDoubleClick }) => {
     const { t } = useTranslation();
+    const loadBranchListData = useCallback(() => rpc.getBranchListData(), []);
     const { data, loading: isLoading } = useRpcData(
-        () => rpc.getBranchListData(),
+        loadBranchListData,
         { initialValue: emptyBranchListData, cacheKey: 'gitLog.branchListData' }
     );
     const treeRef = useRef<BasicTreeViewRef>(null);
@@ -363,7 +364,7 @@ export const BranchListPanel: React.FC<BranchListPanelProps> = ({ onBranchDouble
             };
         }
         return undefined;
-    }, [data?.remoteBranches]);
+    }, [data]);
     const renderTreeContent = () => {
         if (!data && isLoading) return null;
         if (!data) return <div className={styles.noData}>No data</div>;

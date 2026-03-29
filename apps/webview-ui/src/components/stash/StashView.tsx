@@ -12,11 +12,10 @@ import styles from './StashView.module.css';
 
 export function StashView() {
     const { t } = useTranslation();
-    const { data: stashes, loading } = useRpcData(() => rpc.getStashList(), { initialValue: [] as StashItem[] });
+    const loadStashes = useCallback(() => rpc.getStashList(), []);
+    const { data: stashes, loading } = useRpcData(loadStashes, { initialValue: [] as StashItem[] });
     const [selectedIndex, setSelectedIndex] = usePersistedState('stash.selectedIndex');
     const [viewMode, setViewMode] = usePersistedState('stash.viewMode');
-    const [files, setFiles] = useState<CommitFile[]>([]);
-    const [filesLoading, setFilesLoading] = useState(false);
     const [selectedFile, setSelectedFile] = useState<string | null>(null);
     const treeRef = useRef<BaseFileTreeRef>(null);
 
@@ -27,23 +26,22 @@ export function StashView() {
         }
     }, [loading, stashes, selectedIndex, setSelectedIndex]);
 
+    const loadStashFiles = useCallback(() => rpc.getStashFiles(selectedIndex!), [selectedIndex]);
+
     // Load files for selected stash
-    useEffect(() => {
-        if (selectedIndex !== null) {
-            setFilesLoading(true);
-            rpc.getStashFiles(selectedIndex)
-                .then(setFiles)
-                .catch(() => setFiles([]))
-                .finally(() => setFilesLoading(false));
-            setFiles([]);
-            setSelectedFile(null);
+    const { data: files, loading: filesLoading } = useRpcData(
+        loadStashFiles,
+        {
+            initialValue: [] as CommitFile[],
+            refreshOnEvent: true
         }
-    }, [selectedIndex]);
+    );
 
 
 
     const handleStashClick = useCallback((index: number) => {
         setSelectedIndex(index);
+        setSelectedFile(null);
     }, [setSelectedIndex]);
 
     const handleExpandAll = useCallback(() => {

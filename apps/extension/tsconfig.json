@@ -11,10 +11,13 @@
     "strict": true,
     "skipLibCheck": true,
     "outDir": "out",
-    "baseUrl": "../..",
+    "types": [
+      "node",
+      "vscode"
+    ],
     "paths": {
       "@shared/*": [
-        "packages/shared/*"
+        "../../packages/shared/*"
       ]
     }
   },

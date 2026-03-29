@@ -36,7 +36,7 @@ export interface BaseFileTreeProps {
     onFileContextMenu?: (e: React.MouseEvent, path: string, status?: string) => void;
     onFolderContextMenu?: (e: React.MouseEvent, filePaths: string[]) => void;
     contextMenuSection?: string;
-    contextMenuData?: Record<string, any>;
+    contextMenuData?: Record<string, unknown>;
 }
 
 export type BaseFileTreeRef = BasicTreeViewRef;

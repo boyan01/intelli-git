@@ -2,14 +2,14 @@ import { SplitPane } from '../common/SplitPane';
 import { BranchListPanel } from './BranchListPanel';
 import { LogListPanel } from './LogListPanel';
 import { CommitDetailsView } from '../common/CommitDetailsView';
-import { useVersionCheck } from '../common/VersionCheckBanner';
+import { useVersionCheck } from '../../hooks/useVersionCheck';
 import { VersionExpiredPanel } from '../common/VersionExpiredPanel';
 import styles from './GitLogView.module.css';
 
 import { useState, useCallback, useEffect, useRef } from 'react';
-import type { CommitDetails } from '@shared/messages';
 import { rpc } from '../../lib/rpc_client';
 import { usePersistedState } from '../../hooks/usePersistedState';
+import { useRpcData } from '../../hooks/useRpcData';
 
 const NARROW_THRESHOLD = 800;
 
@@ -17,7 +17,6 @@ export function GitLogView() {
     const containerRef = useRef<HTMLDivElement>(null);
     const [selectedHashes, setSelectedHashes] = useState<string[]>([]);
     const [branchFilter, setBranchFilter] = useState<string | undefined>(undefined);
-    const [commitDetails, setCommitDetails] = useState<CommitDetails | undefined>(undefined);
     const [isNarrowMode, setIsNarrowMode] = useState(false);
 
     const [branchSplitRatio, setBranchSplitRatio] = usePersistedState('gitLog.branchSplitRatio');
@@ -26,6 +25,17 @@ export function GitLogView() {
     const handleBranchDoubleClick = useCallback((branch: string) => {
         setBranchFilter(branch);
     }, []);
+
+    const loadCommitDetails = useCallback(() => {
+        return selectedHashes.length === 1 ? rpc.getCommitDetails(selectedHashes[0]) : Promise.resolve(undefined);
+    }, [selectedHashes]);
+
+    const { data: commitDetails } = useRpcData(
+        loadCommitDetails,
+        {
+            initialValue: undefined
+        }
+    );
 
     useEffect(() => {
         if (!containerRef.current) return;
@@ -37,16 +47,6 @@ export function GitLogView() {
         observer.observe(containerRef.current);
         return () => observer.disconnect();
     }, []);
-
-    useEffect(() => {
-        if (selectedHashes.length === 1) {
-            rpc.getCommitDetails(selectedHashes[0])
-                .then(setCommitDetails)
-                .catch(() => setCommitDetails(undefined));
-        } else {
-            setCommitDetails(undefined);
-        }
-    }, [selectedHashes]);
 
     const logListPanel = (
         <LogListPanel

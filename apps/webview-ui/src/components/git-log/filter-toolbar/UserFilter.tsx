@@ -18,30 +18,21 @@ const AuthorInputPopup: React.FC<AuthorInputPopupProps> = ({
 }) => {
     const { t } = useTranslation();
     const [value, setValue] = useState(initialValue);
-    const [suggestions, setSuggestions] = useState<string[]>([]);
     const [activeIndex, setActiveIndex] = useState(0);
     const [suggestionPos, setSuggestionPos] = useState({ top: 0, left: 0 });
-    const [currentLineInput, setCurrentLineInput] = useState('');
     const inputRef = useRef<HTMLTextAreaElement>(null);
+
+    const lines = value.split('\n');
+    const lastLine = lines[lines.length - 1].trim().toLowerCase();
+    const currentLineInput = lastLine;
+
+    const suggestions = lastLine ? allAuthors.filter(a =>
+        a.toLowerCase().includes(lastLine)
+    ) : [];
 
     useEffect(() => {
         inputRef.current?.focus();
     }, []);
-
-    useEffect(() => {
-        const lines = value.split('\n');
-        const lastLine = lines[lines.length - 1].trim().toLowerCase();
-        setCurrentLineInput(lastLine);
-
-        if (lastLine) {
-            setSuggestions(allAuthors.filter(a =>
-                a.toLowerCase().includes(lastLine)
-            ));
-        } else {
-            setSuggestions([]);
-        }
-        setActiveIndex(0);
-    }, [value, allAuthors]);
 
     const getCaretPosition = () => {
         const textarea = inputRef.current;

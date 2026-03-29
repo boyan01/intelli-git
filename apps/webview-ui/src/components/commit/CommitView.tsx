@@ -118,14 +118,20 @@ function buildChangelists(files: FileStatus[], t: (key: string) => string): Chan
 
 export function CommitView({ rebaseStatus }: CommitViewProps) {
     const { t } = useTranslation();
+    const loadStatus = useCallback(() => rpc.getStatus(), []);
+    const loadWorkspaceRoot = useCallback(() => rpc.getWorkspaceRoot(), []);
 
     // Data State
-    const { data: files, loading } = useRpcData(() => rpc.getStatus(), {
+    const { data: files, loading } = useRpcData(loadStatus, {
         initialValue: [] as FileStatus[],
         cacheKey: 'commit.files'
     });
     const changelists = useMemo(() => buildChangelists(files, t), [files, t]);
     const [activeFile, setActiveFile] = useState<string | null>(null);
+
+    // State for amend (Must be declared before hooks that use them)
+    const [lastCommitInfo, setLastCommitInfo] = useState<LastCommitInfo | null>(null);
+    const [savedMessage, setSavedMessage] = useState<string>('');
 
     // Persisted UI State
     const [viewMode, setViewMode] = usePersistedState('commit.viewMode');
@@ -134,7 +140,7 @@ export function CommitView({ rebaseStatus }: CommitViewProps) {
     const [commitMessage, setCommitMessage] = usePersistedState('commit.message');
     const [amend, setAmend] = usePersistedState('commit.amend');
 
-    const { data: workspaceRoot } = useRpcData(() => rpc.getWorkspaceRoot(), {
+    const { data: workspaceRoot } = useRpcData(loadWorkspaceRoot, {
         initialValue: ''
     });
 
@@ -154,10 +160,6 @@ export function CommitView({ rebaseStatus }: CommitViewProps) {
         setSelectedFiles(stagedPaths);
     }, [files, setSelectedFiles]);
 
-    // Last commit info for amend
-    const [lastCommitInfo, setLastCommitInfo] = useState<LastCommitInfo | null>(null);
-    const [savedMessage, setSavedMessage] = useState<string>('');
-
     useEffect(() => {
         if (amend) {
             // Save current message before replacing with last commit message
@@ -171,14 +173,12 @@ export function CommitView({ rebaseStatus }: CommitViewProps) {
         } else {
             setLastCommitInfo(null);
             // Restore saved message when un-checking amend
-            if (savedMessage !== undefined) {
+            if (savedMessage) {
                 setCommitMessage(savedMessage);
                 setSavedMessage('');
             }
         }
-    }, [amend]);
-
-
+    }, [amend, commitMessage, savedMessage, setCommitMessage]);
 
     const handleToggle = useCallback((id: string, expanded: boolean) => {
         setExpandedIds(prev => {
@@ -188,8 +188,6 @@ export function CommitView({ rebaseStatus }: CommitViewProps) {
             return next;
         });
     }, [setExpandedIds]);
-
-
 
     const fileStats = useMemo(() => {
         let added = 0;

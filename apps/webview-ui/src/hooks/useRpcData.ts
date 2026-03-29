@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { rpcEvents } from '../lib/rpc_client';
 import { getCachedValue, updateStoredState } from '../lib/stateCache';
 import type { PersistedStateSchema } from './usePersistedState';
@@ -7,7 +7,6 @@ interface UseRpcDataOptions<T, K extends keyof PersistedStateSchema | undefined 
     initialValue: T;
     refreshOnEvent?: boolean;
     cacheKey?: K;
-    deps?: React.DependencyList;
 }
 
 /**
@@ -24,9 +23,7 @@ export function useRpcData<T, K extends keyof PersistedStateSchema | undefined =
     fetcher: () => Promise<T>,
     options: UseRpcDataOptions<T, K>
 ) {
-    const { initialValue, refreshOnEvent = true, cacheKey, deps = [] } = options;
-    const fetcherRef = useRef(fetcher);
-    fetcherRef.current = fetcher;
+    const { initialValue, refreshOnEvent = true, cacheKey } = options;
 
     const [data, setData] = useState<T>(() => {
         if (cacheKey) {
@@ -40,7 +37,7 @@ export function useRpcData<T, K extends keyof PersistedStateSchema | undefined =
     const load = useCallback(async () => {
         try {
             setError(null);
-            const result = await fetcherRef.current();
+            const result = await fetcher();
             setData(result);
             if (cacheKey) {
                 updateStoredState(cacheKey, result);
@@ -51,14 +48,14 @@ export function useRpcData<T, K extends keyof PersistedStateSchema | undefined =
         } finally {
             setLoading(false);
         }
-    }, [cacheKey]);
+    }, [cacheKey, fetcher]);
 
     useEffect(() => {
         load();
         if (refreshOnEvent) {
             return rpcEvents.refresh.subscribe(load);
         }
-    }, [load, refreshOnEvent, ...deps]);
+    }, [load, refreshOnEvent]);
 
     return { data, loading, error, reload: load };
 }

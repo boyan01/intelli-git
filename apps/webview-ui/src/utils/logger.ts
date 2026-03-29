@@ -1,23 +1,23 @@
 import { rpc } from '../lib/rpc_client';
 
 class WebviewLogger {
-    info(...data: any[]): void {
+    info(...data: unknown[]): void {
         this.sendLog(data, 'info');
     }
 
-    error(...data: any[]): void {
+    error(...data: unknown[]): void {
         this.sendLog(data, 'error');
     }
 
-    warn(...data: any[]): void {
+    warn(...data: unknown[]): void {
         this.sendLog(data, 'warn');
     }
 
-    debug(...data: any[]): void {
+    debug(...data: unknown[]): void {
         this.sendLog(data, 'debug');
     }
 
-    private sendLog(data: any[], type: 'info' | 'error' | 'warn' | 'debug'): void {
+    private sendLog(data: unknown[], type: 'info' | 'error' | 'warn' | 'debug'): void {
         const message = data.join(' ');
         rpc.log({ message, type }).catch(console.error);
 

@@ -22,13 +22,12 @@
     "noEmit": true,
     "jsx": "react-jsx",
     /* Paths */
-    "baseUrl": ".",
     "paths": {
       "@shared/*": [
         "../../packages/shared/*"
       ],
       "@/*": [
-        "src/*"
+        "./src/*"
       ]
     },
     /* Linting */

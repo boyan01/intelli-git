@@ -1,12 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { rpc } from '@/lib/rpc_client';
 import { usePersistedState } from '../../../hooks/usePersistedState';
 import { useRpcData } from '@/hooks/useRpcData';
 
 export function usePushBranches() {
+    const loadPushInitState = useCallback(async () => await rpc.getPushInitState(), []);
+
     // 1. Load Initial State (Local branch & Remotes)
     const { data: initState } = useRpcData(
-        async () => await rpc.getPushInitState(),
+        loadPushInitState,
         {
             initialValue: { localBranch: '', remotes: [] },
             refreshOnEvent: true
@@ -14,107 +16,95 @@ export function usePushBranches() {
     );
 
     // 2. State for User Selection
-    const [selectedRemote, setSelectedRemote] = useState<string>('');
-    const [selectedRemoteBranch, setSelectedRemoteBranch] = useState<string>('');
+    const [selectedRemoteOverride, setSelectedRemoteOverride] = useState<string>('');
+    const [selectedRemoteBranchOverride, setSelectedRemoteBranchOverride] = useState<string>('');
 
     // 3. Persisted State
     const [savedSelection, setSavedSelection] = usePersistedState('push.branchSelection');
 
 
-    // 4. Initialize Selection when initState loads
-    useEffect(() => {
-        if (!initState.localBranch) return; // Not loaded yet
+    const defaultSelection = useMemo(() => {
+        if (!initState.localBranch) {
+            return { remote: '', remoteBranch: '' };
+        }
 
         const { localBranch, remotes, upstream } = initState;
         const saved = savedSelection;
 
-        // Determine Remote & Remote Branch
-        let newRemote = '';
-        let newRemoteBranch = '';
+        let remote = '';
+        let remoteBranch = '';
 
         if (saved.localBranch === localBranch) {
-            // Same local branch: try to respect saved choice if valid
             if (saved.remote && remotes.includes(saved.remote)) {
-                newRemote = saved.remote;
+                remote = saved.remote;
             }
             if (saved.remoteBranch) {
-                newRemoteBranch = saved.remoteBranch;
+                remoteBranch = saved.remoteBranch;
             }
         }
 
-        // If no valid saved selection, fall back to defaults (upstream or intelligent guess)
-        if (!newRemote) {
-            // Try to deduce from upstream
-            if (upstream) {
-                // upstream format: "origin/branch-name"
-                const parts = upstream.split('/');
-                if (parts.length > 1) {
-                    const upstreamRemote = parts[0];
-                    if (remotes.includes(upstreamRemote)) {
-                        newRemote = upstreamRemote;
-                        newRemoteBranch = parts.slice(1).join('/');
-                    }
+        if (!remote && upstream) {
+            const parts = upstream.split('/');
+            if (parts.length > 1) {
+                const upstreamRemote = parts[0];
+                if (remotes.includes(upstreamRemote)) {
+                    remote = upstreamRemote;
+                    remoteBranch = parts.slice(1).join('/');
                 }
             }
-
-            // If still no remote, default to first available
-            if (!newRemote) {
-                newRemote = remotes[0] || 'origin';
-            }
         }
 
-        // If no remote branch yet (and didn't get from upstream)
-        if (!newRemoteBranch) {
-            newRemoteBranch = localBranch; // Default to matching name
+        if (!remote) {
+            remote = remotes[0] || 'origin';
         }
 
-        setSelectedRemote(newRemote);
-        setSelectedRemoteBranch(newRemoteBranch);
+        if (!remoteBranch) {
+            remoteBranch = localBranch;
+        }
 
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [initState.localBranch, JSON.stringify(initState.remotes), initState.upstream]); // Run when localBranch, remotes or upstream changes
+        return { remote, remoteBranch };
+    }, [initState, savedSelection]);
+
+    const selectedRemote = selectedRemoteOverride || defaultSelection.remote;
 
 
     // 5. Load Remote Branches based on selection
+    const loadRemoteBranches = useCallback(async () => {
+        if (!selectedRemote) return [];
+        return await rpc.getRemoteBranches(selectedRemote);
+    }, [selectedRemote]);
+
     const {
         data: remoteBranches,
         loading: isRemoteBranchesLoading,
     } = useRpcData(
-        async () => {
-            if (!selectedRemote) return [];
-            return await rpc.getRemoteBranches(selectedRemote);
-        },
+        loadRemoteBranches,
         {
-            initialValue: [],
-            deps: [selectedRemote]
+            initialValue: []
         }
     );
 
-    // 6. Auto-select remote branch if current selection is invalid for the new remote
-    //    Or if we just switched remote and need a default
-    useEffect(() => {
-        if (!selectedRemote) return;
+    const selectedRemoteBranch = useMemo(() => {
+        const candidate = selectedRemoteBranchOverride || defaultSelection.remoteBranch;
 
-        // If we have no remote branches yet, we can't really "validate", but we can stick to defaults.
-        // If we do have branches, we check validity.
-
-        // If current selection is NOT in the new list
-        if (selectedRemoteBranch && remoteBranches.length > 0 && !remoteBranches.includes(selectedRemoteBranch)) {
-            // Special Case: If the selected branch is explicitly the current local branch,
-            // we ALLOW it even if it's not on remote (this implies pushing a new branch).
-            if (selectedRemoteBranch === initState.localBranch) {
-                return;
-            }
-
-            // Otherwise, try to find a best match from what exists
-            if (initState.localBranch && remoteBranches.includes(initState.localBranch)) {
-                setSelectedRemoteBranch(initState.localBranch);
-            } else {
-                // Fallback to first available
-                setSelectedRemoteBranch(remoteBranches[0]);
-            }
+        if (!selectedRemote) {
+            return candidate;
         }
-    }, [remoteBranches, selectedRemote, initState.localBranch]);
+
+        if (!candidate || remoteBranches.length === 0 || remoteBranches.includes(candidate)) {
+            return candidate;
+        }
+
+        if (candidate === initState.localBranch) {
+            return candidate;
+        }
+
+        if (initState.localBranch && remoteBranches.includes(initState.localBranch)) {
+            return initState.localBranch;
+        }
+
+        return remoteBranches[0] || candidate;
+    }, [selectedRemoteBranchOverride, defaultSelection.remoteBranch, selectedRemote, remoteBranches, initState.localBranch]);
 
 
     // 7. Save Selection Persistence
@@ -128,14 +118,22 @@ export function usePushBranches() {
         }
     }, [initState.localBranch, selectedRemote, selectedRemoteBranch, setSavedSelection]);
 
+    const handleSelectedRemoteChange = useCallback((remote: string) => {
+        setSelectedRemoteOverride(remote);
+    }, []);
+
+    const handleSelectedRemoteBranchChange = useCallback((remoteBranch: string) => {
+        setSelectedRemoteBranchOverride(remoteBranch);
+    }, []);
+
     return {
         localBranch: initState.localBranch,
         remotes: initState.remotes,
         remoteBranches,
         selectedRemote,
-        setSelectedRemote,
+        setSelectedRemote: handleSelectedRemoteChange,
         selectedRemoteBranch,
-        setSelectedRemoteBranch,
+        setSelectedRemoteBranch: handleSelectedRemoteBranchChange,
         isRemoteBranchesLoading,
     };
 }

@@ -13,7 +13,7 @@ i18n
       'zh-cn': { translation: zh }, // Handle lowercase variant
       'zh-CN': { translation: zh }, // Handle uppercase variant
     },
-    lng: (window as any).vscodeLanguage || 'en', // Get language from injected global
+    lng: window.vscodeLanguage || 'en', // Get language from injected global
     fallbackLng: 'en',
     interpolation: {
       escapeValue: false, // React already safe from XSS

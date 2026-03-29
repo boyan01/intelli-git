@@ -92,7 +92,7 @@ export const useLogCommitLoader = (): UseLogCommitLoaderResult => {
 
     useEffect(() => {
         loadMore(true);
-    }, [filters]);
+    }, [filters, loadMore]);
 
     // Subscribe to refresh events to reload commits when Git state changes
     useEffect(() => {

@@ -6,9 +6,10 @@ import { useTranslation } from 'react-i18next';
 import { usePersistedState } from '../../hooks/usePersistedState';
 import { useRpcData } from '../../hooks/useRpcData';
 import { rpc, rpcEvents } from '../../lib/rpc_client';
+import { useVersionCheck } from '../../hooks/useVersionCheck';
 import type { BranchInfo } from '@shared/messages';
 import { BranchStatus } from '../common/BranchStatus';
-import { VersionCheckBanner, useVersionCheck } from '../common/VersionCheckBanner';
+import { VersionCheckBanner } from '../common/VersionCheckBanner';
 import { VersionExpiredPanel } from '../common/VersionExpiredPanel';
 import styles from './LocalChangesView.module.css';
 
@@ -59,7 +60,8 @@ export function LocalChangesView() {
     const { t } = useTranslation();
     const [persistedTab, setPersistedTab] = usePersistedState('commit.activeTab');
     const [tabTimestamp, setTabTimestamp] = usePersistedState('commit.activeTabTimestamp');
-    const { data: branches } = useRpcData(() => rpc.getBranchInfo(), {
+    const loadBranchInfo = useCallback(() => rpc.getBranchInfo(), []);
+    const { data: branches } = useRpcData(loadBranchInfo, {
         initialValue: defaultBranchInfo,
         cacheKey: 'commit.branchInfo'
     });
@@ -76,17 +78,20 @@ export function LocalChangesView() {
         setTabTimestamp(Date.now());
     }, [setPersistedTab, setTabTimestamp]);
 
-    const tabsRef = {
-        commit: useRef<HTMLButtonElement>(null),
-        stash: useRef<HTMLButtonElement>(null),
-        push: useRef<HTMLButtonElement>(null)
-    };
+    const commitTabRef = useRef<HTMLButtonElement>(null);
+    const stashTabRef = useRef<HTMLButtonElement>(null);
+    const pushTabRef = useRef<HTMLButtonElement>(null);
     const activeIndicatorRef = useRef<HTMLDivElement>(null);
 
     // Update indicator position using ResizeObserver and RAF to handle CSS transitions
     useLayoutEffect(() => {
         const updateIndicator = () => {
-            const activeEl = tabsRef[activeTab]?.current;
+            const tabsRefs = {
+                commit: commitTabRef,
+                stash: stashTabRef,
+                push: pushTabRef
+            };
+            const activeEl = tabsRefs[activeTab]?.current;
             const indicator = activeIndicatorRef.current;
             if (activeEl && indicator) {
                 indicator.style.left = `${activeEl.offsetLeft}px`;
@@ -113,7 +118,7 @@ export function LocalChangesView() {
         });
 
         // Observe all tabs
-        Object.values(tabsRef).forEach(ref => {
+        [commitTabRef, stashTabRef, pushTabRef].forEach(ref => {
             if (ref.current) {
                 observer.observe(ref.current);
             }
@@ -152,7 +157,7 @@ export function LocalChangesView() {
                         className={styles.activeIndicator}
                     />
                     <button
-                        ref={tabsRef.commit}
+                        ref={commitTabRef}
                         className={`${styles.tab} ${activeTab === 'commit' ? styles.active : ''}`}
                         onClick={() => setActiveTab('commit')}
                         title={t('Commit')}
@@ -163,7 +168,7 @@ export function LocalChangesView() {
                         </span>
                     </button>
                     <button
-                        ref={tabsRef.stash}
+                        ref={stashTabRef}
                         className={`${styles.tab} ${activeTab === 'stash' ? styles.active : ''}`}
                         onClick={() => setActiveTab('stash')}
                         title={t('Stash')}
@@ -174,7 +179,7 @@ export function LocalChangesView() {
                         </span>
                     </button>
                     <button
-                        ref={tabsRef.push}
+                        ref={pushTabRef}
                         className={`${styles.tab} ${activeTab === 'push' ? styles.active : ''}`}
                         onClick={() => setActiveTab('push')}
                         title={t('Push')}

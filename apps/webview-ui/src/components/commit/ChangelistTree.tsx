@@ -450,7 +450,7 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
                 )}
             </div>
         );
-    }, [viewMode]);
+    }, [viewMode, t]);
 
     const getContextData = useCallback((node: TreeNode<FileNodeData>) => {
         if (!node.data?.isFile) return undefined;

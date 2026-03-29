@@ -1,7 +1,7 @@
 interface TypedVSCodeApi {
-    postMessage(message: any): void;
+    postMessage(message: unknown): void;
     getState<T>(): T | undefined;
-    setState<T>(state: T): T;
+    setState<T>(state: T): void;
 }
 
 /**

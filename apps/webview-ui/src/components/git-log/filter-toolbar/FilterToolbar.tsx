@@ -29,7 +29,7 @@ export const FilterToolbar: React.FC<FilterToolbarProps> = ({ onFilterChange, ex
         if (externalBranch !== undefined) {
             setBranch(externalBranch);
         }
-    }, [externalBranch]);
+    }, [externalBranch, setBranch]);
 
 
     const isInitialMount = useRef(true);

@@ -571,14 +571,14 @@
     "test": "node ./out/apps/extension/test/runTest.js"
   },
   "devDependencies": {
-    "@types/node": "^22.x",
-    "@types/vscode": "^1.100.0",
-    "@typescript-eslint/eslint-plugin": "^8.21.0",
-    "@typescript-eslint/parser": "^8.21.0",
+    "@types/node": "^25.5.0",
+    "@types/vscode": "^1.110.0",
+    "@typescript-eslint/eslint-plugin": "^8.57.2",
+    "@typescript-eslint/parser": "^8.57.2",
     "concurrently": "^9.2.1",
-    "eslint": "^9.18.0",
-    "simple-git": "^3.30.0",
-    "typescript": "^5.7.3",
-    "vite": "^7.2.4"
+    "eslint": "^10.1.0",
+    "simple-git": "^3.33.0",
+    "typescript": "^6.0.2",
+    "vite": "^8.0.3"
   }
 }

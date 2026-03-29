@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { rpc, rpcEvents } from '@/lib/rpc_client';
 import { useRpcEvent } from '@/hooks/useRpcEvent';
 import type { CommitDetails } from '@shared/messages';
@@ -11,7 +11,7 @@ export function usePushData(selectedRemote: string, selectedRemoteBranch: string
     const [hasMore, setHasMore] = useState(false);
     const [isLoadingMore, setIsLoadingMore] = useState(false);
 
-    const loadCommits = async () => {
+    const loadCommits = useCallback(async () => {
         if (!selectedRemote || !selectedRemoteBranch) return;
         try {
             // Reset hasMore when branch changes
@@ -28,17 +28,17 @@ export function usePushData(selectedRemote: string, selectedRemoteBranch: string
         } catch (error) {
             console.error('Failed to load push commits:', error);
         }
-    };
+    }, [selectedRemote, selectedRemoteBranch]);
 
     // Load commits when branch selection changes
     useEffect(() => {
         loadCommits();
-    }, [selectedRemote, selectedRemoteBranch]);
+    }, [loadCommits]);
 
     // Refresh when repo changes
     useRpcEvent(rpcEvents.refresh, () => {
         loadCommits();
-    }, [selectedRemote, selectedRemoteBranch]);
+    });
 
     const handleLoadMore = async () => {
         if (!selectedRemote || !selectedRemoteBranch || isLoadingMore) return;

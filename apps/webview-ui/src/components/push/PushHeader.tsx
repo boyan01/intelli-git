@@ -1,10 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import styles from './PushHeader.module.css';
 
-// ... imports ...
 export interface PushHeaderProps {
-
     selectedRemote: string;
     selectedRemoteBranch: string;
     remotes: string[];
@@ -29,7 +27,6 @@ export const PushHeader: React.FC<PushHeaderProps> = ({
 }) => {
     const { t } = useTranslation();
 
-
     const [isRemoteDropdownOpen, setIsRemoteDropdownOpen] = useState(false);
     const [isEditingBranch, setIsEditingBranch] = useState(false);
     const [editValue, setEditValue] = useState(selectedRemoteBranch);
@@ -51,6 +48,18 @@ export const PushHeader: React.FC<PushHeaderProps> = ({
         }
     }, [isEditingBranch]);
 
+    const handleCommitEdit = useCallback(() => {
+        const trimmed = editValue.trim();
+        if (trimmed && trimmed !== selectedRemoteBranch) {
+            onRemoteBranchChange(trimmed);
+        } else {
+            setEditValue(selectedRemoteBranch);
+        }
+        setIsEditingBranch(false);
+        setHighlightedIndex(0);
+        setShowSuggestions(true);
+    }, [editValue, selectedRemoteBranch, onRemoteBranchChange]);
+
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (remoteRef.current && !remoteRef.current.contains(event.target as Node)) {
@@ -64,7 +73,7 @@ export const PushHeader: React.FC<PushHeaderProps> = ({
         };
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, [isEditingBranch, editValue]);
+    }, [isEditingBranch, editValue, selectedRemoteBranch, onRemoteBranchChange, handleCommitEdit]);
 
     const targetBranch = isEditingBranch ? editValue : selectedRemoteBranch;
     const isNewBranch = !isLoading && targetBranch.trim() !== '' && !remoteBranches.includes(targetBranch);
@@ -76,18 +85,6 @@ export const PushHeader: React.FC<PushHeaderProps> = ({
     const handleRemoteSelect = (remote: string) => {
         onRemoteChange(remote);
         setIsRemoteDropdownOpen(false);
-    };
-
-    const handleCommitEdit = () => {
-        const trimmed = editValue.trim();
-        if (trimmed && trimmed !== selectedRemoteBranch) {
-            onRemoteBranchChange(trimmed);
-        } else {
-            setEditValue(selectedRemoteBranch);
-        }
-        setIsEditingBranch(false);
-        setHighlightedIndex(0);
-        setShowSuggestions(true);
     };
 
     const handleBranchKeyDown = (e: React.KeyboardEvent) => {
@@ -130,113 +127,110 @@ export const PushHeader: React.FC<PushHeaderProps> = ({
         return branch.length > maxLen ? branch.slice(0, maxLen) + '…' : branch;
     };
 
-    return <div className={styles.headerContainer}>
-        <div className={styles.headerTitleRow}>
-            <div className={styles.pushTargetLabel}>{t('Push Target')}</div>
-            <button
-                className={styles.iconBtn}
-                onClick={onToggleView}
-                title={viewMode === 'commits' ? t('Switch to Changes') : t('Switch to Commits')}
-            >
-                <i className={`codicon ${viewMode === 'commits' ? 'codicon-git-commit' : 'codicon-files'}`} />
-            </button>
-        </div>
-        <div className={styles.branchRow}>
-            {/* Arrow */}
-            <div className={styles.arrowRow}>
-                <span>→</span>
+    return (
+        <div className={styles.headerContainer}>
+            <div className={styles.headerTitleRow}>
+                <div className={styles.pushTargetLabel}>{t('Push Target')}</div>
+                <button
+                    className={styles.iconBtn}
+                    onClick={onToggleView}
+                    title={viewMode === 'commits' ? t('Switch to Changes') : t('Switch to Commits')}
+                >
+                    <i className={`codicon ${viewMode === 'commits' ? 'codicon-git-commit' : 'codicon-files'}`} />
+                </button>
             </div>
+            <div className={styles.branchRow}>
+                <div className={styles.arrowRow}>
+                    <span>→</span>
+                </div>
 
-            {/* Remote Branch (Target) */}
-            <div className={styles.remoteWrapper}>
-                {!isEditingBranch ? (
-                    <div
-                        className={styles.remoteDisplay}
-                        ref={remoteRef}
-                    >
-                        {/* Remote Part (Click to Select Remote) */}
-                        <span
-                            className={styles.remotePart}
-                            onClick={() => setIsRemoteDropdownOpen(!isRemoteDropdownOpen)}
-                            title={t('Select Remote')}
+                <div className={styles.remoteWrapper}>
+                    {!isEditingBranch ? (
+                        <div
+                            className={styles.remoteDisplay}
+                            ref={remoteRef}
                         >
-                            {selectedRemote}
-                        </span>
+                            <span
+                                className={styles.remotePart}
+                                onClick={() => setIsRemoteDropdownOpen(!isRemoteDropdownOpen)}
+                                title={t('Select Remote')}
+                            >
+                                {selectedRemote}
+                            </span>
 
-                        <span className={styles.separator}>/</span>
+                            <span className={styles.separator}>/</span>
 
-                        {/* Branch Part (Click to Edit Branch) */}
-                        <span
-                            className={styles.branchPart}
-                            onClick={() => setIsEditingBranch(true)}
-                            title={t('Edit Branch')}
-                        >
-                            {truncateBranch(selectedRemoteBranch, 20)}
-                        </span>
+                            <span
+                                className={styles.branchPart}
+                                onClick={() => setIsEditingBranch(true)}
+                                title={t('Edit Branch')}
+                            >
+                                {truncateBranch(selectedRemoteBranch, 20)}
+                            </span>
 
-                        {/* Remote Dropdown List */}
-                        {isRemoteDropdownOpen && (
-                            <div className={styles.remoteDropdown}>
-                                {remotes.map(remote => (
-                                    <div
-                                        key={remote}
-                                        className={`${styles.suggestionItem} ${remote === selectedRemote ? styles.suggestionItemSelected : ''}`}
-                                        onClick={() => handleRemoteSelect(remote)}
-                                    >
-                                        {remote}
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                ) : (
-                    <div className={styles.inlineEditWrapper} ref={editWrapperRef}>
-                        <span className={styles.remotePrefix}>{selectedRemote}/</span>
-                        <div className={styles.inputStack}>
-                            <input
-                                ref={inputRef}
-                                type="text"
-                                className={styles.inlineInput}
-                                value={editValue}
-                                onChange={(e) => {
-                                    setEditValue(e.target.value);
-                                    setHighlightedIndex(0);
-                                    setShowSuggestions(true);
-                                }}
-                                onKeyDown={handleBranchKeyDown}
-                                onBlur={() => {
-                                    setTimeout(() => {
-                                        if (document.activeElement !== inputRef.current) {
-                                            handleCommitEdit();
-                                        }
-                                    }, 150);
-                                }}
-                            />
-                            {showSuggestions && filteredBranches.length > 0 && (
-                                <div className={styles.suggestionsList}>
-                                    {filteredBranches.slice(0, 5).map((branch, idx) => (
+                            {isRemoteDropdownOpen && (
+                                <div className={styles.remoteDropdown}>
+                                    {remotes.map(remote => (
                                         <div
-                                            key={branch}
-                                            className={`${styles.suggestionItem} ${idx === highlightedIndex ? styles.suggestionItemSelected : ''}`}
-                                            onMouseDown={() => {
-                                                onRemoteBranchChange(branch);
-                                                setIsEditingBranch(false);
-                                                setHighlightedIndex(0);
-                                                setShowSuggestions(true);
-                                            }}
+                                            key={remote}
+                                            className={`${styles.suggestionItem} ${remote === selectedRemote ? styles.suggestionItemSelected : ''}`}
+                                            onClick={() => handleRemoteSelect(remote)}
                                         >
-                                            {branch}
+                                            {remote}
                                         </div>
                                     ))}
                                 </div>
                             )}
                         </div>
-                    </div>
-                )}
-                {isNewBranch && (
-                    <span className={styles.newBadge}>NEW</span>
-                )}
+                    ) : (
+                        <div className={styles.inlineEditWrapper} ref={editWrapperRef}>
+                            <span className={styles.remotePrefix}>{selectedRemote}/</span>
+                            <div className={styles.inputStack}>
+                                <input
+                                    ref={inputRef}
+                                    type="text"
+                                    className={styles.inlineInput}
+                                    value={editValue}
+                                    onChange={(e) => {
+                                        setEditValue(e.target.value);
+                                        setHighlightedIndex(0);
+                                        setShowSuggestions(true);
+                                    }}
+                                    onKeyDown={handleBranchKeyDown}
+                                    onBlur={() => {
+                                        setTimeout(() => {
+                                            if (document.activeElement !== inputRef.current) {
+                                                handleCommitEdit();
+                                            }
+                                        }, 150);
+                                    }}
+                                />
+                                {showSuggestions && filteredBranches.length > 0 && (
+                                    <div className={styles.suggestionsList}>
+                                        {filteredBranches.slice(0, 5).map((branch, idx) => (
+                                            <div
+                                                key={branch}
+                                                className={`${styles.suggestionItem} ${idx === highlightedIndex ? styles.suggestionItemSelected : ''}`}
+                                                onMouseDown={() => {
+                                                    onRemoteBranchChange(branch);
+                                                    setIsEditingBranch(false);
+                                                    setHighlightedIndex(0);
+                                                    setShowSuggestions(true);
+                                                }}
+                                            >
+                                                {branch}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                    {isNewBranch && (
+                        <span className={styles.newBadge}>NEW</span>
+                    )}
+                </div>
             </div>
         </div>
-    </div>;
+    );
 };
