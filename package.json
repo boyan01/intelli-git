@@ -12,6 +12,7 @@
     "watch": "npm run watch --workspaces --if-present",
     "watch:extension": "npm run watch --workspace=intelli-git",
     "watch:webview": "npm run watch --workspace=webview-ui",
+    "package:extension:dev": "npm run package:dev --workspace=intelli-git",
     "lint": "npm run lint --workspaces --if-present",
     "test": "npm run test --workspaces --if-present"
   }
