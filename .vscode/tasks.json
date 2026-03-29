@@ -3,7 +3,7 @@
 	"tasks": [
 		{
 			"type": "npm",
-			"script": "watch",
+			"script": "watch:extension",
 			"problemMatcher": "$tsc-watch",
 			"isBackground": true,
 			"presentation": {
@@ -51,7 +51,7 @@
 		{
 			"label": "Watch All",
 			"dependsOn": [
-				"npm: watch",
+				"npm: watch:extension",
 				"npm: watch:webview"
 			],
 			"group": {

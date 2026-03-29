@@ -10,6 +10,7 @@ dist/
 
 # VS Code extension package
 *.vsix
+apps/extension/l10n/
 
 # IDE
 .idea/
