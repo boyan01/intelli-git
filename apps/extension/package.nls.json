@@ -64,5 +64,11 @@
   "intelli-git.commands.log.file.openRepositoryVersion.title": "Open Repository Version",
   "intelli-git.commands.log.file.revertChanges.title": "Revert Selected Changes",
   "intelli-git.commands.log.file.cherryPickChanges.title": "Cherry-pick Selected Changes",
-  "intelli-git.commands.log.file.createPatch.title": "Create Patch..."
+  "intelli-git.commands.log.file.createPatch.title": "Create Patch...",
+  "intelli-git.viewsContainers.panel.title": "Git Log",
+  "intelli-git.views.intelli-git-log.title": "Git Log",
+  "intelli-git.commands.focusGitLog.title": "Focus Git Log",
+  "intelli-git.commands.ai.selectCopilotModel.title": "Intelli: Select Copilot Model",
+  "intelli-git.commands.moveHunkToInactive.title": "Move hunk to Inactive (Intelli Git)",
+  "intelli-git.config.ai.copilot.model.description": "Preferred GitHub Copilot model id to use for commit message generation (for example: gpt-5-mini, gpt-4.1, claude-sonnet-4)."
 }

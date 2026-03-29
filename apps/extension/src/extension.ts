@@ -19,8 +19,8 @@ export async function activate(context: vscode.ExtensionContext) {
     }
 
     // Initialize services
-    const gitService = await GitService.create(workspaceRoot);
     const inactiveChangesService = new InactiveChangesService(context);
+    const gitService = await GitService.create(workspaceRoot, inactiveChangesService);
 
     // Initialize providers
     const providerOptions = {

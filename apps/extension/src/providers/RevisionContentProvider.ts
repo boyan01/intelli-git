@@ -18,7 +18,7 @@ export class RevisionContentProvider implements vscode.TextDocumentContentProvid
             const ref = query.ref;
             const path = uri.path.startsWith('/') ? uri.path.substring(1) : uri.path;
 
-            if (!ref || !path) {
+            if (ref === undefined || !path) {
                 return '';
             }
 

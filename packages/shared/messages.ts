@@ -5,14 +5,28 @@
 
 export type GitStatusCode = 'A' | 'M' | 'D' | 'R' | 'C' | 'U' | '?';
 
+export interface GitHunk {
+    id: string; // File path + hunk signature (e.g., oldStart)
+    lineRange: string; // e.g., "L10-20"
+    fileHeader: string; // The file-level diff header required to apply the hunk patch
+    content: string; // The diff content of the hunk
+    oldStart: number;
+    newStart: number;
+    oldLineCount: number;
+    newLineCount: number;
+}
+
 export interface FileStatus {
     path: string;
     displayPath?: string;
     status: GitStatusCode;
     staged: boolean;
     inactive?: boolean;
+    hunks?: GitHunk[];
+    inactiveHunkIds?: string[];
     resolvedCandidate?: boolean;
     error?: boolean;
+    hasStagedInactive?: boolean;
 }
 
 export interface ChangelistGroup {
@@ -20,6 +34,7 @@ export interface ChangelistGroup {
     name: string;
     isDefault: boolean;
     items: FileStatus[];
+    hasWarning?: boolean;
 }
 
 export interface BranchInfo {
@@ -95,7 +110,7 @@ export interface ExtensionMethods {
     getCommitFiles: (hash: string) => Promise<CommitFile[]>;
     getMultiCommitFiles: (hashes: string[]) => Promise<CommitFile[]>;
     push: (params: { force: boolean; pushTags: boolean; noVerify?: boolean; remote: string; branch: string }) => Promise<void>;
-    openDiff: (path: string) => Promise<void>;
+    openDiff: (path: string, staged?: boolean) => Promise<void>;
     closeWebView: () => Promise<void>;
     openCommitDiff: (params: { path: string; leftRef: string; rightRef: string; preserveFocus?: boolean }) => Promise<void>;
     getStatus: () => Promise<FileStatus[]>;
@@ -108,8 +123,9 @@ export interface ExtensionMethods {
     unstage: (path: string) => Promise<void>;
     stageAll: () => Promise<void>;
     unstageAll: () => Promise<void>;
+    stageTracked: () => Promise<void>;
     generateCommitMessage: (files?: string[]) => Promise<string>;
-    stash: (params: { message?: string; files: string[] }) => Promise<void>;
+    stash: (params: { message?: string; files: string[]; stagedOnly?: boolean }) => Promise<void>;
     deleteFiles: (files: string[]) => Promise<void>;
     rollback: (files: string[]) => Promise<void>;
     switchBranch: (branch: string) => Promise<void>;
@@ -134,6 +150,8 @@ export interface ExtensionMethods {
     getWorkspaceRoot: () => Promise<string>;
     getLastCommitInfo: () => Promise<LastCommitInfo | null>;
     showErrorMessage: (message: string) => Promise<void>;
+    markHunkInactive: (params: { path: string; hunkId: string }) => Promise<void>;
+    markHunkActive: (params: { path: string; hunkId: string }) => Promise<void>;
 }
 
 

@@ -64,5 +64,11 @@
   "intelli-git.commands.log.file.openRepositoryVersion.title": "打开仓库版本",
   "intelli-git.commands.log.file.revertChanges.title": "还原所选更改",
   "intelli-git.commands.log.file.cherryPickChanges.title": "优选所选更改",
-  "intelli-git.commands.log.file.createPatch.title": "创建补丁..."
+  "intelli-git.commands.log.file.createPatch.title": "创建补丁...",
+  "intelli-git.viewsContainers.panel.title": "Git 日志",
+  "intelli-git.views.intelli-git-log.title": "Git 日志",
+  "intelli-git.commands.focusGitLog.title": "Intelli: 聚焦 Git 日志",
+  "intelli-git.commands.ai.selectCopilotModel.title": "Intelli: 选择 Copilot 模型",
+  "intelli-git.commands.moveHunkToInactive.title": "移动代码块至不活跃列表 (Intelli Git)",
+  "intelli-git.config.ai.copilot.model.description": "用于生成提交信息的首选 GitHub Copilot 模型 ID (例如: gpt-5-mini, gpt-4.1, claude-sonnet-4)。"
 }

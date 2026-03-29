@@ -68,7 +68,7 @@ export const CommitForm: React.FC<CommitFormProps> = ({
         try {
             await rpc.commit({
                 message: options.signOff ? `${message}\n\nSigned-off-by: ` : message,
-                files: files,
+                files,
                 amend: amend,
                 push: options.push
             });

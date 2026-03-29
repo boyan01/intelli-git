@@ -6,8 +6,7 @@ import styles from './CommitToolbar.module.css';
 interface CommitToolbarProps {
     viewMode: 'tree' | 'list';
     selectedFiles: Set<string>;
-    selectedStageablePaths: string[];
-    selectedUnstageablePaths: string[];
+    hasTrackedChanges: boolean;
     onViewModeChange: (mode: 'tree' | 'list') => void;
     onExpandAll: () => void;
     onCollapseAll: () => void;
@@ -16,8 +15,7 @@ interface CommitToolbarProps {
 export function CommitToolbar({
     viewMode,
     selectedFiles,
-    selectedStageablePaths,
-    selectedUnstageablePaths,
+    hasTrackedChanges,
     onViewModeChange,
     onExpandAll,
     onCollapseAll
@@ -33,33 +31,19 @@ export function CommitToolbar({
 
                 <div className={styles.toolbarSeparator} style={{ margin: '0 8px' }}></div>
 
-                <button className={styles.iconBtn} title={t('Rollback')} onClick={() => rpc.rollback(Array.from(selectedFiles))} disabled={selectedFiles.size === 0}>
-                    <i className="codicon codicon-discard"></i>
-                </button>
-                <button className={styles.iconBtn} title={t('Stash')} onClick={() => rpc.stash({ files: Array.from(selectedFiles) })} disabled={selectedFiles.size === 0}>
+                <button className={styles.iconBtn} title={t('Stash')} onClick={() => rpc.stash({ files: Array.from(selectedFiles), stagedOnly: true })} disabled={selectedFiles.size === 0}>
                     <i className="codicon codicon-archive"></i>
                 </button>
                 <button
                     className={styles.iconBtn}
-                    title={t('Stage Selected')}
+                    title={t('Stage All Tracked')}
                     onClick={async () => {
-                        await rpc.stageFiles(selectedStageablePaths);
+                        await rpc.stageTracked();
                         rpcEvents.refresh.emit();
                     }}
-                    disabled={selectedStageablePaths.length === 0}
+                    disabled={!hasTrackedChanges}
                 >
                     <i className="codicon codicon-add"></i>
-                </button>
-                <button
-                    className={styles.iconBtn}
-                    title={t('Unstage Selected')}
-                    onClick={async () => {
-                        await Promise.all(selectedUnstageablePaths.map(path => rpc.unstage(path)));
-                        rpcEvents.refresh.emit();
-                    }}
-                    disabled={selectedUnstageablePaths.length === 0}
-                >
-                    <i className="codicon codicon-remove"></i>
                 </button>
                 <div className={styles.toolbarSeparator}></div>
                 <button

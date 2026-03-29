@@ -86,6 +86,7 @@ export class ExtensionRpcHandler {
                 unstage: this.unstage,
                 stageAll: this.stageAll,
                 unstageAll: this.unstageAll,
+                stageTracked: this.stageTracked,
                 generateCommitMessage: this.generateCommitMessage,
                 stash: this.stash,
                 deleteFiles: this.deleteFiles,
@@ -111,7 +112,9 @@ export class ExtensionRpcHandler {
                 getUnpushedCommits: this.getUnpushedCommits,
                 getWorkspaceRoot: async () => this.gitService.getWorkspaceRoot(),
                 getLastCommitInfo: async () => this.gitService.getLastCommitInfo(),
-                showErrorMessage: this.showErrorMessage
+                showErrorMessage: this.showErrorMessage,
+                markHunkInactive: this.markHunkInactive,
+                markHunkActive: this.markHunkActive
             }
         )
     }
@@ -165,18 +168,37 @@ export class ExtensionRpcHandler {
 
     getStatus = async (): Promise<FileStatus[]> => {
         const status = await this.gitService.getStatus();
-        const inactiveSet = new Set(this.inactiveChangesService?.getInactiveFiles() || []);
         this.inactiveChangesService?.syncWithStatus(status.map(file => file.path));
-        return status.map(file => ({
-            ...file,
-            inactive: inactiveSet.has(file.path)
-        }));
+
+        return status.map(file => {
+            const isFileInactive = !!this.inactiveChangesService?.isInactive(file.path);
+            const inactiveHunkIds = this.inactiveChangesService?.getInactiveHunkIds(file.path) || [];
+
+            // Detection logic:
+            // If the file is staged (or a staged hunk exists) AND (the file is inactive OR some staged hunks are inactive)
+            const hasStagedInactive = file.staged && (isFileInactive || (file.hunks?.some(h => inactiveHunkIds.includes(h.id))));
+
+            return {
+                ...file,
+                inactive: isFileInactive,
+                inactiveHunkIds: inactiveHunkIds,
+                hasStagedInactive: hasStagedInactive
+            };
+        });
     };
 
-    openDiff = async (filePath: string): Promise<void> => {
-        const workspaceRoot = this.gitService.getWorkspaceRoot();
-        const uri = vscode.Uri.file(`${workspaceRoot}/${filePath}`);
-        vscode.commands.executeCommand('git.openChange', uri);
+    openDiff = async (filePath: string, staged?: boolean): Promise<void> => {
+        if (staged) {
+            // HEAD vs Index
+            const leftUri = vscode.Uri.parse(`intelli-git-revision://load/${filePath}?${JSON.stringify({ ref: 'HEAD' })}`);
+            const rightUri = vscode.Uri.parse(`intelli-git-revision://load/${filePath}?${JSON.stringify({ ref: '' })}`);
+            const title = `${path.basename(filePath)} ${i18n.t('(Staged)')}`;
+            await vscode.commands.executeCommand('vscode.diff', leftUri, rightUri, title);
+        } else {
+            const workspaceRoot = this.gitService.getWorkspaceRoot();
+            const uri = vscode.Uri.file(`${workspaceRoot}/${filePath}`);
+            await vscode.commands.executeCommand('git.openChange', uri);
+        }
     };
 
     closeWebView = async (): Promise<void> => {
@@ -355,9 +377,7 @@ export class ExtensionRpcHandler {
     };
 
     stageFiles = async (filePaths: string[]): Promise<void> => {
-        for (const path of filePaths) {
-            await this.gitService.stageFile(path);
-        }
+        await this.gitService.stageFiles(filePaths);
     };
 
     unstage = async (filePath: string): Promise<void> => {
@@ -372,7 +392,11 @@ export class ExtensionRpcHandler {
         await this.gitService.unstageAll();
     };
 
-    stash = async (params: { message?: string; files: string[] }): Promise<void> => {
+    stageTracked = async (): Promise<void> => {
+        await this.gitService.stageTracked();
+    };
+
+    stash = async (params: { message?: string; files: string[]; stagedOnly?: boolean }): Promise<void> => {
         try {
             let message = params.message;
             if (!message) {
@@ -380,7 +404,7 @@ export class ExtensionRpcHandler {
                     placeHolder: i18n.t('extension.stashPlaceholder')
                 });
             }
-            await this.gitService.stash(message, params.files);
+            await this.gitService.stash(message, params.files, false, params.stagedOnly);
             vscode.window.showInformationMessage(i18n.t('extension.stashSuccess'));
         } catch (e) {
             vscode.window.showErrorMessage(i18n.t('extension.stashFailed', `${e}`));
@@ -391,9 +415,9 @@ export class ExtensionRpcHandler {
         const answer = await vscode.window.showWarningMessage(
             i18n.t('extension.deleteFilesConfirm', files.length),
             { modal: true },
-            'Delete'
+            i18n.t('Delete')
         );
-        if (answer === 'Delete') {
+        if (answer === i18n.t('Delete')) {
             const workspaceRoot = this.gitService.getWorkspaceRoot();
             if (!workspaceRoot) return;
             try {
@@ -412,9 +436,9 @@ export class ExtensionRpcHandler {
         const answer = await vscode.window.showWarningMessage(
             i18n.t('extension.rollbackFilesConfirm', files.length),
             { modal: true },
-            'Rollback'
+            i18n.t('Rollback')
         );
-        if (answer === 'Rollback') {
+        if (answer === i18n.t('Rollback')) {
             try {
                 await this.gitService.rollbackFiles(files);
 
@@ -485,6 +509,14 @@ export class ExtensionRpcHandler {
 
     showErrorMessage = async (message: string): Promise<void> => {
         vscode.window.showErrorMessage(message);
+    };
+
+    markHunkInactive = async (params: { path: string; hunkId: string }): Promise<void> => {
+        await this.inactiveChangesService?.markHunkInactive(params.path, params.hunkId);
+    };
+
+    markHunkActive = async (params: { path: string; hunkId: string }): Promise<void> => {
+        await this.inactiveChangesService?.markHunkActive(params.path, params.hunkId);
     };
 
     pickBranch = async (): Promise<void> => {

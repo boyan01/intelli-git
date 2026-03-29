@@ -15,7 +15,6 @@ export interface ChangelistTreeProps {
     expandedIds?: Set<string>;
     activeFile?: string | null;
     onToggle?: (id: string, expanded: boolean) => void;
-    onToggleFile: (path: string, checked: boolean) => void;
     readonly?: boolean;
     workspaceRoot?: string;
     amendCommit?: LastCommitInfo | null;
@@ -42,7 +41,13 @@ interface FileNodeData {
     resolvedCandidate?: boolean;
     fileCount: number;
     selectedStatus?: SelectionStatus;
+    inactiveHunkIds?: string[];
+    isHunk?: boolean;
+    hunkId?: string;
+    hunkRange?: string;
     error?: boolean;
+    hasWarning?: boolean;
+    hasStagedInactive?: boolean;
 }
 
 const getDirPath = (fullPath: string): string => {
@@ -71,32 +76,6 @@ const getAllFilePaths = (node: TreeNode<FileNodeData>): string[] => {
     return node.children.flatMap(getAllFilePaths);
 };
 
-const computeSelection = (nodes: TreeNode<FileNodeData>[], selectedFiles?: Set<string>) => {
-    const compute = (node: TreeNode<FileNodeData>): SelectionStatus => {
-        if (node.data?.isFile) {
-            const status = selectedFiles?.has(node.data.path) ? 'all' : 'none';
-            node.data.selectedStatus = status;
-            return status;
-        }
-        if (!node.children || node.children.length === 0) {
-            node.data!.selectedStatus = 'none';
-            return 'none';
-        }
-        const childStatuses = node.children.map(compute);
-        let status: SelectionStatus;
-        if (childStatuses.every(s => s === 'all')) {
-            status = 'all';
-        } else if (childStatuses.every(s => s === 'none')) {
-            status = 'none';
-        } else {
-            status = 'partial';
-        }
-        node.data!.selectedStatus = status;
-        return status;
-    };
-    nodes.forEach(compute);
-};
-
 const buildTree = (files: FileStatus[]): TreeNode<FileNodeData>[] => {
     const root: TreeNode<FileNodeData>[] = [];
     const map = new Map<string, TreeNode<FileNodeData>>();
@@ -122,7 +101,8 @@ const buildTree = (files: FileStatus[]): TreeNode<FileNodeData>[] => {
                         inactive: isLast ? file.inactive : undefined,
                         resolvedCandidate: isLast ? file.resolvedCandidate : undefined,
                         fileCount: 0,
-                        error: isLast ? file.error : undefined
+                        error: isLast ? file.error : undefined,
+                        hasStagedInactive: isLast ? file.hasStagedInactive : undefined
                     },
                     children: isLast ? undefined : []
                 };
@@ -198,8 +178,6 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
     expandedIds,
     activeFile,
     onToggle,
-    onToggleFile,
-    readonly = false,
     workspaceRoot,
     amendCommit
 }, ref) => {
@@ -230,7 +208,8 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
                             staged: f.staged,
                             inactive: f.inactive,
                             resolvedCandidate: f.resolvedCandidate,
-                            fileCount: 1
+                            fileCount: 1,
+                            hasStagedInactive: f.hasStagedInactive
                         }
                     }))
                     .sort((a, b) => a.label.localeCompare(b.label));
@@ -248,7 +227,8 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
                     isRoot: true,
                     isInactiveGroup: group.id === 'inactive-changes',
                     isStagedGroup: group.id === 'staged-changes',
-                    fileCount: totalFiles
+                    fileCount: totalFiles,
+                    hasWarning: group.hasWarning
                 },
                 children
             });
@@ -256,7 +236,7 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
 
         // Add amend commit node at the bottom
         if (amendCommit) {
-            const amendChildren: TreeNode<FileNodeData>[] = amendCommit.files.map(f => ({
+            const amendChildren: TreeNode<FileNodeData>[] = amendCommit.files.map((f: { path: string; status: string }) => ({
                 id: `amend/${f.path}`,
                 label: f.path.split('/').pop() || f.path,
                 data: {
@@ -286,14 +266,13 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
     }, [groups, viewMode, amendCommit]);
 
     React.useLayoutEffect(() => {
-        computeSelection(nodes, selectedFiles);
         forceUpdate();
     }, [nodes, selectedFiles]);
 
     const handleNodeClick = useCallback((node: TreeNode<FileNodeData>) => {
         if (node.data?.isFile) {
             if (node.data.status === 'D') {
-                rpc.openDiff(node.data.path);
+                rpc.openDiff(node.data.path, node.data.staged);
             } else {
                 rpc.openFile({ path: node.data.path, preserveFocus: true });
             }
@@ -303,38 +282,16 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
     const handleNodeDoubleClick = useCallback((node: TreeNode<FileNodeData>) => {
         if (node.data?.isFile) {
             if (node.data.status === 'D') {
-                rpc.openDiff(node.data.path);
+                rpc.openDiff(node.data.path, node.data.staged);
             } else {
                 rpc.openFile({ path: node.data.path, preserveFocus: false });
             }
         }
     }, []);
 
-    const handleToggleFile = useCallback((node: TreeNode<FileNodeData>, checked: boolean) => {
-        if (readonly || !onToggleFile) return;
-        if (node.id === '__root__inactive-changes' || node.id.startsWith('inactive-changes/')) return;
-        const paths = getAllFilePaths(node);
-        paths.forEach(path => onToggleFile(path, checked));
-    }, [readonly, onToggleFile]);
-
-    const renderLeading = useCallback((node: TreeNode<FileNodeData>) => {
-        // Don't show checkbox for amend commit nodes
-        if (node.data?.isAmendCommit || node.data?.isAmendFile) return null;
-        if (node.id === '__root__inactive-changes' || node.id.startsWith('inactive-changes/')) return null;
-        if (readonly || !onToggleFile) return null;
-
-        const status = node.data?.selectedStatus ?? 'none';
-        return (
-            <input
-                type="checkbox"
-                className={styles.checkbox}
-                checked={status === 'all'}
-                ref={input => { if (input) input.indeterminate = status === 'partial'; }}
-                onClick={(e) => e.stopPropagation()}
-                onChange={(e) => handleToggleFile(node, e.target.checked)}
-            />
-        );
-    }, [readonly, onToggleFile, handleToggleFile]);
+    const renderLeading = useCallback(() => {
+        return null;
+    }, []);
 
     const renderTrailing = useCallback((node: TreeNode<FileNodeData>) => {
         if (node.data?.isRoot && node.data?.fileCount !== undefined) {
@@ -442,13 +399,49 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
                             <span className={styles.fileDirPath}>{getDirPath(node.data!.path)}</span>
                         )}
                     </>
+                ) : node.data?.isHunk ? (
+                    <>
+                        <span className={`codicon codicon-diff-ignored ${styles.icon}`} style={{ fontSize: '12px', opacity: 0.7 }}></span>
+                        <span className={styles.name} style={{ fontSize: '12px', opacity: 0.8, fontFamily: 'monospace' }}>
+                            {node.label}
+                        </span>
+                        <div style={{ flex: 1 }}></div>
+                        <span 
+                            className={`codicon codicon-${node.data?.inactive ? 'circle-slash' : 'circle-filled'}`}
+                            style={{ 
+                                fontSize: '14px', 
+                                cursor: 'pointer',
+                                color: node.data?.inactive ? 'var(--vscode-descriptionForeground)' : 'var(--vscode-charts-blue)',
+                                opacity: node.data?.inactive ? 0.5 : 1
+                            }}
+                            title={node.data?.inactive ? t('Inactive (Excluded from commit)') : t('Active (Included in commit)')}
+                            onClick={async (e) => {
+                                e.stopPropagation();
+                                if (node.data?.inactive) {
+                                    await rpc.markHunkActive({ path: node.data!.path, hunkId: node.data!.hunkId! });
+                                } else {
+                                    await rpc.markHunkInactive({ path: node.data!.path, hunkId: node.data!.hunkId! });
+                                }
+                                rpcEvents.refresh.emit();
+                            }}
+                        />
+                    </>
                 ) : node.data?.isAmendCommit ? (
                     <>
                         <span className={`codicon codicon-git-commit ${styles.icon}`}></span>
                         <span className={styles.name} style={{ fontStyle: 'italic' }}>{node.label}</span>
                     </>
                 ) : node.data?.isRoot ? (
-                    <span className={styles.name}>{node.label}</span>
+                    <>
+                        <span className={styles.name}>{node.label}</span>
+                        {node.data?.hasWarning && (
+                            <span 
+                                className={`codicon codicon-warning ${styles.icon}`} 
+                                style={{ color: 'var(--vscode-notificationsWarningIcon-foreground)', marginLeft: '4px' }}
+                                title={t('Some inactive changes in this group are staged externally. They will be automatically excluded by the plugin during commit.')}
+                            ></span>
+                        )}
+                    </>
                 ) : (
                     <>
                         <span className={`codicon codicon-folder ${styles.icon}`}></span>

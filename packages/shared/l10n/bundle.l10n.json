@@ -222,5 +222,20 @@
     "Delete Local Commits": "Delete Local Commits",
     "Rebase": "Rebase",
     "Rebasing {0} onto {1}...": "Rebasing {0} onto {1}...",
-    "Resetting {0} to {1}...": "Resetting {0} to {1}..."
+    "Resetting {0} to {1}...": "Resetting {0} to {1}...",
+    "(Staged)": "(Staged)",
+    "Inactive (Excluded from commit)": "Inactive (Excluded from commit)",
+    "Active (Included in commit)": "Active (Included in commit)",
+    "Some inactive changes in this group are staged externally. They will be automatically excluded by the plugin during commit.": "Some inactive changes in this group are staged externally. They will be automatically excluded by the plugin during commit.",
+    "Generate": "Generate",
+    "Stage All Tracked": "Stage All Tracked",
+    "Hunk {0} moved to Inactive": "Hunk {0} moved to Inactive",
+    "No modified hunk found at line {0} in {1}": "No modified hunk found at line {0} in {1}",
+    "File status not found for {0}": "File status not found for {0}",
+    "Commit Options": "Commit Options",
+    "Push after Commit": "Push after Commit",
+    "Sign Off": "Sign Off",
+    "Amend": "Amend",
+    "Amend & Push": "Amend & Push",
+    "Commit & Push": "Commit & Push"
 }

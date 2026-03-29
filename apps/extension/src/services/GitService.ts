@@ -5,12 +5,14 @@ import { logger } from '../utils/logger';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import { parseDiffToHunks } from '../utils/diffParser';
 
 
 export class GitService implements vscode.Disposable {
     private git: SimpleGit;
     private _workspaceRoot: string;
     private _gitRoot: string;
+    private _inactiveChangesService?: any;
     private _onDidChange = new vscode.EventEmitter<void>();
 
     /**
@@ -18,13 +20,14 @@ export class GitService implements vscode.Disposable {
      */
     public readonly onDidChange = this._onDidChange.event;
 
-    constructor(workspaceRoot: string, gitRoot: string, git: SimpleGit) {
+    constructor(workspaceRoot: string, gitRoot: string, git: SimpleGit, inactiveChangesService?: any) {
         this._workspaceRoot = workspaceRoot;
         this._gitRoot = gitRoot;
         this.git = git;
+        this._inactiveChangesService = inactiveChangesService;
     }
 
-    public static async create(workspaceRoot: string): Promise<GitService> {
+    public static async create(workspaceRoot: string, inactiveChangesService?: any): Promise<GitService> {
         const tempGit = simpleGit(workspaceRoot);
         let gitRoot = workspaceRoot;
         let finalGit = tempGit;
@@ -42,7 +45,7 @@ export class GitService implements vscode.Disposable {
             console.error('Failed to resolve git root, assuming workspace root:', e);
         }
 
-        return new GitService(workspaceRoot, gitRoot, finalGit);
+        return new GitService(workspaceRoot, gitRoot, finalGit, inactiveChangesService);
     }
 
     public toRepoPath(filePath: string): string {
@@ -94,100 +97,78 @@ export class GitService implements vscode.Disposable {
     }
 
     public getStatus = async (): Promise<FileStatus[]> => {
+        const workspaceRoot = this.getWorkspaceRoot();
+        logger.debug(`Fetching git status at: ${workspaceRoot}`);
         const files: FileStatus[] = [];
 
         try {
             const status: StatusResult = await this.git.status();
 
-            const addFile = (repoPath: string, statusCode: GitStatusCode, staged: boolean) => {
-                const wsPath = this.toWorkspacePath(repoPath);
-                if (wsPath) {
-                    files.push({
-                        path: wsPath,
-                        status: statusCode,
-                        staged: staged
-                    });
-                }
-            };
+            status.files.forEach(file => {
+                const wsPath = this.toWorkspacePath(file.path);
+                if (!wsPath) return;
 
-            status.staged.forEach(file => addFile(file, 'A', true));
-
-            status.modified.forEach(file => {
-                const isStaged = status.staged.includes(file);
-                if (!isStaged) {
-                    addFile(file, 'M', false);
-                }
-            });
-
-            status.deleted.forEach(file => {
-                const isStaged = status.staged.includes(file);
-                if (!isStaged) {
-                    addFile(file, 'D', false);
-                }
-            });
-
-            status.not_added.forEach(file => addFile(file, '?', false));
-
-            status.renamed.forEach(renamed => {
-                const wsPath = this.toWorkspacePath(renamed.to);
-                if (wsPath) {
-                    files.push({
-                        path: wsPath,
-                        status: 'R',
-                        staged: true
-                    });
-                }
-            });
-
-            status.conflicted.forEach(file => {
-                const wsPath = this.toWorkspacePath(file);
-                if (wsPath) {
+                // 1. Conflict check first
+                const isConflicted = status.conflicted.includes(file.path);
+                if (isConflicted) {
                     files.push({
                         path: wsPath,
                         status: 'C',
                         staged: true
                     });
-                }
-            });
-
-            // Also check raw status for 'U' (Unmerged) which simple-git might map differently
-            const indexStatus = await this.git.diff(['--cached', '--name-status']);
-            indexStatus.split('\n').forEach(line => {
-                if (!line) return;
-                const [statusCode, repoPath] = line.split('\t');
-                const wsPath = this.toWorkspacePath(repoPath);
-                if (!wsPath) return;
-
-                const existing = files.find(f => f.path === wsPath);
-
-                // If it's a conflict
-                if ((statusCode === 'U' || statusCode.startsWith('U') || statusCode.endsWith('U'))) {
-                    if (existing) {
-                        existing.status = 'C';
-                        existing.staged = true;
-                    } else if (wsPath) {
-                        files.push({
-                            path: wsPath,
-                            status: 'C',
-                            staged: true
-                        });
-                    }
                     return;
                 }
 
-                if (!existing && wsPath) {
+                // 2. Staged part (Index)
+                if (file.index !== ' ' && file.index !== '?') {
                     files.push({
                         path: wsPath,
-                        status: statusCode as GitStatusCode,
+                        status: file.index as GitStatusCode,
                         staged: true
                     });
-                } else if (existing && existing.status !== 'C') {
-                    existing.status = statusCode as GitStatusCode;
+                }
+
+                // 3. Unstaged part (Working Directory)
+                if (file.working_dir !== ' ' && file.working_dir !== '?') {
+                    const statusCode = (file.working_dir === 'R' ? 'M' : file.working_dir) as GitStatusCode;
+                    files.push({
+                        path: wsPath,
+                        status: statusCode,
+                        staged: false
+                    });
+                } else if (file.index === '?' && file.working_dir === '?') {
+                    // Untracked file
+                    files.push({
+                        path: wsPath,
+                        status: '?',
+                        staged: false
+                    });
                 }
             });
 
         } catch (e) {
             console.error('Error getting status:', e);
+        }
+
+        // 4. Resolve hunks for Modified files
+        for (const file of files) {
+            if (file.status === 'M' || (file.status === 'A' && file.staged) || file.status === 'D') {
+                try {
+                    const repoPath = this.toRepoPath(file.path);
+                    const args = file.staged ? ['--cached', 'HEAD', '--', repoPath] : ['--', repoPath];
+                    const diffText = await this.git.diff(args);
+                    if (diffText) {
+                        const hunks = parseDiffToHunks(diffText, file.path);
+                        file.hunks = hunks;
+                        
+                        if (this._inactiveChangesService) {
+                            file.inactiveHunkIds = this._inactiveChangesService.getInactiveHunkIds(file.path);
+                        }
+                    }
+                } catch (e) {
+                    console.error(`Error parsing hunks for ${file.path}:`, e);
+                }
+            }
         }
 
         // Check for diagnostics errors
@@ -235,7 +216,65 @@ export class GitService implements vscode.Disposable {
     }
 
     public async stageFile(filePath: string): Promise<void> {
-        await this.git.add(this.toRepoPath(filePath));
+        await this._stageFilesWithSupport([filePath]);
+    }
+
+    public async stageFiles(filePaths: string[]): Promise<void> {
+        await this._stageFilesWithSupport(filePaths);
+    }
+
+    private async _stageFilesWithSupport(filePaths: string[]): Promise<void> {
+        if (!filePaths || filePaths.length === 0) {
+            return;
+        }
+
+        const currentStatus = await this.getStatus();
+        const statusMap = new Map(currentStatus.map(f => [f.path, f]));
+
+        const filesToDirectAdd: string[] = [];
+        const filesWithPartialStaging: FileStatus[] = [];
+
+        for (const filePath of filePaths) {
+            const fileStatus = statusMap.get(filePath);
+            if (!fileStatus) {
+                filesToDirectAdd.push(this.toRepoPath(filePath));
+                continue;
+            }
+
+            // Exclude entirely inactive files if this is from a bulk operation? 
+            // Usually stageFiles/stageFile is an explicit user action on these files.
+            // But we still respect hunk-level inactivity.
+            const hasInactiveHunks = fileStatus.inactiveHunkIds && fileStatus.inactiveHunkIds.length > 0;
+            if (hasInactiveHunks && fileStatus.hunks) {
+                filesWithPartialStaging.push(fileStatus);
+            } else {
+                filesToDirectAdd.push(this.toRepoPath(filePath));
+            }
+        }
+
+        // Execute direct adds in batch
+        if (filesToDirectAdd.length > 0) {
+            await this.git.add(filesToDirectAdd);
+        }
+
+        // Handle partial staging files
+        for (const fileStatus of filesWithPartialStaging) {
+            const filePath = fileStatus.path;
+            const repoPath = this.toRepoPath(filePath);
+
+            await this.git.add(repoPath);
+
+            const inactiveHunks = fileStatus.hunks!.filter(h => fileStatus.inactiveHunkIds?.includes(h.id));
+            if (inactiveHunks.length > 0) {
+                const combinedPatch = this.buildPatchFromHunks(inactiveHunks);
+
+                try {
+                    await this.applyPatch(combinedPatch, true, true);
+                } catch (e) {
+                    console.error(`Failed to exclude hunks for ${filePath}:`, e);
+                }
+            }
+        }
     }
 
     public async unstageFile(filePath: string): Promise<void> {
@@ -259,11 +298,26 @@ export class GitService implements vscode.Disposable {
     }
 
     public async stageAll(): Promise<void> {
-        if (this._gitRoot === this._workspaceRoot) {
-            await this.git.add('-A');
-        } else {
-            const rel = path.relative(this._gitRoot, this._workspaceRoot);
-            await this.git.add(['-A', rel]);
+        const currentStatus = await this.getStatus();
+        // Get all files that are not already staged and NOT entirely inactive
+        const filesToStage = currentStatus
+            .filter(f => !f.staged && !f.inactive)
+            .map(f => f.path);
+
+        if (filesToStage.length > 0) {
+            await this._stageFilesWithSupport(filesToStage);
+        }
+    }
+
+    public async stageTracked(): Promise<void> {
+        const currentStatus = await this.getStatus();
+        // Get all tracked files (not status '?') that are not already staged and NOT entirely inactive
+        const filesToStage = currentStatus
+            .filter(f => !f.staged && f.status !== '?' && !f.inactive)
+            .map(f => f.path);
+
+        if (filesToStage.length > 0) {
+            await this._stageFilesWithSupport(filesToStage);
         }
     }
 
@@ -276,8 +330,11 @@ export class GitService implements vscode.Disposable {
         }
     }
 
-    public async stash(message?: string, files?: string[], includeUntracked: boolean = false): Promise<void> {
+    public async stash(message?: string, files?: string[], includeUntracked: boolean = false, stagedOnly: boolean = false): Promise<void> {
         const args = ['push'];
+        if (stagedOnly) {
+            args.push('--staged');
+        }
         if (includeUntracked) {
             args.push('-u');
         }
@@ -424,7 +481,7 @@ export class GitService implements vscode.Disposable {
         }
     }
 
-    public async applyPatch(patch: string, reverse: boolean = false): Promise<void> {
+    public async applyPatch(patch: string, reverse: boolean = false, cached: boolean = false): Promise<void> {
         const tempPatchFile = path.join(os.tmpdir(), `intelli-git-patch-${Date.now()}.patch`);
         fs.writeFileSync(tempPatchFile, patch);
         try {
@@ -432,10 +489,45 @@ export class GitService implements vscode.Disposable {
             if (reverse) {
                 args.push('--reverse');
             }
+            if (cached) {
+                args.push('--cached');
+            }
             args.push(tempPatchFile);
             await this.git.raw(args);
         } finally {
             try { fs.unlinkSync(tempPatchFile); } catch { /* ignore */ }
+        }
+    }
+
+    public buildPatchFromHunks(hunks: Array<{ fileHeader: string; content: string }>): string {
+        if (!hunks || hunks.length === 0) {
+            return '';
+        }
+
+        return `${hunks[0].fileHeader}\n${hunks.map(h => h.content).join('\n')}\n`;
+    }
+
+    private async _excludeInactiveFromIndex(): Promise<void> {
+        const currentStatus = await this.getStatus();
+        const stagedEntries = currentStatus.filter(file => file.staged);
+
+        for (const file of stagedEntries) {
+            if (file.inactive) {
+                await this.unstageFile(file.path);
+                continue;
+            }
+
+            const inactiveHunks = file.hunks?.filter(h => file.inactiveHunkIds?.includes(h.id)) || [];
+            if (inactiveHunks.length === 0) {
+                continue;
+            }
+
+            try {
+                await this.applyPatch(this.buildPatchFromHunks(inactiveHunks), true, true);
+            } catch (e) {
+                console.error(`Failed to exclude inactive hunks from index for ${file.path}:`, e);
+                throw e;
+            }
         }
     }
 
@@ -469,21 +561,14 @@ export class GitService implements vscode.Disposable {
                 throw new Error('No valid files to commit');
             }
 
-            // Only add files that are not yet staged
-            const filesToAdd = filesToCommit.filter(f => {
-                const status = statusMap.get(f);
-                return status && !status.staged;
-            });
-
-            if (filesToAdd.length > 0) {
-                await this.git.add(filesToAdd.map(f => this.toRepoPath(f)));
-            }
-
-            // Commit only the specified files
-            await this.git.commit(message, filesToCommit.map(f => this.toRepoPath(f)));
-        } else {
-            await this.git.commit(message);
+            await this._stageFilesWithSupport(filesToCommit);
+            
+            // To ensure Hunk-level exclusions (partial staging) are respected,
+            // we must commit what is currently in the index.
+            // Using a file list with 'git commit' will bypass the index changes we just made via 'apply --cached'.
         }
+        await this._excludeInactiveFromIndex();
+        await this.git.commit(message);
         this.fireChange();
     }
 
@@ -503,6 +588,8 @@ export class GitService implements vscode.Disposable {
                 await this.git.add(filesToAdd.map(f => this.toRepoPath(f)));
             }
         }
+
+        await this._excludeInactiveFromIndex();
 
         const args: string[] = ['commit', '--amend'];
         if (message) {
