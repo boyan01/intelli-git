@@ -238,6 +238,7 @@ export class GitService implements vscode.Disposable {
         const statusMap = new Map(currentStatus.map(f => [f.path, f]));
 
         const filesToDirectAdd: string[] = [];
+        const filesToUpdate: string[] = [];
         const filesWithPartialStaging: FileStatus[] = [];
 
         for (const filePath of filePaths) {
@@ -247,12 +248,20 @@ export class GitService implements vscode.Disposable {
                 continue;
             }
 
+            // A deleted file may already be fully staged in the index.
+            // Re-staging that path will fail because it no longer exists in the working tree.
+            if (fileStatus.staged && fileStatus.status === 'D') {
+                continue;
+            }
+
             // Exclude entirely inactive files if this is from a bulk operation? 
             // Usually stageFiles/stageFile is an explicit user action on these files.
             // But we still respect hunk-level inactivity.
             const hasInactiveHunks = fileStatus.inactiveHunkIds && fileStatus.inactiveHunkIds.length > 0;
             if (hasInactiveHunks && fileStatus.hunks) {
                 filesWithPartialStaging.push(fileStatus);
+            } else if (fileStatus.status === 'D') {
+                filesToUpdate.push(this.toRepoPath(filePath));
             } else {
                 filesToDirectAdd.push(this.toRepoPath(filePath));
             }
@@ -261,6 +270,10 @@ export class GitService implements vscode.Disposable {
         // Execute direct adds in batch
         if (filesToDirectAdd.length > 0) {
             await this.git.add(filesToDirectAdd);
+        }
+
+        if (filesToUpdate.length > 0) {
+            await this.git.raw(['add', '-u', '--', ...filesToUpdate]);
         }
 
         // Handle partial staging files
@@ -590,11 +603,26 @@ export class GitService implements vscode.Disposable {
             // Only add files that are not yet staged
             const filesToAdd = validFiles.filter(f => {
                 const status = statusMap.get(f);
-                return status && !status.staged;
+                // Keep staged modified files eligible here, but skip staged deletions
+                // because re-adding a removed path triggers a Git pathspec error.
+                return status && !(status.staged && status.status === 'D');
             });
 
             if (filesToAdd.length > 0) {
-                await this.git.add(filesToAdd.map(f => this.toRepoPath(f)));
+                const filesToDirectAdd = filesToAdd
+                    .filter(f => statusMap.get(f)?.status !== 'D')
+                    .map(f => this.toRepoPath(f));
+                const filesToUpdate = filesToAdd
+                    .filter(f => statusMap.get(f)?.status === 'D')
+                    .map(f => this.toRepoPath(f));
+
+                if (filesToDirectAdd.length > 0) {
+                    await this.git.add(filesToDirectAdd);
+                }
+
+                if (filesToUpdate.length > 0) {
+                    await this.git.raw(['add', '-u', '--', ...filesToUpdate]);
+                }
             }
         }
 
