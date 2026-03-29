@@ -4,32 +4,15 @@
 		{
 			"type": "npm",
 			"script": "watch:extension",
-			"problemMatcher": "$tsc-watch",
-			"isBackground": true,
-			"presentation": {
-				"reveal": "never",
-				"group": "watchters"
-			},
-			"group": "build"
-		},
-		{
-			"type": "npm",
-			"script": "watch:webview",
 			"problemMatcher": {
-				"owner": "typescript",
-				"fileLocation": "relative",
+				"owner": "custom",
 				"pattern": {
-					"regexp": "^([^\\s].*)\\((\\d+|\\d+,\\d+|\\d+,\\d+,\\d+,\\d+)\\):\\s+(error|warning|info)\\s+(TS\\d+)\\s*:\\s*(.*)$",
-					"file": 1,
-					"location": 2,
-					"severity": 3,
-					"code": 4,
-					"message": 5
+					"regexp": "."
 				},
 				"background": {
 					"activeOnStart": true,
-					"beginsPattern": "vite v[\\d.]+ building",
-					"endsPattern": "built in \\d+ms"
+					"beginsPattern": "build started\\.{3}",
+					"endsPattern": "built in \\d+ms\\."
 				}
 			},
 			"isBackground": true,
@@ -51,8 +34,7 @@
 		{
 			"label": "Watch All",
 			"dependsOn": [
-				"npm: watch:extension",
-				"npm: watch:webview"
+				"npm: watch:extension"
 			],
 			"group": {
 				"kind": "build",

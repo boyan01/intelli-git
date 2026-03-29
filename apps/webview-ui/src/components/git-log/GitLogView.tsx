@@ -2,6 +2,8 @@ import { SplitPane } from '../common/SplitPane';
 import { BranchListPanel } from './BranchListPanel';
 import { LogListPanel } from './LogListPanel';
 import { CommitDetailsView } from '../common/CommitDetailsView';
+import { useVersionCheck } from '../common/VersionCheckBanner';
+import { VersionExpiredPanel } from '../common/VersionExpiredPanel';
 import styles from './GitLogView.module.css';
 
 import { useState, useCallback, useEffect, useRef } from 'react';
@@ -56,7 +58,8 @@ export function GitLogView() {
         />
     );
 
-    const commitDetailsPanel = (
+    const { isExpired } = useVersionCheck();
+    const commitDetailsPanel = isExpired ? <VersionExpiredPanel /> : (
         <CommitDetailsView
             selectedHashes={selectedHashes}
             commit={commitDetails}

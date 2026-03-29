@@ -239,5 +239,8 @@
     "Stage All Tracked": "暂存所有已跟踪文件",
     "Hunk {0} moved to Inactive": "代码块 {0} 已移至不活跃列表",
     "No modified hunk found at line {0} in {1}": "在 {1} 的第 {0} 行未找到修改后的代码块",
-    "File status not found for {0}": "未找到 {0} 的文件状态"
+    "File status not found for {0}": "未找到 {0} 的文件状态",
+    "version.expires.warning": "当前内测版本将于 {{days}} 天后过期，请留意插件更新以继续使用。",
+    "version.expired.title": "版本已过期",
+    "version.expired.description": "版本已过期。为了保证您的体验，请更新至最新版。"
 }

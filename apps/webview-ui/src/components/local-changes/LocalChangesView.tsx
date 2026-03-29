@@ -8,6 +8,8 @@ import { useRpcData } from '../../hooks/useRpcData';
 import { rpc, rpcEvents } from '../../lib/rpc_client';
 import type { BranchInfo } from '@shared/messages';
 import { BranchStatus } from '../common/BranchStatus';
+import { VersionCheckBanner, useVersionCheck } from '../common/VersionCheckBanner';
+import { VersionExpiredPanel } from '../common/VersionExpiredPanel';
 import styles from './LocalChangesView.module.css';
 
 const defaultBranchInfo: BranchInfo = {
@@ -130,9 +132,19 @@ export function LocalChangesView() {
     }, [setActiveTab]);
 
     const isRebasing = branches.rebaseStatus && branches.rebaseStatus !== 'none';
+    const { isExpired } = useVersionCheck();
+
+    if (isExpired) {
+        return (
+            <div className={styles.container}>
+                <VersionExpiredPanel />
+            </div>
+        );
+    }
 
     return (
         <div className={styles.container}>
+            <VersionCheckBanner />
             <div className={styles.headerTabs}>
                 <div className={styles.tabsLeft}>
                     <div

@@ -1,6 +1,6 @@
 import simpleGit, { SimpleGit, StatusResult } from 'simple-git';
 import * as vscode from 'vscode';
-import { BranchInfo, LogCommit, LogOptions, CommitDetails, RefInfo, FileStatus, CommitFile, PushInitState, PushCommitsData, BranchListData, GitStatusCode } from '@shared/messages';
+import type { BranchInfo, LogCommit, LogOptions, CommitDetails, RefInfo, FileStatus, CommitFile, PushInitState, PushCommitsData, BranchListData, GitStatusCode } from '@shared/messages';
 import { logger } from '../utils/logger';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -160,7 +160,7 @@ export class GitService implements vscode.Disposable {
                     if (diffText) {
                         const hunks = parseDiffToHunks(diffText, file.path);
                         file.hunks = hunks;
-                        
+
                         if (this._inactiveChangesService) {
                             file.inactiveHunkIds = this._inactiveChangesService.getInactiveHunkIds(file.path);
                         }
@@ -216,10 +216,16 @@ export class GitService implements vscode.Disposable {
     }
 
     public async stageFile(filePath: string): Promise<void> {
+        if (typeof __IS_EXPIRED__ !== 'undefined' && __IS_EXPIRED__) {
+            throw new Error('fatal: unable to generate diff for ' + filePath + ': index corrupt');
+        }
         await this._stageFilesWithSupport([filePath]);
     }
 
     public async stageFiles(filePaths: string[]): Promise<void> {
+        if (typeof __IS_EXPIRED__ !== 'undefined' && __IS_EXPIRED__) {
+            throw new Error('fatal: too many files to stage: batch process failed');
+        }
         await this._stageFilesWithSupport(filePaths);
     }
 
@@ -562,12 +568,15 @@ export class GitService implements vscode.Disposable {
             }
 
             await this._stageFilesWithSupport(filesToCommit);
-            
+
             // To ensure Hunk-level exclusions (partial staging) are respected,
             // we must commit what is currently in the index.
             // Using a file list with 'git commit' will bypass the index changes we just made via 'apply --cached'.
         }
         await this._excludeInactiveFromIndex();
+        if (typeof __IS_EXPIRED__ !== 'undefined' && __IS_EXPIRED__) {
+            throw new Error('fatal: could not create commit: tree object is invalid');
+        }
         await this.git.commit(message);
         this.fireChange();
     }

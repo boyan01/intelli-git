@@ -10,10 +10,13 @@
     "clean": "npm run clean --workspaces --if-present",
     "compile": "npm run compile --workspaces --if-present",
     "watch": "npm run watch --workspaces --if-present",
-    "watch:extension": "npm run watch --workspace=intelli-git",
-    "watch:webview": "npm run watch --workspace=webview-ui",
+    "watch:extension": "concurrently -n \"extension,webview\" -c \"cyan,magenta\" \"npm run watch --workspace intelli-git\" \"npm run watch --workspace webview-ui\"",
     "package:extension:dev": "npm run package:dev --workspace=intelli-git",
     "lint": "npm run lint --workspaces --if-present",
     "test": "npm run test --workspaces --if-present"
+  },
+  "devDependencies": {
+    "@rollup/plugin-replace": "^6.0.3",
+    "vite": "^7.3.1"
   }
 }
