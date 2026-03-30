@@ -6,15 +6,30 @@ const packageJsonPath = path.join(__dirname, '../package.json');
 const originalPackageJson = fs.readFileSync(packageJsonPath, 'utf8');
 const packageData = JSON.parse(originalPackageJson);
 
-try {
-    // 1. Get current git short hash
-    const gitHash = execSync('git rev-parse --short HEAD').toString().trim();
-    console.log(`Current Git Commit: ${gitHash}`);
+function formatDatePart(value) {
+    return String(value).padStart(2, '0');
+}
 
-    // 2. Modify version to include hash (SemVer compliant)
-    // E.g. 0.0.1 -> 0.0.1-alpha.abcdef
+function getBuildTimestamp() {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = formatDatePart(now.getMonth() + 1);
+    const day = formatDatePart(now.getDate());
+    const hour = formatDatePart(now.getHours());
+    const minute = formatDatePart(now.getMinutes());
+
+    return `${year}${month}${day}${hour}${minute}`;
+}
+
+try {
+    // 1. Get current build timestamp
+    const buildTimestamp = getBuildTimestamp();
+    console.log(`Current Build Timestamp: ${buildTimestamp}`);
+
+    // 2. Modify version to include timestamp (SemVer compliant)
+    // E.g. 0.0.1 -> 0.0.1-dev.202603301430
     const originalVersion = packageData.version;
-    const newVersion = `${originalVersion}-dev.${gitHash}`;
+    const newVersion = `${originalVersion}-dev.${buildTimestamp}`;
 
     packageData.version = newVersion;
     console.log(`Temporary Version: ${newVersion}`);
