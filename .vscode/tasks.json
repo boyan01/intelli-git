@@ -2,6 +2,33 @@
 	"version": "2.0.0",
 	"tasks": [
 		{
+			"label": "Watch All (Run Extension)",
+			"type": "npm",
+			"script": "watch:extension",
+			"options": {
+				"env": {
+					"MODE": "debug"
+				}
+			},
+			"problemMatcher": {
+				"owner": "custom",
+				"pattern": {
+					"regexp": "."
+				},
+				"background": {
+					"activeOnStart": true,
+					"beginsPattern": "build started\\.{3}",
+					"endsPattern": "built in \\d+ms\\."
+				}
+			},
+			"isBackground": true,
+			"presentation": {
+				"reveal": "never",
+				"group": "watchters"
+			},
+			"group": "build"
+		},
+		{
 			"type": "npm",
 			"script": "watch:extension",
 			"problemMatcher": {
@@ -40,6 +67,14 @@
 				"kind": "build",
 				"isDefault": true
 			},
+			"problemMatcher": []
+		},
+		{
+			"label": "Watch All For Run Extension",
+			"dependsOn": [
+				"Watch All (Run Extension)"
+			],
+			"group": "build",
 			"problemMatcher": []
 		}
 	]

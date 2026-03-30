@@ -6,7 +6,8 @@ import replace from '@rollup/plugin-replace'
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   const repoRoot = path.resolve(__dirname, '../..');
-  const env = loadEnv(mode, repoRoot, '');
+  const effectiveMode = process.env.MODE || mode;
+  const env = loadEnv(effectiveMode, repoRoot, '');
   const daysAgo = parseFloat(env.DEBUG_BUILD_DAYS_AGO || '0');
   const finalBuildTime = Date.now() - (daysAgo * 24 * 60 * 60 * 1000);
 

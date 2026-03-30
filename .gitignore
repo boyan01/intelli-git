@@ -30,3 +30,5 @@ coverage/
 .vscode-test/
 .test
 .env
+.env.*
+!.env.example

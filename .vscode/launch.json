@@ -12,7 +12,7 @@
             "outFiles": [
                 "${workspaceFolder}/apps/extension/out/**/*.js"
             ],
-            "preLaunchTask": "Watch All"
+            "preLaunchTask": "Watch All For Run Extension"
         },
         {
             "name": "Extension Tests",
