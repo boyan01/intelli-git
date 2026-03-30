@@ -84,6 +84,7 @@ export class ExtensionRpcHandler {
                 stage: this.stage,
                 stageFiles: this.stageFiles,
                 unstage: this.unstage,
+                unstageFiles: this.unstageFiles,
                 stageAll: this.stageAll,
                 unstageAll: this.unstageAll,
                 stageTracked: this.stageTracked,
@@ -382,6 +383,10 @@ export class ExtensionRpcHandler {
 
     unstage = async (filePath: string): Promise<void> => {
         await this.gitService.unstageFile(filePath);
+    };
+
+    unstageFiles = async (filePaths: string[]): Promise<void> => {
+        await this.gitService.unstageFiles(filePaths);
     };
 
     stageAll = async (): Promise<void> => {

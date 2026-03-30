@@ -227,6 +227,7 @@
     "Inactive (Excluded from commit)": "Inactive (Excluded from commit)",
     "Active (Included in commit)": "Active (Included in commit)",
     "Some inactive changes in this group are staged externally. They will be automatically excluded by the plugin during commit.": "Some inactive changes in this group are staged externally. They will be automatically excluded by the plugin during commit.",
+    "Cannot stage inactive changes": "Cannot stage inactive changes",
     "Generate": "Generate",
     "Stage All Tracked": "Stage All Tracked",
     "Hunk {0} moved to Inactive": "Hunk {0} moved to Inactive",

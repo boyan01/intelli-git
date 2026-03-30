@@ -70,11 +70,45 @@ const countFiles = (node: TreeNode<FileNodeData>): number => {
     return node.children.reduce((sum, child) => sum + countFiles(child), 0);
 };
 
+const getAllFileNodes = (node: TreeNode<FileNodeData>): FileNodeData[] => {
+    if (node.data?.isFile) {
+        return node.data ? [node.data] : [];
+    }
+
+    if (!node.children) {
+        return [];
+    }
+
+    return node.children.flatMap(getAllFileNodes);
+};
+
 const getAllFilePaths = (node: TreeNode<FileNodeData>): string[] => {
     if (node.data?.isFile) return [node.data.path];
     if (!node.children) return [];
     return node.children.flatMap(getAllFilePaths);
 };
+
+const isConflictStatus = (status?: string): boolean => status === 'C' || status === 'U';
+
+const isInactiveTreeNode = (node: TreeNode<FileNodeData>): boolean => {
+    return Boolean(
+        node.data?.inactive ||
+        node.data?.isInactiveGroup ||
+        node.id === '__root__inactive-changes' ||
+        node.id.startsWith('inactive-changes/')
+    );
+};
+
+const isStagedTreeNode = (node: TreeNode<FileNodeData>): boolean => {
+    return Boolean(
+        node.data?.staged ||
+        node.data?.isStagedGroup ||
+        node.id === '__root__staged-changes' ||
+        node.id.startsWith('staged-changes/')
+    );
+};
+
+const dedupePaths = (paths: string[]): string[] => Array.from(new Set(paths));
 
 const buildTree = (files: FileStatus[]): TreeNode<FileNodeData>[] => {
     const root: TreeNode<FileNodeData>[] = [];
@@ -294,17 +328,9 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
     }, []);
 
     const renderTrailing = useCallback((node: TreeNode<FileNodeData>) => {
-        if (node.data?.isRoot && node.data?.fileCount !== undefined) {
-            return (
-                <span className={styles.fileCount} style={{ marginLeft: 0 }}>
-                    {node.data.fileCount}
-                </span>
-            );
-        }
-
         const isConflictFile = Boolean(
             node.data?.isFile &&
-            (node.data.status === 'C' || node.data.status === 'U')
+            isConflictStatus(node.data.status)
         );
 
         if (isConflictFile) {
@@ -354,7 +380,92 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
             );
         }
 
-        return null;
+        if (node.data?.isHunk || node.data?.isAmendCommit || node.data?.isAmendFile) {
+            return null;
+        }
+
+        const fileNodes = getAllFileNodes(node).filter(file => !isConflictStatus(file.status));
+        const stagedFiles = fileNodes.filter(file => file.staged);
+        const stageableFiles = fileNodes.filter(file => !file.staged && !file.inactive);
+
+        const inStagedTree = isStagedTreeNode(node);
+        const inInactiveTree = isInactiveTreeNode(node);
+
+        let action: {
+            kind: 'stage' | 'unstage';
+            paths: string[];
+            title: string;
+            disabled?: boolean;
+        } | null = null;
+
+        if (inStagedTree) {
+            if (stagedFiles.length > 0) {
+                action = {
+                    kind: 'unstage',
+                    paths: dedupePaths(stagedFiles.map(file => file.path)),
+                    title: t('Unstage')
+                };
+            }
+        } else if (inInactiveTree) {
+            if (stagedFiles.length > 0) {
+                action = {
+                    kind: 'unstage',
+                    paths: dedupePaths(stagedFiles.map(file => file.path)),
+                    title: t('Unstage')
+                };
+            } else if (fileNodes.length > 0) {
+                action = {
+                    kind: 'stage',
+                    paths: [],
+                    title: t('Cannot stage inactive changes'),
+                    disabled: true
+                };
+            }
+        } else if (stageableFiles.length > 0) {
+            action = {
+                kind: 'stage',
+                paths: dedupePaths(stageableFiles.map(file => file.path)),
+                title: t('Stage')
+            };
+        }
+
+        if (!action) {
+            return null;
+        }
+
+        return (
+            <div className={styles.groupTrailing}>
+                {action && (
+                    <button
+                        type="button"
+                        className={styles.hoverAction}
+                        data-action={action.kind}
+                        title={action.title}
+                        disabled={action.disabled}
+                        onClick={async (e) => {
+                            e.stopPropagation();
+
+                            if (action.disabled || action.paths.length === 0) {
+                                return;
+                            }
+
+                            if (action.kind === 'stage') {
+                                await rpc.stageFiles(action.paths);
+                            } else {
+                                await rpc.unstageFiles(action.paths);
+                            }
+
+                            rpcEvents.refresh.emit();
+                        }}
+                    >
+                        <i
+                            className={`codicon ${action.kind === 'stage' ? 'codicon-add' : 'codicon-remove'} ${styles.hoverActionSymbol}`}
+                            aria-hidden="true"
+                        />
+                    </button>
+                )}
+            </div>
+        );
     }, [t]);
 
     const renderLabel = useCallback((node: TreeNode<FileNodeData>) => {
@@ -432,8 +543,13 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
                         <span className={styles.name} style={{ fontStyle: 'italic' }}>{node.label}</span>
                     </>
                 ) : node.data?.isRoot ? (
-                    <>
-                        <span className={styles.name}>{node.label}</span>
+                    <div className={styles.rootTitleGroup}>
+                        <span className={styles.rootTitle}>{node.label}</span>
+                        {node.data?.fileCount !== undefined && (
+                            <span className={styles.fileCount}>
+                                {node.data.fileCount}
+                            </span>
+                        )}
                         {node.data?.hasWarning && (
                             <span 
                                 className={`codicon codicon-warning ${styles.icon}`} 
@@ -441,7 +557,7 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
                                 title={t('Some inactive changes in this group are staged externally. They will be automatically excluded by the plugin during commit.')}
                             ></span>
                         )}
-                    </>
+                    </div>
                 ) : (
                     <>
                         <span className={`codicon codicon-folder ${styles.icon}`}></span>

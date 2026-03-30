@@ -103,11 +103,10 @@
 }
 
 .node:hover .trailing button,
-.node.selected .trailing button,
-.node.focused .trailing button,
 .trailing button:focus-visible {
     opacity: 1;
     pointer-events: auto;
+    transform: translateX(0) scale(1);
 }
 
 .children {

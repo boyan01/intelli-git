@@ -8,7 +8,7 @@
 }
 
 .fileCount {
-    margin-left: 8px;
+    margin-left: 4px;
     padding: 1px 6px;
     font-size: 10px;
     background: var(--vscode-badge-background);
@@ -21,7 +21,7 @@
 .groupTrailing {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
 }
 
 .groupAction {
@@ -133,6 +133,18 @@
     white-space: nowrap;
 }
 
+.rootTitleGroup {
+    display: inline-flex;
+    align-items: center;
+    min-width: 0;
+}
+
+.rootTitle {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .statusM {
     color: var(--vscode-gitDecoration-modifiedResourceForeground, #e2c08d);
 }
@@ -201,31 +213,103 @@
 .resolveAction {
     width: 18px;
     height: 18px;
-    border: none;
-    border-radius: 3px;
-    background: var(--vscode-button-secondaryBackground);
-    color: var(--vscode-button-secondaryForeground);
+    border: 1px solid color-mix(in srgb, var(--vscode-panel-border) 72%, transparent);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--vscode-editorWidget-background) 86%, transparent);
+    color: color-mix(in srgb, var(--vscode-button-secondaryForeground) 88%, var(--vscode-foreground));
     display: inline-flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     opacity: 0;
     pointer-events: none;
-    transition: opacity 0.15s ease;
+    transform: translateX(2px) scale(0.96);
+    transition: opacity 0.16s ease, transform 0.18s ease, background-color 0.16s ease, border-color 0.16s ease;
     flex-shrink: 0;
+    backdrop-filter: blur(8px);
 }
 
 .resolveAction:hover {
-    background: var(--vscode-button-secondaryHoverBackground);
+    background: color-mix(in srgb, var(--vscode-button-secondaryHoverBackground) 76%, transparent);
+    border-color: color-mix(in srgb, var(--vscode-focusBorder) 32%, var(--vscode-panel-border));
 }
 
 .resolveAction:focus-visible {
     opacity: 1;
     pointer-events: auto;
+    transform: translateX(0) scale(1);
 }
 
 .conflictActions {
     display: inline-flex;
     align-items: center;
     gap: 4px;
+}
+
+.hoverAction {
+    width: 17px;
+    height: 17px;
+    border: 1px solid color-mix(in srgb, var(--vscode-panel-border) 76%, transparent);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--vscode-editorWidget-background) 82%, transparent);
+    color: var(--vscode-descriptionForeground);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateX(2px) scale(0.94);
+    transition: opacity 0.16s ease, transform 0.18s ease, background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease;
+    flex-shrink: 0;
+    font-weight: 600;
+    line-height: 1;
+    box-shadow: 0 0 0 1px transparent;
+    backdrop-filter: blur(8px);
+}
+
+.hoverAction:hover {
+    background: color-mix(in srgb, var(--vscode-button-secondaryHoverBackground) 72%, transparent);
+    border-color: color-mix(in srgb, var(--vscode-focusBorder) 26%, var(--vscode-panel-border));
+}
+
+.hoverAction:focus-visible {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateX(0) scale(1);
+}
+
+.hoverAction:disabled {
+    cursor: not-allowed;
+    color: color-mix(in srgb, var(--vscode-disabledForeground) 88%, var(--vscode-descriptionForeground));
+    background: color-mix(in srgb, var(--vscode-editorWidget-background) 56%, transparent);
+    border-color: color-mix(in srgb, var(--vscode-disabledForeground) 26%, transparent);
+}
+
+.hoverActionSymbol {
+    font-size: 12px;
+    transform: translateY(0);
+}
+
+.hoverAction[data-action='stage'] {
+    color: color-mix(in srgb, var(--vscode-gitDecoration-addedResourceForeground) 88%, var(--vscode-foreground));
+}
+
+.hoverAction[data-action='stage']:hover {
+    background: color-mix(in srgb, var(--vscode-gitDecoration-addedResourceForeground) 12%, var(--vscode-toolbar-hoverBackground));
+    border-color: color-mix(in srgb, var(--vscode-gitDecoration-addedResourceForeground) 36%, var(--vscode-panel-border));
+}
+
+.hoverAction[data-action='unstage'] {
+    color: color-mix(in srgb, var(--vscode-gitDecoration-modifiedResourceForeground) 82%, var(--vscode-foreground));
+}
+
+.hoverAction[data-action='unstage']:hover {
+    background: color-mix(in srgb, var(--vscode-gitDecoration-modifiedResourceForeground) 12%, var(--vscode-toolbar-hoverBackground));
+    border-color: color-mix(in srgb, var(--vscode-gitDecoration-modifiedResourceForeground) 34%, var(--vscode-panel-border));
+}
+
+.hoverAction[data-action='stage']:disabled,
+.hoverAction[data-action='unstage']:disabled {
+    color: color-mix(in srgb, var(--vscode-disabledForeground) 82%, var(--vscode-descriptionForeground));
 }

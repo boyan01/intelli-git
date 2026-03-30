@@ -235,6 +235,7 @@
     "Inactive (Excluded from commit)": "不活跃（不包含在提交中）",
     "Active (Included in commit)": "活跃（包含在提交中）",
     "Some inactive changes in this group are staged externally. They will be automatically excluded by the plugin during commit.": "此组中的一些不活跃更改已在外部被暂存。插件将在提交时自动排除它们。",
+    "Cannot stage inactive changes": "无法暂存 inactive 更改",
     "Generate": "生成",
     "Stage All Tracked": "暂存所有已跟踪文件",
     "Hunk {0} moved to Inactive": "代码块 {0} 已移至不活跃列表",

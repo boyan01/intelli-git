@@ -121,6 +121,7 @@ export interface ExtensionMethods {
     stage: (path: string) => Promise<void>;
     stageFiles: (paths: string[]) => Promise<void>;
     unstage: (path: string) => Promise<void>;
+    unstageFiles: (paths: string[]) => Promise<void>;
     stageAll: () => Promise<void>;
     unstageAll: () => Promise<void>;
     stageTracked: () => Promise<void>;

@@ -300,6 +300,14 @@ export class GitService implements vscode.Disposable {
         await this.git.reset(['HEAD', '--', this.toRepoPath(filePath)]);
     }
 
+    public async unstageFiles(filePaths: string[]): Promise<void> {
+        if (!filePaths || filePaths.length === 0) {
+            return;
+        }
+
+        await this.git.reset(['HEAD', '--', ...filePaths.map(filePath => this.toRepoPath(filePath))]);
+    }
+
     public async resolveConflict(filePath: string, side: 'ours' | 'theirs'): Promise<void> {
         const repoPath = this.toRepoPath(filePath);
         const unmerged = await this.git.raw(['ls-files', '-u', '--', repoPath]);
