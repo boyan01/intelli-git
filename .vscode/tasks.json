@@ -3,34 +3,13 @@
 	"tasks": [
 		{
 			"label": "Watch All (Run Extension)",
-			"type": "npm",
-			"script": "watch:extension",
+			"type": "shell",
+			"command": "npm run watch:extension",
 			"options": {
 				"env": {
 					"MODE": "debug"
 				}
 			},
-			"problemMatcher": {
-				"owner": "custom",
-				"pattern": {
-					"regexp": "."
-				},
-				"background": {
-					"activeOnStart": true,
-					"beginsPattern": "build started\\.{3}",
-					"endsPattern": "built in \\d+ms\\."
-				}
-			},
-			"isBackground": true,
-			"presentation": {
-				"reveal": "never",
-				"group": "watchters"
-			},
-			"group": "build"
-		},
-		{
-			"type": "npm",
-			"script": "watch:extension",
 			"problemMatcher": {
 				"owner": "custom",
 				"pattern": {
@@ -61,20 +40,12 @@
 		{
 			"label": "Watch All",
 			"dependsOn": [
-				"npm: watch:extension"
+				"Watch All (Run Extension)"
 			],
 			"group": {
 				"kind": "build",
 				"isDefault": true
 			},
-			"problemMatcher": []
-		},
-		{
-			"label": "Watch All For Run Extension",
-			"dependsOn": [
-				"Watch All (Run Extension)"
-			],
-			"group": "build",
 			"problemMatcher": []
 		}
 	]
