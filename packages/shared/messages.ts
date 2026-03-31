@@ -37,6 +37,14 @@ export interface ChangelistGroup {
     hasWarning?: boolean;
 }
 
+export interface ChangelistFileSelection {
+    path: string;
+    status?: string;
+    staged?: boolean;
+    inactive?: boolean;
+    isConflict?: boolean;
+}
+
 export interface BranchInfo {
     current: string;
     all: string[];
@@ -153,6 +161,8 @@ export interface ExtensionMethods {
     showErrorMessage: (message: string) => Promise<void>;
     markHunkInactive: (params: { path: string; hunkId: string }) => Promise<void>;
     markHunkActive: (params: { path: string; hunkId: string }) => Promise<void>;
+    setActiveChangelistFile: (params: ChangelistFileSelection | null) => Promise<void>;
+    setChangelistTreeFocus: (focused: boolean) => Promise<void>;
 }
 
 

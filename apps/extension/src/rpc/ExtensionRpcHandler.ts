@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { RpcPeer } from '@shared/rpc';
-import type { WebviewMethods, ExtensionMethods, FileStatus } from '@shared/messages';
+import type { WebviewMethods, ExtensionMethods, FileStatus, ChangelistFileSelection } from '@shared/messages';
 import { GitService } from '../services/GitService';
 import { InactiveChangesService } from '../services/InactiveChangesService';
 import { AnthropicService } from '../services/AnthropicService';
@@ -16,6 +16,8 @@ export interface ExtensionRpcHandlerOptions {
     gitService: GitService;
     inactiveChangesService?: InactiveChangesService;
     onDispose?: () => void;
+    onChangelistSelectionChange?: (selection: ChangelistFileSelection | null) => void;
+    onChangelistFocusChange?: (focused: boolean) => void;
 }
 
 /**
@@ -27,6 +29,8 @@ export class ExtensionRpcHandler {
     private gitService: GitService;
     private inactiveChangesService?: InactiveChangesService;
     private onDispose: () => void;
+    private onChangelistSelectionChange?: (selection: ChangelistFileSelection | null) => void;
+    private onChangelistFocusChange?: (focused: boolean) => void;
     private _lastRebaseStatus?: string;
 
     constructor(options: ExtensionRpcHandlerOptions) {
@@ -34,6 +38,8 @@ export class ExtensionRpcHandler {
         this.gitService = options.gitService;
         this.inactiveChangesService = options.inactiveChangesService;
         this.onDispose = options.onDispose || (() => { });
+        this.onChangelistSelectionChange = options.onChangelistSelectionChange;
+        this.onChangelistFocusChange = options.onChangelistFocusChange;
     }
 
     log = (params: { message: string, type?: 'info' | 'error' | 'warn' | 'debug' }): Promise<void> => {
@@ -115,7 +121,9 @@ export class ExtensionRpcHandler {
                 getLastCommitInfo: async () => this.gitService.getLastCommitInfo(),
                 showErrorMessage: this.showErrorMessage,
                 markHunkInactive: this.markHunkInactive,
-                markHunkActive: this.markHunkActive
+                markHunkActive: this.markHunkActive,
+                setActiveChangelistFile: this.setActiveChangelistFile,
+                setChangelistTreeFocus: this.setChangelistTreeFocus
             }
         )
     }
@@ -200,6 +208,14 @@ export class ExtensionRpcHandler {
             const uri = vscode.Uri.file(`${workspaceRoot}/${filePath}`);
             await vscode.commands.executeCommand('git.openChange', uri);
         }
+    };
+
+    setActiveChangelistFile = async (selection: ChangelistFileSelection | null): Promise<void> => {
+        this.onChangelistSelectionChange?.(selection);
+    };
+
+    setChangelistTreeFocus = async (focused: boolean): Promise<void> => {
+        this.onChangelistFocusChange?.(focused);
     };
 
     closeWebView = async (): Promise<void> => {

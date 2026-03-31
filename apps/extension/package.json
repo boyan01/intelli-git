@@ -250,6 +250,14 @@
         "title": "%intelli-git.commands.moveHunkToInactive.title%"
       }
     ],
+    "keybindings": [
+      {
+        "command": "intelli-git.changelist.showDiff",
+        "mac": "cmd+d",
+        "key": "ctrl+d",
+        "when": "intelli-git.hasSelectedChangelistFile && intelli-git.changelistTreeFocus"
+      }
+    ],
     "menus": {
       "view/item/context": [
         {

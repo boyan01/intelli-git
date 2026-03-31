@@ -1,10 +1,14 @@
 import * as vscode from 'vscode';
+import type { ChangelistFileSelection } from '@shared/messages';
 import { BaseWebviewProvider, WebviewProviderOptions } from './BaseWebviewProvider';
+import type { ExtensionRpcHandlerOptions } from '../rpc';
 
 export class CommitViewProvider extends BaseWebviewProvider implements vscode.WebviewViewProvider {
 
     public static readonly viewType = 'intelliGitView';
     private _view?: vscode.WebviewView;
+    private _selectedChangelistFile: ChangelistFileSelection | null = null;
+    private _isChangelistTreeFocused = false;
 
     constructor(options: WebviewProviderOptions) {
         super(options);
@@ -25,6 +29,23 @@ export class CommitViewProvider extends BaseWebviewProvider implements vscode.We
         return undefined;
     }
 
+    protected getRpcHandlerOptions(): Partial<ExtensionRpcHandlerOptions> {
+        return {
+            onChangelistSelectionChange: (selection) => {
+                this._selectedChangelistFile = selection;
+                void vscode.commands.executeCommand('setContext', 'intelli-git.hasSelectedChangelistFile', Boolean(selection?.path));
+            },
+            onChangelistFocusChange: (focused) => {
+                this._isChangelistTreeFocused = focused;
+                void vscode.commands.executeCommand('setContext', 'intelli-git.changelistTreeFocus', focused);
+            }
+        };
+    }
+
+    public getSelectedChangelistFile(): ChangelistFileSelection | null {
+        return this._selectedChangelistFile;
+    }
+
     public resolveWebviewView(
         webviewView: vscode.WebviewView,
         _context: vscode.WebviewViewResolveContext,
@@ -38,6 +59,10 @@ export class CommitViewProvider extends BaseWebviewProvider implements vscode.We
         this.setupActiveFileListener(webviewView);
 
         webviewView.onDidDispose(() => {
+            this._selectedChangelistFile = null;
+            this._isChangelistTreeFocused = false;
+            void vscode.commands.executeCommand('setContext', 'intelli-git.hasSelectedChangelistFile', false);
+            void vscode.commands.executeCommand('setContext', 'intelli-git.changelistTreeFocus', false);
             this.dispose();
         });
     }

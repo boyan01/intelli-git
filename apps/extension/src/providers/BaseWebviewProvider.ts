@@ -4,7 +4,7 @@ import { RpcPeer } from '@shared/rpc';
 import { GitService } from '../services/GitService';
 import { InactiveChangesService } from '../services/InactiveChangesService';
 import { getWebviewHtml } from '../utils/webviewHtml';
-import { createRpc, ExtensionRpcHandler } from '../rpc';
+import { createRpc, ExtensionRpcHandler, type ExtensionRpcHandlerOptions } from '../rpc';
 
 export interface WebviewProviderOptions {
     extensionUri: vscode.Uri;
@@ -37,7 +37,8 @@ export abstract class BaseWebviewProvider {
             context: this.options.context,
             gitService: this.options.gitService,
             inactiveChangesService: this.options.inactiveChangesService,
-            onDispose: this.getOnDispose()
+            onDispose: this.getOnDispose(),
+            ...this.getRpcHandlerOptions()
         });
         handler.registerAll(this._rpc);
 
@@ -59,6 +60,10 @@ export abstract class BaseWebviewProvider {
 
     protected getOnDispose(): (() => void) | undefined {
         return undefined;
+    }
+
+    protected getRpcHandlerOptions(): Partial<ExtensionRpcHandlerOptions> {
+        return {};
     }
 
     protected abstract getTitle(): string;

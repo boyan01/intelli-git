@@ -323,6 +323,25 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
         }
     }, []);
 
+    const handleFocusNodeChange = useCallback((node: TreeNode<FileNodeData>) => {
+        if (!node.data?.isFile) {
+            void rpc.setActiveChangelistFile(null);
+            return;
+        }
+
+        void rpc.setActiveChangelistFile({
+            path: node.data.path,
+            status: node.data.status,
+            staged: node.data.staged,
+            inactive: node.data.inactive,
+            isConflict: isConflictStatus(node.data.status)
+        });
+    }, []);
+
+    const handleTreeFocusChange = useCallback((focused: boolean) => {
+        void rpc.setChangelistTreeFocus(focused);
+    }, []);
+
     const renderLeading = useCallback(() => {
         return null;
     }, []);
@@ -658,6 +677,8 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
             selectedId={activeFile || undefined}
             onSelect={handleNodeClick}
             onDoubleClick={handleNodeDoubleClick}
+            onFocusNodeChange={handleFocusNodeChange}
+            onFocusChange={handleTreeFocusChange}
             renderLeading={renderLeading}
             renderLabel={renderLabel}
             renderTrailing={renderTrailing}

@@ -1,10 +1,12 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
+import type { ChangelistFileSelection } from '@shared/messages';
 import { GitService } from '../services/GitService';
 import { InactiveChangesService } from '../services/InactiveChangesService';
 import { CommitViewProvider } from '../providers/CommitViewProvider';
 import { i18n } from '../utils/i18n';
 import { logger } from '../utils/logger';
+import { log } from 'console';
 
 interface ChangelistFileContext {
     webviewSection: 'changelistFile';
@@ -13,6 +15,35 @@ interface ChangelistFileContext {
     isStaged?: boolean;
     isInactive?: boolean;
     isConflict?: boolean;
+}
+
+async function showDiffForChangelistFile(gitService: GitService, args: ChangelistFileSelection): Promise<void> {
+    if (!args?.path) {
+        return;
+    }
+
+    if (args.status === '?') {
+        const workspaceRoot = gitService.getWorkspaceRoot();
+        if (workspaceRoot) {
+            const uri = vscode.Uri.file(`${workspaceRoot}/${args.path}`);
+            await vscode.commands.executeCommand('vscode.open', uri);
+        }
+        return;
+    }
+
+    if (args.staged) {
+        const leftUri = vscode.Uri.parse(`intelli-git-revision://load/${args.path}?${JSON.stringify({ ref: 'HEAD' })}`);
+        const rightUri = vscode.Uri.parse(`intelli-git-revision://load/${args.path}?${JSON.stringify({ ref: '' })}`);
+        const title = `${path.basename(args.path)} ${i18n.t('(Staged)')}`;
+        await vscode.commands.executeCommand('vscode.diff', leftUri, rightUri, title);
+        return;
+    }
+
+    const workspaceRoot = gitService.getWorkspaceRoot();
+    if (workspaceRoot) {
+        const uri = vscode.Uri.file(`${workspaceRoot}/${args.path}`);
+        await vscode.commands.executeCommand('git.openChange', uri);
+    }
 }
 
 /**
@@ -38,30 +69,11 @@ export function registerChangelistCommands(
 
     context.subscriptions.push(
         vscode.commands.registerCommand('intelli-git.changelist.showDiff', async (args: ChangelistFileContext) => {
-            if (args?.path) {
-                if (args.status === '?') {
-                    // Unversioned file: just open the source file
-                    const workspaceRoot = gitService.getWorkspaceRoot();
-                    if (workspaceRoot) {
-                        const uri = vscode.Uri.file(`${workspaceRoot}/${args.path}`);
-                        await vscode.commands.executeCommand('vscode.open', uri);
-                    }
-                    return;
-                }
-
-                if (args.isStaged) {
-                    const leftUri = vscode.Uri.parse(`intelli-git-revision://load/${args.path}?${JSON.stringify({ ref: 'HEAD' })}`);
-                    const rightUri = vscode.Uri.parse(`intelli-git-revision://load/${args.path}?${JSON.stringify({ ref: '' })}`);
-                    const title = `${path.basename(args.path)} ${i18n.t('(Staged)')}`;
-                    await vscode.commands.executeCommand('vscode.diff', leftUri, rightUri, title);
-                } else {
-                    const workspaceRoot = gitService.getWorkspaceRoot();
-                    if (workspaceRoot) {
-                        const uri = vscode.Uri.file(`${workspaceRoot}/${args.path}`);
-                        await vscode.commands.executeCommand('git.openChange', uri);
-                    }
-                }
+            const target = args?.path ? args : provider.getSelectedChangelistFile();
+            if (!target) {
+                return;
             }
+            await showDiffForChangelistFile(gitService, target);
         })
     );
 

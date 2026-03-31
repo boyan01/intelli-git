@@ -23,6 +23,8 @@ export interface BasicTreeViewProps<T = unknown> {
     onSelect?: (node: TreeNode<T>) => void;
     onDoubleClick?: (node: TreeNode<T>) => void;
     onContextMenu?: (e: React.MouseEvent, node: TreeNode<T>) => void;
+    onFocusNodeChange?: (node: TreeNode<T>) => void;
+    onFocusChange?: (focused: boolean) => void;
     renderLabel?: (node: TreeNode<T>) => React.ReactNode;
     renderTrailing?: (node: TreeNode<T>) => React.ReactNode;
     getContextData?: (node: TreeNode<T>) => Record<string, unknown> | undefined;
@@ -69,6 +71,8 @@ interface TreeNodeItemProps<T> {
     onSelect?: (node: TreeNode<T>) => void;
     onDoubleClick?: (node: TreeNode<T>) => void;
     onContextMenu?: (e: React.MouseEvent, node: TreeNode<T>) => void;
+    onFocusNodeChange?: (node: TreeNode<T>) => void;
+    onFocusChange?: (focused: boolean) => void;
     renderLabel?: (node: TreeNode<T>) => React.ReactNode;
     renderTrailing?: (node: TreeNode<T>) => React.ReactNode;
     getContextData?: (node: TreeNode<T>) => Record<string, unknown> | undefined;
@@ -83,6 +87,7 @@ interface TreeNodeItemProps<T> {
     getDragLabel?: (node: TreeNode<T>) => { label: string; count?: number };
     setFocusedId: (id: string | null) => void;
     setDragOverId: (id: string | null) => void;
+    focusTree: () => void;
     dragGhostRef: React.RefObject<HTMLDivElement | null>;
     draggedNodeRef: React.MutableRefObject<TreeNode<T> | null>;
     clearDragTimeoutRef: React.MutableRefObject<ReturnType<typeof setTimeout> | null>;
@@ -91,11 +96,11 @@ interface TreeNodeItemProps<T> {
 const TreeNodeItem = <T,>(props: TreeNodeItemProps<T>) => {
     const {
         node, depth, expandedIds, selectedId, focusedId, dragOverId,
-        toggleNode, onSelect, onDoubleClick, onContextMenu,
+        toggleNode, onSelect, onDoubleClick, onContextMenu, onFocusNodeChange,
         renderLabel, renderTrailing, getContextData, renderLeading,
         baseIndent, indent, isDraggable, isDropTarget,
         getDropTargetRootId, onDrop, getDragData, getDragLabel,
-        setFocusedId, setDragOverId, dragGhostRef,
+        setFocusedId, setDragOverId, focusTree, dragGhostRef,
         draggedNodeRef, clearDragTimeoutRef
     } = props;
 
@@ -207,7 +212,9 @@ const TreeNodeItem = <T,>(props: TreeNodeItemProps<T>) => {
                 onDragEnd={() => { draggedNodeRef.current = null; setDragOverId(null); }}
                 onClick={(e) => {
                     e.stopPropagation();
+                    focusTree();
                     setFocusedId(node.id);
+                    onFocusNodeChange?.(node);
                     if (isLeaf) {
                         onSelect?.(node);
                     } else {
@@ -216,10 +223,13 @@ const TreeNodeItem = <T,>(props: TreeNodeItemProps<T>) => {
                 }}
                 onDoubleClick={(e) => {
                     e.stopPropagation();
+                    focusTree();
                     onDoubleClick?.(node);
                 }}
                 onContextMenu={(e) => {
+                    focusTree();
                     setFocusedId(node.id);
+                    onFocusNodeChange?.(node);
                     onContextMenu?.(e, node);
                 }}
                 {...(contextData ? { 'data-vscode-context': JSON.stringify(contextData) } : {})}
@@ -268,7 +278,7 @@ function BasicTreeViewInner<T>(
 ) {
     const {
         nodes, expandedIds: controlledExpandedIds, selectedId, defaultExpandAll = false,
-        onToggle, onSelect, onDoubleClick, onContextMenu, renderLabel, renderTrailing,
+        onToggle, onSelect, onDoubleClick, onContextMenu, onFocusNodeChange, onFocusChange, renderLabel, renderTrailing,
         getContextData, indent = 8, baseIndent = 0, renderLeading, isDraggable, isDropTarget,
         getDropTargetRootId, onDrop, getDragData, getDragLabel
     } = props;
@@ -285,6 +295,10 @@ function BasicTreeViewInner<T>(
     });
 
     const expandedIds = controlledExpandedIds ?? internalExpandedIds;
+
+    const focusTree = useCallback(() => {
+        rootRef.current?.focus();
+    }, []);
 
     const toggleNode = useCallback((id: string) => {
         const isExpanded = expandedIds.has(id);
@@ -315,7 +329,13 @@ function BasicTreeViewInner<T>(
     }), [nodes, controlledExpandedIds, onToggle, expandedIds]);
 
     return (
-        <div ref={rootRef} className={styles.root} tabIndex={0}>
+        <div
+            ref={rootRef}
+            className={styles.root}
+            tabIndex={0}
+            onFocus={() => onFocusChange?.(true)}
+            onBlur={() => onFocusChange?.(false)}
+        >
             {nodes.map(node => (
                 <TreeNodeItem
                     key={node.id}
@@ -329,6 +349,7 @@ function BasicTreeViewInner<T>(
                     onSelect={onSelect}
                     onDoubleClick={onDoubleClick}
                     onContextMenu={onContextMenu}
+                    onFocusNodeChange={onFocusNodeChange}
                     renderLabel={renderLabel}
                     renderTrailing={renderTrailing}
                     getContextData={getContextData}
@@ -343,6 +364,7 @@ function BasicTreeViewInner<T>(
                     getDragLabel={getDragLabel}
                     setFocusedId={setFocusedId}
                     setDragOverId={setDragOverId}
+                    focusTree={focusTree}
                     dragGhostRef={dragGhostRef}
                     draggedNodeRef={draggedNodeRef}
                     clearDragTimeoutRef={clearDragTimeoutRef}
