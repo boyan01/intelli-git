@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import type { ChangelistFileSelection } from '@shared/messages';
 import { GitService } from '../services/GitService';
+import { ChangelistStateService } from '../services/ChangelistStateService';
 import { InactiveChangesService } from '../services/InactiveChangesService';
 import { CommitViewProvider } from '../providers/CommitViewProvider';
 import { i18n } from '../utils/i18n';
@@ -11,10 +12,74 @@ import { log } from 'console';
 interface ChangelistFileContext {
     webviewSection: 'changelistFile';
     path: string;
+    paths?: string[];
     status?: string;
     isStaged?: boolean;
     isInactive?: boolean;
     isConflict?: boolean;
+    isUntracked?: boolean;
+    hasStaged?: boolean;
+    allStaged?: boolean;
+    hasInactive?: boolean;
+    allInactive?: boolean;
+    hasConflict?: boolean;
+    hasUntracked?: boolean;
+    changelistMode?: 'staged' | 'changes';
+    changelistId?: string;
+}
+
+interface ChangelistRootContext {
+    webviewSection: 'changelistRoot';
+    changelistId?: string;
+    paths?: string[];
+    isActiveChangelist?: boolean;
+    canDeleteChangelist?: boolean;
+    hasStaged?: boolean;
+    allStaged?: boolean;
+    hasInactive?: boolean;
+    allInactive?: boolean;
+    hasConflict?: boolean;
+    hasUntracked?: boolean;
+    changelistMode?: 'staged' | 'changes';
+}
+
+interface ChangelistFolderContext {
+    webviewSection: 'changelistFolder';
+    path: string;
+    paths: string[];
+    hasStaged?: boolean;
+    allStaged?: boolean;
+    hasInactive?: boolean;
+    allInactive?: boolean;
+    hasConflict?: boolean;
+    hasUntracked?: boolean;
+    changelistMode?: 'staged' | 'changes';
+    changelistId?: string;
+}
+
+interface ChangelistHunkContext {
+    webviewSection: 'changelistHunk';
+    path: string;
+    hunkId: string;
+    changelistId?: string;
+}
+
+type ChangelistTargetContext = ChangelistFileContext | ChangelistFolderContext | ChangelistRootContext;
+
+function getTargetPaths(args?: ChangelistTargetContext): string[] {
+    if (!args) {
+        return [];
+    }
+
+    if (Array.isArray(args.paths) && args.paths.length > 0) {
+        return Array.from(new Set(args.paths));
+    }
+
+    if ('path' in args && args.path) {
+        return [args.path];
+    }
+
+    return [];
 }
 
 async function showDiffForChangelistFile(gitService: GitService, args: ChangelistFileSelection): Promise<void> {
@@ -53,8 +118,110 @@ export function registerChangelistCommands(
     context: vscode.ExtensionContext,
     gitService: GitService,
     inactiveChangesService: InactiveChangesService,
+    changelistStateService: ChangelistStateService,
     provider: CommitViewProvider
 ): void {
+    context.subscriptions.push(
+        vscode.commands.registerCommand('intelli-git.changelist.createList', async () => {
+            const changelistName = await vscode.window.showInputBox({
+                prompt: i18n.t('extension.enterChangelistName'),
+                value: i18n.t('Changes')
+            });
+            if (!changelistName?.trim()) {
+                return;
+            }
+            await changelistStateService.createList(changelistName.trim());
+            provider.rpc?.refresh();
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand('intelli-git.changelist.renameList', async (args: ChangelistRootContext) => {
+            if (!args?.changelistId) {
+                return;
+            }
+            const current = changelistStateService.getState().lists.find(list => list.id === args.changelistId);
+            if (!current) {
+                return;
+            }
+            const changelistName = await vscode.window.showInputBox({
+                prompt: i18n.t('extension.enterChangelistName'),
+                value: current.name
+            });
+            if (!changelistName?.trim()) {
+                return;
+            }
+            await changelistStateService.renameList(args.changelistId, changelistName.trim());
+            provider.rpc?.refresh();
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand('intelli-git.changelist.deleteList', async (args: ChangelistRootContext) => {
+            if (!args?.changelistId) {
+                return;
+            }
+            const current = changelistStateService.getState().lists.find(list => list.id === args.changelistId);
+            if (!current) {
+                return;
+            }
+            if (changelistStateService.getListItemCount(args.changelistId) > 0) {
+                const confirmed = await vscode.window.showWarningMessage(
+                    i18n.t('extension.changelistNotEmpty', current.name),
+                    { modal: true },
+                    i18n.t('Delete')
+                );
+                if (confirmed !== i18n.t('Delete')) {
+                    return;
+                }
+            }
+            await changelistStateService.deleteList(args.changelistId);
+            provider.rpc?.refresh();
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand('intelli-git.changelist.setActiveList', async (args: ChangelistRootContext) => {
+            if (!args?.changelistId) {
+                return;
+            }
+            await changelistStateService.setActiveList(args.changelistId);
+            provider.rpc?.refresh();
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand('intelli-git.changelist.moveToList', async (args: ChangelistFileContext | ChangelistHunkContext) => {
+            const state = changelistStateService.getState();
+
+            const currentListId = args?.changelistId;
+            const target = await vscode.window.showQuickPick(
+                state.lists
+                    .filter(list => list.id !== currentListId)
+                    .map(list => ({
+                        label: list.name,
+                        description: list.isActive ? i18n.t('Active') : undefined,
+                        id: list.id
+                    })),
+                {
+                    placeHolder: i18n.t('Move to Changelist...')
+                }
+            );
+
+            if (!target) {
+                return;
+            }
+
+            if (args?.webviewSection === 'changelistHunk' && args.hunkId) {
+                await changelistStateService.moveHunks(args.path, [args.hunkId], target.id);
+            } else if (args?.path) {
+                await changelistStateService.moveFiles([args.path], target.id);
+            }
+
+            provider.rpc?.refresh();
+        })
+    );
+
     context.subscriptions.push(
         vscode.commands.registerCommand('intelli-git.changelist.openFile', async (args: ChangelistFileContext) => {
             if (args?.path) {
@@ -78,16 +245,17 @@ export function registerChangelistCommands(
     );
 
     context.subscriptions.push(
-        vscode.commands.registerCommand('intelli-git.changelist.rollback', async (args: ChangelistFileContext) => {
-            if (args?.path) {
+        vscode.commands.registerCommand('intelli-git.changelist.rollback', async (args: ChangelistTargetContext) => {
+            const paths = getTargetPaths(args);
+            if (paths.length > 0) {
                 const confirm = await vscode.window.showWarningMessage(
-                    i18n.t('extension.rollbackFilesConfirm', 1),
+                    i18n.t('extension.rollbackFilesConfirm', paths.length),
                     { modal: true },
                     i18n.t('Rollback')
                 );
                 if (confirm === i18n.t('Rollback')) {
                     try {
-                        await gitService.rollbackFiles([args.path]);
+                        await gitService.rollbackFiles(paths);
                         provider.rpc?.refresh();
                     } catch (e) {
                         vscode.window.showErrorMessage(i18n.t('extension.rollbackFailed', `${e}`));
@@ -98,13 +266,14 @@ export function registerChangelistCommands(
     );
 
     context.subscriptions.push(
-        vscode.commands.registerCommand('intelli-git.changelist.stash', async (args: ChangelistFileContext) => {
-            if (args?.path) {
+        vscode.commands.registerCommand('intelli-git.changelist.stash', async (args: ChangelistTargetContext) => {
+            const paths = getTargetPaths(args);
+            if (paths.length > 0) {
                 const message = await vscode.window.showInputBox({
                     placeHolder: i18n.t('extension.stashPlaceholder')
                 });
                 try {
-                    await gitService.stash(message, [args.path]);
+                    await gitService.stash(message, paths);
                     provider.rpc?.refresh();
                 } catch (e) {
                     vscode.window.showErrorMessage(i18n.t('extension.stashFailed', `${e}`));
@@ -114,10 +283,11 @@ export function registerChangelistCommands(
     );
 
     context.subscriptions.push(
-        vscode.commands.registerCommand('intelli-git.changelist.delete', async (args: ChangelistFileContext) => {
-            if (args?.path) {
+        vscode.commands.registerCommand('intelli-git.changelist.delete', async (args: ChangelistTargetContext) => {
+            const paths = getTargetPaths(args);
+            if (paths.length > 0) {
                 const confirm = await vscode.window.showWarningMessage(
-                    i18n.t('extension.deleteFilesConfirm', 1),
+                    i18n.t('extension.deleteFilesConfirm', paths.length),
                     { modal: true },
                     i18n.t('Delete')
                 );
@@ -125,8 +295,17 @@ export function registerChangelistCommands(
                     const workspaceRoot = gitService.getWorkspaceRoot();
                     if (workspaceRoot) {
                         try {
-                            const uri = vscode.Uri.file(`${workspaceRoot}/${args.path}`);
-                            await vscode.workspace.fs.delete(uri, { recursive: false, useTrash: true });
+                            for (const filePath of paths) {
+                                const uri = vscode.Uri.file(`${workspaceRoot}/${filePath}`);
+                                try {
+                                    await vscode.workspace.fs.delete(uri, { recursive: false, useTrash: true });
+                                } catch (error) {
+                                    if (error instanceof vscode.FileSystemError && error.code === 'FileNotFound') {
+                                        continue;
+                                    }
+                                    throw error;
+                                }
+                            }
                             provider.rpc?.refresh();
                         } catch (e) {
                             vscode.window.showErrorMessage(i18n.t('extension.deleteFailed', `${e}`));
@@ -138,15 +317,20 @@ export function registerChangelistCommands(
     );
 
     context.subscriptions.push(
-        vscode.commands.registerCommand('intelli-git.changelist.markInactive', async (args: ChangelistFileContext) => {
-            if (args?.path) {
-                await inactiveChangesService.markInactive([args.path]);
+        vscode.commands.registerCommand('intelli-git.changelist.markInactive', async (args: ChangelistTargetContext) => {
+            const paths = getTargetPaths(args);
+            if (paths.length > 0) {
+                await inactiveChangesService.markInactive(paths);
 
-                // Keep inactive files out of commit index.
+                // Keep inactive files out of commit index, including mixed staged/unstaged entries.
                 const status = await gitService.getStatus();
-                const target = status.find(file => file.path === args.path);
-                if (target?.staged) {
-                    await gitService.unstageFile(args.path);
+                const stagedPaths = Array.from(new Set(
+                    status
+                        .filter(file => paths.includes(file.path) && file.staged)
+                        .map(file => file.path)
+                ));
+                if (stagedPaths.length > 0) {
+                    await gitService.unstageFiles(stagedPaths);
                 }
 
                 provider.rpc?.refresh();
@@ -155,22 +339,28 @@ export function registerChangelistCommands(
     );
 
     context.subscriptions.push(
-        vscode.commands.registerCommand('intelli-git.changelist.markActive', async (args: ChangelistFileContext) => {
-            if (args?.path) {
-                await inactiveChangesService.markActive([args.path]);
+        vscode.commands.registerCommand('intelli-git.changelist.markActive', async (args: ChangelistTargetContext) => {
+            const paths = getTargetPaths(args);
+            if (paths.length > 0) {
+                await inactiveChangesService.markActive(paths);
                 provider.rpc?.refresh();
             }
         })
     );
 
     context.subscriptions.push(
-        vscode.commands.registerCommand('intelli-git.changelist.stage', async (args: ChangelistFileContext) => {
-            if (!args?.path || args.isInactive) {
+        vscode.commands.registerCommand('intelli-git.changelist.stage', async (args: ChangelistTargetContext) => {
+            const paths = getTargetPaths(args);
+            if (paths.length === 0 || args?.allInactive) {
                 return;
             }
 
             try {
-                await gitService.stageFile(args.path);
+                if (paths.length === 1) {
+                    await gitService.stageFile(paths[0]);
+                } else {
+                    await gitService.stageFiles(paths);
+                }
                 provider.rpc?.refresh();
             } catch (e) {
                 vscode.window.showErrorMessage(i18n.t('extension.stageFailed', `${e}`));
@@ -179,13 +369,18 @@ export function registerChangelistCommands(
     );
 
     context.subscriptions.push(
-        vscode.commands.registerCommand('intelli-git.changelist.unstage', async (args: ChangelistFileContext) => {
-            if (!args?.path) {
+        vscode.commands.registerCommand('intelli-git.changelist.unstage', async (args: ChangelistTargetContext) => {
+            const paths = getTargetPaths(args);
+            if (paths.length === 0) {
                 return;
             }
 
             try {
-                await gitService.unstageFile(args.path);
+                if (paths.length === 1) {
+                    await gitService.unstageFile(paths[0]);
+                } else {
+                    await gitService.unstageFiles(paths);
+                }
                 provider.rpc?.refresh();
             } catch (e) {
                 vscode.window.showErrorMessage(i18n.t('extension.unstageFailed', `${e}`));

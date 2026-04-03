@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { CommitViewProvider, GitLogViewProvider, PushPanel, StashContentProvider, RevisionContentProvider } from './providers';
 import { GitService } from './services/GitService';
 import { createGitWatcher } from './services/GitRepositoryWatcher';
+import { ChangelistStateService } from './services/ChangelistStateService';
 import { InactiveChangesService } from './services/InactiveChangesService';
 import { BranchStatusBar, GitLogStatusBar } from './ui';
 import { registerStashCommands, registerNavigationCommands, registerBranchCommands, registerLogCommands, registerLogFileCommands, registerChangelistCommands, registerAiCommands } from './commands';
@@ -20,6 +21,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
     // Initialize services
     const inactiveChangesService = new InactiveChangesService(context);
+    const changelistStateService = new ChangelistStateService(context);
     const gitService = await GitService.create(workspaceRoot, inactiveChangesService);
 
     // Initialize providers
@@ -27,7 +29,8 @@ export async function activate(context: vscode.ExtensionContext) {
         extensionUri: context.extensionUri,
         context,
         gitService,
-        inactiveChangesService
+        inactiveChangesService,
+        changelistStateService
     };
     const provider = new CommitViewProvider(providerOptions);
     const gitLogProvider = new GitLogViewProvider(providerOptions);
@@ -58,7 +61,7 @@ export async function activate(context: vscode.ExtensionContext) {
     registerBranchCommands(context, gitService, provider);
     registerLogCommands(context, gitService);
     registerLogFileCommands(context, gitService);
-    registerChangelistCommands(context, gitService, inactiveChangesService, provider);
+    registerChangelistCommands(context, gitService, inactiveChangesService, changelistStateService, provider);
     registerAiCommands(context);
 
     context.subscriptions.push(branchStatusBar);
@@ -109,6 +112,14 @@ export async function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(
         vscode.languages.onDidChangeDiagnostics(() => {
             triggerRefresh();
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.workspace.onDidChangeConfiguration((event) => {
+            if (event.affectsConfiguration('intelli-git.changelist.mode')) {
+                triggerRefresh();
+            }
         })
     );
 }

@@ -35,6 +35,28 @@ export interface ChangelistGroup {
     isDefault: boolean;
     items: FileStatus[];
     hasWarning?: boolean;
+    isActive?: boolean;
+}
+
+export type ChangelistMode = 'staged' | 'changes';
+
+export interface ChangelistInfo {
+    id: string;
+    name: string;
+    isDefault: boolean;
+    isActive: boolean;
+}
+
+export interface ChangelistAssignment {
+    fileListId?: string;
+    hunkListIds?: Record<string, string>;
+}
+
+export interface ChangelistState {
+    mode: ChangelistMode;
+    activeListId: string;
+    lists: ChangelistInfo[];
+    assignments: Record<string, ChangelistAssignment>;
 }
 
 export interface ChangelistFileSelection {
@@ -122,6 +144,7 @@ export interface ExtensionMethods {
     closeWebView: () => Promise<void>;
     openCommitDiff: (params: { path: string; leftRef: string; rightRef: string; preserveFocus?: boolean }) => Promise<void>;
     getStatus: () => Promise<FileStatus[]>;
+    getChangelistState: () => Promise<ChangelistState>;
     getBranchInfo: () => Promise<BranchInfo>;
     getStashList: () => Promise<StashItem[]>;
     getStashFiles: (index: number) => Promise<CommitFile[]>;
@@ -161,6 +184,13 @@ export interface ExtensionMethods {
     showErrorMessage: (message: string) => Promise<void>;
     markHunkInactive: (params: { path: string; hunkId: string }) => Promise<void>;
     markHunkActive: (params: { path: string; hunkId: string }) => Promise<void>;
+    setChangelistMode: (mode: ChangelistMode) => Promise<void>;
+    createChangelist: (name?: string) => Promise<ChangelistInfo | null>;
+    renameChangelist: (params: { id: string; name?: string }) => Promise<ChangelistInfo | null>;
+    deleteChangelist: (id: string) => Promise<void>;
+    setActiveChangelist: (id: string) => Promise<void>;
+    moveFilesToChangelist: (params: { paths: string[]; targetListId: string }) => Promise<void>;
+    moveHunksToChangelist: (params: { path: string; hunkIds: string[]; targetListId: string }) => Promise<void>;
     setActiveChangelistFile: (params: ChangelistFileSelection | null) => Promise<void>;
     setChangelistTreeFocus: (focused: boolean) => Promise<void>;
 }

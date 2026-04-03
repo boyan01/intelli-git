@@ -3,6 +3,7 @@ import * as path from 'path';
 import { RpcPeer } from '@shared/rpc';
 import type { WebviewMethods, ExtensionMethods, FileStatus, ChangelistFileSelection } from '@shared/messages';
 import { GitService } from '../services/GitService';
+import { ChangelistStateService } from '../services/ChangelistStateService';
 import { InactiveChangesService } from '../services/InactiveChangesService';
 import { AnthropicService } from '../services/AnthropicService';
 import { GoogleAiService } from '../services/GoogleAiService';
@@ -15,6 +16,7 @@ export interface ExtensionRpcHandlerOptions {
     context: vscode.ExtensionContext;
     gitService: GitService;
     inactiveChangesService?: InactiveChangesService;
+    changelistStateService?: ChangelistStateService;
     onDispose?: () => void;
     onChangelistSelectionChange?: (selection: ChangelistFileSelection | null) => void;
     onChangelistFocusChange?: (focused: boolean) => void;
@@ -28,6 +30,7 @@ export class ExtensionRpcHandler {
     private context: vscode.ExtensionContext;
     private gitService: GitService;
     private inactiveChangesService?: InactiveChangesService;
+    private changelistStateService?: ChangelistStateService;
     private onDispose: () => void;
     private onChangelistSelectionChange?: (selection: ChangelistFileSelection | null) => void;
     private onChangelistFocusChange?: (focused: boolean) => void;
@@ -37,6 +40,7 @@ export class ExtensionRpcHandler {
         this.context = options.context;
         this.gitService = options.gitService;
         this.inactiveChangesService = options.inactiveChangesService;
+        this.changelistStateService = options.changelistStateService;
         this.onDispose = options.onDispose || (() => { });
         this.onChangelistSelectionChange = options.onChangelistSelectionChange;
         this.onChangelistFocusChange = options.onChangelistFocusChange;
@@ -83,6 +87,7 @@ export class ExtensionRpcHandler {
                 closeWebView: this.closeWebView,
                 openCommitDiff: this.openCommitDiff,
                 getStatus: this.getStatus,
+                getChangelistState: this.getChangelistState,
                 getBranchInfo: this.gitService.getRpcBranchInfo,
                 getStashList: this.gitService.getStashList,
                 getStashFiles: this.gitService.getStashFilesAsCommitFiles,
@@ -122,6 +127,13 @@ export class ExtensionRpcHandler {
                 showErrorMessage: this.showErrorMessage,
                 markHunkInactive: this.markHunkInactive,
                 markHunkActive: this.markHunkActive,
+                setChangelistMode: this.setChangelistMode,
+                createChangelist: this.createChangelist,
+                renameChangelist: this.renameChangelist,
+                deleteChangelist: this.deleteChangelist,
+                setActiveChangelist: this.setActiveChangelist,
+                moveFilesToChangelist: this.moveFilesToChangelist,
+                moveHunksToChangelist: this.moveHunksToChangelist,
                 setActiveChangelistFile: this.setActiveChangelistFile,
                 setChangelistTreeFocus: this.setChangelistTreeFocus
             }
@@ -178,6 +190,7 @@ export class ExtensionRpcHandler {
     getStatus = async (): Promise<FileStatus[]> => {
         const status = await this.gitService.getStatus();
         this.inactiveChangesService?.syncWithStatus(status.map(file => file.path));
+        this.changelistStateService?.syncWithStatus(status);
 
         return status.map(file => {
             const isFileInactive = !!this.inactiveChangesService?.isInactive(file.path);
@@ -194,6 +207,17 @@ export class ExtensionRpcHandler {
                 hasStagedInactive: hasStagedInactive
             };
         });
+    };
+
+    getChangelistState = async () => {
+        const status = await this.gitService.getStatus();
+        this.changelistStateService?.syncWithStatus(status);
+        return this.changelistStateService?.getState() || {
+            mode: 'staged',
+            activeListId: 'changes',
+            lists: [{ id: 'changes', name: 'Changes', isDefault: true, isActive: true }],
+            assignments: {}
+        };
     };
 
     openDiff = async (filePath: string, staged?: boolean): Promise<void> => {
@@ -372,10 +396,43 @@ export class ExtensionRpcHandler {
 
     commit = async (params: { message: string; amend: boolean; files: string[]; push?: boolean }): Promise<void> => {
         try {
+            const changelistState = this.changelistStateService?.getState();
+
+            if (changelistState?.mode === 'changes') {
+                const status = await this.gitService.getStatus();
+                this.changelistStateService?.syncWithStatus(status);
+                const plan = this.changelistStateService?.buildCommitPlan(status);
+
+                if (!plan || plan.files.length === 0) {
+                    throw new Error('No active changelist changes to commit');
+                }
+
+                await this.gitService.stageFiles(plan.files);
+
+                for (const excludedFile of plan.excludedFiles) {
+                    await this.gitService.unstageFile(excludedFile);
+                }
+
+                for (const [filePath, hunkIds] of Object.entries(plan.excludedHunkIdsByPath)) {
+                    if (hunkIds.length === 0) {
+                        continue;
+                    }
+
+                    const hunks = status
+                        .filter(file => file.path === filePath)
+                        .flatMap(file => file.hunks || [])
+                        .filter(hunk => hunkIds.includes(hunk.id));
+
+                    if (hunks.length > 0) {
+                        await this.gitService.applyPatch(this.gitService.buildPatchFromHunks(hunks), true, true);
+                    }
+                }
+            }
+
             if (params.amend) {
-                await this.gitService.commitAmend(params.message, params.files);
+                await this.gitService.commitAmend(params.message, changelistState?.mode === 'changes' ? undefined : params.files);
             } else {
-                await this.gitService.commit(params.message, params.files);
+                await this.gitService.commit(params.message, changelistState?.mode === 'changes' ? undefined : params.files);
             }
 
             if (params.push) {
@@ -538,6 +595,75 @@ export class ExtensionRpcHandler {
 
     markHunkActive = async (params: { path: string; hunkId: string }): Promise<void> => {
         await this.inactiveChangesService?.markHunkActive(params.path, params.hunkId);
+    };
+
+    setChangelistMode = async (mode: 'staged' | 'changes'): Promise<void> => {
+        await this.changelistStateService?.setMode(mode);
+    };
+
+    createChangelist = async (name?: string) => {
+        const changelistName = (name || await vscode.window.showInputBox({
+            prompt: i18n.t('extension.enterChangelistName'),
+            value: i18n.t('Changes')
+        }))?.trim();
+
+        if (!changelistName) {
+            return null;
+        }
+
+        return this.changelistStateService?.createList(changelistName) || null;
+    };
+
+    renameChangelist = async (params: { id: string; name?: string }) => {
+        const current = this.changelistStateService?.getState().lists.find(list => list.id === params.id);
+        if (!current) {
+            return null;
+        }
+
+        const changelistName = (params.name || await vscode.window.showInputBox({
+            prompt: i18n.t('extension.enterChangelistName'),
+            value: current.name
+        }))?.trim();
+
+        if (!changelistName) {
+            return null;
+        }
+
+        return this.changelistStateService?.renameList(params.id, changelistName) || null;
+    };
+
+    deleteChangelist = async (id: string): Promise<void> => {
+        const target = this.changelistStateService?.getState().lists.find(list => list.id === id);
+        if (!target) {
+            return;
+        }
+
+        const itemCount = this.changelistStateService?.getListItemCount(id) || 0;
+        if (itemCount > 0) {
+            const confirmed = await vscode.window.showWarningMessage(
+                i18n.t('extension.changelistNotEmpty', target.name),
+                { modal: true },
+                i18n.t('Delete')
+            );
+
+            if (confirmed !== i18n.t('Delete')) {
+                return;
+            }
+        }
+
+        await this.changelistStateService?.deleteList(id);
+    };
+
+    setActiveChangelist = async (id: string): Promise<void> => {
+        await this.changelistStateService?.setActiveList(id);
+    };
+
+    moveFilesToChangelist = async (params: { paths: string[]; targetListId: string }): Promise<void> => {
+        await this.changelistStateService?.moveFiles(params.paths, params.targetListId);
+    };
+
+    moveHunksToChangelist = async (params: { path: string; hunkIds: string[]; targetListId: string }): Promise<void> => {
+        await this.changelistStateService?.moveHunks(params.path, params.hunkIds, params.targetListId);
     };
 
     pickBranch = async (): Promise<void> => {

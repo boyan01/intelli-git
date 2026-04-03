@@ -1,5 +1,5 @@
 import React, { useMemo, useCallback, useRef } from 'react';
-import type { ChangelistGroup, FileStatus, LastCommitInfo } from '@shared/messages';
+import type { ChangelistGroup, ChangelistState, FileStatus, LastCommitInfo } from '@shared/messages';
 import { useTranslation } from 'react-i18next';
 import { BasicTreeView } from '../common/BasicTreeView';
 import type { TreeNode, BasicTreeViewRef } from '../common/BasicTreeView';
@@ -10,6 +10,7 @@ import styles from '../file-tree/BaseFileTree.module.css';
 
 export interface ChangelistTreeProps {
     groups: ChangelistGroup[];
+    changelistState: ChangelistState;
     viewMode: 'tree' | 'list';
     selectedFiles: Set<string>;
     expandedIds?: Set<string>;
@@ -25,29 +26,23 @@ export interface ChangelistTreeRef {
     collapseAll: () => void;
 }
 
-type SelectionStatus = 'all' | 'partial' | 'none';
-
 interface FileNodeData {
     path: string;
     isFile: boolean;
     isRoot?: boolean;
     isInactiveGroup?: boolean;
     isStagedGroup?: boolean;
-    isAmendCommit?: boolean;
-    isAmendFile?: boolean;
     status?: string;
     staged?: boolean;
     inactive?: boolean;
     resolvedCandidate?: boolean;
     fileCount: number;
-    selectedStatus?: SelectionStatus;
-    inactiveHunkIds?: string[];
-    isHunk?: boolean;
-    hunkId?: string;
-    hunkRange?: string;
-    error?: boolean;
     hasWarning?: boolean;
-    hasStagedInactive?: boolean;
+    isAmendCommit?: boolean;
+    isAmendFile?: boolean;
+    changelistId?: string;
+    isActiveChangelist?: boolean;
+    isChangelistGroup?: boolean;
 }
 
 const getDirPath = (fullPath: string): string => {
@@ -70,46 +65,6 @@ const countFiles = (node: TreeNode<FileNodeData>): number => {
     return node.children.reduce((sum, child) => sum + countFiles(child), 0);
 };
 
-const getAllFileNodes = (node: TreeNode<FileNodeData>): FileNodeData[] => {
-    if (node.data?.isFile) {
-        return node.data ? [node.data] : [];
-    }
-
-    if (!node.children) {
-        return [];
-    }
-
-    return node.children.flatMap(getAllFileNodes);
-};
-
-const getAllFilePaths = (node: TreeNode<FileNodeData>): string[] => {
-    if (node.data?.isFile) return [node.data.path];
-    if (!node.children) return [];
-    return node.children.flatMap(getAllFilePaths);
-};
-
-const isConflictStatus = (status?: string): boolean => status === 'C' || status === 'U';
-
-const isInactiveTreeNode = (node: TreeNode<FileNodeData>): boolean => {
-    return Boolean(
-        node.data?.inactive ||
-        node.data?.isInactiveGroup ||
-        node.id === '__root__inactive-changes' ||
-        node.id.startsWith('inactive-changes/')
-    );
-};
-
-const isStagedTreeNode = (node: TreeNode<FileNodeData>): boolean => {
-    return Boolean(
-        node.data?.staged ||
-        node.data?.isStagedGroup ||
-        node.id === '__root__staged-changes' ||
-        node.id.startsWith('staged-changes/')
-    );
-};
-
-const dedupePaths = (paths: string[]): string[] => Array.from(new Set(paths));
-
 const buildTree = (files: FileStatus[]): TreeNode<FileNodeData>[] => {
     const root: TreeNode<FileNodeData>[] = [];
     const map = new Map<string, TreeNode<FileNodeData>>();
@@ -128,17 +83,15 @@ const buildTree = (files: FileStatus[]): TreeNode<FileNodeData>[] => {
                     id: currentPath,
                     label: part,
                     data: {
-                        path: currentPath,
+                        path: file.path,
                         isFile: isLast,
                         status: isLast ? file.status : undefined,
                         staged: isLast ? file.staged : undefined,
                         inactive: isLast ? file.inactive : undefined,
                         resolvedCandidate: isLast ? file.resolvedCandidate : undefined,
-                        fileCount: 0,
-                        error: isLast ? file.error : undefined,
-                        hasStagedInactive: isLast ? file.hasStagedInactive : undefined
+                        fileCount: 0
                     },
-                    children: isLast ? undefined : []
+                    children: isLast ? [] : []
                 };
 
                 map.set(currentPath, node);
@@ -146,13 +99,15 @@ const buildTree = (files: FileStatus[]): TreeNode<FileNodeData>[] => {
                 if (index === 0) {
                     root.push(node);
                 } else {
-                    const parent = map.get(parentPath);
-                    if (parent && parent.children) {
-                        parent.children.push(node);
-                    }
+                    map.get(parentPath)?.children?.push(node);
                 }
             }
         });
+
+        const fileNode = map.get(file.path);
+        if (fileNode) {
+            fileNode.children = undefined;
+        }
     });
 
     const processNodes = (nodes: TreeNode<FileNodeData>[]) => {
@@ -167,48 +122,59 @@ const buildTree = (files: FileStatus[]): TreeNode<FileNodeData>[] => {
             node.data!.fileCount = countFiles(node);
         });
     };
+
     processNodes(root);
-
-    const compactFolders = (nodes: TreeNode<FileNodeData>[]): TreeNode<FileNodeData>[] => {
-        return nodes.map(node => {
-            if (!node.children || node.children.length === 0) {
-                return node;
-            }
-            node.children = compactFolders(node.children);
-            let children = node.children;
-            while (
-                children.length === 1 &&
-                children[0].children &&
-                children[0].children.length > 0
-            ) {
-                const child = children[0];
-                node.label = `${node.label}/${child.label}`;
-                node.id = child.id;
-                node.data = child.data;
-                node.children = child.children;
-                children = child.children!;
-            }
-            return node;
-        });
-    };
-
-    return compactFolders(root);
+    return root;
 };
 
-// Helper to recursively prefix node IDs with group ID
-const prefixNodes = (nodes: TreeNode<FileNodeData>[], prefix: string): TreeNode<FileNodeData>[] => {
+const prefixNodes = (nodes: TreeNode<FileNodeData>[], prefix: string, listId?: string): TreeNode<FileNodeData>[] => {
     return nodes.map(node => ({
         ...node,
         id: `${prefix}/${node.id}`,
-        data: node.data,
-        children: node.children ? prefixNodes(node.children, prefix) : undefined
+        data: node.data ? {
+            ...node.data,
+            changelistId: listId
+        } : undefined,
+        children: node.children ? prefixNodes(node.children, prefix, listId) : undefined
     }));
 };
 
+function getAllMoveData(node: TreeNode<FileNodeData>): { paths: string[]; hunkMap: Record<string, string[]> } {
+    if (node.data?.isFile) {
+        return {
+            paths: [node.data.path],
+            hunkMap: {}
+        };
+    }
+
+    const paths = new Set<string>();
+    const hunkMap: Record<string, string[]> = {};
+    node.children?.forEach(child => {
+        const childData = getAllMoveData(child);
+        childData.paths.forEach(path => paths.add(path));
+        Object.entries(childData.hunkMap).forEach(([path, hunkIds]) => {
+            hunkMap[path] = [...(hunkMap[path] || []), ...hunkIds];
+        });
+    });
+
+    return {
+        paths: Array.from(paths),
+        hunkMap
+    };
+}
+
+function getDescendantFiles(node: TreeNode<FileNodeData>): FileNodeData[] {
+    if (node.data?.isFile) {
+        return node.data.path ? [node.data] : [];
+    }
+
+    return (node.children || []).flatMap(child => getDescendantFiles(child));
+}
+
 export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTreeProps>(({
     groups,
+    changelistState,
     viewMode,
-    selectedFiles,
     expandedIds,
     activeFile,
     onToggle,
@@ -217,7 +183,6 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
 }, ref) => {
     const { t } = useTranslation();
     const treeRef = useRef<BasicTreeViewRef>(null);
-    const [, forceUpdate] = React.useReducer(x => x + 1, 0);
 
     React.useImperativeHandle(ref, () => ({
         expandAll: () => treeRef.current?.expandAll(),
@@ -227,31 +192,26 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
     const nodes = useMemo(() => {
         const result: TreeNode<FileNodeData>[] = [];
 
-        // Add changelist groups first
         groups.forEach(group => {
-            let children: TreeNode<FileNodeData>[];
-            if (viewMode === 'list') {
-                children = group.items
-                    .map(f => ({
-                        id: `${group.id}/${f.path}`,
-                        label: f.path.split('/').pop() || f.path,
-                        data: {
-                            path: f.path,
-                            isFile: true,
-                            status: f.status,
-                            staged: f.staged,
-                            inactive: f.inactive,
-                            resolvedCandidate: f.resolvedCandidate,
-                            fileCount: 1,
-                            hasStagedInactive: f.hasStagedInactive
-                        }
-                    }))
-                    .sort((a, b) => a.label.localeCompare(b.label));
-            } else {
-                children = prefixNodes(buildTree(group.items), group.id);
-            }
+            const listInfo = changelistState.lists.find(list => list.id === group.id);
+            const children = viewMode === 'list'
+                ? group.items.map(file => ({
+                    id: `${group.id}/${file.path}`,
+                    label: file.path.split('/').pop() || file.path,
+                    data: {
+                        path: file.path,
+                        isFile: true,
+                        status: file.status,
+                        staged: file.staged,
+                        inactive: file.inactive,
+                        resolvedCandidate: file.resolvedCandidate,
+                        fileCount: 1,
+                        changelistId: group.id
+                    },
+                    children: undefined
+                }))
+                : prefixNodes(buildTree(group.items), group.id, group.id);
 
-            const totalFiles = children.reduce((sum, n) => sum + countFiles(n), 0);
             result.push({
                 id: `__root__${group.id}`,
                 label: group.name,
@@ -261,27 +221,17 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
                     isRoot: true,
                     isInactiveGroup: group.id === 'inactive-changes',
                     isStagedGroup: group.id === 'staged-changes',
-                    fileCount: totalFiles,
-                    hasWarning: group.hasWarning
+                    fileCount: group.items.length,
+                    hasWarning: group.hasWarning,
+                    changelistId: group.id,
+                    isActiveChangelist: group.isActive,
+                    isChangelistGroup: Boolean(listInfo)
                 },
                 children
             });
         });
 
-        // Add amend commit node at the bottom
         if (amendCommit) {
-            const amendChildren: TreeNode<FileNodeData>[] = amendCommit.files.map((f: { path: string; status: string }) => ({
-                id: `amend/${f.path}`,
-                label: f.path.split('/').pop() || f.path,
-                data: {
-                    path: f.path,
-                    isFile: true,
-                    isAmendFile: true,
-                    status: f.status,
-                    fileCount: 1
-                }
-            }));
-
             result.push({
                 id: '__root__amend',
                 label: amendCommit.subject,
@@ -292,16 +242,22 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
                     isAmendCommit: true,
                     fileCount: amendCommit.files.length
                 },
-                children: amendChildren
+                children: amendCommit.files.map(file => ({
+                    id: `amend/${file.path}`,
+                    label: file.path.split('/').pop() || file.path,
+                    data: {
+                        path: file.path,
+                        isFile: true,
+                        isAmendFile: true,
+                        status: file.status,
+                        fileCount: 1
+                    }
+                }))
             });
         }
 
         return result;
-    }, [groups, viewMode, amendCommit]);
-
-    React.useLayoutEffect(() => {
-        forceUpdate();
-    }, [nodes, selectedFiles]);
+    }, [groups, changelistState.lists, viewMode, amendCommit]);
 
     const handleNodeClick = useCallback((node: TreeNode<FileNodeData>) => {
         if (node.data?.isFile) {
@@ -334,338 +290,247 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
             status: node.data.status,
             staged: node.data.staged,
             inactive: node.data.inactive,
-            isConflict: isConflictStatus(node.data.status)
+            isConflict: node.data.status === 'C' || node.data.status === 'U'
         });
     }, []);
 
-    const handleTreeFocusChange = useCallback((focused: boolean) => {
-        void rpc.setChangelistTreeFocus(focused);
-    }, []);
-
-    const renderLeading = useCallback(() => {
-        return null;
-    }, []);
-
     const renderTrailing = useCallback((node: TreeNode<FileNodeData>) => {
-        const isConflictFile = Boolean(
-            node.data?.isFile &&
-            isConflictStatus(node.data.status)
+        if (node.data?.isRoot && node.data.isChangelistGroup && changelistState.mode === 'changes') {
+            return null;
+        }
+
+        if (node.data?.isAmendCommit || node.data?.isAmendFile) {
+            return null;
+        }
+
+        if (changelistState.mode === 'changes') {
+            return null;
+        }
+
+        const fileNodes = node.data?.isFile ? [node.data] : [];
+        if (fileNodes.length === 0) {
+            return null;
+        }
+
+        const action = fileNodes[0].staged ? {
+            kind: 'unstage' as const,
+            title: t('Unstage')
+        } : {
+            kind: 'stage' as const,
+            title: t('Stage')
+        };
+
+        return (
+            <div className={styles.groupTrailing}>
+                <button
+                    type="button"
+                    className={styles.hoverAction}
+                    title={action.title}
+                    onClick={async (event) => {
+                        event.stopPropagation();
+                        if (action.kind === 'stage') {
+                            await rpc.stage(node.data!.path);
+                        } else {
+                            await rpc.unstage(node.data!.path);
+                        }
+                        rpcEvents.refresh.emit();
+                    }}
+                >
+                    <i className={`codicon ${action.kind === 'stage' ? 'codicon-add' : 'codicon-remove'}`} />
+                </button>
+            </div>
         );
+    }, [changelistState, t]);
 
-        if (isConflictFile) {
+    const renderLabel = useCallback((node: TreeNode<FileNodeData>) => {
+        const status = node.data?.status;
+        const statusColor = getStatusColor(status);
+        const isDeleted = status === 'D';
+        const isAmendFile = node.data?.isAmendFile;
+        const showPath = viewMode === 'list' && (node.data?.isFile || isAmendFile);
+
+        if (node.data?.isAmendCommit) {
             return (
-                <div className={styles.conflictActions}>
-                    <button
-                        type="button"
-                        className={styles.resolveAction}
-                        title={t('Accept Current Change')}
-                        onClick={async (e) => {
-                            e.stopPropagation();
-                            await rpc.resolveConflict({ path: node.data!.path, side: 'ours' });
-                            rpcEvents.refresh.emit();
-                        }}
-                    >
-                        <i className="codicon codicon-arrow-left"></i>
-                    </button>
+                <div className={styles.fileItemContent}>
+                    <span className={`codicon codicon-git-commit ${styles.icon}`}></span>
+                    <span className={styles.name} style={{ fontStyle: 'italic' }}>{node.label}</span>
+                </div>
+            );
+        }
 
-                    <button
-                        type="button"
-                        className={styles.resolveAction}
-                        title={t('Accept Incoming Change')}
-                        onClick={async (e) => {
-                            e.stopPropagation();
-                            await rpc.resolveConflict({ path: node.data!.path, side: 'theirs' });
-                            rpcEvents.refresh.emit();
-                        }}
-                    >
-                        <i className="codicon codicon-arrow-right"></i>
-                    </button>
-
-                    {node.data?.resolvedCandidate && (
-                        <button
-                            type="button"
-                            className={styles.resolveAction}
-                            title={t('Mark as Resolved')}
-                            onClick={async (e) => {
-                                e.stopPropagation();
-                                await rpc.stage(node.data!.path);
-                                rpcEvents.refresh.emit();
-                            }}
-                        >
-                            <i className="codicon codicon-check"></i>
-                        </button>
+        if (node.data?.isRoot) {
+            return (
+                <div className={styles.rootTitleGroup}>
+                    <span className={styles.rootTitle} style={node.data.isActiveChangelist ? { fontWeight: 700 } : undefined}>{node.label}</span>
+                    <span
+                        className={styles.fileCount}
+                    >{node.data.fileCount}</span>
+                    {node.data.hasWarning && (
+                        <span
+                            className={`codicon codicon-warning ${styles.icon}`}
+                            style={{ color: 'var(--vscode-notificationsWarningIcon-foreground)', marginLeft: '4px' }}
+                            title={t('Some inactive changes in this group are staged externally. They will be automatically excluded by the plugin during commit.')}
+                        ></span>
                     )}
                 </div>
             );
         }
 
-        if (node.data?.isHunk || node.data?.isAmendCommit || node.data?.isAmendFile) {
-            return null;
-        }
-
-        const fileNodes = getAllFileNodes(node).filter(file => !isConflictStatus(file.status));
-        const stagedFiles = fileNodes.filter(file => file.staged);
-        const stageableFiles = fileNodes.filter(file => !file.staged && !file.inactive);
-
-        const inStagedTree = isStagedTreeNode(node);
-        const inInactiveTree = isInactiveTreeNode(node);
-
-        let action: {
-            kind: 'stage' | 'unstage';
-            paths: string[];
-            title: string;
-            disabled?: boolean;
-        } | null = null;
-
-        if (inStagedTree) {
-            if (stagedFiles.length > 0) {
-                action = {
-                    kind: 'unstage',
-                    paths: dedupePaths(stagedFiles.map(file => file.path)),
-                    title: t('Unstage')
-                };
-            }
-        } else if (inInactiveTree) {
-            if (stagedFiles.length > 0) {
-                action = {
-                    kind: 'unstage',
-                    paths: dedupePaths(stagedFiles.map(file => file.path)),
-                    title: t('Unstage')
-                };
-            } else if (fileNodes.length > 0) {
-                action = {
-                    kind: 'stage',
-                    paths: [],
-                    title: t('Cannot stage inactive changes'),
-                    disabled: true
-                };
-            }
-        } else if (stageableFiles.length > 0) {
-            action = {
-                kind: 'stage',
-                paths: dedupePaths(stageableFiles.map(file => file.path)),
-                title: t('Stage')
-            };
-        }
-
-        if (!action) {
-            return null;
+        if (node.data?.isFile) {
+            return (
+                <div className={styles.fileItemContent} data-drag-label="true">
+                    <span
+                        className={styles.fileIconSvg}
+                        style={{ color: statusColor || getFileIcon(node.label).color }}
+                        dangerouslySetInnerHTML={{ __html: getFileIcon(node.label).svg }}
+                    />
+                    <span className={styles.name} style={isDeleted ? undefined : { color: statusColor }}>
+                        {node.label}
+                    </span>
+                    {showPath && <span className={styles.fileDirPath}>{getDirPath(node.data.path)}</span>}
+                </div>
+            );
         }
 
         return (
-            <div className={styles.groupTrailing}>
-                {action && (
-                    <button
-                        type="button"
-                        className={styles.hoverAction}
-                        data-action={action.kind}
-                        title={action.title}
-                        disabled={action.disabled}
-                        onClick={async (e) => {
-                            e.stopPropagation();
-
-                            if (action.disabled || action.paths.length === 0) {
-                                return;
-                            }
-
-                            if (action.kind === 'stage') {
-                                await rpc.stageFiles(action.paths);
-                            } else {
-                                await rpc.unstageFiles(action.paths);
-                            }
-
-                            rpcEvents.refresh.emit();
-                        }}
-                    >
-                        <i
-                            className={`codicon ${action.kind === 'stage' ? 'codicon-add' : 'codicon-remove'} ${styles.hoverActionSymbol}`}
-                            aria-hidden="true"
-                        />
-                    </button>
-                )}
+            <div className={styles.fileItemContent}>
+                <span className={`codicon codicon-folder ${styles.icon}`}></span>
+                <span className={styles.name}>{node.label}</span>
             </div>
         );
-    }, [t]);
-
-    const renderLabel = useCallback((node: TreeNode<FileNodeData>) => {
-        const isFile = node.data?.isFile;
-        const status = node.data?.status;
-        const isDeleted = status === 'D';
-        const isError = node.data?.error;
-        const statusColor = isError ? 'var(--vscode-list-errorForeground)' : getStatusColor(status);
-        const isAmendFile = node.data?.isAmendFile;
-
-        const statusClass = status === 'M' ? styles.statusM :
-            status === 'A' ? styles.statusA :
-                status === 'D' ? styles.statusD :
-                    status === 'R' ? styles.statusR :
-                        status === '?' ? styles.statusUntracked :
-                            status === '!' ? styles.statusIgnored : '';
-
-        const showPath = viewMode === 'list' && (isFile || isAmendFile);
-
-        return (
-            <div className={styles.fileItemContent} data-drag-label="true">
-                {isFile ? (
-                    <>
-                        {(status === 'C' || status === 'U') ? (
-                            <span className={`codicon codicon-warning ${styles.icon}`} style={{ color: statusColor }}></span>
-                        ) : (
-                            <span
-                                className={styles.fileIconSvg}
-                                style={{ color: statusColor || getFileIcon(node.label).color }}
-                                dangerouslySetInnerHTML={{ __html: getFileIcon(node.label).svg }}
-                            />
-                        )}
-
-                        <span
-                            className={`${styles.name} ${statusClass}`}
-                            style={isDeleted ? undefined : { color: statusColor }}
-                        >
-                            {node.label}
-                        </span>
-
-                        {showPath && (
-                            <span className={styles.fileDirPath}>{getDirPath(node.data!.path)}</span>
-                        )}
-                    </>
-                ) : node.data?.isHunk ? (
-                    <>
-                        <span className={`codicon codicon-diff-ignored ${styles.icon}`} style={{ fontSize: '12px', opacity: 0.7 }}></span>
-                        <span className={styles.name} style={{ fontSize: '12px', opacity: 0.8, fontFamily: 'monospace' }}>
-                            {node.label}
-                        </span>
-                        <div style={{ flex: 1 }}></div>
-                        <span 
-                            className={`codicon codicon-${node.data?.inactive ? 'circle-slash' : 'circle-filled'}`}
-                            style={{ 
-                                fontSize: '14px', 
-                                cursor: 'pointer',
-                                color: node.data?.inactive ? 'var(--vscode-descriptionForeground)' : 'var(--vscode-charts-blue)',
-                                opacity: node.data?.inactive ? 0.5 : 1
-                            }}
-                            title={node.data?.inactive ? t('Inactive (Excluded from commit)') : t('Active (Included in commit)')}
-                            onClick={async (e) => {
-                                e.stopPropagation();
-                                if (node.data?.inactive) {
-                                    await rpc.markHunkActive({ path: node.data!.path, hunkId: node.data!.hunkId! });
-                                } else {
-                                    await rpc.markHunkInactive({ path: node.data!.path, hunkId: node.data!.hunkId! });
-                                }
-                                rpcEvents.refresh.emit();
-                            }}
-                        />
-                    </>
-                ) : node.data?.isAmendCommit ? (
-                    <>
-                        <span className={`codicon codicon-git-commit ${styles.icon}`}></span>
-                        <span className={styles.name} style={{ fontStyle: 'italic' }}>{node.label}</span>
-                    </>
-                ) : node.data?.isRoot ? (
-                    <div className={styles.rootTitleGroup}>
-                        <span className={styles.rootTitle}>{node.label}</span>
-                        {node.data?.fileCount !== undefined && (
-                            <span className={styles.fileCount}>
-                                {node.data.fileCount}
-                            </span>
-                        )}
-                        {node.data?.hasWarning && (
-                            <span 
-                                className={`codicon codicon-warning ${styles.icon}`} 
-                                style={{ color: 'var(--vscode-notificationsWarningIcon-foreground)', marginLeft: '4px' }}
-                                title={t('Some inactive changes in this group are staged externally. They will be automatically excluded by the plugin during commit.')}
-                            ></span>
-                        )}
-                    </div>
-                ) : (
-                    <>
-                        <span className={`codicon codicon-folder ${styles.icon}`}></span>
-                        <span className={styles.name}>{node.label}</span>
-                    </>
-                )}
-            </div>
-        );
-    }, [viewMode, t]);
+    }, [t, viewMode]);
 
     const getContextData = useCallback((node: TreeNode<FileNodeData>) => {
-        if (!node.data?.isFile) return undefined;
+        const descendantFiles = getDescendantFiles(node);
+        const paths = Array.from(new Set(descendantFiles.map(file => file.path)));
+        const hasConflict = descendantFiles.some(file => file.status === 'C' || file.status === 'U');
+        const hasInactive = descendantFiles.some(file => Boolean(file.inactive));
+        const allInactive = descendantFiles.length > 0 && descendantFiles.every(file => Boolean(file.inactive));
+        const hasStaged = descendantFiles.some(file => Boolean(file.staged));
+        const allStaged = descendantFiles.length > 0 && descendantFiles.every(file => Boolean(file.staged));
+        const hasUntracked = descendantFiles.some(file => file.status === '?');
+
+        if (!node.data?.isFile) {
+            if (node.data?.isRoot) {
+                return {
+                    webviewSection: 'changelistRoot',
+                    changelistId: node.data.changelistId,
+                    paths,
+                    isActiveChangelist: Boolean(node.data.isActiveChangelist),
+                    canDeleteChangelist: changelistState.lists.length > 1,
+                    hasConflict,
+                    hasInactive,
+                    allInactive,
+                    hasStaged,
+                    allStaged,
+                    hasUntracked,
+                    changelistMode: changelistState.mode,
+                    preventDefaultContextMenuItems: true
+                };
+            }
+
+            return {
+                webviewSection: 'changelistFolder',
+                path: node.id,
+                paths,
+                hasConflict,
+                hasInactive,
+                allInactive,
+                hasStaged,
+                allStaged,
+                hasUntracked,
+                changelistId: node.data?.changelistId,
+                changelistMode: changelistState.mode,
+                preventDefaultContextMenuItems: true
+            };
+        }
         return {
             webviewSection: 'changelistFile',
             path: node.data.path,
+            paths: [node.data.path],
             status: node.data.status,
             isStaged: Boolean(node.data.staged),
             isConflict: node.data.status === 'C' || node.data.status === 'U',
             isInactive: Boolean(node.data.inactive || node.id.startsWith('inactive-changes/')),
+            isUntracked: node.data.status === '?',
+            hasConflict,
+            hasInactive,
+            allInactive,
+            hasStaged,
+            allStaged,
+            hasUntracked,
+            changelistId: node.data.changelistId,
+            changelistMode: changelistState.mode,
             preventDefaultContextMenuItems: true
         };
-    }, []);
+    }, [changelistState.lists.length, changelistState.mode]);
 
-    // Drag: allow dragging from non-staged and non-inactive groups.
     const isDraggable = useCallback((node: TreeNode<FileNodeData>) => {
-        const nodeId = node.id;
-        if (nodeId.startsWith('inactive-changes/')) return false;
-        if (nodeId.startsWith('staged-changes/')) return false;
-        if (nodeId.startsWith('amend/')) return false;
-        return nodeId.startsWith('changes/') ||
-            nodeId.startsWith('untracked-changes/') ||
-            nodeId.startsWith('conflicting-changes/') ||
-            nodeId === '__root__changes' ||
-            nodeId === '__root__untracked-changes' ||
-            nodeId === '__root__conflicting-changes';
-    }, []);
+        if (changelistState.mode !== 'changes') {
+            return false;
+        }
+        if (node.id.startsWith('inactive-changes/') || node.id.startsWith('untracked-changes/') || node.id.startsWith('amend/')) {
+            return false;
+        }
+        return Boolean(node.data?.isFile || (!node.data?.isRoot && node.children));
+    }, [changelistState.mode]);
 
-    // Drop: allow dropping on staged group root or any of its children.
     const isDropTarget = useCallback((node: TreeNode<FileNodeData>) => {
-        return node.id === '__root__staged-changes' || node.id.startsWith('staged-changes/');
-    }, []);
+        return changelistState.mode === 'changes' && Boolean(node.data?.isRoot && node.data.isChangelistGroup);
+    }, [changelistState.mode]);
 
-    // Always highlight staged root when dragging over staged children.
     const getDropTargetRootId = useCallback((node: TreeNode<FileNodeData>) => {
-        if (node.id === '__root__staged-changes' || node.id.startsWith('staged-changes/')) {
-            return '__root__staged-changes';
+        if (node.data?.isRoot && node.data.isChangelistGroup) {
+            return node.id;
         }
         return null;
     }, []);
 
-    // Handle drop: stage the files (git add)
-    const handleDrop = useCallback((draggedNode: TreeNode<FileNodeData>, targetNode: TreeNode<FileNodeData>) => {
+    const handleDrop = useCallback(async (draggedNode: TreeNode<FileNodeData>, targetNode: TreeNode<FileNodeData>) => {
         logger.info(`Drop detected ${draggedNode.id} -> ${targetNode.id}`);
-        const paths = getAllFilePaths(draggedNode);
-        if (paths.length > 0) {
-            rpc.stageFiles(paths);
+        const targetListId = targetNode.data?.changelistId;
+        if (!targetListId) {
+            return;
         }
+
+        const moveData = getAllMoveData(draggedNode);
+        if (moveData.paths.length > 0) {
+            await rpc.moveFilesToChangelist({ paths: moveData.paths, targetListId });
+        }
+
+        for (const [path, hunkIds] of Object.entries(moveData.hunkMap)) {
+            if (hunkIds.length > 0) {
+                await rpc.moveHunksToChangelist({ path, hunkIds, targetListId });
+            }
+        }
+
+        rpcEvents.refresh.emit();
     }, []);
 
-    // Provide native file drag data (text/uri-list)
     const getDragData = useCallback((node: TreeNode<FileNodeData>): Record<string, string> => {
-        const paths = getAllFilePaths(node);
+        const moveData = getAllMoveData(node);
+        const paths = Array.from(new Set([
+            ...moveData.paths,
+            ...Object.keys(moveData.hunkMap)
+        ]));
         if (paths.length === 0) return {};
 
         const root = workspaceRoot || '';
-
-        // Calculate absolute paths and file URIs
-        const absPaths = paths.map(p => root ? (root.endsWith('/') ? root + p : root + '/' + p) : p);
-        const fileUris = absPaths.map(p => `file://${encodeURI(p)}`);
-
+        const absPaths = paths.map(path => root ? `${root}/${path}` : path);
+        const fileUris = absPaths.map(path => `file://${encodeURI(path)}`);
         const uriList = fileUris.join('\r\n');
-        const plainText = absPaths.join('\n');
 
         return {
             'text/uri-list': uriList,
-            'text/plain': plainText,
-            'application/vnd.code.uri-list': uriList,
-            'codefiles': JSON.stringify(absPaths),
-            'resourceurls': JSON.stringify(fileUris)
+            'text/plain': absPaths.join('\n'),
+            'application/vnd.code.uri-list': uriList
         };
     }, [workspaceRoot]);
 
-    // Get label info for drag image
-    const getDragLabel = useCallback((node: TreeNode<FileNodeData>) => {
-        return {
-            label: node.label,
-            count: node.data?.fileCount
-        };
-    }, []);
+    const getDragLabel = useCallback((node: TreeNode<FileNodeData>) => ({
+        label: node.label,
+        count: countFiles(node)
+    }), []);
 
     return (
         <BasicTreeView
@@ -678,8 +543,7 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
             onSelect={handleNodeClick}
             onDoubleClick={handleNodeDoubleClick}
             onFocusNodeChange={handleFocusNodeChange}
-            onFocusChange={handleTreeFocusChange}
-            renderLeading={renderLeading}
+            onFocusChange={(focused) => void rpc.setChangelistTreeFocus(focused)}
             renderLabel={renderLabel}
             renderTrailing={renderTrailing}
             getContextData={getContextData}
@@ -691,6 +555,11 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
             onDrop={handleDrop}
             getDragData={getDragData}
             getDragLabel={getDragLabel}
+            rootContextData={changelistState.mode === 'changes' ? {
+                webviewSection: 'changelistBackground',
+                changelistMode: changelistState.mode,
+                preventDefaultContextMenuItems: true
+            } : undefined}
         />
     );
 });

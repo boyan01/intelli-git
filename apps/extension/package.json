@@ -248,6 +248,26 @@
       {
         "command": "intelli-git.moveHunkToInactive",
         "title": "%intelli-git.commands.moveHunkToInactive.title%"
+      },
+      {
+        "command": "intelli-git.changelist.createList",
+        "title": "%intelli-git.commands.changelist.createList.title%"
+      },
+      {
+        "command": "intelli-git.changelist.renameList",
+        "title": "%intelli-git.commands.changelist.renameList.title%"
+      },
+      {
+        "command": "intelli-git.changelist.deleteList",
+        "title": "%intelli-git.commands.changelist.deleteList.title%"
+      },
+      {
+        "command": "intelli-git.changelist.setActiveList",
+        "title": "%intelli-git.commands.changelist.setActiveList.title%"
+      },
+      {
+        "command": "intelli-git.changelist.moveToList",
+        "title": "%intelli-git.commands.changelist.moveToList.title%"
       }
     ],
     "keybindings": [
@@ -399,27 +419,27 @@
         },
         {
           "command": "intelli-git.changelist.rollback",
-          "when": "webviewSection == 'changelistFile'",
+          "when": "(webviewSection == 'changelistFile' || webviewSection == 'changelistFolder' || webviewSection == 'changelistRoot') && hasConflict != true",
           "group": "1_modification@1"
         },
         {
           "command": "intelli-git.changelist.stash",
-          "when": "webviewSection == 'changelistFile' && isConflict != true",
+          "when": "(webviewSection == 'changelistFile' || webviewSection == 'changelistFolder' || webviewSection == 'changelistRoot') && hasConflict != true",
           "group": "1_modification@2"
         },
         {
           "command": "intelli-git.changelist.delete",
-          "when": "webviewSection == 'changelistFile' && isConflict != true",
+          "when": "(webviewSection == 'changelistFile' || webviewSection == 'changelistFolder' || webviewSection == 'changelistRoot') && hasConflict != true",
           "group": "2_danger"
         },
         {
           "command": "intelli-git.changelist.stage",
-          "when": "webviewSection == 'changelistFile' && isInactive != true && isStaged != true && isConflict != true",
+          "when": "(webviewSection == 'changelistFile' || webviewSection == 'changelistFolder' || webviewSection == 'changelistRoot') && changelistMode == 'staged' && allInactive != true && allStaged != true && hasConflict != true",
           "group": "1_modification@0"
         },
         {
           "command": "intelli-git.changelist.unstage",
-          "when": "webviewSection == 'changelistFile' && isStaged == true && isConflict != true",
+          "when": "(webviewSection == 'changelistFile' || webviewSection == 'changelistFolder' || webviewSection == 'changelistRoot') && changelistMode == 'staged' && hasStaged == true && hasConflict != true",
           "group": "1_modification@0"
         },
         {
@@ -434,13 +454,38 @@
         },
         {
           "command": "intelli-git.changelist.markInactive",
-          "when": "webviewSection == 'changelistFile' && isInactive != true && isConflict != true",
+          "when": "(webviewSection == 'changelistFile' || webviewSection == 'changelistFolder' || webviewSection == 'changelistRoot') && changelistMode == 'staged' && allInactive != true && hasConflict != true",
           "group": "3_other@1"
         },
         {
           "command": "intelli-git.changelist.markActive",
-          "when": "webviewSection == 'changelistFile' && isInactive == true && isConflict != true",
+          "when": "(webviewSection == 'changelistFile' || webviewSection == 'changelistFolder' || webviewSection == 'changelistRoot') && changelistMode == 'staged' && allInactive == true && hasConflict != true",
           "group": "3_other"
+        },
+        {
+          "command": "intelli-git.changelist.moveToList",
+          "when": "(webviewSection == 'changelistFile' || webviewSection == 'changelistHunk') && changelistMode == 'changes' && isConflict != true && isInactive != true && isUntracked != true",
+          "group": "1_modification@0"
+        },
+        {
+          "command": "intelli-git.changelist.createList",
+          "when": "webviewSection == 'changelistBackground' && changelistMode == 'changes'",
+          "group": "1_modification@0"
+        },
+        {
+          "command": "intelli-git.changelist.setActiveList",
+          "when": "webviewSection == 'changelistRoot' && changelistMode == 'changes' && isActiveChangelist != true",
+          "group": "1_modification@0"
+        },
+        {
+          "command": "intelli-git.changelist.renameList",
+          "when": "webviewSection == 'changelistRoot' && changelistMode == 'changes'",
+          "group": "1_modification@1"
+        },
+        {
+          "command": "intelli-git.changelist.deleteList",
+          "when": "webviewSection == 'changelistRoot' && changelistMode == 'changes' && canDeleteChangelist == true",
+          "group": "2_danger"
         },
         {
           "command": "intelli-git.copyAuthorEmail",
@@ -510,6 +555,19 @@
             "%intelli-git.config.ai.provider.custom%"
           ],
           "description": "%intelli-git.config.ai.provider.description%"
+        },
+        "intelli-git.changelist.mode": {
+          "type": "string",
+          "default": "staged",
+          "enum": [
+            "staged",
+            "changes"
+          ],
+          "enumDescriptions": [
+            "%intelli-git.config.changelist.mode.staged%",
+            "%intelli-git.config.changelist.mode.changes%"
+          ],
+          "description": "%intelli-git.config.changelist.mode.description%"
         },
         "intelli-git.ai.copilot.model": {
           "type": "string",

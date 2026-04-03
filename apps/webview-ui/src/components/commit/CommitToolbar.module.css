@@ -44,7 +44,7 @@
     color: var(--vscode-disabledForeground);
 }
 
-.iconBtn.active {
+.activeMode {
     background: var(--vscode-list-activeSelectionBackground);
     color: var(--vscode-list-activeSelectionForeground);
 }

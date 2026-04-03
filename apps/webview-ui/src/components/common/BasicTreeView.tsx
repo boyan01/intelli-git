@@ -39,6 +39,7 @@ export interface BasicTreeViewProps<T = unknown> {
     getDragData?: (node: TreeNode<T>) => Record<string, string>;
     getDragLabel?: (node: TreeNode<T>) => { label: string; count?: number };
     onDrop?: (draggedNode: TreeNode<T>, targetNode: TreeNode<T>) => void;
+    rootContextData?: Record<string, unknown>;
 }
 
 export interface BasicTreeViewRef {
@@ -281,6 +282,7 @@ function BasicTreeViewInner<T>(
         onToggle, onSelect, onDoubleClick, onContextMenu, onFocusNodeChange, onFocusChange, renderLabel, renderTrailing,
         getContextData, indent = 8, baseIndent = 0, renderLeading, isDraggable, isDropTarget,
         getDropTargetRootId, onDrop, getDragData, getDragLabel
+        , rootContextData
     } = props;
 
     const rootRef = useRef<HTMLDivElement>(null);
@@ -335,6 +337,7 @@ function BasicTreeViewInner<T>(
             tabIndex={0}
             onFocus={() => onFocusChange?.(true)}
             onBlur={() => onFocusChange?.(false)}
+            {...(rootContextData ? { 'data-vscode-context': JSON.stringify(rootContextData) } : {})}
         >
             {nodes.map(node => (
                 <TreeNodeItem
