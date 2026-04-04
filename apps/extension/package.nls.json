@@ -78,5 +78,6 @@
   "intelli-git.commands.changelist.deleteList.title": "Delete Changelist",
   "intelli-git.commands.changelist.setActiveList.title": "Set Active Changelist",
   "intelli-git.commands.changelist.moveToList.title": "Move to Changelist...",
+  "intelli-git.commands.hunk.toggleInactive.title": "Toggle Inactive",
   "intelli-git.config.ai.copilot.model.description": "Preferred GitHub Copilot model id to use for commit message generation (for example: gpt-5-mini, gpt-4.1, claude-sonnet-4)."
 }

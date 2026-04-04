@@ -268,6 +268,11 @@
       {
         "command": "intelli-git.changelist.moveToList",
         "title": "%intelli-git.commands.changelist.moveToList.title%"
+      },
+      {
+        "command": "intelli-git.hunk.toggleInactive",
+        "title": "%intelli-git.commands.hunk.toggleInactive.title%",
+        "icon": "$(eye-closed)"
       }
     ],
     "keybindings": [
@@ -533,6 +538,25 @@
           "command": "intelli-git.moveHunkToInactive",
           "when": "isInDiffEditor",
           "group": "7_modification"
+        }
+      ],
+      "scm/change/title": [
+        {
+          "command": "intelli-git.hunk.toggleInactive",
+          "when": "originalResourceScheme == 'git'",
+          "group": "navigation@10"
+        }
+      ],
+      "diffEditor/gutter/hunk": [
+        {
+          "command": "intelli-git.hunk.toggleInactive",
+          "group": "primary@10"
+        }
+      ],
+      "diffEditor/gutter/selection": [
+        {
+          "command": "intelli-git.hunk.toggleInactive",
+          "group": "primary@10"
         }
       ]
     },

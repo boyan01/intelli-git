@@ -78,5 +78,6 @@
   "intelli-git.commands.changelist.deleteList.title": "删除变更列表",
   "intelli-git.commands.changelist.setActiveList.title": "设为活动变更列表",
   "intelli-git.commands.changelist.moveToList.title": "移动到变更列表...",
+  "intelli-git.commands.hunk.toggleInactive.title": "Toggle Inactive",
   "intelli-git.config.ai.copilot.model.description": "用于生成提交信息的首选 GitHub Copilot 模型 ID (例如: gpt-5-mini, gpt-4.1, claude-sonnet-4)。"
 }

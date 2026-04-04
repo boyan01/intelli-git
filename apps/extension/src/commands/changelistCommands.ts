@@ -506,7 +506,110 @@ export function registerChangelistCommands(
                     logger.warn('Hunk matching failed', { line, relativePath, hunkCount: fileStatus.hunks.length });
                 }
             } else {
-                logger.warn('File status or hunks not found for command', { relativePath });
+                    vscode.window.showWarningMessage(i18n.t('File status not found for {0}', relativePath));
+            }
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand('intelli-git.hunk.toggleInactive', async (...args) => {
+            let uri: vscode.Uri | undefined;
+            let targetLine: number | undefined;
+
+            logger.info('ToggleInactive triggered with args:', JSON.stringify(args));
+
+            if (args.length >= 2 && args[0] instanceof vscode.Uri) {
+                // From scm/change/title (Quick Diff)
+                // args: [uri, changes (LineChange[]), index]
+                uri = args[0];
+                const changes = args[1];
+                const index = args[2];
+                if (changes && changes.length > index) {
+                    targetLine = changes[index].modifiedStartLineNumber;
+                    if (targetLine === 0) {
+                        targetLine = 1;
+                    }
+                }
+            } else if (args.length === 1 && args[0] && args[0].modifiedUri) {
+                // From diffEditor/gutter/hunk (Diff Editor)
+                // args: [context: DiffEditorSelectionHunkToolbarContext]
+                const context = args[0];
+                uri = context.modifiedUri;
+                const mapping = context.mapping;
+                if (mapping && mapping.modified) {
+                    targetLine = mapping.modified.startLineNumber;
+                    if (targetLine === 0) {
+                        targetLine = 1; // Fallback
+                    }
+                }
+            }
+
+            if (!uri || targetLine === undefined) {
+                logger.warn('Could not determine uri or target line for toggleInactive');
+                return;
+            }
+
+            const workspaceRoot = gitService.getWorkspaceRoot();
+            if (!workspaceRoot) return;
+
+            let filePath = uri.fsPath;
+            let isStagedView = false;
+            if (uri.scheme === 'intelli-git-revision') {
+                isStagedView = true;
+                try {
+                    const parsed = JSON.parse(uri.query);
+                    let rawPath = parsed.path || parsed.fsPath || (typeof parsed === 'string' ? parsed : null);
+                    if (!rawPath) rawPath = uri.path.startsWith('/') ? uri.path.substring(1) : uri.path;
+                    if (rawPath) filePath = path.isAbsolute(rawPath) ? rawPath : path.join(workspaceRoot, rawPath);
+                } catch { /* ignore */ }
+            } else if (uri.scheme === 'git' && uri.authority === 'index') {
+                isStagedView = true;
+                try {
+                    const parsed = JSON.parse(uri.query);
+                    if (parsed.path) filePath = path.join(workspaceRoot, parsed.path);
+                } catch { /* ignore */ }
+            }
+
+            if (!filePath.startsWith(workspaceRoot)) {
+                logger.warn('File not in workspace root', { filePath, workspaceRoot });
+                return;
+            }
+
+            const relativePath = path.relative(workspaceRoot, filePath).replace(/\\/g, '/');
+            const status = await gitService.getStatus();
+            const matchingFiles = status.filter(f => f.path === relativePath);
+
+            let fileStatus = matchingFiles.find(f => f.staged === isStagedView);
+            if (!fileStatus && matchingFiles.length > 0) {
+                fileStatus = matchingFiles[0];
+            }
+
+            if (fileStatus && fileStatus.hunks) {
+                const hunk = fileStatus.hunks.find(h => {
+                    const diffOldEnd = h.oldStart + Math.max(0, h.oldLineCount - 1);
+                    const diffNewEnd = h.newStart + Math.max(0, h.newLineCount - 1);
+                    // allow +/- 1 line discrepancy between VS Code internal differ and git diff
+                    const inOldRange = targetLine! >= (h.oldStart - 1) && targetLine! <= (diffOldEnd + 1);
+                    const inNewRange = targetLine! >= (h.newStart - 1) && targetLine! <= (diffNewEnd + 1);
+                    return inOldRange || inNewRange;
+                });
+
+                if (hunk) {
+                    const inactiveHunkIds = inactiveChangesService.getInactiveHunkIds(relativePath);
+                    const isCurrentlyInactive = inactiveHunkIds.includes(hunk.id);
+
+                    if (isCurrentlyInactive) {
+                        await inactiveChangesService.markHunkActive(relativePath, hunk.id);
+                        vscode.window.showInformationMessage(i18n.t('Hunk moved to Active'));
+                    } else {
+                        await inactiveChangesService.markHunkInactive(relativePath, hunk.id);
+                        vscode.window.showInformationMessage(i18n.t('Hunk moved to Inactive'));
+                    }
+                    provider.rpc?.refresh();
+                } else {
+                    vscode.window.showWarningMessage(i18n.t('No modified hunk found at line {0} in {1}', targetLine, relativePath));
+                }
+            } else {
                 vscode.window.showWarningMessage(i18n.t('File status not found for {0}', relativePath));
             }
         })
