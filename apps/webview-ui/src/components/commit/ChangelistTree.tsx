@@ -307,18 +307,20 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
             return null;
         }
 
-        const fileNodes = node.data?.isFile ? [node.data] : [];
+        const fileNodes = getDescendantFiles(node);
         if (fileNodes.length === 0) {
             return null;
         }
 
-        const action = fileNodes[0].staged ? {
+        const isAllStaged = fileNodes.every(file => file.staged);
+        const action = isAllStaged ? {
             kind: 'unstage' as const,
             title: t('Unstage')
         } : {
             kind: 'stage' as const,
             title: t('Stage')
         };
+        const paths = fileNodes.map(file => file.path);
 
         return (
             <div className={styles.groupTrailing}>
@@ -329,9 +331,9 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
                     onClick={async (event) => {
                         event.stopPropagation();
                         if (action.kind === 'stage') {
-                            await rpc.stage(node.data!.path);
+                            await rpc.stageFiles(paths);
                         } else {
-                            await rpc.unstage(node.data!.path);
+                            await rpc.unstageFiles(paths);
                         }
                         rpcEvents.refresh.emit();
                     }}
