@@ -22,6 +22,12 @@ export function usePushBranches() {
     // 3. Persisted State
     const [savedSelection, setSavedSelection] = usePersistedState('push.branchSelection');
 
+    // 4. Reset overrides when local branch changes
+    useEffect(() => {
+        setSelectedRemoteOverride('');
+        setSelectedRemoteBranchOverride('');
+    }, [initState.localBranch]);
+
 
     const defaultSelection = useMemo(() => {
         if (!initState.localBranch) {
@@ -85,7 +91,11 @@ export function usePushBranches() {
     );
 
     const selectedRemoteBranch = useMemo(() => {
-        const candidate = selectedRemoteBranchOverride || defaultSelection.remoteBranch;
+        if (selectedRemoteBranchOverride) {
+            return selectedRemoteBranchOverride;
+        }
+
+        const candidate = defaultSelection.remoteBranch;
 
         if (!selectedRemote) {
             return candidate;
