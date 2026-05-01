@@ -75,10 +75,11 @@ export function PushTab() {
             <div className={styles.scrollArea} ref={scrollAreaRef} tabIndex={0}>
                 {viewMode === 'commits' && (
                     <>
-                        {commits.map(commit => (
+                        {commits.map((commit, index) => (
                             <CommitAccordionItem
                                 key={commit.hash}
                                 commit={commit}
+                                isLatestUnpushed={index === 0}
                                 isExpanded={expandedCommitHash === commit.hash}
                                 onToggle={() => toggleCommit(commit.hash)}
                                 fileViewMode={commitsViewMode}

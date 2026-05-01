@@ -430,6 +430,21 @@
           "group": "4_edit"
         },
         {
+          "command": "intelli-git.log.undoCommit",
+          "when": "webviewSection == 'pushCommit' && isLatestUnpushed == true",
+          "group": "1_actions@1"
+        },
+        {
+          "command": "intelli-git.log.editMessage",
+          "when": "webviewSection == 'pushCommit' && isUnpushed == true",
+          "group": "1_actions@2"
+        },
+        {
+          "command": "intelli-git.copyCommitHash",
+          "when": "webviewSection == 'pushCommit'",
+          "group": "1_cutcopypaste"
+        },
+        {
           "command": "intelli-git.copyCommitHash",
           "when": "webviewSection == 'gitLogCommit'",
           "group": "1_cutcopypaste"

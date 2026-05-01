@@ -10,6 +10,7 @@ import styles from './CommitAccordionItem.module.css';
 
 export interface CommitAccordionItemProps {
     commit: CommitDetails;
+    isLatestUnpushed: boolean;
     isExpanded: boolean;
     onToggle: () => void;
     fileViewMode: 'tree' | 'list';
@@ -19,6 +20,7 @@ export interface CommitAccordionItemProps {
 
 export const CommitAccordionItem: React.FC<CommitAccordionItemProps> = ({
     commit,
+    isLatestUnpushed,
     isExpanded,
     onToggle,
     fileViewMode,
@@ -59,7 +61,17 @@ export const CommitAccordionItem: React.FC<CommitAccordionItemProps> = ({
     })) : [];
 
     return (
-        <div className={styles.commitItem}>
+        <div
+            className={styles.commitItem}
+            data-vscode-context={JSON.stringify({
+                webviewSection: 'pushCommit',
+                hash: commit.hash,
+                shortHash: commit.shortHash,
+                subject: commit.subject,
+                isUnpushed: true,
+                isLatestUnpushed
+            })}
+        >
             {/* Commit Header */}
             <div
                 className={`${styles.commitHeader} ${isExpanded ? styles.commitHeaderExpanded : ''}`}
