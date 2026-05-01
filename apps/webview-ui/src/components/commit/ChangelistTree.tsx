@@ -7,6 +7,7 @@ import { getFileIcon } from '../../lib/fileIcons';
 import { rpc, rpcEvents } from '@/lib/rpc_client';
 import { logger } from '@/utils/logger';
 import styles from '../file-tree/BaseFileTree.module.css';
+import { compactSingleChildFolders } from '../file-tree/treeUtils';
 
 export interface ChangelistTreeProps {
     groups: ChangelistGroup[];
@@ -124,7 +125,7 @@ const buildTree = (files: FileStatus[]): TreeNode<FileNodeData>[] => {
     };
 
     processNodes(root);
-    return root;
+    return compactSingleChildFolders(root);
 };
 
 const prefixNodes = (nodes: TreeNode<FileNodeData>[], prefix: string, listId?: string): TreeNode<FileNodeData>[] => {
