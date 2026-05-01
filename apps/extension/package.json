@@ -2,7 +2,7 @@
   "name": "intelli-git",
   "displayName": "Intelli Git",
   "description": "JetBrains-style Git tools for VS Code: an IntelliJ IDEA-like commit panel, changelists, stash, and Git log workflows.",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "publisher": "boyan01",
   "license": "SEE LICENSE IN LICENSE",
   "icon": "resources/icon.png",
