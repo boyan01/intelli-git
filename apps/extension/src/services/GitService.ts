@@ -1,18 +1,26 @@
 import simpleGit, { SimpleGit, StatusResult } from 'simple-git';
 import * as vscode from 'vscode';
-import type { BranchInfo, LogCommit, LogOptions, CommitDetails, RefInfo, FileStatus, CommitFile, PushInitState, PushCommitsData, BranchListData, GitStatusCode } from '@shared/messages';
+import type { BranchInfo, LogCommit, LogOptions, CommitDetails, RefInfo, FileStatus, CommitFile, PushInitState, PushCommitsData, BranchListData, GitStatusCode, GitHunk } from '@shared/messages';
 import { logger } from '../utils/logger';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { parseDiffToHunks } from '../utils/diffParser';
+import { parseDiffToFileHunks } from '../utils/diffParser';
+import type { ChangelistStateService, ChangelistStateSnapshot, CommitPlan } from './ChangelistStateService';
+import type { InactiveChangesService, InactiveChangesSnapshot } from './InactiveChangesService';
+
+interface ExtensionGitStateSnapshot {
+    inactiveChanges?: InactiveChangesSnapshot;
+    changelists?: ChangelistStateSnapshot;
+}
 
 
 export class GitService implements vscode.Disposable {
     private git: SimpleGit;
     private _workspaceRoot: string;
     private _gitRoot: string;
-    private _inactiveChangesService?: any;
+    private _inactiveChangesService?: InactiveChangesService;
+    private _changelistStateService?: ChangelistStateService;
     private _onDidChange = new vscode.EventEmitter<void>();
 
     /**
@@ -20,14 +28,15 @@ export class GitService implements vscode.Disposable {
      */
     public readonly onDidChange = this._onDidChange.event;
 
-    constructor(workspaceRoot: string, gitRoot: string, git: SimpleGit, inactiveChangesService?: any) {
+    constructor(workspaceRoot: string, gitRoot: string, git: SimpleGit, inactiveChangesService?: InactiveChangesService, changelistStateService?: ChangelistStateService) {
         this._workspaceRoot = workspaceRoot;
         this._gitRoot = gitRoot;
         this.git = git;
         this._inactiveChangesService = inactiveChangesService;
+        this._changelistStateService = changelistStateService;
     }
 
-    public static async create(workspaceRoot: string, inactiveChangesService?: any): Promise<GitService> {
+    public static async create(workspaceRoot: string, inactiveChangesService?: InactiveChangesService, changelistStateService?: ChangelistStateService): Promise<GitService> {
         const tempGit = simpleGit(workspaceRoot);
         let gitRoot = workspaceRoot;
         let finalGit = tempGit;
@@ -45,7 +54,7 @@ export class GitService implements vscode.Disposable {
             console.error('Failed to resolve git root, assuming workspace root:', e);
         }
 
-        return new GitService(workspaceRoot, gitRoot, finalGit, inactiveChangesService);
+        return new GitService(workspaceRoot, gitRoot, finalGit, inactiveChangesService, changelistStateService);
     }
 
     public toRepoPath(filePath: string): string {
@@ -72,6 +81,137 @@ export class GitService implements vscode.Disposable {
      */
     private fireChange() {
         this._onDidChange.fire();
+    }
+
+    private getWorkspacePathspecArgs(): string[] {
+        if (this._gitRoot === this._workspaceRoot) {
+            return [];
+        }
+
+        return ['--', path.relative(this._gitRoot, this._workspaceRoot)];
+    }
+
+    private async parseWorkspaceDiff(args: string[], idPrefix: string): Promise<Map<string, GitHunk[]>> {
+        const diffText = await this.git.diff(args);
+        if (!diffText) {
+            return new Map();
+        }
+
+        return parseDiffToFileHunks(
+            diffText,
+            repoPath => this.toWorkspacePath(repoPath),
+            { idPrefix }
+        );
+    }
+
+    private async hasLocalChanges(): Promise<boolean> {
+        const status = await this.git.status();
+        return status.files.length > 0;
+    }
+
+    private async withTemporaryStash(operationName: string, operation: () => Promise<void>): Promise<void> {
+        const shouldStash = await this.hasLocalChanges();
+        const stashMessage = `Intelli Git ${operationName}: ${new Date().toISOString()}`;
+
+        if (!shouldStash) {
+            await operation();
+            this.fireChange();
+            return;
+        }
+
+        const extensionStateSnapshot = this.createExtensionGitStateSnapshot();
+        await this.git.stash(['push', '-u', '-m', stashMessage]);
+
+        try {
+            await operation();
+        } catch (operationError) {
+            await this.restoreExtensionGitStateSnapshot(extensionStateSnapshot);
+            this.fireChange();
+            throw new Error(`${operationName} failed after local changes were saved to the stash. Resolve the git state, then restore "${stashMessage}" from the stash list.`, { cause: operationError });
+        }
+
+        try {
+            await this.git.stash(['pop', '--index']);
+        } catch (restoreError) {
+            await this.restoreExtensionGitStateSnapshot(extensionStateSnapshot);
+            this.fireChange();
+            throw new Error(`${operationName} completed, but restoring local changes caused conflicts. The temporary stash was kept for recovery.`, { cause: restoreError });
+        }
+
+        await this.restoreExtensionGitStateSnapshot(extensionStateSnapshot, true);
+        this.fireChange();
+    }
+
+    private createExtensionGitStateSnapshot(): ExtensionGitStateSnapshot {
+        return {
+            inactiveChanges: this._inactiveChangesService?.createSnapshot(),
+            changelists: this._changelistStateService?.createSnapshot()
+        };
+    }
+
+    private async restoreExtensionGitStateSnapshot(snapshot: ExtensionGitStateSnapshot, reconcile: boolean = false): Promise<void> {
+        if (snapshot.inactiveChanges) {
+            await this._inactiveChangesService?.restoreSnapshot(snapshot.inactiveChanges);
+        }
+
+        if (snapshot.changelists) {
+            await this._changelistStateService?.restoreSnapshot(snapshot.changelists);
+        }
+
+        if (reconcile && (this._inactiveChangesService || this._changelistStateService)) {
+            const status = await this.getStatus();
+            this._inactiveChangesService?.syncWithStatus(status);
+            this._changelistStateService?.syncWithStatus(status);
+        }
+    }
+
+    private async withTemporaryIndex<T>(operation: (git: SimpleGit) => Promise<T>): Promise<T> {
+        const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'intelli-git-index-'));
+        const indexPath = path.join(tempDir, 'index');
+        const tempGit = simpleGit(this._gitRoot).env({
+            ...process.env,
+            GIT_INDEX_FILE: indexPath
+        });
+
+        try {
+            await tempGit.raw(['read-tree', 'HEAD']);
+            return await operation(tempGit);
+        } finally {
+            try {
+                fs.rmSync(tempDir, { recursive: true, force: true });
+            } catch {
+                // Ignore cleanup errors for temporary index files.
+            }
+        }
+    }
+
+    private async stageFilesInGit(git: SimpleGit, filePaths: string[], status: FileStatus[]): Promise<void> {
+        if (!filePaths || filePaths.length === 0) {
+            return;
+        }
+
+        const statusMap = new Map(status.map(file => [file.path, file]));
+        const filesToDirectAdd: string[] = [];
+        const filesToUpdate: string[] = [];
+
+        for (const filePath of filePaths) {
+            const fileStatus = statusMap.get(filePath);
+            const repoPath = this.toRepoPath(filePath);
+
+            if (fileStatus?.status === 'D') {
+                filesToUpdate.push(repoPath);
+            } else {
+                filesToDirectAdd.push(repoPath);
+            }
+        }
+
+        if (filesToDirectAdd.length > 0) {
+            await git.add(filesToDirectAdd);
+        }
+
+        if (filesToUpdate.length > 0) {
+            await git.raw(['add', '-u', '--', ...filesToUpdate]);
+        }
     }
 
     public dispose() {
@@ -150,25 +290,39 @@ export class GitService implements vscode.Disposable {
             console.error('Error getting status:', e);
         }
 
-        // 4. Resolve hunks for Modified files
-        for (const file of files) {
-            if (file.status === 'M' || (file.status === 'A' && file.staged) || file.status === 'D') {
-                try {
-                    const repoPath = this.toRepoPath(file.path);
-                    const args = file.staged ? ['--cached', 'HEAD', '--', repoPath] : ['--', repoPath];
-                    const diffText = await this.git.diff(args);
-                    if (diffText) {
-                        const hunks = parseDiffToHunks(diffText, file.path);
-                        file.hunks = hunks;
+        // 4. Resolve hunks in bulk. This keeps status refresh responsive for large diffs by
+        // avoiding one `git diff` process per changed file.
+        const shouldResolveHunks = (file: FileStatus) =>
+            file.status === 'M' || (file.status === 'A' && file.staged) || file.status === 'D';
 
-                        if (this._inactiveChangesService) {
-                            file.inactiveHunkIds = this._inactiveChangesService.getInactiveHunkIds(file.path);
-                        }
-                    }
-                } catch (e) {
-                    console.error(`Error parsing hunks for ${file.path}:`, e);
+        const hasStagedDiff = files.some(file => file.staged && shouldResolveHunks(file));
+        const hasWorktreeDiff = files.some(file => !file.staged && shouldResolveHunks(file));
+        const workspacePathspec = this.getWorkspacePathspecArgs();
+
+        try {
+            const stagedHunks = hasStagedDiff
+                ? await this.parseWorkspaceDiff(['--cached', 'HEAD', ...workspacePathspec], 'index')
+                : new Map<string, GitHunk[]>();
+            const worktreeHunks = hasWorktreeDiff
+                ? await this.parseWorkspaceDiff(workspacePathspec, 'worktree')
+                : new Map<string, GitHunk[]>();
+
+            for (const file of files) {
+                if (!shouldResolveHunks(file)) {
+                    continue;
+                }
+
+                const hunks = file.staged ? stagedHunks.get(file.path) : worktreeHunks.get(file.path);
+                if (hunks) {
+                    file.hunks = hunks;
+                }
+
+                if (this._inactiveChangesService) {
+                    file.inactiveHunkIds = this._inactiveChangesService.getInactiveHunkIds(file.path);
                 }
             }
+        } catch (e) {
+            console.error('Error parsing git hunks:', e);
         }
 
         // Check for diagnostics errors
@@ -210,9 +364,13 @@ export class GitService implements vscode.Disposable {
     public async switchBranch(branchName: string, force: boolean = false): Promise<void> {
         if (force) {
             await this.git.checkout(['-f', branchName]);
-        } else {
-            await this.git.checkout(branchName);
+            this.fireChange();
+            return;
         }
+
+        await this.withTemporaryStash(`switch branch ${branchName}`, async () => {
+            await this.git.checkout(branchName);
+        });
     }
 
     public async stageFile(filePath: string): Promise<void> {
@@ -509,6 +667,10 @@ export class GitService implements vscode.Disposable {
     }
 
     public async applyPatch(patch: string, reverse: boolean = false, cached: boolean = false): Promise<void> {
+        await this.applyPatchWithGit(this.git, patch, reverse, cached);
+    }
+
+    private async applyPatchWithGit(git: SimpleGit, patch: string, reverse: boolean = false, cached: boolean = false): Promise<void> {
         const tempPatchFile = path.join(os.tmpdir(), `intelli-git-patch-${Date.now()}.patch`);
         fs.writeFileSync(tempPatchFile, patch);
         try {
@@ -520,7 +682,7 @@ export class GitService implements vscode.Disposable {
                 args.push('--cached');
             }
             args.push(tempPatchFile);
-            await this.git.raw(args);
+            await git.raw(args);
         } finally {
             try { fs.unlinkSync(tempPatchFile); } catch { /* ignore */ }
         }
@@ -600,6 +762,58 @@ export class GitService implements vscode.Disposable {
         }
         await this.git.commit(message);
         this.fireChange();
+    }
+
+    public async commitChangelistPlan(message: string, amend: boolean, plan: CommitPlan, status: FileStatus[]): Promise<void> {
+        if (!plan.files || plan.files.length === 0) {
+            throw new Error('No active changelist changes to commit');
+        }
+
+        await this.withTemporaryIndex(async tempGit => {
+            await this.applyCommitPlanToIndex(tempGit, plan, status);
+
+            const args = amend ? ['commit', '--amend'] : ['commit'];
+            if (message) {
+                args.push('-m', message);
+            } else if (amend) {
+                args.push('--no-edit');
+            }
+
+            await tempGit.raw(args);
+        });
+
+        await this.git.reset(['-q', 'HEAD', '--', ...plan.files.map(filePath => this.toRepoPath(filePath))]);
+        this.fireChange();
+    }
+
+    public async getDiffForChangelistPlan(plan: CommitPlan, status: FileStatus[]): Promise<string> {
+        if (!plan.files || plan.files.length === 0) {
+            return '';
+        }
+
+        return this.withTemporaryIndex(async tempGit => {
+            await this.applyCommitPlanToIndex(tempGit, plan, status);
+            return tempGit.diff(['--cached']);
+        });
+    }
+
+    private async applyCommitPlanToIndex(git: SimpleGit, plan: CommitPlan, status: FileStatus[]): Promise<void> {
+        await this.stageFilesInGit(git, plan.files, status);
+
+        for (const [filePath, hunkIds] of Object.entries(plan.excludedHunkIdsByPath)) {
+            if (hunkIds.length === 0) {
+                continue;
+            }
+
+            const hunks = status
+                .filter(file => file.path === filePath)
+                .flatMap(file => file.hunks || [])
+                .filter(hunk => hunkIds.includes(hunk.id));
+
+            if (hunks.length > 0) {
+                await this.applyPatchWithGit(git, this.buildPatchFromHunks(hunks), true, true);
+            }
+        }
     }
 
     public async commitAmend(message?: string, files?: string[]): Promise<void> {
@@ -772,7 +986,9 @@ export class GitService implements vscode.Disposable {
     }
 
     public async pull(): Promise<void> {
-        await this.git.pull();
+        await this.withTemporaryStash('pull --rebase', async () => {
+            await this.git.raw(['pull', '--rebase']);
+        });
     }
 
     public async getStagedDiff(): Promise<string> {
@@ -989,30 +1205,36 @@ export class GitService implements vscode.Disposable {
     }
 
     public async checkoutRemoteBranch(remoteBranch: string, force: boolean = false): Promise<void> {
-        const parts = remoteBranch.split('/');
-        const localBranchName = parts.slice(1).join('/');
+        const checkout = async () => {
+            const parts = remoteBranch.split('/');
+            const localBranchName = parts.slice(1).join('/');
 
-        const localBranches = await this.getBranches();
-        if (localBranches.all.includes(localBranchName)) {
-            if (force) {
-                await this.git.checkout(['-f', localBranchName]);
+            const localBranches = await this.getBranches();
+            if (localBranches.all.includes(localBranchName)) {
+                if (force) {
+                    await this.git.checkout(['-f', localBranchName]);
+                } else {
+                    await this.git.checkout(localBranchName);
+                }
             } else {
-                await this.git.checkout(localBranchName);
+                // New branch from remote, force doesn't apply to creation usually unless overwrite,
+                // but here we are checking out. If force is true, we might want to start clean.
+                // `git checkout --track origin/b` may fail when local changes conflict.
+                const args = ['-b', localBranchName, '--track', remoteBranch];
+                if (force) {
+                    args.unshift('-f');
+                }
+                await this.git.checkout(args);
             }
-        } else {
-            // New branch from remote, force doesn't apply to creation usually unless overwrite, 
-            // but here we are checking out. If force is true, we might want to start clean?
-            // But if untracked files conflict with new files from remote, `checkout -b ...` might fail.
-            // `-f` with `-b` implies force creating branch (resetting if exists), but we checked existence.
-            // `git checkout -f -b` isn't standard for "ignore local changes".
-            // Actually `git checkout --track origin/b` will fail if local changes conflict.
-            // So we pass force to the checkout command.
-            const args = ['-b', localBranchName, '--track', remoteBranch];
-            if (force) {
-                args.unshift('-f'); // checkout -f -b ...
-            }
-            await this.git.checkout(args);
+        };
+
+        if (force) {
+            await checkout();
+            this.fireChange();
+            return;
         }
+
+        await this.withTemporaryStash(`checkout remote branch ${remoteBranch}`, checkout);
     }
 
 
@@ -1449,7 +1671,9 @@ export class GitService implements vscode.Disposable {
     };
 
     public async rebaseOnto(targetBranch: string): Promise<void> {
-        await this.git.rebase([targetBranch]);
+        await this.withTemporaryStash(`rebase onto ${targetBranch}`, async () => {
+            await this.git.rebase([targetBranch]);
+        });
     }
 
     public async merge(branchName: string): Promise<void> {
@@ -1462,7 +1686,9 @@ export class GitService implements vscode.Disposable {
     }
 
     public async pullWithRebase(remote: string, branch: string): Promise<void> {
-        await this.git.pull(remote, branch, { '--rebase': 'true' });
+        await this.withTemporaryStash(`pull --rebase ${remote}/${branch}`, async () => {
+            await this.git.raw(['pull', '--rebase', remote, branch]);
+        });
     }
 
     public async pullWithMerge(remote: string, branch: string): Promise<void> {

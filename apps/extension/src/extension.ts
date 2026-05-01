@@ -22,7 +22,7 @@ export async function activate(context: vscode.ExtensionContext) {
     // Initialize services
     const inactiveChangesService = new InactiveChangesService(context);
     const changelistStateService = new ChangelistStateService(context);
-    const gitService = await GitService.create(workspaceRoot, inactiveChangesService);
+    const gitService = await GitService.create(workspaceRoot, inactiveChangesService, changelistStateService);
 
     // Initialize providers
     const providerOptions = {

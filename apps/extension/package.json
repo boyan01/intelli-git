@@ -646,7 +646,8 @@
     "watch:webview": "cd ../webview-ui && npm run watch",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src",
-    "test": "node ./out/apps/extension/test/runTest.js"
+    "test:regression": "node scripts/run-regression-tests.js",
+    "test": "npm run test:regression"
   },
   "dependencies": {
     "simple-git": "^3.33.0"

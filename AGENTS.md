@@ -162,6 +162,13 @@ Webview 和 extension host 共用同一组 l10n bundle files，但插值语法�
 这一节定义了 commit view 必须遵守的交互行为。
 未来任何涉及 commit view、changelist state、tree rendering、context menus、commit selection、toolbar actions 的重构或功能修改，都必须保持这些规则，除非产品需求明确变更。当需要变更时，必须更新这一节的规则。
 
+### Product Goals
+- Commit UI 的 diff 处理必须在 state 和 operation 层精确到 hunk。File-oriented tree 只是展示形态，不能成为丢失 hunk identity、hunk assignment、partial commit precision 的理由。
+- `staged` 和 `changes` 两种 mode 都是一等能力。实现或重构时不能为了简化其中一种 mode 而破坏另一种 mode 的语义、toolbar、context menu、commit selection 或 commit execution。
+- 大 diff 场景必须保持可用性能。Diff parsing、state reconciliation、RPC payload、React rendering 都应避免无界全量工作；优先使用缓存、增量刷新、lazy loading、virtualized rendering 或按需拉取 diff content。
+- 更新项目、`pull --rebase`、checkout / switch branch 等 git workflow 必须对 dirty worktree 更智能。遇到本地改动时不应直接失败；应先识别 staged、unstaged、untracked、inactive changes、changelist / hunk assignments，再通过明确可恢复的 temporary stash / shelf / autostash-style flow 保护本地改动。
+- 自动保护本地改动时必须保留用户语义：staged state、active changelist、hunk-to-changelist assignment、inactive changes、untracked files 都不能被静默丢失。恢复失败或产生 conflict 时，必须把 recovery action 和当前 git state 明确暴露给用户。
+
 ### General Rules
 - Commit view 只支持两种 mode：`staged` 和 `changes`。
 - 当前 mode 由配置项 `intelli-git.changelist.mode` 控制。

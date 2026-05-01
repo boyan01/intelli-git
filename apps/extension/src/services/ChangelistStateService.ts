@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import type { ChangelistAssignment, ChangelistInfo, ChangelistMode, ChangelistState, FileStatus } from '@shared/messages';
+import { remapHunkValues } from '../utils/hunkIdentity';
 
 interface PersistedChangelistState {
     lists: Array<{ id: string; name: string }>;
@@ -7,7 +8,9 @@ interface PersistedChangelistState {
     assignments: Record<string, ChangelistAssignment>;
 }
 
-interface CommitPlan {
+export type ChangelistStateSnapshot = PersistedChangelistState;
+
+export interface CommitPlan {
     files: string[];
     excludedFiles: string[];
     excludedHunkIdsByPath: Record<string, string[]>;
@@ -37,6 +40,16 @@ export class ChangelistStateService {
     private async saveState() {
         this.ensureInvariants();
         await this.context.workspaceState.update(ChangelistStateService.STORAGE_KEY, this.state);
+    }
+
+    public createSnapshot(): ChangelistStateSnapshot {
+        this.ensureInvariants();
+        return JSON.parse(JSON.stringify(this.state)) as ChangelistStateSnapshot;
+    }
+
+    public async restoreSnapshot(snapshot: ChangelistStateSnapshot): Promise<void> {
+        this.state = JSON.parse(JSON.stringify(snapshot)) as PersistedChangelistState;
+        await this.saveState();
     }
 
     private ensureInvariants() {
@@ -230,14 +243,13 @@ export class ChangelistStateService {
                 continue;
             }
 
-            const hunkIds = Array.from(new Set(entries.flatMap(entry => entry.hunks?.map(hunk => hunk.id) || [])));
+            const hunks = Array.from(new Map(
+                entries.flatMap(entry => (entry.hunks || []).map(hunk => [hunk.id, hunk]))
+            ).values());
             const assignment = this.state.assignments[path] || {};
 
-            if (hunkIds.length > 0) {
-                const nextHunkIds: Record<string, string> = {};
-                for (const hunkId of hunkIds) {
-                    nextHunkIds[hunkId] = assignment.hunkListIds?.[hunkId] || this.state.activeListId;
-                }
+            if (hunks.length > 0) {
+                const nextHunkIds = remapHunkValues(hunks, assignment.hunkListIds, () => this.state.activeListId);
 
                 if (JSON.stringify(nextHunkIds) !== JSON.stringify(assignment.hunkListIds || {})) {
                     assignment.hunkListIds = nextHunkIds;
@@ -253,7 +265,7 @@ export class ChangelistStateService {
                 changed = true;
             }
 
-            if (assignment.hunkListIds && hunkIds.length === 0) {
+            if (assignment.hunkListIds && hunks.length === 0) {
                 delete assignment.hunkListIds;
                 changed = true;
             }

@@ -187,9 +187,9 @@ export class ExtensionRpcHandler {
         }
     };
 
-    getStatus = async (): Promise<FileStatus[]> => {
+    private async getStatusWithState(): Promise<FileStatus[]> {
         const status = await this.gitService.getStatus();
-        this.inactiveChangesService?.syncWithStatus(status.map(file => file.path));
+        this.inactiveChangesService?.syncWithStatus(status);
         this.changelistStateService?.syncWithStatus(status);
 
         return status.map(file => {
@@ -207,6 +207,10 @@ export class ExtensionRpcHandler {
                 hasStagedInactive: hasStagedInactive
             };
         });
+    }
+
+    getStatus = async (): Promise<FileStatus[]> => {
+        return this.getStatusWithState();
     };
 
     getChangelistState = async () => {
@@ -399,40 +403,18 @@ export class ExtensionRpcHandler {
             const changelistState = this.changelistStateService?.getState();
 
             if (changelistState?.mode === 'changes') {
-                const status = await this.gitService.getStatus();
-                this.changelistStateService?.syncWithStatus(status);
+                const status = await this.getStatusWithState();
                 const plan = this.changelistStateService?.buildCommitPlan(status);
 
                 if (!plan || plan.files.length === 0) {
                     throw new Error('No active changelist changes to commit');
                 }
 
-                await this.gitService.stageFiles(plan.files);
-
-                for (const excludedFile of plan.excludedFiles) {
-                    await this.gitService.unstageFile(excludedFile);
-                }
-
-                for (const [filePath, hunkIds] of Object.entries(plan.excludedHunkIdsByPath)) {
-                    if (hunkIds.length === 0) {
-                        continue;
-                    }
-
-                    const hunks = status
-                        .filter(file => file.path === filePath)
-                        .flatMap(file => file.hunks || [])
-                        .filter(hunk => hunkIds.includes(hunk.id));
-
-                    if (hunks.length > 0) {
-                        await this.gitService.applyPatch(this.gitService.buildPatchFromHunks(hunks), true, true);
-                    }
-                }
-            }
-
-            if (params.amend) {
-                await this.gitService.commitAmend(params.message, changelistState?.mode === 'changes' ? undefined : params.files);
+                await this.gitService.commitChangelistPlan(params.message, params.amend, plan, status);
+            } else if (params.amend) {
+                await this.gitService.commitAmend(params.message, params.files);
             } else {
-                await this.gitService.commit(params.message, changelistState?.mode === 'changes' ? undefined : params.files);
+                await this.gitService.commit(params.message, params.files);
             }
 
             if (params.push) {
@@ -571,8 +553,10 @@ export class ExtensionRpcHandler {
     pull = async (): Promise<void> => {
         try {
             await this.gitService.pull();
+            vscode.window.showInformationMessage(i18n.t('extension.pullSuccess'));
         } catch (e) {
             vscode.window.showErrorMessage(i18n.t('extension.pullFailed', `${e}`));
+            throw e;
         }
     };
 
@@ -733,7 +717,13 @@ export class ExtensionRpcHandler {
     generateCommitMessage = async (files?: string[]): Promise<string> => {
         try {
             let diff = '';
-            if (files && files.length > 0) {
+            const changelistState = this.changelistStateService?.getState();
+
+            if (changelistState?.mode === 'changes') {
+                const status = await this.getStatusWithState();
+                const plan = this.changelistStateService?.buildCommitPlan(status);
+                diff = plan ? await this.gitService.getDiffForChangelistPlan(plan, status) : '';
+            } else if (files && files.length > 0) {
                 diff = await this.gitService.getDiffForFiles(files);
             } else {
                 diff = await this.gitService.getStagedDiff();

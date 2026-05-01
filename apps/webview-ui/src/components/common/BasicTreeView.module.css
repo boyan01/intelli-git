@@ -4,9 +4,9 @@
     outline: none;
 }
 
-.nodeWrapper {
-    display: flex;
-    flex-direction: column;
+.virtualSpacer {
+    flex: 0 0 auto;
+    pointer-events: none;
 }
 
 .node {
@@ -107,11 +107,6 @@
     opacity: 1;
     pointer-events: auto;
     transform: translateX(0) scale(1);
-}
-
-.children {
-    display: flex;
-    flex-direction: column;
 }
 
 /* Highlight match */

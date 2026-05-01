@@ -1,9 +1,13 @@
 import * as vscode from 'vscode';
+import type { FileStatus } from '@shared/messages';
+import { remapHunkIdSet } from '../utils/hunkIdentity';
 
 interface InactiveData {
     // filePath -> set of hunkIds
     files: { [path: string]: { all?: boolean; hunkIds?: string[] } };
 }
+
+export type InactiveChangesSnapshot = InactiveData;
 
 export class InactiveChangesService {
     private static readonly STORAGE_KEY_V2 = 'ideaCommitPanel.inactiveChangesV2';
@@ -34,6 +38,15 @@ export class InactiveChangesService {
             InactiveChangesService.STORAGE_KEY_V2,
             this.state
         );
+    }
+
+    public createSnapshot(): InactiveChangesSnapshot {
+        return JSON.parse(JSON.stringify(this.state)) as InactiveChangesSnapshot;
+    }
+
+    public async restoreSnapshot(snapshot: InactiveChangesSnapshot): Promise<void> {
+        this.state = JSON.parse(JSON.stringify(snapshot)) as InactiveData;
+        await this.saveState();
     }
 
     public getInactiveFiles(): string[] {
@@ -86,8 +99,15 @@ export class InactiveChangesService {
         await this.saveState();
     }
 
-    public syncWithStatus(statusPaths: string[]) {
-        const validPaths = new Set(statusPaths);
+    public syncWithStatus(status: FileStatus[]) {
+        const grouped = new Map<string, FileStatus[]>();
+        for (const file of status) {
+            const entries = grouped.get(file.path) || [];
+            entries.push(file);
+            grouped.set(file.path, entries);
+        }
+
+        const validPaths = new Set(grouped.keys());
         let changed = false;
 
         Object.keys(this.state.files).forEach(path => {
@@ -96,6 +116,28 @@ export class InactiveChangesService {
                 changed = true;
             }
         });
+
+        for (const [path, fileInfo] of Object.entries(this.state.files)) {
+            if (fileInfo.all || !fileInfo.hunkIds || fileInfo.hunkIds.length === 0) {
+                continue;
+            }
+
+            const entries = grouped.get(path) || [];
+            const hunks = Array.from(new Map(
+                entries.flatMap(entry => (entry.hunks || []).map(hunk => [hunk.id, hunk]))
+            ).values());
+            const nextHunkIds = remapHunkIdSet(hunks, fileInfo.hunkIds);
+
+            if (JSON.stringify(nextHunkIds) !== JSON.stringify(fileInfo.hunkIds)) {
+                fileInfo.hunkIds = nextHunkIds;
+                changed = true;
+            }
+
+            if (fileInfo.hunkIds.length === 0) {
+                delete this.state.files[path];
+                changed = true;
+            }
+        }
 
         if (changed) {
             void this.saveState();
