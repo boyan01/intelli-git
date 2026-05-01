@@ -23,7 +23,7 @@ export class StashContentProvider implements vscode.TextDocumentContentProvider 
             }
 
             return await this.gitService.getFileContent(ref, path);
-        } catch (e) {
+        } catch {
             return '';
         }
     }

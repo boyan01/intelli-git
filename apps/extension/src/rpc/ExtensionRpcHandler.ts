@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { RpcPeer } from '@shared/rpc';
-import type { WebviewMethods, ExtensionMethods, FileStatus, ChangelistFileSelection } from '@shared/messages';
+import type { WebviewMethods, ExtensionMethods, FileStatus, ChangelistFileSelection, ChangelistState } from '@shared/messages';
 import { GitService } from '../services/GitService';
 import { ChangelistStateService } from '../services/ChangelistStateService';
 import { InactiveChangesService } from '../services/InactiveChangesService';
@@ -11,6 +11,7 @@ import { OpenAiService } from '../services/CustomOpenAiService';
 import { i18n } from '../utils/i18n';
 import { AiProvider } from '../services/ai';
 import { logger } from '../utils/logger';
+import { getAiApiKey } from '../utils/aiSecrets';
 
 export interface ExtensionRpcHandlerOptions {
     context: vscode.ExtensionContext;
@@ -88,6 +89,7 @@ export class ExtensionRpcHandler {
                 openCommitDiff: this.openCommitDiff,
                 getStatus: this.getStatus,
                 getChangelistState: this.getChangelistState,
+                getCommitViewState: this.getCommitViewState,
                 getBranchInfo: this.gitService.getRpcBranchInfo,
                 getStashList: this.gitService.getStashList,
                 getStashFiles: this.gitService.getStashFilesAsCommitFiles,
@@ -192,22 +194,8 @@ export class ExtensionRpcHandler {
         this.inactiveChangesService?.syncWithStatus(status);
         this.changelistStateService?.syncWithStatus(status);
 
-        return status.map(file => {
-            const isFileInactive = !!this.inactiveChangesService?.isInactive(file.path);
-            const inactiveHunkIds = this.inactiveChangesService?.getInactiveHunkIds(file.path) || [];
-
-            // Detection logic:
-            // If the file is staged (or a staged hunk exists) AND (the file is inactive OR some staged hunks are inactive)
-            const hasStagedInactive = file.staged && (isFileInactive || (file.hunks?.some(h => inactiveHunkIds.includes(h.id))));
-
-            return {
-                ...file,
-                inactive: isFileInactive,
-                inactiveHunkIds: inactiveHunkIds,
-                hasStagedInactive: hasStagedInactive
-            };
-        });
-    }
+        return this.decorateStatus(status);
+    };
 
     getStatus = async (): Promise<FileStatus[]> => {
         return this.getStatusWithState();
@@ -216,13 +204,55 @@ export class ExtensionRpcHandler {
     getChangelistState = async () => {
         const status = await this.gitService.getStatus();
         this.changelistStateService?.syncWithStatus(status);
+        return this.getCurrentChangelistState();
+    };
+
+    getCommitViewState = async () => {
+        const startedAt = Date.now();
+        const status = await this.gitService.getStatus();
+        this.inactiveChangesService?.syncWithStatus(status);
+        this.changelistStateService?.syncWithStatus(status);
+        const files = this.decorateStatus(status);
+        const changelistState = this.getCurrentChangelistState();
+        const elapsedMs = Date.now() - startedAt;
+
+        logger.info('[refresh] commit view state loaded', {
+            elapsedMs,
+            files: files.length,
+            hunkFiles: files.filter(file => file.hunks && file.hunks.length > 0).length,
+            mode: changelistState.mode
+        });
+
+        return {
+            files,
+            changelistState,
+            workspaceRoot: this.gitService.getWorkspaceRoot()
+        };
+    };
+
+    private getCurrentChangelistState(): ChangelistState {
         return this.changelistStateService?.getState() || {
             mode: 'staged',
             activeListId: 'changes',
             lists: [{ id: 'changes', name: 'Changes', isDefault: true, isActive: true }],
             assignments: {}
         };
-    };
+    }
+
+    private decorateStatus(status: FileStatus[]): FileStatus[] {
+        return status.map(file => {
+            const isFileInactive = !!this.inactiveChangesService?.isInactive(file.path);
+            const inactiveHunkIds = this.inactiveChangesService?.getInactiveHunkIds(file.path) || [];
+            const hasStagedInactive = file.staged && (isFileInactive || (file.hunks?.some(h => inactiveHunkIds.includes(h.id))));
+
+            return {
+                ...file,
+                inactive: isFileInactive,
+                inactiveHunkIds,
+                hasStagedInactive
+            };
+        });
+    }
 
     openDiff = async (filePath: string, staged?: boolean): Promise<void> => {
         if (staged) {
@@ -762,15 +792,17 @@ export class ExtensionRpcHandler {
         const provider = vscode.workspace.getConfiguration('intelli-git.ai').get<string>('provider', AiProvider.Copilot);
 
         if (provider === AiProvider.Anthropic) {
-            const model = new AnthropicService().getModel();
+            const apiKey = await getAiApiKey(this.context, 'anthropic');
+            const model = new AnthropicService().getModel(apiKey);
             if (!model) {
-                throw new Error(i18n.t('extension.anthropicApiUrlMissing'));
+                throw new Error(apiKey ? i18n.t('extension.anthropicApiUrlMissing') : i18n.t('extension.anthropicApiKeyMissing'));
             }
             return model;
         }
 
         if (provider === AiProvider.Google) {
-            const model = new GoogleAiService().getModel();
+            const apiKey = await getAiApiKey(this.context, 'google');
+            const model = new GoogleAiService().getModel(apiKey);
             if (!model) {
                 throw new Error(i18n.t('extension.googleApiKeyMissing'));
             }
@@ -778,7 +810,8 @@ export class ExtensionRpcHandler {
         }
 
         if (provider === AiProvider.OpenAi) {
-            const model = new OpenAiService().getModel();
+            const apiKey = await getAiApiKey(this.context, 'custom');
+            const model = new OpenAiService().getModel(apiKey);
             if (!model) {
                 throw new Error(i18n.t('extension.noAIModel')); // generic error or specific custom one if added
             }

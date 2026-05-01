@@ -5,7 +5,7 @@ import { CommitViewProvider } from '../providers/CommitViewProvider';
 export function registerBranchCommands(
     context: vscode.ExtensionContext,
     gitService: GitService,
-    provider?: CommitViewProvider
+    _provider?: CommitViewProvider
 ) {
     // Helper to get branch/ref name from arguments
     const getBranchName = (arg: any): string | undefined => {

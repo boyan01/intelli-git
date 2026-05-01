@@ -23,9 +23,21 @@ export const rpcEvents = {
     switchTab: new EventStream<'commit' | 'stash' | 'push'>(),
 };
 
-const _rpc = new RpcPeer<ExtensionMethods, WebviewMethods>({
-    postMessage: (message) => vscode.postMessage(message)
-});
+const _rpc = new RpcPeer<ExtensionMethods, WebviewMethods>(
+    {
+        postMessage: (message) => vscode.postMessage(message)
+    },
+    {
+        trace: event => {
+            if (event.elapsedMs === undefined) {
+                return;
+            }
+
+            const log = event.ok === false ? console.warn : console.debug;
+            log('[Intelli Git RPC]', event);
+        }
+    }
+);
 
 export const rpc = _rpc.proxy;
 

@@ -237,12 +237,17 @@ export class GitService implements vscode.Disposable {
     }
 
     public getStatus = async (): Promise<FileStatus[]> => {
+        const startedAt = Date.now();
         const workspaceRoot = this.getWorkspaceRoot();
         logger.debug(`Fetching git status at: ${workspaceRoot}`);
         const files: FileStatus[] = [];
+        let gitStatusMs = 0;
+        let hunkFileCount = 0;
 
         try {
+            const gitStatusStartedAt = Date.now();
             const status: StatusResult = await this.git.status();
+            gitStatusMs = Date.now() - gitStatusStartedAt;
 
             status.files.forEach(file => {
                 const wsPath = this.toWorkspacePath(file.path);
@@ -287,11 +292,12 @@ export class GitService implements vscode.Disposable {
             });
 
         } catch (e) {
-            console.error('Error getting status:', e);
+            logger.error('Error getting status:', e);
         }
 
         // 4. Resolve hunks in bulk. This keeps status refresh responsive for large diffs by
         // avoiding one `git diff` process per changed file.
+        const diffStartedAt = Date.now();
         const shouldResolveHunks = (file: FileStatus) =>
             file.status === 'M' || (file.status === 'A' && file.staged) || file.status === 'D';
 
@@ -315,6 +321,7 @@ export class GitService implements vscode.Disposable {
                 const hunks = file.staged ? stagedHunks.get(file.path) : worktreeHunks.get(file.path);
                 if (hunks) {
                     file.hunks = hunks;
+                    hunkFileCount++;
                 }
 
                 if (this._inactiveChangesService) {
@@ -322,10 +329,12 @@ export class GitService implements vscode.Disposable {
                 }
             }
         } catch (e) {
-            console.error('Error parsing git hunks:', e);
+            logger.error('Error parsing git hunks:', e);
         }
+        const diffMs = Date.now() - diffStartedAt;
 
         // Check for diagnostics errors
+        const diagnosticsStartedAt = Date.now();
         files.forEach(file => {
             try {
                 if (file.status === 'C' || file.status === 'U') {
@@ -340,9 +349,19 @@ export class GitService implements vscode.Disposable {
                 if (hasError) {
                     file.error = true;
                 }
-            } catch (e) {
+            } catch {
                 // Ignore errors checking diagnostics
             }
+        });
+        const diagnosticsMs = Date.now() - diagnosticsStartedAt;
+
+        logger.debug('[git-status] loaded', {
+            elapsedMs: Date.now() - startedAt,
+            gitStatusMs,
+            diffMs,
+            diagnosticsMs,
+            files: files.length,
+            hunkFiles: hunkFileCount
         });
 
         return files.sort((a, b) => a.path.localeCompare(b.path));
@@ -1999,7 +2018,7 @@ export class GitService implements vscode.Disposable {
             try {
                 const branchOutput = await this.git.branch(['--contains', hash]);
                 containingBranches = branchOutput.all;
-            } catch (e) {
+            } catch {
                 // Ignore error if commit is not reachable
             }
 

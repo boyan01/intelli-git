@@ -21,9 +21,25 @@ export interface PostMessageImpl {
 interface PendingRequest {
     resolve: (value: any) => void;
     reject: (reason: any) => void;
+    timeout: ReturnType<typeof setTimeout>;
+    method: string;
+    startedAt: number;
 }
 
 export type RpcSchema = { [key: string]: (...args: any[]) => any };
+
+export interface RpcTraceEvent {
+    method: string;
+    id: string;
+    direction: 'incoming' | 'outgoing';
+    elapsedMs?: number;
+    ok?: boolean;
+    error?: string;
+}
+
+export interface RpcPeerOptions {
+    trace?: (event: RpcTraceEvent) => void;
+}
 
 /**
  * Bidirectional RPC peer.
@@ -31,12 +47,13 @@ export type RpcSchema = { [key: string]: (...args: any[]) => any };
  * @template TLocal - Methods that can be registered locally
  */
 export class RpcPeer<TRemote = any, TLocal = any> {
+    private nextRequestId = 1;
     private pendingRequests = new Map<string, PendingRequest>();
     private handlers = new Map<string, (params: any) => Promise<any> | any>();
     private postMessageTarget: PostMessageImpl;
     private _proxy: TRemote | null = null;
 
-    constructor(postMessageTarget: PostMessageImpl) {
+    constructor(postMessageTarget: PostMessageImpl, private readonly options: RpcPeerOptions = {}) {
         this.postMessageTarget = postMessageTarget;
     }
 
@@ -63,10 +80,26 @@ export class RpcPeer<TRemote = any, TLocal = any> {
      * Call a remote method.
      */
     private call(method: string, params?: any): Promise<any> {
-        const id = Math.random().toString(36).substring(7);
+        const id = String(this.nextRequestId++);
 
         return new Promise((resolve, reject) => {
-            this.pendingRequests.set(id, { resolve, reject });
+            const startedAt = Date.now();
+            const timeout = setTimeout(() => {
+                if (this.pendingRequests.has(id)) {
+                    this.pendingRequests.delete(id);
+                    this.trace({
+                        method,
+                        id,
+                        direction: 'outgoing',
+                        elapsedMs: Date.now() - startedAt,
+                        ok: false,
+                        error: 'timeout'
+                    });
+                    reject(new Error(`RPC timeout for method: ${method}`));
+                }
+            }, 60000);
+
+            this.pendingRequests.set(id, { resolve, reject, timeout, method, startedAt });
 
             this.postMessageTarget.postMessage({
                 type: 'rpc-request',
@@ -75,12 +108,7 @@ export class RpcPeer<TRemote = any, TLocal = any> {
                 params
             });
 
-            setTimeout(() => {
-                if (this.pendingRequests.has(id)) {
-                    this.pendingRequests.delete(id);
-                    reject(new Error(`RPC timeout for method: ${method}`));
-                }
-            }, 60000);
+            this.trace({ method, id, direction: 'outgoing' });
         });
     }
 
@@ -130,6 +158,7 @@ export class RpcPeer<TRemote = any, TLocal = any> {
     private async handleRequest(message: RpcRequest) {
         const { id, method, params } = message;
         const handler = this.handlers.get(method);
+        const startedAt = Date.now();
 
         try {
             if (!handler) {
@@ -143,11 +172,27 @@ export class RpcPeer<TRemote = any, TLocal = any> {
                 id,
                 result
             });
+            this.trace({
+                method,
+                id,
+                direction: 'incoming',
+                elapsedMs: Date.now() - startedAt,
+                ok: true
+            });
         } catch (error: any) {
+            const messageText = error.message || String(error);
             this.postMessageTarget.postMessage({
                 type: 'rpc-response',
                 id,
-                error: error.message || String(error)
+                error: messageText
+            });
+            this.trace({
+                method,
+                id,
+                direction: 'incoming',
+                elapsedMs: Date.now() - startedAt,
+                ok: false,
+                error: messageText
             });
         }
     }
@@ -155,14 +200,34 @@ export class RpcPeer<TRemote = any, TLocal = any> {
     private handleResponse(message: RpcResponse) {
         const { id, result, error } = message;
         if (this.pendingRequests.has(id)) {
-            const { resolve, reject } = this.pendingRequests.get(id)!;
+            const { resolve, reject, timeout, method, startedAt } = this.pendingRequests.get(id)!;
             this.pendingRequests.delete(id);
+            clearTimeout(timeout);
 
             if (error) {
+                this.trace({
+                    method,
+                    id,
+                    direction: 'outgoing',
+                    elapsedMs: Date.now() - startedAt,
+                    ok: false,
+                    error
+                });
                 reject(new Error(error));
             } else {
+                this.trace({
+                    method,
+                    id,
+                    direction: 'outgoing',
+                    elapsedMs: Date.now() - startedAt,
+                    ok: true
+                });
                 resolve(result);
             }
         }
+    }
+
+    private trace(event: RpcTraceEvent): void {
+        this.options.trace?.(event);
     }
 }

@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { RpcPeer } from '@shared/rpc';
 import type { WebviewMethods, ExtensionMethods } from '@shared/messages';
+import { logger } from '../utils/logger';
 
 export interface RpcHelperOptions {
     webview: vscode.Webview;
@@ -13,20 +14,32 @@ export interface RpcHelperOptions {
 export function createRpc(options: RpcHelperOptions): RpcPeer<WebviewMethods, ExtensionMethods> {
     const { webview, onDisposed } = options;
 
-    const rpc = new RpcPeer<WebviewMethods, ExtensionMethods>({
-        postMessage: (msg: any) => {
-            if (onDisposed && onDisposed()) {
-                return;
-            }
-            try {
-                webview.postMessage(msg);
-            } catch (error) {
-                if (!onDisposed || !onDisposed()) {
-                    console.error('Failed to post message to webview:', error);
+    const rpc = new RpcPeer<WebviewMethods, ExtensionMethods>(
+        {
+            postMessage: (msg: any) => {
+                if (onDisposed && onDisposed()) {
+                    return;
+                }
+                try {
+                    webview.postMessage(msg);
+                } catch (error) {
+                    if (!onDisposed || !onDisposed()) {
+                        logger.error('Failed to post message to webview:', error);
+                    }
                 }
             }
+        },
+        {
+            trace: event => {
+                if (event.elapsedMs === undefined) {
+                    return;
+                }
+
+                const log = event.ok === false ? logger.warn : logger.debug;
+                log('[rpc]', event);
+            }
         }
-    });
+    );
 
     return rpc;
 }

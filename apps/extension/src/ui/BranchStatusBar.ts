@@ -25,7 +25,7 @@ export class BranchStatusBar {
             this.currentBranch = branches.current;
             this.statusBarItem.text = `$(git-branch) ${this.currentBranch}`;
             this.statusBarItem.show();
-        } catch (e) {
+        } catch {
             this.statusBarItem.text = `$(git-branch) ${vscode.l10n.t('No Branch')}`;
             this.statusBarItem.show();
         }

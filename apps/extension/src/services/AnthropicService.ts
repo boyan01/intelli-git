@@ -62,8 +62,6 @@ export class AnthropicLanguageModel implements vscode.LanguageModelChat {
     private readonly apiUrl: string;
 
     constructor(modelId: string, apiKey: string, apiUrl: string) {
-        console.debug('AnthropicLanguageModel', modelId, apiKey, apiUrl);
-
         this.id = modelId;
         this.name = modelId;
         this.family = modelId;
@@ -180,13 +178,12 @@ export class AnthropicLanguageModel implements vscode.LanguageModelChat {
  * Service to get Anthropic language model
  */
 export class AnthropicService {
-    getModel(): AnthropicLanguageModel | undefined {
+    getModel(apiKey: string): AnthropicLanguageModel | undefined {
         const config = vscode.workspace.getConfiguration('intelli-git.ai.anthropic');
-        const apiKey = config.get<string>('apiKey', '');
         const model = config.get<string>('model', '');
         const apiUrl = config.get<string>('apiUrl', '');
 
-        if (!apiUrl) {
+        if (!apiKey || !apiUrl) {
             return undefined;
         }
 

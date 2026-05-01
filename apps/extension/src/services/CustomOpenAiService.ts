@@ -68,8 +68,6 @@ export class CustomOpenAiLanguageModel implements vscode.LanguageModelChat {
     private readonly apiUrl: string;
 
     constructor(modelId: string, apiKey: string, apiUrl: string) {
-        console.debug('CustomOpenAiLanguageModel', modelId, 'API Key Length:', apiKey.length, apiUrl);
-
         this.id = modelId;
         this.name = modelId;
         this.family = modelId;
@@ -200,9 +198,8 @@ export class CustomOpenAiLanguageModel implements vscode.LanguageModelChat {
  * Service to get Custom OpenAI Compatible language model
  */
 export class OpenAiService {
-    getModel(): CustomOpenAiLanguageModel | undefined {
+    getModel(apiKey: string): CustomOpenAiLanguageModel | undefined {
         const config = vscode.workspace.getConfiguration('intelli-git.ai.custom');
-        const apiKey = config.get<string>('apiKey', '');
         let model = config.get<string>('model', '');
         let apiUrl = config.get<string>('apiUrl', '');
 

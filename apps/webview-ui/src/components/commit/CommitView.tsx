@@ -195,22 +195,25 @@ function buildChangelists(files: FileStatus[], changelistState: ChangelistState,
 
 export function CommitView({ rebaseStatus }: CommitViewProps) {
     const { t } = useTranslation();
-    const loadStatus = useCallback(() => rpc.getStatus(), []);
-    const loadChangelistState = useCallback(() => rpc.getChangelistState(), []);
-    const loadWorkspaceRoot = useCallback(() => rpc.getWorkspaceRoot(), []);
+    const loadCommitViewState = useCallback(() => rpc.getCommitViewState(), []);
+    const initialChangelistState = useMemo(() => ({
+        mode: 'staged',
+        activeListId: 'changes',
+        lists: [{ id: 'changes', name: t('Changes'), isDefault: true, isActive: true }],
+        assignments: {}
+    } as ChangelistState), [t]);
 
-    const { data: files, loading } = useRpcData(loadStatus, {
-        initialValue: [] as FileStatus[],
-        cacheKey: 'commit.files'
-    });
-    const { data: changelistState } = useRpcData(loadChangelistState, {
+    const { data: commitViewState, loading } = useRpcData(loadCommitViewState, {
         initialValue: {
-            mode: 'staged',
-            activeListId: 'changes',
-            lists: [{ id: 'changes', name: t('Changes'), isDefault: true, isActive: true }],
-            assignments: {}
-        } as ChangelistState
+            files: [] as FileStatus[],
+            changelistState: initialChangelistState,
+            workspaceRoot: ''
+        },
+        cacheKey: 'commit.viewState'
     });
+    const files = commitViewState.files;
+    const changelistState = commitViewState.changelistState;
+    const workspaceRoot = commitViewState.workspaceRoot;
 
     const changelists = useMemo(() => buildChangelists(files, changelistState, t), [files, changelistState, t]);
     const [activeFile, setActiveFile] = useState<string | null>(null);
@@ -222,10 +225,6 @@ export function CommitView({ rebaseStatus }: CommitViewProps) {
     const [expandedIds, setExpandedIds] = usePersistedState('commit.expandedIds');
     const [commitMessage, setCommitMessage] = usePersistedState('commit.message');
     const [amend, setAmend] = usePersistedState('commit.amend');
-
-    const { data: workspaceRoot } = useRpcData(loadWorkspaceRoot, {
-        initialValue: ''
-    });
 
     useEffect(() => {
         const handleActiveFile = ({ path }: { path: string }) => {
