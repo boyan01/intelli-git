@@ -37,6 +37,8 @@ export interface BaseFileTreeProps {
     onFolderContextMenu?: (e: React.MouseEvent, filePaths: string[]) => void;
     contextMenuSection?: string;
     contextMenuData?: Record<string, unknown>;
+    stickyHeaders?: boolean;
+    isStickyHeader?: (node: TreeNode<FileNodeData>) => boolean;
 }
 
 export type BaseFileTreeRef = BasicTreeViewRef;
@@ -196,7 +198,9 @@ export const BaseFileTree = React.forwardRef<BaseFileTreeRef, BaseFileTreeProps>
     onFileContextMenu,
     onFolderContextMenu,
     contextMenuSection,
-    contextMenuData
+    contextMenuData,
+    stickyHeaders,
+    isStickyHeader
 }, ref) => {
     const [, forceUpdate] = React.useReducer(x => x + 1, 0);
 
@@ -380,6 +384,8 @@ export const BaseFileTree = React.forwardRef<BaseFileTreeRef, BaseFileTreeProps>
             getContextData={getContextData}
             indent={16}
             baseIndent={8}
+            stickyHeaders={stickyHeaders}
+            isStickyHeader={isStickyHeader}
         />
     );
 });

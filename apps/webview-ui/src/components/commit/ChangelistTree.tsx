@@ -544,6 +544,7 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
             expandedIds={expandedIds}
             onToggle={onToggle}
             defaultExpandAll={true}
+            stickyHeaders={true}
             selectedId={activeFile || undefined}
             onSelect={handleNodeClick}
             onDoubleClick={handleNodeDoubleClick}
