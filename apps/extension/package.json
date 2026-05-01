@@ -222,6 +222,10 @@
         "title": "%intelli-git.commands.ai.selectCopilotModel.title%"
       },
       {
+        "command": "intelli-git.ai.configureProvider",
+        "title": "%intelli-git.commands.ai.configureProvider.title%"
+      },
+      {
         "command": "intelli-git.ai.setApiKey",
         "title": "%intelli-git.commands.ai.setApiKey.title%"
       },
@@ -570,7 +574,7 @@
             "%intelli-git.config.ai.provider.google%",
             "%intelli-git.config.ai.provider.custom%"
           ],
-          "description": "%intelli-git.config.ai.provider.description%"
+          "markdownDescription": "%intelli-git.config.ai.provider.markdownDescription%"
         },
         "intelli-git.changelist.mode": {
           "type": "string",
@@ -594,7 +598,7 @@
           "type": "string",
           "default": "",
           "deprecationMessage": "%intelli-git.config.ai.apiKey.deprecated%",
-          "description": "%intelli-git.config.ai.anthropic.apiKey.description%"
+          "markdownDescription": "%intelli-git.config.ai.apiKey.markdownDescription%"
         },
         "intelli-git.ai.anthropic.model": {
           "type": "string",
@@ -610,7 +614,7 @@
           "type": "string",
           "default": "",
           "deprecationMessage": "%intelli-git.config.ai.apiKey.deprecated%",
-          "description": "%intelli-git.config.ai.google.apiKey.description%"
+          "markdownDescription": "%intelli-git.config.ai.apiKey.markdownDescription%"
         },
         "intelli-git.ai.google.model": {
           "type": "string",
@@ -626,7 +630,7 @@
           "type": "string",
           "default": "",
           "deprecationMessage": "%intelli-git.config.ai.apiKey.deprecated%",
-          "description": "%intelli-git.config.ai.custom.apiKey.description%"
+          "markdownDescription": "%intelli-git.config.ai.apiKey.markdownDescription%"
         },
         "intelli-git.ai.custom.model": {
           "type": "string",
