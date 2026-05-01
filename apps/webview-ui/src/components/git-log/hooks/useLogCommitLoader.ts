@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import type { LogCommit, LogOptions } from '@shared/messages';
 import { rpc, rpcEvents } from '../../../lib/rpc_client';
 import { LONG_DISTANCE_THRESHOLD } from '../graphUtils';
@@ -15,6 +15,24 @@ interface UseLogCommitLoaderResult {
 }
 
 const BATCH_SIZE = 50 + LONG_DISTANCE_THRESHOLD;
+
+function arrayEquals<T>(left?: T[], right?: T[]): boolean {
+    if (left === right) return true;
+    if (!left || !right) return !left && !right;
+    if (left.length !== right.length) return false;
+    return left.every((value, index) => value === right[index]);
+}
+
+function filtersEqual(left: Partial<LogOptions>, right: Partial<LogOptions>): boolean {
+    return left.branch === right.branch
+        && left.search === right.search
+        && left.regexMode === right.regexMode
+        && left.caseSensitive === right.caseSensitive
+        && arrayEquals(left.authors, right.authors)
+        && arrayEquals(left.paths, right.paths)
+        && left.since === right.since
+        && left.until === right.until;
+}
 
 // Build initial filters from cached values to match FilterToolbar's initial state
 function getInitialFilters(): Partial<LogOptions> {
@@ -48,47 +66,76 @@ export const useLogCommitLoader = (): UseLogCommitLoaderResult => {
     const [filters, setFilters] = useState<Partial<LogOptions>>(getInitialFilters);
     // Store as array to preserve order (first = latest unpushed)
     const [unpushedList, setUnpushedList] = useState<string[]>([]);
+    const loadingRef = useRef(false);
+    const commitsLengthRef = useRef(commits.length);
+    const filtersRef = useRef(filters);
+    const pendingResetRef = useRef(false);
 
     const unpushedCommits = useMemo(() => new Set(unpushedList), [unpushedList]);
     const latestUnpushedHash = unpushedList[0] ?? null;
 
-    const loadMore = useCallback(async (reset = false) => {
-        if (!reset && loading) return;
+    useEffect(() => {
+        commitsLengthRef.current = commits.length;
+    }, [commits.length]);
 
+    useEffect(() => {
+        filtersRef.current = filters;
+    }, [filters]);
+
+    const loadMore = useCallback(async (reset = false) => {
+        if (loadingRef.current) {
+            if (reset) {
+                pendingResetRef.current = true;
+            }
+            return;
+        }
+
+        loadingRef.current = true;
         setLoading(true);
         try {
-            const currentCount = reset ? 0 : commits.length;
+            let shouldReset = reset;
 
-            const [newCommits, newUnpushedList] = await Promise.all([
-                rpc.getLog({
-                    maxCount: BATCH_SIZE,
-                    skip: currentCount,
-                    ...filters
-                }),
-                reset ? rpc.getUnpushedCommits() : Promise.resolve([])
-            ]);
+            do {
+                pendingResetRef.current = false;
+                const currentCount = shouldReset ? 0 : commitsLengthRef.current;
+                const currentFilters = filtersRef.current;
 
-            if (reset) {
-                setUnpushedList(newUnpushedList);
-            }
+                const [newCommits, newUnpushedList] = await Promise.all([
+                    rpc.getLog({
+                        maxCount: BATCH_SIZE,
+                        skip: currentCount,
+                        ...currentFilters
+                    }),
+                    shouldReset ? rpc.getUnpushedCommits() : Promise.resolve([])
+                ]);
 
-            if (newCommits.length < BATCH_SIZE) {
-                setHasMore(false);
-            } else {
-                setHasMore(true);
-            }
+                if (shouldReset) {
+                    setUnpushedList(newUnpushedList);
+                }
 
-            setCommits(prev => {
-                const result = reset ? newCommits : [...prev, ...newCommits];
-                updateStoredState('gitLog.commits', result);
-                return result;
-            });
+                setHasMore(newCommits.length >= BATCH_SIZE);
+                const isResetLoad = shouldReset;
+
+                setCommits(prev => {
+                    const result = isResetLoad ? newCommits : [...prev, ...newCommits];
+                    updateStoredState('gitLog.commits', result);
+                    commitsLengthRef.current = result.length;
+                    return result;
+                });
+
+                shouldReset = pendingResetRef.current;
+            } while (shouldReset);
         } catch (error) {
             console.error('Failed to load logs', error);
         } finally {
+            loadingRef.current = false;
             setLoading(false);
         }
-    }, [commits.length, loading, filters]);
+    }, []);
+
+    const updateFilters = useCallback((nextFilters: Partial<LogOptions>) => {
+        setFilters(prev => filtersEqual(prev, nextFilters) ? prev : nextFilters);
+    }, []);
 
     useEffect(() => {
         loadMore(true);
@@ -108,6 +155,6 @@ export const useLogCommitLoader = (): UseLogCommitLoaderResult => {
         unpushedCommits,
         latestUnpushedHash,
         loadMore,
-        setFilters
+        setFilters: updateFilters
     };
 };
