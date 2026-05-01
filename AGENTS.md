@@ -148,6 +148,25 @@ Webview 和 extension host 共用同一组 l10n bundle files，但插值语法�
 
 ## Workflows
 
+### Intelli Git Extension Release
+这是 monorepo。`intelli-git` VS Code extension 的 release tag 必须使用产品级前缀：
+
+```text
+intelli-git-extension-vx.x.x
+```
+
+例如：
+
+```text
+intelli-git-extension-v0.0.3
+```
+
+发布 `apps/extension` 时：
+1. tag version 必须与 `apps/extension/package.json` 中的 `version` 一致。
+2. tag 必须指向实际要发布的 commit，不能从未打 tag 的 branch head 发布。
+3. changelog 只写产品相关、用户可感知或需要知道的内容；构建、CI、测试、依赖、内部重构、发布脚本等默认不写入 changelog。
+4. VSIX 必须从对应 tag 的 commit 重新构建并审计后再发布。
+
 ### 添加 Context Menus
 参见 `.agent/workflows/add-context-menu.md`。
 
