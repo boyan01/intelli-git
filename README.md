@@ -42,8 +42,18 @@ npm run test
 ### Package
 
 ```bash
+# Create a Marketplace-ready .vsix package
+npm run package:extension
+
 # Create a dev .vsix package
 npm run package:extension:dev
+```
+
+### Publish
+
+```bash
+# Requires a Visual Studio Marketplace publisher and vsce login/PAT setup
+npm run publish:extension:marketplace
 ```
 
 ### Development Workflow

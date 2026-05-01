@@ -15,15 +15,18 @@ out/src/**
 .test/**
 .git/**
 .gitignore
+node_modules/**
 **/*.map
 *.ts
 !*.d.ts
 tsconfig.json
 eslint.config.mjs
+eslint.config.cjs
 scripts/**
 
 # Webview node_modules (build artifacts are in out/webview)
 webview-ui/node_modules/**
+out/webview/vite.svg
 
 # Other unnecessary files
 *.vsix
