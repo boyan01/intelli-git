@@ -164,6 +164,7 @@ export const CommitAccordionItem: React.FC<CommitAccordionItemProps> = ({
                             activeFile={activeFilePath}
                             onToggleFile={() => { }}
                             onFileDoubleClick={(path) => handleOpenFile(path, false)}
+                            stickyHeaders={true}
                         />
                     </div>
                 </div>

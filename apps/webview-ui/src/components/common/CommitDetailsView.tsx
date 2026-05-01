@@ -168,6 +168,7 @@ export const CommitDetailsView: React.FC<CommitDetailsViewProps> = ({
                         commitHash: selectedHashes[0],
                         parentHash: commit?.parentHashes?.[0] || ''
                     } : undefined}
+                    stickyHeaders={true}
                 />
             </div>
         </div>

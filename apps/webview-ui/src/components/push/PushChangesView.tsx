@@ -97,6 +97,7 @@ export const PushChangesView: React.FC<PushChangesViewProps> = ({
                     activeFile={activeFile?.path ?? null}
                     onToggleFile={() => { }}
                     onFileDoubleClick={(path) => handleOpenFile(path, false)}
+                    stickyHeaders={true}
                 />
             </div>
         </div>

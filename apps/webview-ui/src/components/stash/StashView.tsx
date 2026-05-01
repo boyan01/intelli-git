@@ -151,6 +151,7 @@ export function StashView() {
                                     readonly
                                     onFileClick={handleFileClick}
                                     onFileDoubleClick={handleFileDoubleClick}
+                                    stickyHeaders={true}
                                 />
                             ) : (
                                 <div className={styles.emptyPreview}>

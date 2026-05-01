@@ -381,6 +381,7 @@ export const BranchListPanel: React.FC<BranchListPanelProps> = ({ onBranchDouble
                 renderTrailing={renderTrailing}
                 getContextData={getContextData}
                 baseIndent={8}
+                stickyHeaders={true}
             />
         );
     };
