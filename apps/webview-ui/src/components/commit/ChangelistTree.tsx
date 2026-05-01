@@ -379,12 +379,14 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
         }
 
         if (node.data?.isFile) {
+            const fileIcon = getFileIcon(node.label);
+
             return (
                 <div className={styles.fileItemContent} data-drag-label="true">
                     <span
                         className={styles.fileIconSvg}
-                        style={{ color: statusColor || getFileIcon(node.label).color }}
-                        dangerouslySetInnerHTML={{ __html: getFileIcon(node.label).svg }}
+                        style={{ color: statusColor || fileIcon.color }}
+                        dangerouslySetInnerHTML={{ __html: fileIcon.svg }}
                     />
                     <span className={styles.name} style={isDeleted ? undefined : { color: statusColor }}>
                         {node.label}

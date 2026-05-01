@@ -123,6 +123,7 @@
     width: 24px;
     height: 24px;
     fill: currentColor;
+    flex-shrink: 0;
     margin: -4px;
 }
 

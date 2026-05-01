@@ -311,6 +311,7 @@ export const BaseFileTree = React.forwardRef<BaseFileTreeRef, BaseFileTreeProps>
                             status === '!' ? styles.statusIgnored : '';
 
         const showPath = viewMode === 'list' && isFile;
+        const fileIcon = getFileIcon(node.label);
 
         return (
             <div className={styles.fileItemContent}>
@@ -322,8 +323,8 @@ export const BaseFileTree = React.forwardRef<BaseFileTreeRef, BaseFileTreeProps>
                         ) : (
                             <span
                                 className={styles.fileIconSvg}
-                                style={{ color: getFileIcon(node.label).color }}
-                                dangerouslySetInnerHTML={{ __html: getFileIcon(node.label).svg }}
+                                style={{ color: fileIcon.color }}
+                                dangerouslySetInnerHTML={{ __html: fileIcon.svg }}
                             />
                         )}
 
