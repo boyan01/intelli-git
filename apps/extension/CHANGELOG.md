@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.0.2
+
+- Fixed Marketplace display name and description metadata.
+
 ## 0.0.1
 
 - Initial Marketplace release.

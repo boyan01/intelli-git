@@ -1,8 +1,8 @@
 {
   "name": "intelli-git",
-  "displayName": "%intelli-git.displayName%",
-  "description": "%intelli-git.description%",
-  "version": "0.0.1",
+  "displayName": "Intelli Git",
+  "description": "A VS Code extension that mimics IntelliJ IDEA's commit panel workflow.",
+  "version": "0.0.2",
   "publisher": "boyan01",
   "license": "SEE LICENSE IN LICENSE",
   "icon": "resources/icon.png",
