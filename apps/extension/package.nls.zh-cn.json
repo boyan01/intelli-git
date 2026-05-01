@@ -1,6 +1,4 @@
 {
-  "intelli-git.displayName": "Intelli Git",
-  "intelli-git.description": "一个模仿 IntelliJ IDEA 提交面板工作流的 VS Code 扩展。",
   "intelli-git.viewsContainers.activitybar.title": "提交",
   "intelli-git.views.intelli-git-container.title": "提交",
   "intelli-git.commands.switchTabCommit.title": "切换到提交",

@@ -1,7 +1,7 @@
 {
   "name": "intelli-git",
   "displayName": "Intelli Git",
-  "description": "A VS Code extension that mimics IntelliJ IDEA's commit panel workflow.",
+  "description": "JetBrains-style Git tools for VS Code: an IntelliJ IDEA-like commit panel, changelists, stash, and Git log workflows.",
   "version": "0.0.2",
   "publisher": "boyan01",
   "license": "SEE LICENSE IN LICENSE",
@@ -13,9 +13,15 @@
   "keywords": [
     "git",
     "commit",
+    "commit-panel",
     "changelist",
+    "git-log",
+    "idea",
     "scm",
-    "intellij"
+    "intellij",
+    "intellij-idea",
+    "jetbrains",
+    "stash"
   ],
   "engines": {
     "vscode": "^1.100.0"

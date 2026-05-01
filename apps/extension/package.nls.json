@@ -1,6 +1,4 @@
 {
-  "intelli-git.displayName": "Intelli Git",
-  "intelli-git.description": "A VS Code extension that mimics IntelliJ IDEA's commit panel workflow.",
   "intelli-git.viewsContainers.activitybar.title": "Commit",
   "intelli-git.views.intelli-git-container.title": "Commit",
   "intelli-git.commands.switchTabCommit.title": "Switch to Commit",
