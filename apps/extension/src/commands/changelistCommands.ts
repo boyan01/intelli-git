@@ -530,18 +530,6 @@ export function registerChangelistCommands(
                         targetLine = 1;
                     }
                 }
-            } else if (args.length === 1 && args[0] && args[0].modifiedUri) {
-                // From diffEditor/gutter/hunk (Diff Editor)
-                // args: [context: DiffEditorSelectionHunkToolbarContext]
-                const context = args[0];
-                uri = context.modifiedUri;
-                const mapping = context.mapping;
-                if (mapping && mapping.modified) {
-                    targetLine = mapping.modified.startLineNumber;
-                    if (targetLine === 0) {
-                        targetLine = 1; // Fallback
-                    }
-                }
             }
 
             if (!uri || targetLine === undefined) {

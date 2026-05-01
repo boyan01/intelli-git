@@ -546,18 +546,6 @@
           "when": "originalResourceScheme == 'git'",
           "group": "navigation@10"
         }
-      ],
-      "diffEditor/gutter/hunk": [
-        {
-          "command": "intelli-git.hunk.toggleInactive",
-          "group": "primary@10"
-        }
-      ],
-      "diffEditor/gutter/selection": [
-        {
-          "command": "intelli-git.hunk.toggleInactive",
-          "group": "primary@10"
-        }
       ]
     },
     "configuration": {
