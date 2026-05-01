@@ -73,8 +73,6 @@ export class GoogleLanguageModel implements vscode.LanguageModelChat {
     private readonly apiUrl: string;
 
     constructor(modelId: string, apiKey: string, apiUrl: string) {
-        console.debug('GoogleLanguageModel', modelId, 'API Key Length:', apiKey.length, apiUrl);
-
         this.id = modelId;
         this.name = modelId;
         this.family = modelId;
@@ -197,7 +195,7 @@ export class GoogleLanguageModel implements vscode.LanguageModelChat {
                                 try {
                                     const response: GoogleApiResponse = JSON.parse(dataStr);
                                     if (response.error) {
-                                        console.error(`[GoogleAiService] Stream returned error:`, response.error);
+                                        logger.error(`[GoogleAiService] Stream returned error:`, response.error);
                                         throw new Error(response.error.message);
                                     }
 
@@ -214,7 +212,7 @@ export class GoogleLanguageModel implements vscode.LanguageModelChat {
                                     if (e instanceof Error && e.message === 'Unexpected end of JSON input') {
                                         // Ignore partial JSON parsing errors if any
                                     } else {
-                                        console.error(`[GoogleAiService] Failed to parse stream chunk:`, e, dataStr);
+                                        logger.error(`[GoogleAiService] Failed to parse stream chunk:`, e, dataStr);
                                     }
                                 }
                             }
@@ -251,9 +249,8 @@ export class GoogleLanguageModel implements vscode.LanguageModelChat {
  * Service to get Google AI language model
  */
 export class GoogleAiService {
-    getModel(): GoogleLanguageModel | undefined {
+    getModel(apiKey: string): GoogleLanguageModel | undefined {
         const config = vscode.workspace.getConfiguration('intelli-git.ai.google');
-        const apiKey = config.get<string>('apiKey', '');
         let model = config.get<string>('model', '');
         let apiUrl = config.get<string>('apiUrl', '');
 

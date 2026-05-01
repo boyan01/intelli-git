@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { CommitViewProvider, GitLogViewProvider, PushPanel, StashContentProvider, RevisionContentProvider } from './providers';
+import { CommitViewProvider, GitLogViewProvider, StashContentProvider, RevisionContentProvider } from './providers';
 import { GitService } from './services/GitService';
 import { createGitWatcher } from './services/GitRepositoryWatcher';
 import { ChangelistStateService } from './services/ChangelistStateService';

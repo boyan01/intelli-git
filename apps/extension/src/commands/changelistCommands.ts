@@ -7,7 +7,6 @@ import { InactiveChangesService } from '../services/InactiveChangesService';
 import { CommitViewProvider } from '../providers/CommitViewProvider';
 import { i18n } from '../utils/i18n';
 import { logger } from '../utils/logger';
-import { log } from 'console';
 
 interface ChangelistFileContext {
     webviewSection: 'changelistFile';

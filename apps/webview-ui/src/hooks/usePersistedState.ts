@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { getStoredState, updateStoredState } from '../lib/stateCache';
-import type { FileStatus, BranchInfo, BranchListData, LogCommit } from '@shared/messages';
+import type { FileStatus, BranchInfo, BranchListData, LogCommit, CommitViewState } from '@shared/messages';
 
 /**
  * Schema defining all persistable state keys and their types.
@@ -16,6 +16,7 @@ export interface PersistedStateSchema {
     'commit.selectedFiles': Set<string>;
     'commit.expandedIds': Set<string>;
     'commit.files': FileStatus[];
+    'commit.viewState': CommitViewState;
     'commit.branchInfo': BranchInfo;
 
     // Push View
@@ -71,6 +72,16 @@ export const stateDefaults: PersistedStateSchema = {
     'commit.selectedFiles': new Set(),
     'commit.expandedIds': new Set(),
     'commit.files': [],
+    'commit.viewState': {
+        files: [],
+        changelistState: {
+            mode: 'staged',
+            activeListId: 'changes',
+            lists: [{ id: 'changes', name: 'Changes', isDefault: true, isActive: true }],
+            assignments: {}
+        },
+        workspaceRoot: ''
+    },
     'commit.branchInfo': { current: '', all: [], ahead: 0, behind: 0, rebaseStatus: 'none' },
 
     // Push View

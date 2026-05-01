@@ -222,6 +222,10 @@
         "title": "%intelli-git.commands.ai.selectCopilotModel.title%"
       },
       {
+        "command": "intelli-git.ai.setApiKey",
+        "title": "%intelli-git.commands.ai.setApiKey.title%"
+      },
+      {
         "command": "intelli-git.log.file.showDiff",
         "title": "%intelli-git.commands.log.file.showDiff.title%"
       },
@@ -589,6 +593,7 @@
         "intelli-git.ai.anthropic.apiKey": {
           "type": "string",
           "default": "",
+          "deprecationMessage": "%intelli-git.config.ai.apiKey.deprecated%",
           "description": "%intelli-git.config.ai.anthropic.apiKey.description%"
         },
         "intelli-git.ai.anthropic.model": {
@@ -604,6 +609,7 @@
         "intelli-git.ai.google.apiKey": {
           "type": "string",
           "default": "",
+          "deprecationMessage": "%intelli-git.config.ai.apiKey.deprecated%",
           "description": "%intelli-git.config.ai.google.apiKey.description%"
         },
         "intelli-git.ai.google.model": {
@@ -619,6 +625,7 @@
         "intelli-git.ai.custom.apiKey": {
           "type": "string",
           "default": "",
+          "deprecationMessage": "%intelli-git.config.ai.apiKey.deprecated%",
           "description": "%intelli-git.config.ai.custom.apiKey.description%"
         },
         "intelli-git.ai.custom.model": {
@@ -644,9 +651,8 @@
     "compile": "npm run sync:l10n && npm run build:webview && tsc -p tsconfig.json --noEmit && npm run bundle:extension",
     "watch": "npm run sync:l10n && concurrently --raw \"tsc -watch -p tsconfig.json --noEmit\" \"node scripts/build-extension.js --watch\"",
     "watch:webview": "cd ../webview-ui && npm run watch",
-    "pretest": "npm run compile && npm run lint",
     "lint": "eslint src",
-    "test": "node ./out/apps/extension/test/runTest.js"
+    "test": "vitest run --config vitest.config.ts"
   },
   "dependencies": {
     "simple-git": "^3.33.0"
@@ -660,6 +666,7 @@
     "esbuild": "^0.28.0",
     "eslint": "^10.1.0",
     "typescript": "^6.0.2",
-    "vite": "^8.0.3"
+    "vite": "^8.0.3",
+    "vitest": "^4.0.15"
   }
 }

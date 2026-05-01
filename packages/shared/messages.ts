@@ -59,6 +59,12 @@ export interface ChangelistState {
     assignments: Record<string, ChangelistAssignment>;
 }
 
+export interface CommitViewState {
+    files: FileStatus[];
+    changelistState: ChangelistState;
+    workspaceRoot: string;
+}
+
 export interface ChangelistFileSelection {
     path: string;
     status?: string;
@@ -145,6 +151,7 @@ export interface ExtensionMethods {
     openCommitDiff: (params: { path: string; leftRef: string; rightRef: string; preserveFocus?: boolean }) => Promise<void>;
     getStatus: () => Promise<FileStatus[]>;
     getChangelistState: () => Promise<ChangelistState>;
+    getCommitViewState: () => Promise<CommitViewState>;
     getBranchInfo: () => Promise<BranchInfo>;
     getStashList: () => Promise<StashItem[]>;
     getStashFiles: (index: number) => Promise<CommitFile[]>;

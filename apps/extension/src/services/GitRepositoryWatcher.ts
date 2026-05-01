@@ -1,5 +1,4 @@
 import * as vscode from 'vscode';
-import * as path from 'path';
 import { logger } from '../utils/logger';
 
 // Types for VS Code Git extension API
@@ -39,12 +38,12 @@ export class VSCodeGitWatcher implements vscode.Disposable {
         return this._isActive;
     }
 
-    constructor(context: vscode.ExtensionContext) {
+    constructor() {
         this.disposables.push(this.onChangeEmitter);
-        this.initialize(context);
+        this.initialize();
     }
 
-    private async initialize(context: vscode.ExtensionContext) {
+    private async initialize() {
         const gitExtension = vscode.extensions.getExtension<GitExtension>('vscode.git');
         if (!gitExtension) {
             logger.info('VS Code Git extension not found, will use fallback watcher');
@@ -103,7 +102,7 @@ export class FileSystemGitWatcher implements vscode.Disposable {
 
     public readonly onChange = this.onChangeEmitter.event;
 
-    constructor(workspaceRoot: string) {
+    constructor(_workspaceRoot: string) {
         // Watch all files including .git directory
         const watcher = vscode.workspace.createFileSystemWatcher('**/*');
         watcher.onDidChange(this.handleChange);
@@ -150,10 +149,10 @@ export class FileSystemGitWatcher implements vscode.Disposable {
  * Tries VSCodeGitWatcher first, falls back to FileSystemGitWatcher.
  */
 export async function createGitWatcher(
-    context: vscode.ExtensionContext,
+    _context: vscode.ExtensionContext,
     workspaceRoot: string
 ): Promise<vscode.Disposable & { onChange: vscode.Event<void> }> {
-    const vsCodeWatcher = new VSCodeGitWatcher(context);
+    const vsCodeWatcher = new VSCodeGitWatcher();
 
     // Wait a bit for async initialization
     await new Promise(resolve => setTimeout(resolve, 100));

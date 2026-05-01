@@ -56,7 +56,7 @@ export class CommitViewProvider extends BaseWebviewProvider implements vscode.We
         this.setupWebview(webviewView.webview, () => !this._view);
         webviewView.webview.html = this.getHtml(webviewView.webview);
 
-        this.setupActiveFileListener(webviewView);
+        this.setupActiveFileListener();
 
         webviewView.onDidDispose(() => {
             this._selectedChangelistFile = null;
@@ -67,7 +67,7 @@ export class CommitViewProvider extends BaseWebviewProvider implements vscode.We
         });
     }
 
-    private setupActiveFileListener(webviewView: vscode.WebviewView): void {
+    private setupActiveFileListener(): void {
         const notifyActiveFile = (editor: vscode.TextEditor | undefined) => {
             if (!editor) return;
 

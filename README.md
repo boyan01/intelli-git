@@ -6,17 +6,13 @@ A VS Code extension that provides an enhanced Git experience with a webview-base
 
 ### Prerequisites
 
-- Node.js (v18+)
+- Node.js 22.13.0+ or 20.19.0+
 - VS Code
 
 ### Install Dependencies
 
 ```bash
-# Install extension dependencies
-npm install
-
-# Install webview UI dependencies
-cd webview-ui && npm install
+npm ci
 ```
 
 ### Build
@@ -26,27 +22,36 @@ cd webview-ui && npm install
 npm run compile
 
 # Build webview only
-npm run build:webview
+npm run build:webview --workspace intelli-git
 
-# Watch mode for extension TypeScript
-npm run watch
+# Watch extension and webview builds together
+npm run watch:extension
 
 # Watch mode for webview UI
-npm run watch:webview
+npm run watch --workspace webview-ui
+```
+
+### Quality Checks
+
+```bash
+npm run lint
+npm run compile
+npm run test
 ```
 
 ### Package
 
 ```bash
 # Create a dev .vsix package
-npm run package:dev
+npm run package:extension:dev
 ```
 
 ### Development Workflow
 
-1. Run `npm run watch` and `npm run watch:webview` in separate terminals
+1. Run `npm run watch:extension`
 2. Press `F5` in VS Code to launch the Extension Development Host
 3. Make changes and reload the extension host to see updates
+
 
 ## License
 
