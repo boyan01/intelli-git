@@ -1,5 +1,13 @@
 let changelistMode = 'staged';
 
+export class EventEmitter<T> {
+    public readonly event = (_listener: (event: T) => unknown) => ({ dispose() { } });
+
+    public fire(_event: T): void { }
+
+    public dispose(): void { }
+}
+
 export const ConfigurationTarget = {
     Workspace: 2
 } as const;

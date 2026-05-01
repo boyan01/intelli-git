@@ -14,6 +14,27 @@ interface ExtensionGitStateSnapshot {
     changelists?: ChangelistStateSnapshot;
 }
 
+const SIMPLE_GIT_UNSAFE_ENV_KEYS = new Set([
+    'editor',
+    'git_askpass',
+    'git_config',
+    'git_config_count',
+    'git_config_global',
+    'git_config_system',
+    'git_editor',
+    'git_exec_path',
+    'git_external_diff',
+    'git_pager',
+    'git_proxy_command',
+    'git_sequence_editor',
+    'git_ssh',
+    'git_ssh_command',
+    'git_template_dir',
+    'pager',
+    'prefix',
+    'ssh_askpass'
+]);
+
 
 export class GitService implements vscode.Disposable {
     private git: SimpleGit;
@@ -168,10 +189,9 @@ export class GitService implements vscode.Disposable {
     private async withTemporaryIndex<T>(operation: (git: SimpleGit) => Promise<T>): Promise<T> {
         const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'intelli-git-index-'));
         const indexPath = path.join(tempDir, 'index');
-        const tempGit = simpleGit(this._gitRoot).env({
-            ...process.env,
+        const tempGit = simpleGit(this._gitRoot).env(this.createGitEnv({
             GIT_INDEX_FILE: indexPath
-        });
+        }));
 
         try {
             await tempGit.raw(['read-tree', 'HEAD']);
@@ -183,6 +203,30 @@ export class GitService implements vscode.Disposable {
                 // Ignore cleanup errors for temporary index files.
             }
         }
+    }
+
+    private createGitEnv(overrides: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
+        const env: NodeJS.ProcessEnv = {};
+
+        for (const [key, value] of Object.entries(process.env)) {
+            if (!SIMPLE_GIT_UNSAFE_ENV_KEYS.has(key.toLowerCase())) {
+                env[key] = value;
+            }
+        }
+
+        return {
+            ...env,
+            ...overrides
+        };
+    }
+
+    private createEditorGit(envOverrides: NodeJS.ProcessEnv): SimpleGit {
+        return simpleGit({
+            baseDir: this._gitRoot,
+            unsafe: {
+                allowUnsafeEditor: true
+            }
+        }).env(this.createGitEnv(envOverrides));
     }
 
     private async stageFilesInGit(git: SimpleGit, filePaths: string[], status: FileStatus[]): Promise<void> {
@@ -957,13 +1001,12 @@ export class GitService implements vscode.Disposable {
         try {
             // GIT_SEQUENCE_EDITOR: change 'pick <hash>' to 'reword <hash>'
             // GIT_EDITOR: cat the new message file to replace the commit message
-            const env = {
-                ...process.env,
+            const rebaseGit = this.createEditorGit({
                 GIT_SEQUENCE_EDITOR: `sed -i '' 's/^pick ${shortHash}/reword ${shortHash}/'`,
                 GIT_EDITOR: `cp "${msgFile}"`
-            };
+            });
 
-            await this.git.env(env).raw(['rebase', '-i', `${hash}^`, '--autostash']);
+            await rebaseGit.raw(['rebase', '-i', `${hash}^`, '--autostash']);
             this.fireChange();
         } finally {
             // Clean up temp file
@@ -1466,7 +1509,7 @@ export class GitService implements vscode.Disposable {
             }
         }
 
-        const gitWithEditorBypass = this.git.env({ ...process.env, GIT_EDITOR: 'true' });
+        const gitWithEditorBypass = this.createEditorGit({ GIT_EDITOR: 'true' });
         if (status === 'merging') {
             await gitWithEditorBypass.raw(['merge', '--continue']);
             return;
