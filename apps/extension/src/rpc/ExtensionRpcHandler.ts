@@ -180,7 +180,7 @@ export class ExtensionRpcHandler {
                 }
 
                 const branchStatus = await this.gitService.getBranchStatus();
-                throw new Error(`PUSH_REJECTED_BEHIND:${branchStatus.behind || 1}`);
+                throw new Error(`PUSH_REJECTED_BEHIND:${branchStatus.behind || 1}`, { cause: error });
             }
 
             throw error;

@@ -204,7 +204,7 @@ export const LogListPanel: React.FC<LogListPanelProps> = ({
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (commits.length === 0) return;
 
-        let newIndex = -1;
+        let newIndex: number;
 
         const currentIndex = lastSelectedRef.current
             ? commits.findIndex(c => c.hash === lastSelectedRef.current)
@@ -222,7 +222,7 @@ export const LogListPanel: React.FC<LogListPanelProps> = ({
             return;
         }
 
-        if (newIndex !== -1 && newIndex !== currentIndex) {
+        if (newIndex !== currentIndex) {
             const newHash = commits[newIndex].hash;
             setSelectedCommits([newHash]);
             onSelectionChange?.([newHash]);

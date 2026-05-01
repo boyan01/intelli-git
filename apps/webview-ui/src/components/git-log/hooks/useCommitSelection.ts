@@ -29,7 +29,7 @@ export const useCommitSelection = ({
 
     const handleRowClick = useCallback((e: React.MouseEvent, commit: LogCommit) => {
         const hash = commit.hash;
-        let newSelection: string[] = [];
+        let newSelection: string[];
 
         if (e.metaKey || e.ctrlKey) {
             // Toggle selection
