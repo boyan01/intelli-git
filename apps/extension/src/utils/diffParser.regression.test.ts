@@ -35,8 +35,8 @@ test('parseDiffToFileHunks keeps multi-file hunks under the correct path with st
 
     assert.equal(alphaHunks.length, 2);
     assert.equal(betaHunks.length, 1);
-    assert.match(alphaHunks[0].id, /^src\/alpha\.ts:worktree:1:3:1:4:[a-z0-9]+$/);
-    assert.match(alphaHunks[1].id, /^src\/alpha\.ts:worktree:20:2:21:2:[a-z0-9]+$/);
+    assert.match(alphaHunks[0].id, /^src\/alpha\.ts:worktree:2:1:2:2:[a-z0-9]+$/);
+    assert.match(alphaHunks[1].id, /^src\/alpha\.ts:worktree:20:1:21:1:[a-z0-9]+$/);
     assert.match(betaHunks[0].id, /^src\/beta\.ts:worktree:5:1:5:1:[a-z0-9]+$/);
     assert.equal(alphaHunks[0].fileHeader.includes('src/beta.ts'), false);
     assert.equal(betaHunks[0].fileHeader.includes('src/beta.ts'), true);

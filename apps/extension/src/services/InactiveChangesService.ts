@@ -99,6 +99,27 @@ export class InactiveChangesService {
         await this.saveState();
     }
 
+    public async markMatchingHunkActive(path: string, hunkId: string, currentHunks: FileStatus['hunks'] = []): Promise<void> {
+        const fileInfo = this.state.files[path];
+        if (!fileInfo || fileInfo.all || !fileInfo.hunkIds) {
+            return;
+        }
+
+        const hunkIds = new Set([hunkId]);
+        for (const storedId of fileInfo.hunkIds) {
+            if (remapHunkIdSet(currentHunks || [], [storedId]).includes(hunkId)) {
+                hunkIds.add(storedId);
+            }
+        }
+
+        fileInfo.hunkIds = fileInfo.hunkIds.filter(id => !hunkIds.has(id));
+        if (fileInfo.hunkIds.length === 0) {
+            delete this.state.files[path];
+        }
+
+        await this.saveState();
+    }
+
     public syncWithStatus(status: FileStatus[]) {
         const grouped = new Map<string, FileStatus[]>();
         for (const file of status) {

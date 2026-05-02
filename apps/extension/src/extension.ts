@@ -7,6 +7,7 @@ import { InactiveChangesService } from './services/InactiveChangesService';
 import { BranchStatusBar, GitLogStatusBar } from './ui';
 import { registerStashCommands, registerNavigationCommands, registerBranchCommands, registerLogCommands, registerLogFileCommands, registerChangelistCommands, registerAiCommands } from './commands';
 import { logger } from './utils/logger';
+import { ChangeBlockEditorController } from './editor/ChangeBlockEditorController';
 
 export async function activate(context: vscode.ExtensionContext) {
     logger.initLogger(context);
@@ -64,8 +65,10 @@ export async function activate(context: vscode.ExtensionContext) {
     registerChangelistCommands(context, gitService, inactiveChangesService, changelistStateService, provider);
     registerAiCommands(context);
 
+    const changeBlockEditorController = new ChangeBlockEditorController(gitService, inactiveChangesService, changelistStateService, provider);
     context.subscriptions.push(branchStatusBar);
     context.subscriptions.push(gitLogStatusBar);
+    context.subscriptions.push(changeBlockEditorController);
 
     const updateChangelistModeContext = () => {
         void vscode.commands.executeCommand('setContext', 'intelli-git.changelistMode', changelistStateService.getState().mode);
@@ -94,6 +97,7 @@ export async function activate(context: vscode.ExtensionContext) {
         gitLogProvider.rpc?.refresh();
         branchStatusBar.update();
         gitLogStatusBar.update();
+        changeBlockEditorController.refresh();
     };
 
     // Git watcher: uses VS Code Git extension API, falls back to FileSystemWatcher

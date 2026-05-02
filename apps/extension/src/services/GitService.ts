@@ -358,6 +358,11 @@ export class GitService implements vscode.Disposable {
                 : new Map<string, GitHunk[]>();
 
             for (const file of files) {
+                if (this._inactiveChangesService) {
+                    file.inactive = this._inactiveChangesService.isInactive(file.path);
+                    file.inactiveHunkIds = this._inactiveChangesService.getInactiveHunkIds(file.path);
+                }
+
                 if (!shouldResolveHunks(file)) {
                     continue;
                 }
@@ -368,9 +373,6 @@ export class GitService implements vscode.Disposable {
                     hunkFileCount++;
                 }
 
-                if (this._inactiveChangesService) {
-                    file.inactiveHunkIds = this._inactiveChangesService.getInactiveHunkIds(file.path);
-                }
             }
         } catch (e) {
             logger.error('Error parsing git hunks:', e);

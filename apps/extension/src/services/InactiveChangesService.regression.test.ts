@@ -18,3 +18,17 @@ test('InactiveChangesService remaps inactive hunk ids when hunk content changes 
 
     assert.deepEqual(service.getInactiveHunkIds(path), [remappedHunk.id]);
 });
+
+test('InactiveChangesService marks stale matching hunk ids active', async () => {
+    const context = createExtensionContext();
+    const service = new InactiveChangesService(context as never);
+    const path = 'docs/shared.txt';
+    const staleHunk = createHunk(`${path}:worktree:2:0:4:1:oldhash`, 2, 4, 0, 1);
+    const currentHunk = createHunk(`${path}:worktree:2:0:4:1:newhash`, 2, 4, 0, 1);
+    const otherHunk = createHunk(`${path}:worktree:8:0:10:1:other`, 8, 10, 0, 1);
+
+    await service.markHunkInactive(path, staleHunk.id);
+    await service.markMatchingHunkActive(path, currentHunk.id, [currentHunk, otherHunk]);
+
+    assert.deepEqual(service.getInactiveHunkIds(path), []);
+});

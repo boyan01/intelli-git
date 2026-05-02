@@ -418,12 +418,14 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
 
         if (!node.data?.isFile) {
             if (node.data?.isRoot) {
+                const changelist = changelistState.lists.find(list => list.id === node.data?.changelistId);
                 return {
                     webviewSection: 'changelistRoot',
                     changelistId: node.data.changelistId,
                     paths,
                     isActiveChangelist: Boolean(node.data.isActiveChangelist),
-                    canDeleteChangelist: changelistState.lists.length > 1,
+                    canSetActiveChangelist: Boolean(changelist && !node.data.isActiveChangelist && node.data.changelistId !== 'inactive-changes'),
+                    canDeleteChangelist: Boolean(changelist && !changelist.isDefault),
                     hasConflict,
                     hasInactive,
                     allInactive,

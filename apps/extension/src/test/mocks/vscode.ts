@@ -30,6 +30,16 @@ export const workspace = {
     }
 };
 
+export const DiagnosticSeverity = {
+    Error: 0
+} as const;
+
+export const languages = {
+    getDiagnostics() {
+        return [];
+    }
+};
+
 export function __setChangelistMode(mode: string): void {
     changelistMode = mode;
 }

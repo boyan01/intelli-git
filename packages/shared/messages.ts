@@ -6,10 +6,10 @@
 export type GitStatusCode = 'A' | 'M' | 'D' | 'R' | 'C' | 'U' | '?';
 
 export interface GitHunk {
-    id: string; // File path + hunk signature (e.g., oldStart)
+    id: string; // File path + change block signature (e.g., oldStart/newStart/content hash)
     lineRange: string; // e.g., "L10-20"
-    fileHeader: string; // The file-level diff header required to apply the hunk patch
-    content: string; // The diff content of the hunk
+    fileHeader: string; // The file-level diff header required to apply the change block patch
+    content: string; // The diff content of the change block
     oldStart: number;
     newStart: number;
     oldLineCount: number;

@@ -95,8 +95,20 @@ describe('ChangelistStateService', () => {
                 {
                     id: 'review',
                     name: 'Review',
-                    isDefault: true,
+                    isDefault: false,
                     isActive: true
+                },
+                {
+                    id: 'changes',
+                    name: 'Changes',
+                    isDefault: true,
+                    isActive: false
+                },
+                {
+                    id: 'inactive-changes',
+                    name: 'Inactive Changes',
+                    isDefault: true,
+                    isActive: false
                 }
             ],
             assignments: {
@@ -132,6 +144,10 @@ describe('ChangelistStateService', () => {
                 {
                     id: 'changes',
                     isActive: true
+                },
+                {
+                    id: 'inactive-changes',
+                    isActive: false
                 }
             ],
             assignments: {

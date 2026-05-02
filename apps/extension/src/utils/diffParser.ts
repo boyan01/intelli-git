@@ -4,6 +4,22 @@ interface ParseDiffOptions {
     idPrefix?: string;
 }
 
+interface ParsedDiffLine {
+    text: string;
+    type: 'context' | 'add' | 'delete' | 'marker';
+    oldLine?: number;
+    newLine?: number;
+    oldBefore: number;
+    newBefore: number;
+}
+
+interface ParsedHunkHeader {
+    oldStart: number;
+    oldLineCount: number;
+    newStart: number;
+    newLineCount: number;
+}
+
 function hashHunk(content: string): string {
     let hash = 5381;
     for (let i = 0; i < content.length; i++) {
@@ -15,6 +31,16 @@ function hashHunk(content: string): string {
 function createHunkId(filePath: string, hunk: Pick<GitHunk, 'oldStart' | 'oldLineCount' | 'newStart' | 'newLineCount'>, content: string, options?: ParseDiffOptions): string {
     const prefix = options?.idPrefix ? `${options.idPrefix}:` : '';
     return `${filePath}:${prefix}${hunk.oldStart}:${hunk.oldLineCount}:${hunk.newStart}:${hunk.newLineCount}:${hashHunk(content)}`;
+}
+
+function formatRange(start: number, count: number): string {
+    return count === 1 ? `${start}` : `${start},${count}`;
+}
+
+function formatLineRange(oldStart: number, oldLineCount: number, newStart: number, newLineCount: number): string {
+    const oldEnd = oldLineCount === 0 ? oldStart : oldStart + oldLineCount - 1;
+    const newEnd = newLineCount === 0 ? newStart : newStart + newLineCount - 1;
+    return `L${oldStart}-${oldEnd} / L${newStart}-${newEnd}`;
 }
 
 function normalizeDiffPath(value: string): string {
@@ -61,7 +87,102 @@ function extractHeaderPath(fileHeader: string[]): string | undefined {
     return deletedPath;
 }
 
-function finalizeHunk(
+function parseHunkLines(header: ParsedHunkHeader, hunkLines: string[]): ParsedDiffLine[] {
+    const bodyLines = hunkLines.slice(1);
+    const result: ParsedDiffLine[] = [];
+    let oldLine = header.oldStart;
+    let newLine = header.newStart;
+
+    for (const text of bodyLines) {
+        const oldBefore = oldLine;
+        const newBefore = newLine;
+
+        if (text.startsWith(' ')) {
+            result.push({ text, type: 'context', oldLine, newLine, oldBefore, newBefore });
+            oldLine++;
+            newLine++;
+            continue;
+        }
+
+        if (text.startsWith('-')) {
+            result.push({ text, type: 'delete', oldLine, oldBefore, newBefore });
+            oldLine++;
+            continue;
+        }
+
+        if (text.startsWith('+')) {
+            result.push({ text, type: 'add', newLine, oldBefore, newBefore });
+            newLine++;
+            continue;
+        }
+
+        result.push({ text, type: 'marker', oldBefore, newBefore });
+    }
+
+    return result;
+}
+
+function isChangeLine(line: ParsedDiffLine): boolean {
+    return line.type === 'add' || line.type === 'delete';
+}
+
+function buildChangeBlock(
+    filePath: string,
+    fileHeader: string,
+    lines: ParsedDiffLine[],
+    changeStart: number,
+    changeEnd: number,
+    options?: ParseDiffOptions
+): GitHunk {
+    let includeStart = changeStart;
+    let includeEnd = changeEnd;
+
+    if (includeStart > 0 && lines[includeStart - 1].type === 'context') {
+        includeStart--;
+    }
+
+    if (includeEnd + 1 < lines.length && lines[includeEnd + 1].type === 'context') {
+        includeEnd++;
+    }
+
+    while (includeEnd + 1 < lines.length && lines[includeEnd + 1].type === 'marker') {
+        includeEnd++;
+    }
+
+    const includedLines = lines.slice(includeStart, includeEnd + 1);
+    const oldLines = includedLines.filter(line => line.type === 'context' || line.type === 'delete');
+    const newLines = includedLines.filter(line => line.type === 'context' || line.type === 'add');
+    const firstIncluded = includedLines[0];
+    const patchOldStart = oldLines[0]?.oldLine ?? firstIncluded.oldBefore;
+    const patchNewStart = newLines[0]?.newLine ?? firstIncluded.newBefore;
+    const patchOldLineCount = oldLines.length;
+    const patchNewLineCount = newLines.length;
+    const patchHeader = `@@ -${formatRange(patchOldStart, patchOldLineCount)} +${formatRange(patchNewStart, patchNewLineCount)} @@`;
+    const content = [patchHeader, ...includedLines.map(line => line.text)].join('\n');
+
+    const changedLines = lines.slice(changeStart, changeEnd + 1);
+    const deletedLines = changedLines.filter(line => line.type === 'delete');
+    const addedLines = changedLines.filter(line => line.type === 'add');
+    const firstChanged = changedLines[0];
+    const oldStart = deletedLines[0]?.oldLine ?? firstChanged.oldBefore;
+    const newStart = addedLines[0]?.newLine ?? firstChanged.newBefore;
+    const oldLineCount = deletedLines.length;
+    const newLineCount = addedLines.length;
+    const block: GitHunk = {
+        id: '',
+        lineRange: formatLineRange(oldStart, oldLineCount, newStart, newLineCount),
+        fileHeader,
+        content,
+        oldStart,
+        oldLineCount,
+        newStart,
+        newLineCount
+    };
+    block.id = createHunkId(filePath, block, content, options);
+    return block;
+}
+
+function splitHunkIntoChangeBlocks(
     hunks: GitHunk[],
     currentHunk: Partial<GitHunk> | null,
     hunkLines: string[],
@@ -72,10 +193,24 @@ function finalizeHunk(
         return;
     }
 
-    const content = hunkLines.join('\n');
-    currentHunk.content = content;
-    currentHunk.id = createHunkId(filePath, currentHunk as GitHunk, content, options);
-    hunks.push(currentHunk as GitHunk);
+    const parsedLines = parseHunkLines(currentHunk as ParsedHunkHeader, hunkLines);
+    let changeStart: number | null = null;
+
+    for (let i = 0; i < parsedLines.length; i++) {
+        if (isChangeLine(parsedLines[i])) {
+            changeStart = changeStart ?? i;
+            continue;
+        }
+
+        if (changeStart !== null) {
+            hunks.push(buildChangeBlock(filePath, currentHunk.fileHeader || '', parsedLines, changeStart, i - 1, options));
+            changeStart = null;
+        }
+    }
+
+    if (changeStart !== null) {
+        hunks.push(buildChangeBlock(filePath, currentHunk.fileHeader || '', parsedLines, changeStart, parsedLines.length - 1, options));
+    }
 }
 
 /**
@@ -99,7 +234,7 @@ export function parseDiffToHunks(diffText: string, filePath: string, options?: P
         const hunkHeaderMatch = line.match(/^@@ -(\d+),?(\d*) \+(\d+),?(\d*) @@/);
 
         if (hunkHeaderMatch) {
-            finalizeHunk(hunks, currentHunk, hunkLines, filePath, options);
+            splitHunkIntoChangeBlocks(hunks, currentHunk, hunkLines, filePath, options);
 
             const oldStart = parseInt(hunkHeaderMatch[1], 10);
             const oldLineCount = parseInt(hunkHeaderMatch[2] || '1', 10);
@@ -107,7 +242,7 @@ export function parseDiffToHunks(diffText: string, filePath: string, options?: P
             const newLineCount = parseInt(hunkHeaderMatch[4] || '1', 10);
 
             currentHunk = {
-                lineRange: `L${oldStart}-${oldStart + oldLineCount - 1} / L${newStart}-${newStart + newLineCount - 1}`,
+                lineRange: formatLineRange(oldStart, oldLineCount, newStart, newLineCount),
                 fileHeader: currentFileHeader.join('\n'),
                 oldStart,
                 oldLineCount,
@@ -126,7 +261,7 @@ export function parseDiffToHunks(diffText: string, filePath: string, options?: P
     }
 
     // Push the last hunk
-    finalizeHunk(hunks, currentHunk, hunkLines, filePath, options);
+    splitHunkIntoChangeBlocks(hunks, currentHunk, hunkLines, filePath, options);
 
     return hunks;
 }
@@ -152,7 +287,7 @@ export function parseDiffToFileHunks(
         }
 
         const hunks = result.get(currentFilePath) || [];
-        finalizeHunk(hunks, currentHunk, hunkLines, currentFilePath, options);
+        splitHunkIntoChangeBlocks(hunks, currentHunk, hunkLines, currentFilePath, options);
         if (hunks.length > 0) {
             result.set(currentFilePath, hunks);
         }
@@ -184,7 +319,7 @@ export function parseDiffToFileHunks(
             const newLineCount = parseInt(hunkHeaderMatch[4] || '1', 10);
 
             currentHunk = {
-                lineRange: `L${oldStart}-${oldStart + oldLineCount - 1} / L${newStart}-${newStart + newLineCount - 1}`,
+                lineRange: formatLineRange(oldStart, oldLineCount, newStart, newLineCount),
                 fileHeader: currentFileHeader.join('\n'),
                 oldStart,
                 oldLineCount,

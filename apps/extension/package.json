@@ -306,6 +306,10 @@
         "title": "%intelli-git.commands.moveHunkToInactive.title%"
       },
       {
+        "command": "intelli-git.moveHunkToActive",
+        "title": "%intelli-git.commands.moveHunkToActive.title%"
+      },
+      {
         "command": "intelli-git.changelist.createList",
         "title": "%intelli-git.commands.changelist.createList.title%"
       },
@@ -324,6 +328,10 @@
       {
         "command": "intelli-git.changelist.moveToList",
         "title": "%intelli-git.commands.changelist.moveToList.title%"
+      },
+      {
+        "command": "intelli-git.revealCurrentChangeBlock",
+        "title": "%intelli-git.commands.revealCurrentChangeBlock.title%"
       },
       {
         "command": "intelli-git.hunk.toggleInactive",
@@ -590,7 +598,7 @@
         },
         {
           "command": "intelli-git.changelist.setActiveList",
-          "when": "webviewSection == 'changelistRoot' && changelistMode == 'changes' && isActiveChangelist != true",
+          "when": "webviewSection == 'changelistRoot' && changelistMode == 'changes' && canSetActiveChangelist == true",
           "group": "1_modification@0"
         },
         {
@@ -647,8 +655,23 @@
       "editor/context": [
         {
           "command": "intelli-git.moveHunkToInactive",
-          "when": "isInDiffEditor",
-          "group": "7_modification"
+          "when": "intelli-git.hasCurrentChangeBlock && intelli-git.currentChangeBlockInactive != true && intelli-git.changelistMode == 'staged'",
+          "group": "7_modification@1"
+        },
+        {
+          "command": "intelli-git.moveHunkToActive",
+          "when": "intelli-git.hasCurrentChangeBlock && intelli-git.currentChangeBlockInactive == true && intelli-git.changelistMode == 'staged'",
+          "group": "7_modification@2"
+        },
+        {
+          "command": "intelli-git.changelist.moveToList",
+          "when": "intelli-git.hasCurrentChangeBlock && intelli-git.changelistMode == 'changes'",
+          "group": "7_modification@1"
+        },
+        {
+          "command": "intelli-git.revealCurrentChangeBlock",
+          "when": "intelli-git.hasCurrentChangeBlock",
+          "group": "7_modification@9"
         }
       ],
       "scm/change/title": [
@@ -691,6 +714,21 @@
             "%intelli-git.config.changelist.mode.changes%"
           ],
           "description": "%intelli-git.config.changelist.mode.description%"
+        },
+        "intelli-git.editor.changeBlockDecorations": {
+          "type": "string",
+          "default": "allEditors",
+          "enum": [
+            "off",
+            "diffOnly",
+            "allEditors"
+          ],
+          "enumDescriptions": [
+            "%intelli-git.config.editor.changeBlockDecorations.off%",
+            "%intelli-git.config.editor.changeBlockDecorations.diffOnly%",
+            "%intelli-git.config.editor.changeBlockDecorations.allEditors%"
+          ],
+          "description": "%intelli-git.config.editor.changeBlockDecorations.description%"
         },
         "intelli-git.ai.copilot.model": {
           "type": "string",

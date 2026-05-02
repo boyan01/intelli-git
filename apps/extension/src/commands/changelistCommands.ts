@@ -1,12 +1,13 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
-import type { ChangelistFileSelection, ChangelistMode } from '@shared/messages';
+import type { ChangelistFileSelection, ChangelistMode, FileStatus, GitHunk } from '@shared/messages';
 import { GitService } from '../services/GitService';
 import { ChangelistStateService } from '../services/ChangelistStateService';
 import { InactiveChangesService } from '../services/InactiveChangesService';
 import { CommitViewProvider } from '../providers/CommitViewProvider';
 import { i18n } from '../utils/i18n';
 import { logger } from '../utils/logger';
+import { EditorHunkResolver, findBestHunkMatch, type EditorHunkMatchTarget } from '../editor/EditorHunkResolver';
 
 interface ChangelistFileContext {
     webviewSection: 'changelistFile';
@@ -65,6 +66,23 @@ interface ChangelistHunkContext {
 
 type ChangelistTargetContext = ChangelistFileContext | ChangelistFolderContext | ChangelistRootContext;
 
+interface LineChangeLike {
+    originalStartLineNumber: number;
+    originalEndLineNumber: number;
+    modifiedStartLineNumber: number;
+    modifiedEndLineNumber: number;
+}
+
+interface HunkMatch {
+    fileStatus: FileStatus;
+    hunk: GitHunk;
+}
+
+interface EditorHunkCommandArgs {
+    path: string;
+    hunkId: string;
+}
+
 function getTargetPaths(args?: ChangelistTargetContext): string[] {
     if (!args) {
         return [];
@@ -79,6 +97,125 @@ function getTargetPaths(args?: ChangelistTargetContext): string[] {
     }
 
     return [];
+}
+
+function toWorktreeHunkId(hunkId: string): string {
+    return hunkId.replace(':index:', ':worktree:');
+}
+
+async function hideEditorHover(): Promise<void> {
+    try {
+        await vscode.commands.executeCommand('editor.action.hideHover');
+    } catch {
+        // The command is best-effort. Older VS Code builds or non-editor invocations may not expose it.
+    }
+}
+
+async function resolveEditorChangeBlockTarget(resolver: EditorHunkResolver): Promise<EditorHunkMatchTarget | undefined> {
+    const editor = vscode.window.activeTextEditor;
+    if (!editor) return undefined;
+
+    logger.info('Editor change block command triggered', {
+        scheme: editor.document.uri.scheme,
+        query: editor.document.uri.query,
+        fsPath: editor.document.uri.fsPath
+    });
+
+    return resolver.resolveCurrentTarget(editor);
+}
+
+async function resolveEditorChangeBlockTargetFromArgs(
+    gitService: GitService,
+    args: EditorHunkCommandArgs | undefined
+): Promise<EditorHunkMatchTarget | undefined> {
+    if (!args?.path || !args.hunkId) {
+        return undefined;
+    }
+
+    const status = await gitService.getStatus();
+    const matchingFiles = status.filter(file => file.path === args.path);
+    for (const fileStatus of matchingFiles) {
+        const hunk = fileStatus.hunks?.find(hunk => hunk.id === args.hunkId);
+        if (hunk) {
+            return {
+                path: args.path,
+                fileStatus,
+                hunk,
+                side: fileStatus.staged ? 'original' : 'modified',
+                inactive: Boolean(fileStatus.inactive || fileStatus.inactiveHunkIds?.includes(hunk.id) || fileStatus.inactiveHunkIds?.includes(toWorktreeHunkId(hunk.id))),
+                isDefaultChangelist: true,
+                mode: 'staged',
+                matchingFiles,
+                targetLine: hunk.newStart
+            };
+        }
+    }
+
+    return undefined;
+}
+
+async function setChangeBlockInactive(
+    gitService: GitService,
+    inactiveChangesService: InactiveChangesService,
+    provider: CommitViewProvider,
+    relativePath: string,
+    matchingFiles: FileStatus[],
+    hunkMatch: HunkMatch | undefined,
+    targetLine: number,
+    inactive: boolean
+): Promise<void> {
+    const fileStatus = hunkMatch?.fileStatus;
+    const hunk = hunkMatch?.hunk;
+
+    if (!fileStatus || !hunk) {
+        vscode.window.showWarningMessage(i18n.t('No modified change block found at line {0} in {1}', targetLine, relativePath));
+        logger.warn('Change block matching failed', { line: targetLine, relativePath, hunkCount: matchingFiles.flatMap(file => file.hunks || []).length });
+        return;
+    }
+
+    logger.info('ToggleInactive matched change block', {
+        relativePath,
+        staged: fileStatus.staged,
+        hunkId: hunk.id,
+        targetLine,
+        action: inactive ? 'inactive' : 'active'
+    });
+
+    const inactiveHunkIds = inactiveChangesService.getInactiveHunkIds(relativePath);
+    const inactiveHunkId = fileStatus.staged ? toWorktreeHunkId(hunk.id) : hunk.id;
+    const isCurrentlyInactive = inactiveHunkIds.includes(hunk.id) || inactiveHunkIds.includes(inactiveHunkId);
+
+    if (!inactive) {
+        const currentHunks = matchingFiles.flatMap(file => file.hunks || []);
+        await inactiveChangesService.markMatchingHunkActive(relativePath, hunk.id, currentHunks);
+        if (inactiveHunkId !== hunk.id) {
+            await inactiveChangesService.markMatchingHunkActive(relativePath, inactiveHunkId, currentHunks);
+        }
+        provider.rpc?.refresh();
+        await vscode.commands.executeCommand('intelli-git.refreshChangeBlockDecorations');
+        return;
+    }
+
+    if (isCurrentlyInactive) {
+        provider.rpc?.refresh();
+        await vscode.commands.executeCommand('intelli-git.refreshChangeBlockDecorations');
+        return;
+    }
+
+    if (fileStatus.staged) {
+        try {
+            const patch = gitService.buildPatchFromHunks([hunk]);
+            await gitService.applyPatch(patch, true, true);
+        } catch (e) {
+            logger.error(`Failed to unstage change block for ${relativePath}:`, e);
+            vscode.window.showErrorMessage(i18n.t('extension.unstageFailed', `${e}`));
+            return;
+        }
+    }
+
+    await inactiveChangesService.markHunkInactive(relativePath, inactiveHunkId);
+    provider.rpc?.refresh();
+    await vscode.commands.executeCommand('intelli-git.refreshChangeBlockDecorations');
 }
 
 async function showDiffForChangelistFile(gitService: GitService, args: ChangelistFileSelection): Promise<void> {
@@ -120,6 +257,8 @@ export function registerChangelistCommands(
     changelistStateService: ChangelistStateService,
     provider: CommitViewProvider
 ): void {
+    const editorHunkResolver = new EditorHunkResolver(gitService, inactiveChangesService, changelistStateService);
+
     const setChangelistMode = async (mode: ChangelistMode) => {
         if (changelistStateService.getState().mode === mode) {
             await vscode.commands.executeCommand('setContext', 'intelli-git.changelistMode', mode);
@@ -215,9 +354,21 @@ export function registerChangelistCommands(
 
     context.subscriptions.push(
         vscode.commands.registerCommand('intelli-git.changelist.moveToList', async (args: ChangelistFileContext | ChangelistHunkContext) => {
+            await hideEditorHover();
             const state = changelistStateService.getState();
+            let editorTarget: EditorHunkMatchTarget | undefined;
+            let currentListId = args?.changelistId;
 
-            const currentListId = args?.changelistId;
+            if (!args) {
+                editorTarget = await resolveEditorChangeBlockTarget(editorHunkResolver);
+                if (!editorTarget) {
+                    vscode.window.showWarningMessage(i18n.t('No modified change block found at line {0} in {1}', 0, ''));
+                    return;
+                }
+
+                currentListId = editorTarget.changelist?.id;
+            }
+
             const target = await vscode.window.showQuickPick(
                 state.lists
                     .filter(list => list.id !== currentListId)
@@ -237,11 +388,14 @@ export function registerChangelistCommands(
 
             if (args?.webviewSection === 'changelistHunk' && args.hunkId) {
                 await changelistStateService.moveHunks(args.path, [args.hunkId], target.id);
+            } else if (editorTarget) {
+                await changelistStateService.moveHunks(editorTarget.path, [editorTarget.hunk.id], target.id);
             } else if (args?.path) {
                 await changelistStateService.moveFiles([args.path], target.id);
             }
 
             provider.rpc?.refresh();
+            await vscode.commands.executeCommand('intelli-git.refreshChangeBlockDecorations');
         })
     );
 
@@ -442,95 +596,40 @@ export function registerChangelistCommands(
     );
 
     context.subscriptions.push(
-        vscode.commands.registerCommand('intelli-git.moveHunkToInactive', async () => {
-            const editor = vscode.window.activeTextEditor;
-            if (!editor) return;
+        vscode.commands.registerCommand('intelli-git.moveHunkToInactive', async (args?: EditorHunkCommandArgs) => {
+            await hideEditorHover();
+            editorHunkResolver.invalidate();
+            const target = await resolveEditorChangeBlockTargetFromArgs(gitService, args) || await resolveEditorChangeBlockTarget(editorHunkResolver);
+            if (!target) return;
+            await setChangeBlockInactive(
+                gitService,
+                inactiveChangesService,
+                provider,
+                target.path,
+                target.matchingFiles,
+                { fileStatus: target.fileStatus, hunk: target.hunk },
+                target.targetLine,
+                true
+            );
+        })
+    );
 
-            const line = editor.selection.active.line + 1;
-            const docUri = editor.document.uri;
-            const workspaceRoot = gitService.getWorkspaceRoot();
-
-            logger.info('MoveHunkToInactive triggered', {
-                scheme: docUri.scheme,
-                query: docUri.query,
-                fsPath: docUri.fsPath
-            });
-
-            let filePath = docUri.fsPath;
-            let isStagedView = false;
-
-            if (docUri.scheme === 'git' || docUri.scheme === 'intelli-git-revision' || docUri.scheme === 'git-revision') {
-                try {
-                    const parsed = JSON.parse(docUri.query);
-                    let rawPath = parsed.path || parsed.fsPath || (typeof parsed === 'string' ? parsed : null);
-
-                    // Specific handling for our custom revision scheme: path is in uri.path
-                    if (!rawPath && docUri.scheme === 'intelli-git-revision') {
-                        rawPath = docUri.path.startsWith('/') ? docUri.path.substring(1) : docUri.path;
-                    }
-
-                    if (rawPath) {
-                        filePath = path.isAbsolute(rawPath) ? rawPath : path.join(workspaceRoot || '', rawPath);
-                    }
-
-                    // For our revision scheme, it's typically a staged diff
-                    if (docUri.scheme === 'intelli-git-revision') {
-                        isStagedView = true;
-                    } else if (docUri.scheme === 'git' && docUri.authority === 'index') {
-                        isStagedView = true;
-                    }
-                } catch (e) {
-                    logger.warn('Failed to parse URI query', e);
-                }
-            } else if (docUri.scheme === 'file') {
-                isStagedView = false;
-            }
-
-            if (!workspaceRoot || !filePath.startsWith(workspaceRoot)) {
-                logger.warn('File not in workspace root', { filePath, workspaceRoot });
-                return;
-            }
-
-            const relativePath = path.relative(workspaceRoot, filePath).replace(/\\/g, '/');
-            const status = await gitService.getStatus();
-            const matchingFiles = status.filter(f => f.path === relativePath);
-
-            // Prefer the status matching the current view's stagedness
-            let fileStatus = matchingFiles.find(f => f.staged === isStagedView);
-            if (!fileStatus && matchingFiles.length > 0) {
-                fileStatus = matchingFiles[0];
-            }
-
-            if (fileStatus && fileStatus.hunks) {
-                // Dual-side matching: check both old and new line ranges
-                const hunk = fileStatus.hunks.find(h => {
-                    const inOldRange = line >= h.oldStart && line <= (h.oldStart + Math.max(0, h.oldLineCount - 1));
-                    const inNewRange = line >= h.newStart && line <= (h.newStart + Math.max(0, h.newLineCount - 1));
-                    return inOldRange || inNewRange;
-                });
-
-                if (hunk) {
-                    await inactiveChangesService.markHunkInactive(relativePath, hunk.id);
-
-                    // If moving a staged hunk to inactive, we should also unstage it from the index
-                    if (fileStatus.staged) {
-                        try {
-                            const patch = gitService.buildPatchFromHunks([hunk]);
-                            await gitService.applyPatch(patch, true, true);
-                        } catch (e) {
-                            logger.error(`Failed to unstage hunk for ${relativePath}:`, e);
-                        }
-                    }
-
-                    provider.rpc?.refresh();
-                    vscode.window.showInformationMessage(i18n.t('Hunk {0} moved to Inactive', hunk.lineRange));
-                } else {
-                    vscode.window.showWarningMessage(i18n.t('No modified hunk found at line {0} in {1}', line, relativePath));
-                    logger.warn('Hunk matching failed', { line, relativePath, hunkCount: fileStatus.hunks.length });
-                }
-            } else {
-                    vscode.window.showWarningMessage(i18n.t('File status not found for {0}', relativePath));
-            }
+    context.subscriptions.push(
+        vscode.commands.registerCommand('intelli-git.moveHunkToActive', async (args?: EditorHunkCommandArgs) => {
+            await hideEditorHover();
+            editorHunkResolver.invalidate();
+            const target = await resolveEditorChangeBlockTargetFromArgs(gitService, args) || await resolveEditorChangeBlockTarget(editorHunkResolver);
+            if (!target) return;
+            await setChangeBlockInactive(
+                gitService,
+                inactiveChangesService,
+                provider,
+                target.path,
+                target.matchingFiles,
+                { fileStatus: target.fileStatus, hunk: target.hunk },
+                target.targetLine,
+                false
+            );
         })
     );
 
@@ -538,6 +637,7 @@ export function registerChangelistCommands(
         vscode.commands.registerCommand('intelli-git.hunk.toggleInactive', async (...args) => {
             let uri: vscode.Uri | undefined;
             let targetLine: number | undefined;
+            let lineChange: LineChangeLike | undefined;
 
             logger.info('ToggleInactive triggered with args:', JSON.stringify(args));
 
@@ -548,7 +648,8 @@ export function registerChangelistCommands(
                 const changes = args[1];
                 const index = args[2];
                 if (changes && changes.length > index) {
-                    targetLine = changes[index].modifiedStartLineNumber;
+                    lineChange = changes[index];
+                    targetLine = lineChange?.modifiedStartLineNumber;
                     if (targetLine === 0) {
                         targetLine = 1;
                     }
@@ -589,40 +690,22 @@ export function registerChangelistCommands(
             const relativePath = path.relative(workspaceRoot, filePath).replace(/\\/g, '/');
             const status = await gitService.getStatus();
             const matchingFiles = status.filter(f => f.path === relativePath);
+            const hunkMatch = findBestHunkMatch(matchingFiles, lineChange, targetLine);
+            const inactiveHunkIds = inactiveChangesService.getInactiveHunkIds(relativePath);
+            const hunk = hunkMatch?.hunk;
+            const inactiveHunkId = hunkMatch?.fileStatus.staged && hunk ? toWorktreeHunkId(hunk.id) : hunk?.id;
+            const shouldMoveInactive = hunk ? !(inactiveHunkIds.includes(hunk.id) || (inactiveHunkId ? inactiveHunkIds.includes(inactiveHunkId) : false)) : true;
 
-            let fileStatus = matchingFiles.find(f => f.staged === isStagedView);
-            if (!fileStatus && matchingFiles.length > 0) {
-                fileStatus = matchingFiles[0];
-            }
-
-            if (fileStatus && fileStatus.hunks) {
-                const hunk = fileStatus.hunks.find(h => {
-                    const diffOldEnd = h.oldStart + Math.max(0, h.oldLineCount - 1);
-                    const diffNewEnd = h.newStart + Math.max(0, h.newLineCount - 1);
-                    // allow +/- 1 line discrepancy between VS Code internal differ and git diff
-                    const inOldRange = targetLine! >= (h.oldStart - 1) && targetLine! <= (diffOldEnd + 1);
-                    const inNewRange = targetLine! >= (h.newStart - 1) && targetLine! <= (diffNewEnd + 1);
-                    return inOldRange || inNewRange;
-                });
-
-                if (hunk) {
-                    const inactiveHunkIds = inactiveChangesService.getInactiveHunkIds(relativePath);
-                    const isCurrentlyInactive = inactiveHunkIds.includes(hunk.id);
-
-                    if (isCurrentlyInactive) {
-                        await inactiveChangesService.markHunkActive(relativePath, hunk.id);
-                        vscode.window.showInformationMessage(i18n.t('Hunk moved to Active'));
-                    } else {
-                        await inactiveChangesService.markHunkInactive(relativePath, hunk.id);
-                        vscode.window.showInformationMessage(i18n.t('Hunk moved to Inactive'));
-                    }
-                    provider.rpc?.refresh();
-                } else {
-                    vscode.window.showWarningMessage(i18n.t('No modified hunk found at line {0} in {1}', targetLine, relativePath));
-                }
-            } else {
-                vscode.window.showWarningMessage(i18n.t('File status not found for {0}', relativePath));
-            }
+            await setChangeBlockInactive(
+                gitService,
+                inactiveChangesService,
+                provider,
+                relativePath,
+                matchingFiles,
+                hunkMatch,
+                targetLine,
+                shouldMoveInactive
+            );
         })
     );
 }

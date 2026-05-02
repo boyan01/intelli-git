@@ -20,8 +20,12 @@ export class ChangelistStateService {
     private static readonly STORAGE_KEY = 'ideaCommitPanel.changelists.v1';
     private static readonly MODE_STORAGE_KEY = 'ideaCommitPanel.changelistMode.v1';
     private static readonly DEFAULT_LIST_ID = 'changes';
+    private static readonly INACTIVE_LIST_ID = 'inactive-changes';
     private state: PersistedChangelistState = {
-        lists: [{ id: ChangelistStateService.DEFAULT_LIST_ID, name: 'Changes' }],
+        lists: [
+            { id: ChangelistStateService.DEFAULT_LIST_ID, name: 'Changes' },
+            { id: ChangelistStateService.INACTIVE_LIST_ID, name: 'Inactive Changes' }
+        ],
         activeListId: ChangelistStateService.DEFAULT_LIST_ID,
         assignments: {}
     };
@@ -55,8 +59,17 @@ export class ChangelistStateService {
 
     private ensureInvariants() {
         if (!this.state.lists || this.state.lists.length === 0) {
-            this.state.lists = [{ id: ChangelistStateService.DEFAULT_LIST_ID, name: 'Changes' }];
+            this.state.lists = [];
         }
+
+        const ensureList = (id: string, name: string) => {
+            if (!this.state.lists.some(list => list.id === id)) {
+                this.state.lists.push({ id, name });
+            }
+        };
+
+        ensureList(ChangelistStateService.DEFAULT_LIST_ID, 'Changes');
+        ensureList(ChangelistStateService.INACTIVE_LIST_ID, 'Inactive Changes');
 
         const seen = new Set<string>();
         this.state.lists = this.state.lists.filter(list => {
@@ -68,7 +81,11 @@ export class ChangelistStateService {
         });
 
         if (!this.state.lists.some(list => list.id === this.state.activeListId)) {
-            this.state.activeListId = this.state.lists[0].id;
+            this.state.activeListId = this.state.lists.find(list => list.id !== ChangelistStateService.INACTIVE_LIST_ID)?.id || ChangelistStateService.DEFAULT_LIST_ID;
+        }
+
+        if (this.state.activeListId === ChangelistStateService.INACTIVE_LIST_ID) {
+            this.state.activeListId = ChangelistStateService.DEFAULT_LIST_ID;
         }
 
         for (const [path, assignment] of Object.entries(this.state.assignments || {})) {
@@ -104,10 +121,10 @@ export class ChangelistStateService {
     }
 
     private createInfo(): ChangelistInfo[] {
-        return this.state.lists.map((list, index) => ({
+        return this.state.lists.map(list => ({
             id: list.id,
             name: list.name,
-            isDefault: index === 0,
+            isDefault: list.id === ChangelistStateService.DEFAULT_LIST_ID || list.id === ChangelistStateService.INACTIVE_LIST_ID,
             isActive: list.id === this.state.activeListId
         }));
     }
@@ -142,7 +159,7 @@ export class ChangelistStateService {
 
     public async renameList(id: string, name: string): Promise<ChangelistInfo> {
         const target = this.state.lists.find(list => list.id === id);
-        if (!target) {
+        if (!target || id === ChangelistStateService.DEFAULT_LIST_ID || id === ChangelistStateService.INACTIVE_LIST_ID) {
             throw new Error(`Unknown changelist: ${id}`);
         }
 
@@ -152,7 +169,11 @@ export class ChangelistStateService {
     }
 
     public async deleteList(id: string): Promise<void> {
-        if (this.state.lists.length <= 1) {
+        if (id === ChangelistStateService.DEFAULT_LIST_ID || id === ChangelistStateService.INACTIVE_LIST_ID) {
+            return;
+        }
+
+        if (this.state.lists.length <= 2) {
             return;
         }
 
@@ -161,7 +182,7 @@ export class ChangelistStateService {
             return;
         }
 
-        const fallbackId = this.state.lists.find(list => list.id !== id)?.id || ChangelistStateService.DEFAULT_LIST_ID;
+        const fallbackId = ChangelistStateService.DEFAULT_LIST_ID;
 
         for (const assignment of Object.values(this.state.assignments)) {
             if (assignment.fileListId === id) {
@@ -186,7 +207,7 @@ export class ChangelistStateService {
     }
 
     public async setActiveList(id: string): Promise<void> {
-        if (!this.hasList(id)) {
+        if (!this.hasList(id) || id === ChangelistStateService.INACTIVE_LIST_ID) {
             return;
         }
         this.state.activeListId = id;
