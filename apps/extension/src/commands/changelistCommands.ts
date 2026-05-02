@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
-import type { ChangelistFileSelection } from '@shared/messages';
+import type { ChangelistFileSelection, ChangelistMode } from '@shared/messages';
 import { GitService } from '../services/GitService';
 import { ChangelistStateService } from '../services/ChangelistStateService';
 import { InactiveChangesService } from '../services/InactiveChangesService';
@@ -120,6 +120,30 @@ export function registerChangelistCommands(
     changelistStateService: ChangelistStateService,
     provider: CommitViewProvider
 ): void {
+    const setChangelistMode = async (mode: ChangelistMode) => {
+        if (changelistStateService.getState().mode === mode) {
+            await vscode.commands.executeCommand('setContext', 'intelli-git.changelistMode', mode);
+            return;
+        }
+
+        await changelistStateService.setMode(mode);
+        await vscode.commands.executeCommand('setContext', 'intelli-git.changelistMode', mode);
+        provider.rpc?.refresh();
+    };
+
+    for (const [command, mode] of [
+        ['intelli-git.changelistMode.staged', 'staged'],
+        ['intelli-git.changelistMode.staged.current', 'staged'],
+        ['intelli-git.changelistMode.changes', 'changes'],
+        ['intelli-git.changelistMode.changes.current', 'changes']
+    ] as const) {
+        context.subscriptions.push(
+            vscode.commands.registerCommand(command, async () => {
+                await setChangelistMode(mode);
+            })
+        );
+    }
+
     context.subscriptions.push(
         vscode.commands.registerCommand('intelli-git.changelist.createList', async () => {
             const changelistName = await vscode.window.showInputBox({

@@ -90,6 +90,24 @@
         "title": "%intelli-git.commands.focusCommitView.title%"
       },
       {
+        "command": "intelli-git.changelistMode.staged",
+        "title": "%intelli-git.commands.changelistMode.staged.title%"
+      },
+      {
+        "command": "intelli-git.changelistMode.staged.current",
+        "title": "%intelli-git.commands.changelistMode.staged.current.title%",
+        "icon": "$(check)"
+      },
+      {
+        "command": "intelli-git.changelistMode.changes",
+        "title": "%intelli-git.commands.changelistMode.changes.title%"
+      },
+      {
+        "command": "intelli-git.changelistMode.changes.current",
+        "title": "%intelli-git.commands.changelistMode.changes.current.title%",
+        "icon": "$(check)"
+      },
+      {
         "command": "intelli-git.copyCommitHash",
         "title": "%intelli-git.commands.copyCommitHash.title%"
       },
@@ -312,6 +330,46 @@
       }
     ],
     "menus": {
+      "commandPalette": [
+        {
+          "command": "intelli-git.changelistMode.staged",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.changelistMode.staged.current",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.changelistMode.changes",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.changelistMode.changes.current",
+          "when": "false"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "intelli-git.changelistMode.staged.current",
+          "when": "view == intelliGitView && intelli-git.changelistMode == 'staged'",
+          "group": "2_mode@1"
+        },
+        {
+          "command": "intelli-git.changelistMode.staged",
+          "when": "view == intelliGitView && intelli-git.changelistMode != 'staged'",
+          "group": "2_mode@1"
+        },
+        {
+          "command": "intelli-git.changelistMode.changes.current",
+          "when": "view == intelliGitView && intelli-git.changelistMode == 'changes'",
+          "group": "2_mode@2"
+        },
+        {
+          "command": "intelli-git.changelistMode.changes",
+          "when": "view == intelliGitView && intelli-git.changelistMode != 'changes'",
+          "group": "2_mode@2"
+        }
+      ],
       "view/item/context": [
         {
           "command": "intelli-git.showBranchPicker",

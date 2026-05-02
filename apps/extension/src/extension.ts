@@ -67,6 +67,11 @@ export async function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(branchStatusBar);
     context.subscriptions.push(gitLogStatusBar);
 
+    const updateChangelistModeContext = () => {
+        void vscode.commands.executeCommand('setContext', 'intelli-git.changelistMode', changelistStateService.getState().mode);
+    };
+    updateChangelistModeContext();
+
     // Register Author Context Menu Commands
     context.subscriptions.push(
         vscode.commands.registerCommand('intelli-git.copyAuthorEmail', async (args) => {
@@ -118,6 +123,7 @@ export async function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(
         vscode.workspace.onDidChangeConfiguration((event) => {
             if (event.affectsConfiguration('intelli-git.changelist.mode')) {
+                updateChangelistModeContext();
                 triggerRefresh();
             }
         })
