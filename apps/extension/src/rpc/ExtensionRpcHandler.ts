@@ -9,7 +9,7 @@ import { AnthropicService } from '../services/AnthropicService';
 import { GoogleAiService } from '../services/GoogleAiService';
 import { OpenAiService } from '../services/CustomOpenAiService';
 import { i18n } from '../utils/i18n';
-import { AiProvider } from '../services/ai';
+import { AiProvider, DEFAULT_COMMIT_MESSAGE_PROMPT } from '../services/ai';
 import { logger } from '../utils/logger';
 import { getAiApiKey } from '../utils/aiSecrets';
 
@@ -764,11 +764,13 @@ export class ExtensionRpcHandler {
             }
 
             const model = await this.getAIModel();
+            const commitPrompt = vscode.workspace
+                .getConfiguration('intelli-git.ai')
+                .get<string>('commitPrompt', DEFAULT_COMMIT_MESSAGE_PROMPT)
+                .trim() || DEFAULT_COMMIT_MESSAGE_PROMPT;
 
             const messages = [
-                vscode.LanguageModelChatMessage.User(
-                    'Generate a concise commit message based on the following diff. Use the conventional commits format (e.g. feat: ..., fix: ...). Only return the commit message, no explanation, no code blocks.'
-                ),
+                vscode.LanguageModelChatMessage.User(commitPrompt),
                 vscode.LanguageModelChatMessage.User(diff)
             ];
 

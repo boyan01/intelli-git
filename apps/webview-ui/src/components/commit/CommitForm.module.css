@@ -79,6 +79,10 @@
     align-items: center;
 }
 
+.generateButtonContext {
+    display: inline-flex;
+}
+
 .generateBtn:disabled {
     cursor: not-allowed;
     opacity: 0.5;

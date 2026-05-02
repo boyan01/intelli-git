@@ -37,6 +37,9 @@ export function registerAiCommands(context: vscode.ExtensionContext) {
             if (selectedProvider) {
                 await setProviderApiKey(context, selectedProvider);
             }
+        }),
+        vscode.commands.registerCommand('intelli-git.ai.openCommitPromptSettings', async () => {
+            await vscode.commands.executeCommand('workbench.action.openSettings', 'intelli-git.ai.commitPrompt');
         })
     );
 

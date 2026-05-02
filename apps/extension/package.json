@@ -278,6 +278,10 @@
         "title": "%intelli-git.commands.ai.setApiKey.title%"
       },
       {
+        "command": "intelli-git.ai.openCommitPromptSettings",
+        "title": "%intelli-git.commands.ai.openCommitPromptSettings.title%"
+      },
+      {
         "command": "intelli-git.log.file.showDiff",
         "title": "%intelli-git.commands.log.file.showDiff.title%"
       },
@@ -612,6 +616,11 @@
           "group": "2_danger"
         },
         {
+          "command": "intelli-git.ai.openCommitPromptSettings",
+          "when": "webviewSection == 'commitGenerateButton'",
+          "group": "1_settings"
+        },
+        {
           "command": "intelli-git.copyAuthorEmail",
           "when": "webviewSection == 'authorName'",
           "group": "1_modification@1"
@@ -701,6 +710,12 @@
             "%intelli-git.config.ai.provider.custom%"
           ],
           "markdownDescription": "%intelli-git.config.ai.provider.markdownDescription%"
+        },
+        "intelli-git.ai.commitPrompt": {
+          "type": "string",
+          "default": "Generate a concise commit message based on the following diff. Use the conventional commits format (e.g. feat: ..., fix: ...). Only return the commit message, no explanation, no code blocks.",
+          "editPresentation": "multilineText",
+          "markdownDescription": "%intelli-git.config.ai.commitPrompt.markdownDescription%"
         },
         "intelli-git.changelist.mode": {
           "type": "string",

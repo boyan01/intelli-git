@@ -126,14 +126,21 @@ export const CommitForm: React.FC<CommitFormProps> = ({
                         <span>{t('Amend')}</span>
                     </label>
 
-                    <button
-                        className={`${styles.iconBtn} ${styles.generateBtn} ${isGenerating ? styles.generateBtnLoading : ''}`}
-                        onClick={handleGenerateMessage}
-                        disabled={isGenerating || selectedFiles.size === 0}
-                        title={t('Generate')}
+                    <span
+                        className={styles.generateButtonContext}
+                        data-vscode-context={JSON.stringify({
+                            webviewSection: 'commitGenerateButton'
+                        })}
                     >
-                        <i className={`codicon ${isGenerating ? 'codicon-loading codicon-modifier-spin' : 'codicon-sparkle'}`}></i>
-                    </button>
+                        <button
+                            className={`${styles.iconBtn} ${styles.generateBtn} ${isGenerating ? styles.generateBtnLoading : ''}`}
+                            onClick={handleGenerateMessage}
+                            disabled={isGenerating || selectedFiles.size === 0}
+                            title={t('Generate')}
+                        >
+                            <i className={`codicon ${isGenerating ? 'codicon-loading codicon-modifier-spin' : 'codicon-sparkle'}`}></i>
+                        </button>
+                    </span>
                 </div>
 
                 {(addedCount > 0 || modifiedCount > 0 || deletedCount > 0) && (
