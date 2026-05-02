@@ -436,11 +436,15 @@ export class ExtensionRpcHandler {
                 const status = await this.getStatusWithState();
                 const plan = this.changelistStateService?.buildCommitPlan(status);
 
-                if (!plan || plan.files.length === 0) {
+                if (!plan || (!params.amend && plan.files.length === 0)) {
                     throw new Error('No active changelist changes to commit');
                 }
 
-                await this.gitService.commitChangelistPlan(params.message, params.amend, plan, status);
+                if (params.amend && plan.files.length === 0) {
+                    await this.gitService.commitAmend(params.message, []);
+                } else {
+                    await this.gitService.commitChangelistPlan(params.message, params.amend, plan, status);
+                }
             } else if (params.amend) {
                 await this.gitService.commitAmend(params.message, params.files);
             } else {

@@ -928,8 +928,7 @@ export class GitService implements vscode.Disposable {
 
     public async getLastCommitMessage(): Promise<string> {
         try {
-            const log = await this.git.log({ maxCount: 1 });
-            return log.latest?.message || '';
+            return this.getCommitMessage('HEAD');
         } catch {
             return '';
         }
@@ -948,7 +947,7 @@ export class GitService implements vscode.Disposable {
 
             const hash = log.latest.hash;
             const files = await this.getCommitFiles(hash);
-            const message = log.latest.message || '';
+            const message = await this.getCommitMessage(hash);
 
             return {
                 hash,

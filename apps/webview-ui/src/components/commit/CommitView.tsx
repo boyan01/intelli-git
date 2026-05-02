@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { ChangelistTree } from './ChangelistTree';
 import { CommitForm } from './CommitForm';
 import { RebaseForm } from './RebaseForm';
@@ -293,12 +293,18 @@ export function CommitView({ rebaseStatus }: CommitViewProps) {
     const [activeFile, setActiveFile] = useState<string | null>(null);
 
     const [lastCommitInfo, setLastCommitInfo] = useState<LastCommitInfo | null>(null);
-    const [savedMessage, setSavedMessage] = useState<string>('');
 
     const [viewMode, setViewMode] = usePersistedState('commit.viewMode');
     const [expandedIds, setExpandedIds] = usePersistedState('commit.expandedIds');
     const [commitMessage, setCommitMessage] = usePersistedState('commit.message');
     const [amend, setAmend] = usePersistedState('commit.amend');
+    const currentCommitMessageRef = useRef(commitMessage);
+    const savedMessageRef = useRef<string | null>(null);
+    const lastCommitInfoRequestRef = useRef(0);
+
+    useEffect(() => {
+        currentCommitMessageRef.current = commitMessage;
+    }, [commitMessage]);
 
     useEffect(() => {
         const handleActiveFile = ({ path }: { path: string }) => {
@@ -317,9 +323,14 @@ export function CommitView({ rebaseStatus }: CommitViewProps) {
     }, [changelistState.mode, changelists, files]);
 
     useEffect(() => {
+        const requestId = ++lastCommitInfoRequestRef.current;
+
         if (amend) {
-            setSavedMessage(commitMessage);
+            savedMessageRef.current = currentCommitMessageRef.current;
             rpc.getLastCommitInfo().then(info => {
+                if (requestId !== lastCommitInfoRequestRef.current) {
+                    return;
+                }
                 setLastCommitInfo(info);
                 if (info) {
                     setCommitMessage(info.message);
@@ -327,12 +338,13 @@ export function CommitView({ rebaseStatus }: CommitViewProps) {
             });
         } else {
             setLastCommitInfo(null);
-            if (savedMessage) {
-                setCommitMessage(savedMessage);
-                setSavedMessage('');
+            if (savedMessageRef.current !== null) {
+                setCommitMessage(savedMessageRef.current);
+                currentCommitMessageRef.current = savedMessageRef.current;
+                savedMessageRef.current = null;
             }
         }
-    }, [amend, commitMessage, savedMessage, setCommitMessage]);
+    }, [amend, setCommitMessage]);
 
     const handleToggle = useCallback((id: string, expanded: boolean) => {
         setExpandedIds(prev => {
@@ -376,7 +388,7 @@ export function CommitView({ rebaseStatus }: CommitViewProps) {
     }, [files]);
 
     const handleCommitSuccess = useCallback(() => {
-        setSavedMessage('');
+        savedMessageRef.current = null;
         setAmend(false);
     }, [setAmend]);
 
