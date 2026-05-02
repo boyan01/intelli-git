@@ -17,7 +17,7 @@ function initLogger(context: vscode.ExtensionContext): void {
 
 function consoleLog(type: 'info' | 'error' | 'warn' | 'debug', ...args: unknown[]): void {
     const ts = new Date().toISOString();
-    console.log(`[Intelli Git] ${ts} [${type.toLowerCase()}]`, ...args.map(redactValue));
+    console.log(`[Intelli Git] ${ts} [${type.toLowerCase()}] ${formatMessage(...args)}`);
 }
 
 function info(...args: unknown[]): void {
@@ -53,12 +53,22 @@ function showOutputChannel(): void {
 }
 
 function formatMessage(...args: unknown[]): string {
-    return args.map(arg => stringifyValue(redactValue(arg))).join(' ');
+    return args.map(arg => {
+        const value = prepareLogValue(arg);
+        const message = stringifyValue(value);
+        return shouldStartOnNewLine(value) ? `\n${message}` : message;
+    }).join(' ').replace(/ \n/g, '\n');
 }
 
 function stringifyValue(value: unknown): string {
     if (value instanceof Error) {
         return value.stack || value.message;
+    }
+
+    if (isFlatLogRecord(value)) {
+        return Object.entries(value)
+            .map(([key, nestedValue]) => `${key}=${formatFlatLogValue(nestedValue)}`)
+            .join(' ');
     }
 
     if (typeof value === 'object') {
@@ -72,17 +82,44 @@ function stringifyValue(value: unknown): string {
     return String(value);
 }
 
-function redactValue(value: unknown): unknown {
+function shouldStartOnNewLine(value: unknown): boolean {
+    return Boolean(value && typeof value === 'object' && !(value instanceof Error) && !isFlatLogRecord(value));
+}
+
+function isFlatLogRecord(value: unknown): value is Record<string, unknown> {
+    if (!value || typeof value !== 'object' || value instanceof Error || Array.isArray(value)) {
+        return false;
+    }
+
+    return Object.values(value).every(nestedValue => {
+        return nestedValue === null
+            || nestedValue === undefined
+            || typeof nestedValue === 'string'
+            || typeof nestedValue === 'number'
+            || typeof nestedValue === 'boolean'
+            || typeof nestedValue === 'bigint';
+    });
+}
+
+function formatFlatLogValue(value: unknown): string {
+    if (typeof value === 'string') {
+        return value && /^[^\s"'=]+$/.test(value) ? value : JSON.stringify(value);
+    }
+
+    return String(value);
+}
+
+function prepareLogValue(value: unknown): unknown {
     if (value instanceof Error) {
         return value;
     }
 
     if (typeof value === 'string') {
-        return redactString(value);
+        return compactWorkspacePaths(redactString(value));
     }
 
     if (Array.isArray(value)) {
-        return value.map(redactValue);
+        return value.map(prepareLogValue);
     }
 
     if (value && typeof value === 'object') {
@@ -91,13 +128,41 @@ function redactValue(value: unknown): unknown {
             if (/api[-_ ]?key|authorization|token|secret/i.test(key)) {
                 redacted[key] = '[redacted]';
             } else {
-                redacted[key] = redactValue(nestedValue);
+                redacted[key] = prepareLogValue(nestedValue);
             }
         }
         return redacted;
     }
 
     return value;
+}
+
+function compactWorkspacePaths(value: string): string {
+    const workspaceRoots = getWorkspaceRootPaths();
+    if (!workspaceRoots.length) {
+        return value;
+    }
+
+    return workspaceRoots.reduce((message, workspaceRoot) => {
+        const escapedRoot = escapeRegExp(workspaceRoot);
+        return message
+            .replace(new RegExp(`${escapedRoot}/`, 'g'), '')
+            .replace(new RegExp(`${escapedRoot}(?=$|[\\s"'\\)\\]\\},])`, 'g'), '.');
+    }, value.replace(/\\/g, '/'));
+}
+
+function getWorkspaceRootPaths(): string[] {
+    const workspaceFolders = vscode.workspace.workspaceFolders ?? [];
+    const roots = workspaceFolders
+        .map(folder => folder.uri.fsPath)
+        .filter(Boolean)
+        .map(root => root.replace(/\\/g, '/').replace(/\/+$/, ''));
+
+    return Array.from(new Set(roots)).sort((a, b) => b.length - a.length);
+}
+
+function escapeRegExp(value: string): string {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 function redactString(value: string): string {
