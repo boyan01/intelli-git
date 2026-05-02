@@ -4,6 +4,10 @@ Intelli Git is distributed as a proprietary Visual Studio Code extension.
 
 ## Reporting Issues
 
+Use the Intelli Git feedback repository for bug reports, feature requests, questions, and AI provider problems:
+
+https://github.com/boyan01/intelli-git-feedback/issues/new/choose
+
 When reporting an issue, include:
 
 - Intelli Git version

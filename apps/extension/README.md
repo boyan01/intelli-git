@@ -57,7 +57,7 @@ When AI commit message generation is used, selected diff context may be sent to 
 
 ## Support
 
-For support and issue reporting, see `SUPPORT.md`.
+For support and issue reporting, see [SUPPORT.md](SUPPORT.md) or open a report in the [Intelli Git feedback repository](https://github.com/boyan01/intelli-git-feedback/issues/new/choose).
 
 ## License
 

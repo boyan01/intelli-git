@@ -5,6 +5,11 @@
   "version": "0.0.3",
   "publisher": "boyan01",
   "license": "SEE LICENSE IN LICENSE",
+  "homepage": "https://github.com/boyan01/intelli-git-feedback#readme",
+  "bugs": {
+    "url": "https://github.com/boyan01/intelli-git-feedback/issues"
+  },
+  "qna": "https://github.com/boyan01/intelli-git-feedback/issues/new/choose",
   "icon": "resources/icon.png",
   "galleryBanner": {
     "color": "#1F6FEB",
@@ -88,6 +93,11 @@
       {
         "command": "intelli-git.focusCommitView",
         "title": "%intelli-git.commands.focusCommitView.title%"
+      },
+      {
+        "command": "intelli-git.openFeedback",
+        "title": "%intelli-git.commands.openFeedback.title%",
+        "icon": "$(comment-discussion)"
       },
       {
         "command": "intelli-git.changelistMode.staged",
