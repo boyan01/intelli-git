@@ -1,5 +1,5 @@
-import test from 'node:test';
-import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import * as assert from 'node:assert/strict';
 import { parseDiffToFileHunks } from './diffParser';
 
 test('parseDiffToFileHunks keeps multi-file hunks under the correct path with stable id shape', () => {

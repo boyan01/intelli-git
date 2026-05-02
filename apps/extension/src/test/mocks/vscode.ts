@@ -33,3 +33,7 @@ export const workspace = {
 export function __setChangelistMode(mode: string): void {
     changelistMode = mode;
 }
+
+export function __getChangelistMode(): string {
+    return changelistMode;
+}

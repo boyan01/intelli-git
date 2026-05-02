@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FileStatus, GitHunk } from '@shared/messages';
 import { ChangelistStateService } from './ChangelistStateService';
-import { __setChangelistMode } from '../test/mocks/vscode';
+import { __getChangelistMode, __setChangelistMode } from '../test/mocks/vscode';
 
 interface WorkspaceState {
-    get<T>(key: string): T | undefined;
+    get<T>(key: string, defaultValue?: T): T | undefined;
     update(key: string, value: unknown): Promise<void>;
 }
 
@@ -12,8 +12,10 @@ function createWorkspaceState(initial: Record<string, unknown> = {}): WorkspaceS
     const values = { ...initial };
     return {
         values,
-        get<T>(key: string): T | undefined {
-            return values[key] as T | undefined;
+        get<T>(key: string, defaultValue?: T): T | undefined {
+            return Object.prototype.hasOwnProperty.call(values, key)
+                ? values[key] as T | undefined
+                : defaultValue;
         },
         async update(key: string, value: unknown): Promise<void> {
             values[key] = value;
@@ -27,6 +29,14 @@ function createService(initial?: unknown): ChangelistStateService {
     } : {});
 
     return new ChangelistStateService({ workspaceState } as never);
+}
+
+function createServiceWithWorkspaceState(initial: Record<string, unknown> = {}) {
+    const workspaceState = createWorkspaceState(initial);
+    return {
+        workspaceState,
+        service: new ChangelistStateService({ workspaceState } as never)
+    };
 }
 
 function hunk(id: string): GitHunk {
@@ -94,6 +104,17 @@ describe('ChangelistStateService', () => {
                 'src/hunks.ts': { hunkListIds: { keep: 'review' } }
             }
         });
+    });
+
+    it('stores mode in extension workspace state instead of workspace settings', async () => {
+        __setChangelistMode('staged');
+        const { service, workspaceState } = createServiceWithWorkspaceState();
+
+        await service.setMode('changes');
+
+        expect(service.getState().mode).toBe('changes');
+        expect(workspaceState.values['ideaCommitPanel.changelistMode.v1']).toBe('changes');
+        expect(__getChangelistMode()).toBe('staged');
     });
 
     it('moves deleted changelist assignments to the remaining list and keeps one active list', async () => {

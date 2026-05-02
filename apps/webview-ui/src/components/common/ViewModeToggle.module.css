@@ -1,4 +1,5 @@
 .toggle {
+    position: relative;
     width: 22px;
     height: 22px;
     padding: 0;
@@ -14,4 +15,32 @@
 
 .toggle:hover {
     background: var(--vscode-toolbar-hoverBackground);
+}
+
+.toggle::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 50%;
+    z-index: 10;
+    max-width: 220px;
+    padding: 3px 8px;
+    border: 1px solid var(--vscode-editorHoverWidget-border, var(--vscode-widget-border));
+    border-radius: 3px;
+    background: var(--vscode-editorHoverWidget-background, var(--vscode-editorWidget-background));
+    box-shadow: 0 2px 8px var(--vscode-widget-shadow, rgb(0 0 0 / 30%));
+    color: var(--vscode-editorHoverWidget-foreground, var(--vscode-foreground));
+    font-size: 11px;
+    line-height: 16px;
+    opacity: 0;
+    pointer-events: none;
+    transform: translate(-50%, -2px);
+    transition: opacity 80ms ease, transform 80ms ease;
+    white-space: nowrap;
+}
+
+.toggle:hover::after,
+.toggle:focus-visible::after {
+    opacity: 1;
+    transform: translate(-50%, 0);
 }

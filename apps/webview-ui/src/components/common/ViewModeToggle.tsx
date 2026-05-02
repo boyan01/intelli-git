@@ -28,6 +28,8 @@ export const ViewModeToggle: React.FC<ViewModeToggleProps> = ({
         <button
             className={`${styles.toggle} ${className ?? ''}`}
             title={title}
+            aria-label={title}
+            data-tooltip={title}
             onClick={handleClick}
         >
             <i className={`codicon codicon-${iconClass}`} />

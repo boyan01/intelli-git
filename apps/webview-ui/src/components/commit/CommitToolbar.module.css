@@ -20,6 +20,7 @@
 }
 
 .iconBtn {
+    position: relative;
     width: 22px;
     height: 22px;
     padding: 0;
@@ -33,18 +34,40 @@
     border-radius: 3px;
 }
 
-.iconBtn:hover {
+.iconBtn:not(:disabled):hover {
     background: var(--vscode-toolbar-hoverBackground);
+}
+
+.iconBtn::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 50%;
+    z-index: 10;
+    max-width: 220px;
+    padding: 3px 8px;
+    border: 1px solid var(--vscode-editorHoverWidget-border, var(--vscode-widget-border));
+    border-radius: 3px;
+    background: var(--vscode-editorHoverWidget-background, var(--vscode-editorWidget-background));
+    box-shadow: 0 2px 8px var(--vscode-widget-shadow, rgb(0 0 0 / 30%));
+    color: var(--vscode-editorHoverWidget-foreground, var(--vscode-foreground));
+    font-size: 11px;
+    line-height: 16px;
+    opacity: 0;
+    pointer-events: none;
+    transform: translate(-50%, -2px);
+    transition: opacity 80ms ease, transform 80ms ease;
+    white-space: nowrap;
+}
+
+.iconBtn:hover::after,
+.iconBtn:focus-visible::after {
+    opacity: 1;
+    transform: translate(-50%, 0);
 }
 
 .iconBtn:disabled {
     opacity: 0.4;
     cursor: not-allowed;
-    pointer-events: none;
     color: var(--vscode-disabledForeground);
-}
-
-.activeMode {
-    background: var(--vscode-list-activeSelectionBackground);
-    color: var(--vscode-list-activeSelectionForeground);
 }

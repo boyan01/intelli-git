@@ -1,5 +1,5 @@
-import test from 'node:test';
-import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import * as assert from 'node:assert/strict';
 import { createExtensionContext, resetVscodeMock } from '../testSupport/vscodeMock';
 import { createHunk } from '../testSupport/hunks';
 import { ChangelistStateService } from './ChangelistStateService';

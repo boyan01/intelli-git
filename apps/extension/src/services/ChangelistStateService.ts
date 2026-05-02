@@ -18,6 +18,7 @@ export interface CommitPlan {
 
 export class ChangelistStateService {
     private static readonly STORAGE_KEY = 'ideaCommitPanel.changelists.v1';
+    private static readonly MODE_STORAGE_KEY = 'ideaCommitPanel.changelistMode.v1';
     private static readonly DEFAULT_LIST_ID = 'changes';
     private state: PersistedChangelistState = {
         lists: [{ id: ChangelistStateService.DEFAULT_LIST_ID, name: 'Changes' }],
@@ -112,11 +113,14 @@ export class ChangelistStateService {
     }
 
     private getActiveMode(): ChangelistMode {
-        return vscode.workspace.getConfiguration('intelli-git').get<ChangelistMode>('changelist.mode', 'staged');
+        return this.context.workspaceState.get<ChangelistMode>(
+            ChangelistStateService.MODE_STORAGE_KEY,
+            vscode.workspace.getConfiguration('intelli-git').get<ChangelistMode>('changelist.mode', 'staged')
+        ) || 'staged';
     }
 
     public async setMode(mode: ChangelistMode): Promise<void> {
-        await vscode.workspace.getConfiguration('intelli-git').update('changelist.mode', mode, vscode.ConfigurationTarget.Workspace);
+        await this.context.workspaceState.update(ChangelistStateService.MODE_STORAGE_KEY, mode);
     }
 
     public getState(): ChangelistState {
