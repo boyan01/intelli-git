@@ -32,3 +32,30 @@ test('InactiveChangesService marks stale matching hunk ids active', async () => 
 
     assert.deepEqual(service.getInactiveHunkIds(path), []);
 });
+
+test('InactiveChangesService converts whole-file inactive state when one hunk moves active', async () => {
+    const context = createExtensionContext();
+    const service = new InactiveChangesService(context as never);
+    const path = 'src/staged.txt';
+    const activeHunk = createHunk(`${path}:worktree:1:1:1:1:active`, 1, 1, 1, 1);
+    const inactiveHunk = createHunk(`${path}:worktree:5:1:5:1:inactive`, 5, 5, 1, 1);
+
+    await service.markInactive([path]);
+    await service.markMatchingHunkActive(path, activeHunk.id, [activeHunk, inactiveHunk]);
+
+    assert.equal(service.isInactive(path), false);
+    assert.deepEqual(service.getInactiveHunkIds(path), [inactiveHunk.id]);
+});
+
+test('InactiveChangesService clears whole-file inactive state when its only hunk moves active', async () => {
+    const context = createExtensionContext();
+    const service = new InactiveChangesService(context as never);
+    const path = 'src/staged.txt';
+    const activeHunk = createHunk(`${path}:worktree:1:1:1:1:active`, 1, 1, 1, 1);
+
+    await service.markInactive([path]);
+    await service.markMatchingHunkActive(path, activeHunk.id, [activeHunk]);
+
+    assert.equal(service.isInactive(path), false);
+    assert.deepEqual(service.getInactiveHunkIds(path), []);
+});

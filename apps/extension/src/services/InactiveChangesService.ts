@@ -101,7 +101,31 @@ export class InactiveChangesService {
 
     public async markMatchingHunkActive(path: string, hunkId: string, currentHunks: FileStatus['hunks'] = []): Promise<void> {
         const fileInfo = this.state.files[path];
-        if (!fileInfo || fileInfo.all || !fileInfo.hunkIds) {
+        if (!fileInfo) {
+            return;
+        }
+
+        if (fileInfo.all) {
+            const equivalentIds = new Set([
+                hunkId,
+                hunkId.replace(':index:', ':worktree:'),
+                hunkId.replace(':worktree:', ':index:')
+            ]);
+            const remainingInactiveHunkIds = (currentHunks || [])
+                .filter(hunk => !equivalentIds.has(hunk.id))
+                .map(hunk => hunk.id);
+
+            if (remainingInactiveHunkIds.length === 0) {
+                delete this.state.files[path];
+            } else {
+                this.state.files[path] = { hunkIds: remainingInactiveHunkIds };
+            }
+
+            await this.saveState();
+            return;
+        }
+
+        if (!fileInfo.hunkIds) {
             return;
         }
 
