@@ -148,6 +148,34 @@ Webview 和 extension host 共用同一组 l10n bundle files，但插值语法�
 
 ## Workflows
 
+### Commit Message Requirements
+本仓库的 release changelog 需要依附于 commit history，因此 commit message 必须足够具体，能让后续维护者只看 commit log 就判断哪些内容应进入 product changelog。
+
+基本要求：
+- Commit message 必须使用英文，不添加 `[codex]` 或其他 agent 前缀。
+- Subject 使用 imperative mood，说明具体结果或用户可感知行为，避免 `Update files`、`Fix bug`、`Refactor`、`Cleanup` 这类泛化描述。
+- 非平凡改动必须写 body。body 用短 bullet 说明改了什么、为什么改、影响到哪个用户路径或功能边界。
+- Bug fix 要写清触发场景和修复后的行为；不要只写 `fix crash` 或 `fix issue`。
+- UI/UX 改动要写清用户能看到的变化、入口位置、交互行为或状态变化。
+- AI、git workflow、changelist、release、packaging 等容易影响用户信任的改动，要写清安全边界、保留行为、fallback 或失败处理。
+- Internal-only 改动也要标明是 internal、build、test、CI、dependency 或 refactor，避免后续被误写进 product changelog。
+- 一个 commit 尽量只表达一个产品或技术主题；如果确实包含多个用户可见点，body 要分 bullet 列出，方便生成 changelog。
+- 不要在 commit message 里夸大 diff 没有实现的效果；changelog 只能从真实 commit 内容提炼。
+
+推荐格式：
+```text
+Improve AI provider setup flow
+
+- Add the Intelli: Configure AI Provider command for guided provider setup.
+- Keep direct settings.json editing available for advanced custom providers.
+- Store API keys in VS Code SecretStorage instead of user settings.
+```
+
+对于 release commit：
+- Subject 使用 `Release Intelli Git x.y.z`。
+- Body 只列 product-facing changes，保持和最终 changelog 同一口径。
+- 构建、审计、CI、依赖整理、内部脚本等默认不进入 release commit body，除非用户需要知道。
+
 ### Intelli Git Extension Release
 这是 monorepo。`intelli-git` VS Code extension 的 release tag 必须使用产品级前缀：
 
@@ -164,8 +192,9 @@ intelli-git-extension-v0.0.3
 发布 `apps/extension` 时：
 1. tag version 必须与 `apps/extension/package.json` 中的 `version` 一致。
 2. tag 必须指向实际要发布的 commit，不能从未打 tag 的 branch head 发布。
-3. changelog 只写产品相关、用户可感知或需要知道的内容；构建、CI、测试、依赖、内部重构、发布脚本等默认不写入 changelog。
-4. VSIX 必须从对应 tag 的 commit 重新构建并审计后再发布。
+3. 写 changelog 前必须先阅读上一产品 tag 之后的 commit history，并按 `Commit Message Requirements` 提炼用户可见变化。
+4. changelog 只写产品相关、用户可感知或需要知道的内容；构建、CI、测试、依赖、内部重构、发布脚本等默认不写入 changelog。
+5. VSIX 必须从对应 tag 的 commit 重新构建并审计后再发布。
 
 ### 添加 Context Menus
 参见 `.agent/workflows/add-context-menu.md`。
