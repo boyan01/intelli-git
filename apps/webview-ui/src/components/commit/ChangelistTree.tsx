@@ -44,6 +44,7 @@ interface FileNodeData {
     changelistId?: string;
     isActiveChangelist?: boolean;
     isChangelistGroup?: boolean;
+    showInDragMode?: boolean;
 }
 
 const getDirPath = (fullPath: string): string => {
@@ -226,7 +227,12 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
                     hasWarning: group.hasWarning,
                     changelistId: group.id,
                     isActiveChangelist: group.isActive,
-                    isChangelistGroup: Boolean(listInfo)
+                    isChangelistGroup: Boolean(listInfo),
+                    showInDragMode: group.items.length === 0 && (
+                        group.id === 'staged-changes' ||
+                        group.id === 'changes' ||
+                        group.id === 'inactive-changes'
+                    )
                 },
                 children
             });
@@ -474,25 +480,49 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
     }, [changelistState.lists.length, changelistState.mode]);
 
     const isDraggable = useCallback((node: TreeNode<FileNodeData>) => {
-        if (changelistState.mode !== 'changes') {
-            return false;
+        if (node.id.startsWith('amend/')) return false;
+        if (node.id.startsWith('untracked-changes/')) return false;
+
+        if (changelistState.mode === 'changes') {
+            if (node.id.startsWith('inactive-changes/')) return false;
+            return Boolean(node.data?.isFile || (!node.data?.isRoot && node.children));
         }
-        if (node.id.startsWith('inactive-changes/') || node.id.startsWith('untracked-changes/') || node.id.startsWith('amend/')) {
-            return false;
+
+        if (changelistState.mode === 'staged') {
+            return Boolean(node.data?.isFile || (!node.data?.isRoot && node.children));
         }
-        return Boolean(node.data?.isFile || (!node.data?.isRoot && node.children));
+
+        return false;
     }, [changelistState.mode]);
 
     const isDropTarget = useCallback((node: TreeNode<FileNodeData>) => {
-        return changelistState.mode === 'changes' && Boolean(node.data?.isRoot && node.data.isChangelistGroup);
-    }, [changelistState.mode]);
+        const changelistId = node.data?.changelistId;
+        if (!changelistId) return false;
+
+        if (changelistState.mode === 'changes') {
+            return changelistState.lists.some(list => list.id === changelistId);
+        }
+
+        if (changelistState.mode === 'staged') {
+            return changelistId === 'staged-changes' || changelistId === 'changes' || changelistId === 'inactive-changes';
+        }
+
+        return false;
+    }, [changelistState.lists, changelistState.mode]);
 
     const getDropTargetRootId = useCallback((node: TreeNode<FileNodeData>) => {
-        if (node.data?.isRoot && node.data.isChangelistGroup) {
-            return node.id;
+        const changelistId = node.data?.changelistId;
+        if (!changelistId) return null;
+        if (changelistState.mode === 'changes' && changelistState.lists.some(list => list.id === changelistId)) {
+            return `__root__${changelistId}`;
+        }
+        if (changelistState.mode === 'staged') {
+            if (changelistId === 'staged-changes' || changelistId === 'changes' || changelistId === 'inactive-changes') {
+                return `__root__${changelistId}`;
+            }
         }
         return null;
-    }, []);
+    }, [changelistState.lists, changelistState.mode]);
 
     const handleDrop = useCallback(async (draggedNode: TreeNode<FileNodeData>, targetNode: TreeNode<FileNodeData>) => {
         logger.info(`Drop detected ${draggedNode.id} -> ${targetNode.id}`);
@@ -502,18 +532,40 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
         }
 
         const moveData = getAllMoveData(draggedNode);
-        if (moveData.paths.length > 0) {
-            await rpc.moveFilesToChangelist({ paths: moveData.paths, targetListId });
-        }
+        const paths = moveData.paths;
 
-        for (const [path, hunkIds] of Object.entries(moveData.hunkMap)) {
-            if (hunkIds.length > 0) {
-                await rpc.moveHunksToChangelist({ path, hunkIds, targetListId });
+        if (changelistState.mode === 'changes') {
+            if (paths.length > 0) {
+                await rpc.moveFilesToChangelist({ paths, targetListId });
+            }
+            for (const [path, hunkIds] of Object.entries(moveData.hunkMap)) {
+                if (hunkIds.length > 0) {
+                    await rpc.moveHunksToChangelist({ path, hunkIds, targetListId });
+                }
+            }
+        } else if (changelistState.mode === 'staged') {
+            if (paths.length === 0) return;
+
+            const sourceChangelistId = draggedNode.data?.changelistId;
+
+            if (targetListId === 'staged-changes') {
+                if (sourceChangelistId === 'inactive-changes') {
+                    await rpc.markFilesActive(paths);
+                }
+                await rpc.stageFiles(paths);
+            } else if (targetListId === 'changes') {
+                if (sourceChangelistId === 'staged-changes') {
+                    await rpc.unstageFiles(paths);
+                } else if (sourceChangelistId === 'inactive-changes') {
+                    await rpc.markFilesActive(paths);
+                }
+            } else if (targetListId === 'inactive-changes') {
+                await rpc.markFilesInactive(paths);
             }
         }
 
         rpcEvents.refresh.emit();
-    }, []);
+    }, [changelistState.mode]);
 
     const getDragData = useCallback((node: TreeNode<FileNodeData>): Record<string, string> => {
         const moveData = getAllMoveData(node);
@@ -556,6 +608,7 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
             renderLabel={renderLabel}
             renderTrailing={renderTrailing}
             getContextData={getContextData}
+            getNodeClassName={(node) => node.data?.showInDragMode ? 'dropOnlyGroup' : undefined}
             indent={16}
             baseIndent={8}
             isDraggable={isDraggable}

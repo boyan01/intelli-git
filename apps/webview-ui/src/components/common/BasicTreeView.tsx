@@ -1,8 +1,10 @@
-import React, { useState, useCallback, useRef, useMemo, useLayoutEffect } from 'react';
+import React, { useState, useCallback, useRef, useMemo, useLayoutEffect, useEffect } from 'react';
 import styles from './BasicTreeView.module.css';
 
 const ROW_HEIGHT = 22;
 const OVERSCAN_ROWS = 8;
+const DRAG_AUTO_SCROLL_EDGE = 72;
+const DRAG_AUTO_SCROLL_MAX_SPEED = 18;
 
 /**
  * Generic tree node interface for BasicTreeView.
@@ -32,6 +34,7 @@ export interface BasicTreeViewProps<T = unknown> {
     onFocusChange?: (focused: boolean) => void;
     renderLabel?: (node: TreeNode<T>) => React.ReactNode;
     renderTrailing?: (node: TreeNode<T>) => React.ReactNode;
+    getNodeClassName?: (node: TreeNode<T>) => string | undefined;
     getContextData?: (node: TreeNode<T>) => Record<string, unknown> | undefined;
     indent?: number;
     baseIndent?: number;
@@ -82,6 +85,7 @@ interface TreeNodeItemProps<T> {
     onFocusChange?: (focused: boolean) => void;
     renderLabel?: (node: TreeNode<T>) => React.ReactNode;
     renderTrailing?: (node: TreeNode<T>) => React.ReactNode;
+    getNodeClassName?: (node: TreeNode<T>) => string | undefined;
     getContextData?: (node: TreeNode<T>) => Record<string, unknown> | undefined;
     renderLeading?: (node: TreeNode<T>) => React.ReactNode;
     baseIndent: number;
@@ -98,6 +102,9 @@ interface TreeNodeItemProps<T> {
     dragGhostRef: React.RefObject<HTMLDivElement | null>;
     draggedNodeRef: React.MutableRefObject<TreeNode<T> | null>;
     clearDragTimeoutRef: React.MutableRefObject<ReturnType<typeof setTimeout> | null>;
+    scheduleDragAutoScroll: (clientY: number) => void;
+    startDragAutoScrollTracking: () => void;
+    stopDragAutoScrollTracking: () => void;
 }
 
 interface FlatTreeNode<T> {
@@ -256,15 +263,42 @@ function getScrollParent(element: HTMLElement | null): HTMLElement | Window {
     return window;
 }
 
+function getScrollViewport(scrollTarget: HTMLElement | Window) {
+    if (scrollTarget instanceof Window) {
+        return {
+            top: 0,
+            bottom: window.innerHeight,
+            height: window.innerHeight
+        };
+    }
+
+    const rect = scrollTarget.getBoundingClientRect();
+    return {
+        top: rect.top,
+        bottom: rect.bottom,
+        height: rect.height
+    };
+}
+
+function scrollTargetBy(scrollTarget: HTMLElement | Window, delta: number) {
+    if (scrollTarget instanceof Window) {
+        scrollTarget.scrollBy({ top: delta });
+        return;
+    }
+
+    scrollTarget.scrollTop += delta;
+}
+
 const TreeNodeItem = <T,>(props: TreeNodeItemProps<T>) => {
     const {
         node, depth, isStickyClone = false, expandedIds, selectedId, focusedId, dragOverId,
         toggleNode, onSelect, onDoubleClick, onContextMenu, onFocusNodeChange,
-        renderLabel, renderTrailing, getContextData, renderLeading,
+        renderLabel, renderTrailing, getNodeClassName, getContextData, renderLeading,
         baseIndent, indent, isDraggable, isDropTarget,
         getDropTargetRootId, onDrop, getDragData, getDragLabel,
         setFocusedId, setDragOverId, focusTree, dragGhostRef,
-        draggedNodeRef, clearDragTimeoutRef
+        draggedNodeRef, clearDragTimeoutRef, scheduleDragAutoScroll,
+        startDragAutoScrollTracking, stopDragAutoScrollTracking
     } = props;
 
     const hasChildren = node.children && node.children.length > 0;
@@ -273,6 +307,7 @@ const TreeNodeItem = <T,>(props: TreeNodeItemProps<T>) => {
     const isLeaf = !hasChildren;
 
     const contextData = getContextData?.(node);
+    const nodeClassName = getNodeClassName?.(node);
     const leadingContent = renderLeading?.(node);
     const canDrag = isDraggable?.(node) ?? false;
     const canDrop = isDropTarget?.(node) ?? false;
@@ -308,6 +343,14 @@ const TreeNodeItem = <T,>(props: TreeNodeItemProps<T>) => {
             }
             e.dataTransfer.setDragImage(ghost, -10, -10);
         }
+
+        const root = e.currentTarget.closest('[data-basic-tree-root="true"]');
+        window.setTimeout(() => {
+            if (draggedNodeRef.current) {
+                root?.classList.add(styles.dragging);
+                startDragAutoScrollTracking();
+            }
+        }, 0);
     };
 
     const handleDragOver = (e: React.DragEvent) => {
@@ -315,6 +358,7 @@ const TreeNodeItem = <T,>(props: TreeNodeItemProps<T>) => {
         e.preventDefault();
         e.stopPropagation();
         e.dataTransfer.dropEffect = 'copy';
+        scheduleDragAutoScroll(e.clientY);
 
         if (clearDragTimeoutRef.current) {
             clearTimeout(clearDragTimeoutRef.current);
@@ -359,11 +403,13 @@ const TreeNodeItem = <T,>(props: TreeNodeItemProps<T>) => {
             onDrop(draggedNodeRef.current, node);
         }
         draggedNodeRef.current = null;
+        stopDragAutoScrollTracking();
+        e.currentTarget.closest('[data-basic-tree-root="true"]')?.classList.remove(styles.dragging);
     };
 
     return (
         <div
-            className={`${styles.node} ${isSelected ? styles.selected : ''} ${focusedId === node.id ? styles.focused : ''} ${isDragOver ? styles.dragOver : ''} ${isStickyClone ? styles.stickyNode : ''}`}
+            className={`${styles.node} ${nodeClassName || ''} ${isSelected ? styles.selected : ''} ${focusedId === node.id ? styles.focused : ''} ${isDragOver ? styles.dragOver : ''} ${isStickyClone ? styles.stickyNode : ''}`}
             style={{ paddingLeft: `${baseIndent + depth * indent}px` }}
             draggable={canDrag}
             onDragStart={handleDragStartWrapped}
@@ -371,7 +417,12 @@ const TreeNodeItem = <T,>(props: TreeNodeItemProps<T>) => {
             onDragEnter={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
-            onDragEnd={() => { draggedNodeRef.current = null; setDragOverId(null); }}
+            onDragEnd={(e) => {
+                draggedNodeRef.current = null;
+                setDragOverId(null);
+                stopDragAutoScrollTracking();
+                e.currentTarget.closest('[data-basic-tree-root="true"]')?.classList.remove(styles.dragging);
+            }}
             onClick={(e) => {
                 e.stopPropagation();
                 focusTree();
@@ -433,7 +484,7 @@ function BasicTreeViewInner<T>(
         nodes, expandedIds: controlledExpandedIds, selectedId, defaultExpandAll = false,
         stickyHeaders = false, isStickyHeader,
         onToggle, onSelect, onDoubleClick, onContextMenu, onFocusNodeChange, onFocusChange, renderLabel, renderTrailing,
-        getContextData, indent = 8, baseIndent = 0, renderLeading, isDraggable, isDropTarget,
+        getNodeClassName, getContextData, indent = 8, baseIndent = 0, renderLeading, isDraggable, isDropTarget,
         getDropTargetRootId, onDrop, getDragData, getDragLabel, rootContextData
     } = props;
 
@@ -444,6 +495,9 @@ function BasicTreeViewInner<T>(
     const [dragOverId, setDragOverId] = useState<string | null>(null);
     const draggedNodeRef = useRef<TreeNode<T> | null>(null);
     const clearDragTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const dragAutoScrollFrameRef = useRef<number | null>(null);
+    const dragAutoScrollVelocityRef = useRef(0);
+    const dragAutoScrollListenerRef = useRef<((event: DragEvent) => void) | null>(null);
     const [internalExpandedIds, setInternalExpandedIds] = useState<Set<string>>(() => {
         if (controlledExpandedIds) return controlledExpandedIds;
         return defaultExpandAll ? getAllExpandableIds(nodes) : new Set();
@@ -526,6 +580,81 @@ function BasicTreeViewInner<T>(
         ));
     }, [flatNodeIndexById, flatNodes, isStickyHeader, stickyHeaders, totalHeight]);
 
+    const stopDragAutoScroll = useCallback(() => {
+        dragAutoScrollVelocityRef.current = 0;
+        if (dragAutoScrollFrameRef.current !== null) {
+            window.cancelAnimationFrame(dragAutoScrollFrameRef.current);
+            dragAutoScrollFrameRef.current = null;
+        }
+    }, []);
+
+    const stopDragAutoScrollTracking = useCallback(() => {
+        stopDragAutoScroll();
+        if (dragAutoScrollListenerRef.current) {
+            document.removeEventListener('dragover', dragAutoScrollListenerRef.current, true);
+            dragAutoScrollListenerRef.current = null;
+        }
+    }, [stopDragAutoScroll]);
+
+    const scheduleDragAutoScroll = useCallback((clientY: number) => {
+        const root = rootRef.current;
+        if (!root) return;
+
+        const scrollTarget = getScrollParent(root);
+        const viewport = getScrollViewport(scrollTarget);
+        const edgeSize = Math.min(DRAG_AUTO_SCROLL_EDGE, Math.max(24, viewport.height / 3));
+        const topDistance = clientY - viewport.top;
+        const bottomDistance = viewport.bottom - clientY;
+        let velocity = 0;
+
+        if (topDistance < edgeSize) {
+            const strength = Math.max(0, Math.min(1, (edgeSize - topDistance) / edgeSize));
+            velocity = -Math.ceil(strength * DRAG_AUTO_SCROLL_MAX_SPEED);
+        } else if (bottomDistance < edgeSize) {
+            const strength = Math.max(0, Math.min(1, (edgeSize - bottomDistance) / edgeSize));
+            velocity = Math.ceil(strength * DRAG_AUTO_SCROLL_MAX_SPEED);
+        }
+
+        dragAutoScrollVelocityRef.current = velocity;
+        if (velocity === 0) {
+            stopDragAutoScroll();
+            return;
+        }
+
+        if (dragAutoScrollFrameRef.current !== null) {
+            return;
+        }
+
+        const tick = () => {
+            const nextVelocity = dragAutoScrollVelocityRef.current;
+            if (nextVelocity === 0) {
+                dragAutoScrollFrameRef.current = null;
+                return;
+            }
+
+            scrollTargetBy(scrollTarget, nextVelocity);
+            updateVisibleRange();
+            dragAutoScrollFrameRef.current = window.requestAnimationFrame(tick);
+        };
+
+        dragAutoScrollFrameRef.current = window.requestAnimationFrame(tick);
+    }, [stopDragAutoScroll, updateVisibleRange]);
+
+    const startDragAutoScrollTracking = useCallback(() => {
+        if (dragAutoScrollListenerRef.current) {
+            return;
+        }
+
+        const listener = (event: DragEvent) => {
+            scheduleDragAutoScroll(event.clientY);
+        };
+
+        document.addEventListener('dragover', listener, true);
+        dragAutoScrollListenerRef.current = listener;
+    }, [scheduleDragAutoScroll]);
+
+    useEffect(() => stopDragAutoScrollTracking, [stopDragAutoScrollTracking]);
+
     useLayoutEffect(() => {
         const root = rootRef.current;
         if (!root) return;
@@ -604,6 +733,7 @@ function BasicTreeViewInner<T>(
             onFocus={() => onFocusChange?.(true)}
             onBlur={() => onFocusChange?.(false)}
             {...(rootContextData ? { 'data-vscode-context': JSON.stringify(rootContextData) } : {})}
+            data-basic-tree-root="true"
         >
             {stickyHeaderStates.map(stickyHeaderState => (
                 <div
@@ -633,6 +763,7 @@ function BasicTreeViewInner<T>(
                         onFocusNodeChange={onFocusNodeChange}
                         renderLabel={renderLabel}
                         renderTrailing={renderTrailing}
+                        getNodeClassName={getNodeClassName}
                         getContextData={getContextData}
                         renderLeading={renderLeading}
                         baseIndent={baseIndent}
@@ -649,6 +780,9 @@ function BasicTreeViewInner<T>(
                         dragGhostRef={dragGhostRef}
                         draggedNodeRef={draggedNodeRef}
                         clearDragTimeoutRef={clearDragTimeoutRef}
+                        scheduleDragAutoScroll={scheduleDragAutoScroll}
+                        startDragAutoScrollTracking={startDragAutoScrollTracking}
+                        stopDragAutoScrollTracking={stopDragAutoScrollTracking}
                     />
                 </div>
             ))}
@@ -669,6 +803,7 @@ function BasicTreeViewInner<T>(
                     onFocusNodeChange={onFocusNodeChange}
                     renderLabel={renderLabel}
                     renderTrailing={renderTrailing}
+                    getNodeClassName={getNodeClassName}
                     getContextData={getContextData}
                     renderLeading={renderLeading}
                     baseIndent={baseIndent}
@@ -685,6 +820,9 @@ function BasicTreeViewInner<T>(
                     dragGhostRef={dragGhostRef}
                     draggedNodeRef={draggedNodeRef}
                     clearDragTimeoutRef={clearDragTimeoutRef}
+                    scheduleDragAutoScroll={scheduleDragAutoScroll}
+                    startDragAutoScrollTracking={startDragAutoScrollTracking}
+                    stopDragAutoScrollTracking={stopDragAutoScrollTracking}
                 />
             ))}
             <div className={styles.virtualSpacer} style={{ height: `${bottomSpacerHeight}px` }} />

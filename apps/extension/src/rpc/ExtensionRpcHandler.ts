@@ -129,6 +129,8 @@ export class ExtensionRpcHandler {
                 showErrorMessage: this.showErrorMessage,
                 markHunkInactive: this.markHunkInactive,
                 markHunkActive: this.markHunkActive,
+                markFilesInactive: this.markFilesInactive,
+                markFilesActive: this.markFilesActive,
                 setChangelistMode: this.setChangelistMode,
                 createChangelist: this.createChangelist,
                 renameChangelist: this.renameChangelist,
@@ -613,6 +615,26 @@ export class ExtensionRpcHandler {
 
     markHunkActive = async (params: { path: string; hunkId: string }): Promise<void> => {
         await this.inactiveChangesService?.markHunkActive(params.path, params.hunkId);
+    };
+
+    markFilesInactive = async (paths: string[]): Promise<void> => {
+        if (!this.inactiveChangesService || paths.length === 0) return;
+        await this.inactiveChangesService.markInactive(paths);
+
+        const status = await this.gitService.getStatus();
+        const stagedPaths = Array.from(new Set(
+            status
+                .filter(file => paths.includes(file.path) && file.staged)
+                .map(file => file.path)
+        ));
+        if (stagedPaths.length > 0) {
+            await this.gitService.unstageFiles(stagedPaths);
+        }
+    };
+
+    markFilesActive = async (paths: string[]): Promise<void> => {
+        if (!this.inactiveChangesService || paths.length === 0) return;
+        await this.inactiveChangesService.markActive(paths);
     };
 
     setChangelistMode = async (mode: 'staged' | 'changes'): Promise<void> => {

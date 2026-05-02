@@ -209,25 +209,21 @@ function buildChangelists(files: FileStatus[], changelistState: ChangelistState,
             .map(toActiveFileStatus)
             .filter((file): file is FileStatus => Boolean(file));
 
-        if (stagedFiles.length > 0) {
-            result.push({
-                id: 'staged-changes',
-                name: t('Staged Changes'),
-                isDefault: false,
-                isActive: false,
-                items: stagedFiles
-            });
-        }
+        result.push({
+            id: 'staged-changes',
+            name: t('Staged Changes'),
+            isDefault: false,
+            isActive: false,
+            items: stagedFiles
+        });
 
-        if (changesFiles.length > 0) {
-            result.push({
-                id: 'changes',
-                name: t('Changes'),
-                isDefault: true,
-                isActive: true,
-                items: changesFiles
-            });
-        }
+        result.push({
+            id: 'changes',
+            name: t('Changes'),
+            isDefault: true,
+            isActive: true,
+            items: changesFiles
+        });
     } else {
         changelistState.lists.forEach(list => {
             result.push({
@@ -250,7 +246,7 @@ function buildChangelists(files: FileStatus[], changelistState: ChangelistState,
         });
     }
 
-    if (changelistState.mode === 'staged' && inactiveFiles.length > 0) {
+    if (changelistState.mode === 'staged') {
         result.push({
             id: INACTIVE_CHANGELIST_ID,
             name: t('Inactive Changes'),

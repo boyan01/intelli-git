@@ -191,6 +191,8 @@ export interface ExtensionMethods {
     showErrorMessage: (message: string) => Promise<void>;
     markHunkInactive: (params: { path: string; hunkId: string }) => Promise<void>;
     markHunkActive: (params: { path: string; hunkId: string }) => Promise<void>;
+    markFilesInactive: (paths: string[]) => Promise<void>;
+    markFilesActive: (paths: string[]) => Promise<void>;
     setChangelistMode: (mode: ChangelistMode) => Promise<void>;
     createChangelist: (name?: string) => Promise<ChangelistInfo | null>;
     renameChangelist: (params: { id: string; name?: string }) => Promise<ChangelistInfo | null>;

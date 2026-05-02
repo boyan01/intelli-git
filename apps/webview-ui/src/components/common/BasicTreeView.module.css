@@ -157,6 +157,25 @@
 }
 
 /* Drag and drop */
+.node:global(.dropOnlyGroup) {
+    height: 0;
+    overflow: hidden;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-4px);
+    transition:
+        height 120ms ease-out,
+        opacity 120ms ease-out,
+        transform 120ms ease-out;
+}
+
+.root.dragging .node:global(.dropOnlyGroup) {
+    height: 22px;
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0);
+}
+
 .node.dragOver {
     background-color: var(--vscode-list-dropBackground);
     outline: 1px dashed var(--vscode-focusBorder);
