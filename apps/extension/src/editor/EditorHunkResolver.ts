@@ -122,10 +122,6 @@ export function findBestHunkMatch(
     return bestMatch;
 }
 
-function toWorktreeHunkId(hunkId: string): string {
-    return hunkId.replace(':index:', ':worktree:');
-}
-
 function getEquivalentHunkIds(hunkId: string): string[] {
     return [
         hunkId,
@@ -156,12 +152,12 @@ export class EditorHunkResolver {
         const uri = document.uri;
         let filePath = uri.fsPath;
         let side: EditorDiffSide = 'modified';
-        let preferStaged: boolean | undefined = false;
+        let preferStaged: boolean | undefined;
 
         if (uri.scheme === 'file') {
             preferStaged = false;
         } else if (uri.scheme === 'intelli-git-revision') {
-            let ref = '';
+            let ref: string;
             let queryPreferStaged: boolean | undefined;
             try {
                 const query = uri.query ? JSON.parse(uri.query) : {};

@@ -496,7 +496,7 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
             changelistMode: changelistState.mode,
             preventDefaultContextMenuItems: true
         };
-    }, [changelistState.lists.length, changelistState.mode]);
+    }, [changelistState.lists, changelistState.mode]);
 
     const isDraggable = useCallback((node: TreeNode<FileNodeData>) => {
         if (node.id.startsWith('amend/')) return false;

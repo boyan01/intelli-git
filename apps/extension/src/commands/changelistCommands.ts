@@ -710,9 +710,7 @@ export function registerChangelistCommands(
             if (!workspaceRoot) return;
 
             let filePath = uri.fsPath;
-            let isStagedView = false;
             if (uri.scheme === 'intelli-git-revision') {
-                isStagedView = true;
                 try {
                     const parsed = JSON.parse(uri.query);
                     let rawPath = parsed.path || parsed.fsPath || (typeof parsed === 'string' ? parsed : null);
@@ -720,7 +718,6 @@ export function registerChangelistCommands(
                     if (rawPath) filePath = path.isAbsolute(rawPath) ? rawPath : path.join(workspaceRoot, rawPath);
                 } catch { /* ignore */ }
             } else if (uri.scheme === 'git' && uri.authority === 'index') {
-                isStagedView = true;
                 try {
                     const parsed = JSON.parse(uri.query);
                     if (parsed.path) filePath = path.join(workspaceRoot, parsed.path);

@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.0.4
+
+- Added a native commit mode menu in the commit view title bar with clear staged and changelist mode switching.
+- Added editor change-block decorations and actions for staged, inactive, and changelist-specific changes.
+- Improved staged mode drag and drop with clearer drop targets and better auto-scroll behavior.
+- Added configurable AI commit message prompts.
+- Added public feedback and issue-reporting entry points.
+- Improved Intelli Git diagnostics formatting for easier local review and sharing.
+- Fixed full commit message preservation in amend and push commit editing workflows.
+- Fixed staged and changelist commit planning so partial staging, untracked files, inactive blocks, and changelist assignments are preserved more reliably.
+- Fixed whole-file editor decorations for deleted and untracked files.
+
 ## 0.0.3
 
 - Improved tree navigation with sticky section headers across commit, Git log, stash, and push views.
