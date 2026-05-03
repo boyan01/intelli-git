@@ -8,6 +8,7 @@
   "intelli-git.commands.showBranchPicker.title": "Intelli: Switch Branch",
   "intelli-git.commands.focusCommitView.title": "Intelli: Focus Commit View",
   "intelli-git.commands.openFeedback.title": "Intelli: Open Feedback",
+  "intelli-git.commands.repository.switch.title": "Switch Repository...",
   "intelli-git.commands.changelistMode.staged.title": "Staged Mode",
   "intelli-git.commands.changelistMode.staged.current.title": "✓ Staged Mode",
   "intelli-git.commands.changelistMode.changes.title": "Changelist Mode",

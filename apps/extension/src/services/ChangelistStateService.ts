@@ -46,13 +46,34 @@ export class ChangelistStateService {
         assignments: {}
     };
 
-    constructor(private readonly context: vscode.ExtensionContext) {
+    private storageKey: string;
+
+    constructor(
+        private readonly context: vscode.ExtensionContext,
+        private readonly repoPath?: string,
+        private readonly migrateGlobalState = false
+    ) {
+        if (repoPath) {
+            const hash = repoPath.replace(/[^a-zA-Z0-9]/g, '_');
+            this.storageKey = `${ChangelistStateService.STORAGE_KEY}.${hash}`;
+        } else {
+            this.storageKey = ChangelistStateService.STORAGE_KEY;
+        }
         this.loadState();
         this.ensureInvariants();
     }
 
     private loadState() {
-        const saved = this.context.workspaceState.get<PersistedChangelistState>(ChangelistStateService.STORAGE_KEY);
+        let saved = this.context.workspaceState.get<PersistedChangelistState>(this.storageKey);
+
+        // Migrate the old global key only for the repository that previously owned it.
+        if (!saved && this.repoPath && this.migrateGlobalState) {
+             const globalSaved = this.context.workspaceState.get<PersistedChangelistState>(ChangelistStateService.STORAGE_KEY);
+             if (globalSaved) {
+                 saved = globalSaved;
+             }
+        }
+
         if (saved) {
             this.state = saved;
         }
@@ -60,7 +81,7 @@ export class ChangelistStateService {
 
     private async saveState() {
         this.ensureInvariants();
-        await this.context.workspaceState.update(ChangelistStateService.STORAGE_KEY, this.state);
+        await this.context.workspaceState.update(this.storageKey, this.state);
     }
 
     public createSnapshot(): ChangelistStateSnapshot {

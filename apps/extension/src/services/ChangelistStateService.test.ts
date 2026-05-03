@@ -129,6 +129,52 @@ describe('ChangelistStateService', () => {
         expect(__getChangelistMode()).toBe('staged');
     });
 
+    it('does not copy global changelist state into repo-specific state by default', () => {
+        const workspaceState = createWorkspaceState({
+            'ideaCommitPanel.changelists.v1': {
+                lists: [
+                    { id: 'changes', name: 'Changes' },
+                    { id: 'review', name: 'Review' }
+                ],
+                activeListId: 'review',
+                assignments: {
+                    'README.md': { fileListId: 'review' }
+                }
+            }
+        });
+
+        const service = new ChangelistStateService({ workspaceState } as never, '/workspace/second');
+
+        expect(service.getState()).toMatchObject({
+            activeListId: 'changes',
+            assignments: {}
+        });
+    });
+
+    it('migrates global changelist state only when explicitly requested', () => {
+        const workspaceState = createWorkspaceState({
+            'ideaCommitPanel.changelists.v1': {
+                lists: [
+                    { id: 'changes', name: 'Changes' },
+                    { id: 'review', name: 'Review' }
+                ],
+                activeListId: 'review',
+                assignments: {
+                    'README.md': { fileListId: 'review' }
+                }
+            }
+        });
+
+        const service = new ChangelistStateService({ workspaceState } as never, '/workspace/first', true);
+
+        expect(service.getState()).toMatchObject({
+            activeListId: 'review',
+            assignments: {
+                'README.md': { fileListId: 'review' }
+            }
+        });
+    });
+
     it('moves deleted changelist assignments to the remaining list and keeps one active list', async () => {
         const service = createService();
         const review = await service.createList('Review');

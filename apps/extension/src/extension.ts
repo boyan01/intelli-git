@@ -1,9 +1,7 @@
 import * as vscode from 'vscode';
 import { CommitViewProvider, GitLogViewProvider, StashContentProvider, RevisionContentProvider } from './providers';
-import { GitService } from './services/GitService';
+import { RepositoryManager } from './services/RepositoryManager';
 import { createGitWatcher } from './services/GitRepositoryWatcher';
-import { ChangelistStateService } from './services/ChangelistStateService';
-import { InactiveChangesService } from './services/InactiveChangesService';
 import { BranchStatusBar, GitLogStatusBar } from './ui';
 import { registerStashCommands, registerNavigationCommands, registerBranchCommands, registerLogCommands, registerLogFileCommands, registerChangelistCommands, registerAiCommands } from './commands';
 import { logger } from './utils/logger';
@@ -13,32 +11,105 @@ export async function activate(context: vscode.ExtensionContext) {
     logger.initLogger(context);
     logger.info('Intelli Git is now active!');
 
-    const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const workspaceFolders = vscode.workspace.workspaceFolders;
 
-    if (!workspaceRoot) {
+    if (!workspaceFolders || workspaceFolders.length === 0) {
         logger.info('Intelli Git: No workspace opened.');
         return;
     }
 
-    // Initialize services
-    const inactiveChangesService = new InactiveChangesService(context);
-    const changelistStateService = new ChangelistStateService(context);
-    const gitService = await GitService.create(workspaceRoot, inactiveChangesService, changelistStateService);
+    // Initialize RepositoryManager
+    const repositoryManager = new RepositoryManager(context);
+    context.subscriptions.push(repositoryManager);
+    await repositoryManager.initialize();
+
+    if (!repositoryManager.getActiveService()) {
+        logger.info('Intelli Git: No git repository found.');
+        return;
+    }
 
     // Initialize providers
     const providerOptions = {
         extensionUri: context.extensionUri,
         context,
-        gitService,
-        inactiveChangesService,
-        changelistStateService
+        repositoryManager
     };
     const provider = new CommitViewProvider(providerOptions);
     const gitLogProvider = new GitLogViewProvider(providerOptions);
-    const branchStatusBar = new BranchStatusBar(gitService);
-    const gitLogStatusBar = new GitLogStatusBar(gitService);
-    const stashContentProvider = new StashContentProvider(gitService);
-    const revisionContentProvider = new RevisionContentProvider(gitService);
+    const stashContentProvider = new StashContentProvider(repositoryManager);
+    const revisionContentProvider = new RevisionContentProvider(repositoryManager);
+
+    let branchStatusBar: BranchStatusBar | undefined;
+    let gitLogStatusBar: GitLogStatusBar | undefined;
+    let changeBlockEditorController: ChangeBlockEditorController | undefined;
+    let repoBoundDisposables: vscode.Disposable[] = [];
+
+    const disposeRepoBoundDisposables = () => {
+        for (const disposable of repoBoundDisposables.splice(0)) {
+            disposable.dispose();
+        }
+        branchStatusBar = undefined;
+        gitLogStatusBar = undefined;
+        changeBlockEditorController = undefined;
+    };
+
+    context.subscriptions.push({ dispose: disposeRepoBoundDisposables });
+
+    const updateRepositoryContext = () => {
+        const repositories = repositoryManager.getRepositories();
+        void vscode.commands.executeCommand('setContext', 'intelli-git.hasMultipleRepositories', repositories.length > 1);
+    };
+
+    const updateChangelistModeContext = () => {
+        const mode = repositoryManager.getActiveService()?.changelistStateService?.getState().mode || 'staged';
+        void vscode.commands.executeCommand('setContext', 'intelli-git.changelistMode', mode);
+    };
+
+    const triggerRefresh = () => {
+        provider.rpc?.refresh();
+        gitLogProvider.rpc?.refresh();
+        branchStatusBar?.update();
+        gitLogStatusBar?.update();
+        changeBlockEditorController?.refresh();
+    };
+
+    const bindActiveRepository = () => {
+        disposeRepoBoundDisposables();
+
+        const gitService = repositoryManager.getActiveService();
+        const inactiveChangesService = gitService?.inactiveChangesService;
+        const changelistStateService = gitService?.changelistStateService;
+        if (!gitService || !inactiveChangesService || !changelistStateService) {
+            updateRepositoryContext();
+            updateChangelistModeContext();
+            return;
+        }
+
+        const repoContext = {
+            subscriptions: repoBoundDisposables
+        } as Pick<vscode.ExtensionContext, 'subscriptions'> as vscode.ExtensionContext;
+
+        branchStatusBar = new BranchStatusBar(gitService);
+        gitLogStatusBar = new GitLogStatusBar(gitService);
+        changeBlockEditorController = new ChangeBlockEditorController(gitService, inactiveChangesService, changelistStateService, provider);
+
+        registerStashCommands(repoContext, gitService, provider);
+        registerNavigationCommands(repoContext, gitService, branchStatusBar, gitLogProvider, provider);
+        registerBranchCommands(repoContext, gitService, provider);
+        registerLogCommands(repoContext, gitService);
+        registerLogFileCommands(repoContext, gitService);
+        registerChangelistCommands(repoContext, gitService, inactiveChangesService, changelistStateService, provider);
+
+        repoBoundDisposables.push(
+            branchStatusBar,
+            gitLogStatusBar,
+            changeBlockEditorController,
+            gitService.onDidChange(triggerRefresh)
+        );
+
+        updateRepositoryContext();
+        updateChangelistModeContext();
+    };
 
     // Register content providers
     context.subscriptions.push(
@@ -56,24 +127,8 @@ export async function activate(context: vscode.ExtensionContext) {
         vscode.window.registerWebviewViewProvider(GitLogViewProvider.viewType, gitLogProvider)
     );
 
-    // Register commands
-    registerStashCommands(context, gitService, provider);
-    registerNavigationCommands(context, gitService, branchStatusBar, gitLogProvider, provider);
-    registerBranchCommands(context, gitService, provider);
-    registerLogCommands(context, gitService);
-    registerLogFileCommands(context, gitService);
-    registerChangelistCommands(context, gitService, inactiveChangesService, changelistStateService, provider);
     registerAiCommands(context);
-
-    const changeBlockEditorController = new ChangeBlockEditorController(gitService, inactiveChangesService, changelistStateService, provider);
-    context.subscriptions.push(branchStatusBar);
-    context.subscriptions.push(gitLogStatusBar);
-    context.subscriptions.push(changeBlockEditorController);
-
-    const updateChangelistModeContext = () => {
-        void vscode.commands.executeCommand('setContext', 'intelli-git.changelistMode', changelistStateService.getState().mode);
-    };
-    updateChangelistModeContext();
+    bindActiveRepository();
 
     // Register Author Context Menu Commands
     context.subscriptions.push(
@@ -92,28 +147,68 @@ export async function activate(context: vscode.ExtensionContext) {
         })
     );
 
-    const triggerRefresh = () => {
-        provider.rpc?.refresh();
-        gitLogProvider.rpc?.refresh();
-        branchStatusBar.update();
-        gitLogStatusBar.update();
-        changeBlockEditorController.refresh();
-    };
+    context.subscriptions.push(
+        vscode.commands.registerCommand('intelli-git.repository.switch', async () => {
+            const repositories = repositoryManager.getRepositories();
+            if (repositories.length === 0) {
+                void vscode.window.showInformationMessage(vscode.l10n.t('No repositories available'));
+                return;
+            }
+
+            const activeRepoPath = repositoryManager.getActiveRepoPath();
+            const selected = await vscode.window.showQuickPick(
+                repositories.map(repo => {
+                    const descriptionParts = [];
+                    if (repo.path === activeRepoPath) {
+                        descriptionParts.push(vscode.l10n.t('Current'));
+                    }
+                    if (repo.isSubmodule) {
+                        descriptionParts.push(vscode.l10n.t('Submodule'));
+                    }
+
+                    return {
+                        label: repo.name,
+                        description: descriptionParts.join(' · '),
+                        detail: repo.path,
+                        repoPath: repo.path
+                    };
+                }),
+                {
+                    placeHolder: vscode.l10n.t('Switch Repository...')
+                }
+            );
+
+            if (!selected || selected.repoPath === activeRepoPath) {
+                return;
+            }
+
+            if (repositoryManager.setActiveRepository(selected.repoPath)) {
+                updateRepositoryContext();
+            }
+        })
+    );
 
     // Git watcher: uses VS Code Git extension API, falls back to FileSystemWatcher
-    createGitWatcher(context, workspaceRoot).then(watcher => {
+    createGitWatcher(context, workspaceFolders[0].uri.fsPath).then(watcher => {
         context.subscriptions.push(watcher.onChange(triggerRefresh));
         context.subscriptions.push(watcher);
     });
 
-    // GitService triggers refresh on Git state changes (commit, reset, reword, etc.)
-    context.subscriptions.push(gitService.onDidChange(triggerRefresh));
-    context.subscriptions.push(gitService);
+    context.subscriptions.push(
+        repositoryManager.onDidChangeActiveRepo(() => {
+            bindActiveRepository();
+            triggerRefresh();
+        }),
+        repositoryManager.onDidChangeRepositories(() => {
+            updateRepositoryContext();
+            triggerRefresh();
+        })
+    );
 
     context.subscriptions.push(
         vscode.workspace.onDidChangeWorkspaceFolders(() => {
-            branchStatusBar.update();
-            gitLogStatusBar.update();
+            branchStatusBar?.update();
+            gitLogStatusBar?.update();
         })
     );
 

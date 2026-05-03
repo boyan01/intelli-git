@@ -3,6 +3,7 @@ import * as path from 'path';
 import { RpcPeer } from '@shared/rpc';
 import type { WebviewMethods, ExtensionMethods, FileStatus, ChangelistFileSelection, ChangelistState } from '@shared/messages';
 import { GitService } from '../services/GitService';
+import { RepositoryManager } from '../services/RepositoryManager';
 import { ChangelistStateService } from '../services/ChangelistStateService';
 import { InactiveChangesService } from '../services/InactiveChangesService';
 import { AnthropicService } from '../services/AnthropicService';
@@ -15,9 +16,7 @@ import { getAiApiKey } from '../utils/aiSecrets';
 
 export interface ExtensionRpcHandlerOptions {
     context: vscode.ExtensionContext;
-    gitService: GitService;
-    inactiveChangesService?: InactiveChangesService;
-    changelistStateService?: ChangelistStateService;
+    repositoryManager: RepositoryManager;
     onDispose?: () => void;
     onChangelistSelectionChange?: (selection: ChangelistFileSelection | null) => void;
     onChangelistFocusChange?: (focused: boolean) => void;
@@ -29,9 +28,7 @@ export interface ExtensionRpcHandlerOptions {
  */
 export class ExtensionRpcHandler {
     private context: vscode.ExtensionContext;
-    private gitService: GitService;
-    private inactiveChangesService?: InactiveChangesService;
-    private changelistStateService?: ChangelistStateService;
+    private repositoryManager: RepositoryManager;
     private onDispose: () => void;
     private onChangelistSelectionChange?: (selection: ChangelistFileSelection | null) => void;
     private onChangelistFocusChange?: (focused: boolean) => void;
@@ -39,12 +36,26 @@ export class ExtensionRpcHandler {
 
     constructor(options: ExtensionRpcHandlerOptions) {
         this.context = options.context;
-        this.gitService = options.gitService;
-        this.inactiveChangesService = options.inactiveChangesService;
-        this.changelistStateService = options.changelistStateService;
+        this.repositoryManager = options.repositoryManager;
         this.onDispose = options.onDispose || (() => { });
         this.onChangelistSelectionChange = options.onChangelistSelectionChange;
         this.onChangelistFocusChange = options.onChangelistFocusChange;
+    }
+
+    private get gitService(): GitService {
+        const service = this.repositoryManager.getActiveService();
+        if (!service) {
+            throw new Error("No active repository");
+        }
+        return service;
+    }
+
+    private get inactiveChangesService(): InactiveChangesService | undefined {
+        return this.gitService.inactiveChangesService;
+    }
+
+    private get changelistStateService(): ChangelistStateService | undefined {
+        return this.gitService.changelistStateService;
     }
 
     log = (params: { message: string, type?: 'info' | 'error' | 'warn' | 'debug' }): Promise<void> => {
@@ -74,15 +85,30 @@ export class ExtensionRpcHandler {
         return (value || '').trim().toLowerCase();
     }
 
+    getRepositories = async () => {
+        return this.repositoryManager.getRepositories();
+    };
+
+    getActiveRepository = async () => {
+        return this.repositoryManager.getActiveRepoPath();
+    };
+
+    setActiveRepository = async (repoPath: string) => {
+        return this.repositoryManager.setActiveRepository(repoPath);
+    };
+
     registerAll(rpc: RpcPeer<WebviewMethods, ExtensionMethods>) {
         rpc.registerAll(
             {
+                getRepositories: this.getRepositories,
+                getActiveRepository: this.getActiveRepository,
+                setActiveRepository: this.setActiveRepository,
                 log: this.log,
-                getPushInitState: this.gitService.getPushInitState,
-                getRemoteBranches: this.gitService.getRemoteBranchesForRemote,
-                getPushCommits: this.gitService.getPushCommits,
-                getCommitFiles: this.gitService.getCommitFiles,
-                getMultiCommitFiles: this.gitService.getMultiCommitFiles,
+                getPushInitState: (...args) => this.gitService.getPushInitState(...args),
+                getRemoteBranches: (...args) => this.gitService.getRemoteBranchesForRemote(...args),
+                getPushCommits: (...args) => this.gitService.getPushCommits(...args),
+                getCommitFiles: (...args) => this.gitService.getCommitFiles(...args),
+                getMultiCommitFiles: (...args) => this.gitService.getMultiCommitFiles(...args),
                 push: this.push,
                 openDiff: this.openDiff,
                 closeWebView: this.closeWebView,
@@ -90,9 +116,9 @@ export class ExtensionRpcHandler {
                 getStatus: this.getStatus,
                 getChangelistState: this.getChangelistState,
                 getCommitViewState: this.getCommitViewState,
-                getBranchInfo: this.gitService.getRpcBranchInfo,
-                getStashList: this.gitService.getStashList,
-                getStashFiles: this.gitService.getStashFilesAsCommitFiles,
+                getBranchInfo: (...args) => this.gitService.getRpcBranchInfo(...args),
+                getStashList: (...args) => this.gitService.getStashList(...args),
+                getStashFiles: (...args) => this.gitService.getStashFilesAsCommitFiles(...args),
                 commit: this.commit,
                 stage: this.stage,
                 stageFiles: this.stageFiles,
@@ -114,13 +140,13 @@ export class ExtensionRpcHandler {
                 resolveConflict: this.resolveConflict,
                 openFile: this.openFile,
                 openStashDiff: this.openStashDiff,
-                getBranchListData: this.gitService.getBranchListData,
-                getLog: this.gitService.getLog,
-                getCommitDetails: this.gitService.getCommitDetails,
+                getBranchListData: (...args) => this.gitService.getBranchListData(...args),
+                getLog: (...args) => this.gitService.getLog(...args),
+                getCommitDetails: (...args) => this.gitService.getCommitDetails(...args),
                 pickBranchForFilter: this.pickBranchForFilter,
                 pickPaths: this.pickPaths,
-                getAuthors: this.gitService.getAuthors,
-                getCurrentUser: this.gitService.getCurrentUser,
+                getAuthors: (...args) => this.gitService.getAuthors(...args),
+                getCurrentUser: (...args) => this.gitService.getCurrentUser(...args),
                 getWorkspaceState: this.getWorkspaceState,
                 updateWorkspaceState: this.updateWorkspaceState,
                 getUnpushedCommits: this.getUnpushedCommits,

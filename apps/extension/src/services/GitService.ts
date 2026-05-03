@@ -53,6 +53,14 @@ export class GitService implements vscode.Disposable {
      */
     public readonly onDidChange = this._onDidChange.event;
 
+    public get inactiveChangesService(): InactiveChangesService | undefined {
+        return this._inactiveChangesService;
+    }
+
+    public get changelistStateService(): ChangelistStateService | undefined {
+        return this._changelistStateService;
+    }
+
     constructor(workspaceRoot: string, gitRoot: string, git: SimpleGit, inactiveChangesService?: InactiveChangesService, changelistStateService?: ChangelistStateService) {
         this._workspaceRoot = workspaceRoot;
         this._gitRoot = gitRoot;

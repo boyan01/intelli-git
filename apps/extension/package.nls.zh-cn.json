@@ -8,6 +8,7 @@
   "intelli-git.commands.showBranchPicker.title": "Intelli: 切换分支",
   "intelli-git.commands.focusCommitView.title": "Intelli: 聚焦提交视图",
   "intelli-git.commands.openFeedback.title": "Intelli: 打开反馈",
+  "intelli-git.commands.repository.switch.title": "切换仓库...",
   "intelli-git.commands.changelistMode.staged.title": "暂存模式",
   "intelli-git.commands.changelistMode.staged.current.title": "✓ 暂存模式",
   "intelli-git.commands.changelistMode.changes.title": "变更列表模式",

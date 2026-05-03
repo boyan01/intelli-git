@@ -1,14 +1,10 @@
 import * as vscode from 'vscode';
-import { GitService } from '../services/GitService';
+import { RepositoryManager } from '../services/RepositoryManager';
 
 export class StashContentProvider implements vscode.TextDocumentContentProvider {
-    private gitService: GitService;
-
     onDidChange?: vscode.Event<vscode.Uri> | undefined;
 
-    constructor(gitService: GitService) {
-        this.gitService = gitService;
-    }
+    constructor(private readonly repositoryManager: RepositoryManager) { }
 
     async provideTextDocumentContent(uri: vscode.Uri): Promise<string> {
         // URI format: intelli-git-stash://load/<stash-ref>/<file-path>
@@ -22,7 +18,7 @@ export class StashContentProvider implements vscode.TextDocumentContentProvider 
                 return '';
             }
 
-            return await this.gitService.getFileContent(ref, path);
+            return await this.repositoryManager.getActiveService()?.getFileContent(ref, path) || '';
         } catch {
             return '';
         }

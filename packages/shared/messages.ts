@@ -139,6 +139,9 @@ export interface LogOptions {
 }
 
 export interface ExtensionMethods {
+    getRepositories: () => Promise<Array<{ name: string; path: string; isSubmodule: boolean }>>;
+    getActiveRepository: () => Promise<string | undefined>;
+    setActiveRepository: (repoPath: string) => Promise<boolean>;
     log(params: { message: string; type?: 'info' | 'error' | 'warn' | 'debug' }): Promise<void>;
     getPushInitState: () => Promise<PushInitState>;
     getRemoteBranches: (remote: string) => Promise<string[]>;

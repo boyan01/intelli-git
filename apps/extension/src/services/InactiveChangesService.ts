@@ -24,14 +24,34 @@ export class InactiveChangesService {
     private static readonly STORAGE_KEY_V2 = 'ideaCommitPanel.inactiveChangesV2';
     private state: InactiveData = { files: {} };
 
-    constructor(private context: vscode.ExtensionContext) {
+    private storageKey: string;
+
+    constructor(
+        private context: vscode.ExtensionContext,
+        private repoPath?: string,
+        private migrateGlobalState = false
+    ) {
+        if (repoPath) {
+            const hash = repoPath.replace(/[^a-zA-Z0-9]/g, '_');
+            this.storageKey = `${InactiveChangesService.STORAGE_KEY_V2}.${hash}`;
+        } else {
+            this.storageKey = InactiveChangesService.STORAGE_KEY_V2;
+        }
         this.loadState();
     }
 
     private loadState() {
         // Migration from V1 (if exists) or load V2
         const v1Saved = this.context.workspaceState.get<string[]>('ideaCommitPanel.inactiveChanges');
-        const v2Saved = this.context.workspaceState.get<InactiveData>(InactiveChangesService.STORAGE_KEY_V2);
+        let v2Saved = this.context.workspaceState.get<InactiveData>(this.storageKey);
+
+        // Migrate the old global key only for the repository that previously owned it.
+        if (!v2Saved && this.repoPath && this.migrateGlobalState) {
+             const globalV2Saved = this.context.workspaceState.get<InactiveData>(InactiveChangesService.STORAGE_KEY_V2);
+             if (globalV2Saved) {
+                 v2Saved = globalV2Saved;
+             }
+        }
 
         if (v2Saved) {
             this.state = v2Saved;
@@ -46,7 +66,7 @@ export class InactiveChangesService {
 
     private async saveState() {
         await this.context.workspaceState.update(
-            InactiveChangesService.STORAGE_KEY_V2,
+            this.storageKey,
             this.state
         );
     }

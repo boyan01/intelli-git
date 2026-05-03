@@ -1,10 +1,8 @@
-import { HashRouter, Routes, Route } from 'react-router-dom';
+import { HashRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
+import { useEffect } from 'react';
 import { LocalChangesView } from './components/local-changes/LocalChangesView';
 import { GitLogView } from './components/git-log/GitLogView';
 import './index.css';
-
-import { useNavigate, useLocation } from 'react-router-dom';
-import { useEffect } from 'react';
 
 function AppContent() {
     const navigate = useNavigate();

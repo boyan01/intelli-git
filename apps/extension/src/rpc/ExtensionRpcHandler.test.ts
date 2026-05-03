@@ -25,13 +25,21 @@ function createStagedChangelistState(): ChangelistState {
 }
 
 function createHandler(gitService: Partial<GitService>): ExtensionRpcHandler {
+    // Add getActiveService to the gitService mock or wrap it
+    const gitServiceMock = gitService as GitService;
+    // We mock properties accessed via get inactiveChangesService / changelistStateService
+    Object.defineProperty(gitServiceMock, 'inactiveChangesService', {
+        get: () => ({} as InactiveChangesService)
+    });
+    Object.defineProperty(gitServiceMock, 'changelistStateService', {
+        get: () => ({
+            getState: () => createStagedChangelistState()
+        } as ChangelistStateService)
+    });
+
     return new ExtensionRpcHandler({
         context: {} as vscode.ExtensionContext,
-        gitService: gitService as GitService,
-        inactiveChangesService: {} as InactiveChangesService,
-        changelistStateService: {
-            getState: () => createStagedChangelistState()
-        } as ChangelistStateService
+        repositoryManager: { getActiveService: () => gitServiceMock } as any,
     });
 }
 

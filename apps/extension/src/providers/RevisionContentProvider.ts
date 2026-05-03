@@ -1,15 +1,11 @@
 import * as path from 'path';
 import * as vscode from 'vscode';
-import { GitService } from '../services/GitService';
+import { RepositoryManager } from '../services/RepositoryManager';
 
 export class RevisionContentProvider implements vscode.TextDocumentContentProvider {
-    private gitService: GitService;
-
     onDidChange?: vscode.Event<vscode.Uri> | undefined;
 
-    constructor(gitService: GitService) {
-        this.gitService = gitService;
-    }
+    constructor(private readonly repositoryManager: RepositoryManager) { }
 
     async provideTextDocumentContent(uri: vscode.Uri): Promise<string> {
         // URI format: intelli-git-revision://load/<file-path>?{"ref":"<commit-hash>"}
@@ -23,8 +19,13 @@ export class RevisionContentProvider implements vscode.TextDocumentContentProvid
                 return '';
             }
 
+            const gitService = this.repositoryManager.getActiveService();
+            if (!gitService) {
+                return '';
+            }
+
             if (ref === 'WORKTREE') {
-                const workspaceRoot = this.gitService.getWorkspaceRoot();
+                const workspaceRoot = gitService.getWorkspaceRoot();
                 if (!workspaceRoot) {
                     return '';
                 }
@@ -38,7 +39,7 @@ export class RevisionContentProvider implements vscode.TextDocumentContentProvid
                 }
             }
 
-            return await this.gitService.getFileContent(ref, filePath);
+            return await gitService.getFileContent(ref, filePath);
         } catch (e) {
             console.error('RevisionContentProvider error:', e);
             return '';

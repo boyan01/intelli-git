@@ -77,10 +77,10 @@ export class CommitViewProvider extends BaseWebviewProvider implements vscode.We
 
             if (uri.scheme === 'file') {
                 const wsRelPath = vscode.workspace.asRelativePath(uri, false);
-                relativePath = this.options.gitService.toRepoPath(wsRelPath);
+                relativePath = this.options.repositoryManager.getActiveService()?.toRepoPath(wsRelPath) || wsRelPath;
             } else if (uri.scheme === 'git') {
                 const wsRelPath = vscode.workspace.asRelativePath(vscode.Uri.file(uri.path), false);
-                relativePath = this.options.gitService.toRepoPath(wsRelPath);
+                relativePath = this.options.repositoryManager.getActiveService()?.toRepoPath(wsRelPath) || wsRelPath;
             } else if (uri.scheme === 'intelli-git-revision') {
                 // URI format: intelli-git-revision://load/{path}?{query}
                 // If it's intelli-git-revision://load/path, uri.path is "/path"
