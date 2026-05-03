@@ -444,7 +444,7 @@ export class ExtensionRpcHandler {
 
             if (changelistState?.mode === 'changes') {
                 const status = await this.getStatusWithState();
-                const plan = this.changelistStateService?.buildCommitPlan(status);
+                const plan = this.changelistStateService?.buildCommitPlan(status, params.files);
 
                 if (!plan || (!params.amend && plan.files.length === 0)) {
                     throw new Error('No active changelist changes to commit');
@@ -456,9 +456,9 @@ export class ExtensionRpcHandler {
                     await this.gitService.commitChangelistPlan(params.message, params.amend, plan, status);
                 }
             } else if (params.amend) {
-                await this.gitService.commitAmend(params.message, params.files);
+                await this.gitService.commitAmend(params.message, undefined);
             } else {
-                await this.gitService.commit(params.message, params.files);
+                await this.gitService.commit(params.message, undefined);
             }
 
             if (params.push) {
@@ -787,7 +787,7 @@ export class ExtensionRpcHandler {
 
             if (changelistState?.mode === 'changes') {
                 const status = await this.getStatusWithState();
-                const plan = this.changelistStateService?.buildCommitPlan(status);
+                const plan = this.changelistStateService?.buildCommitPlan(status, files);
                 diff = plan ? await this.gitService.getDiffForChangelistPlan(plan, status) : '';
             } else if (files && files.length > 0) {
                 diff = await this.gitService.getDiffForFiles(files);

@@ -207,4 +207,44 @@ describe('ChangelistStateService', () => {
             }
         });
     });
+
+    it('includes requested untracked files in the active changelist commit plan', async () => {
+        const service = createService();
+
+        const plan = service.buildCommitPlan([
+            {
+                path: 'src/new.ts',
+                status: '?',
+                staged: false
+            },
+            {
+                path: 'src/ignored.ts',
+                status: '?',
+                staged: false
+            }
+        ], ['src/new.ts']);
+
+        expect(plan).toEqual({
+            files: ['src/new.ts'],
+            excludedFiles: [],
+            excludedHunkIdsByPath: {}
+        });
+    });
+
+    it('does not reverse-apply hunks for files excluded from the commit plan', async () => {
+        const service = createService();
+        const review = await service.createList('Review');
+        await service.moveHunks('src/deleted.ts', ['delete-hunk'], review.id);
+
+        const plan = service.buildCommitPlan([
+            status('src/active.ts', [hunk('active-hunk')]),
+            status('src/deleted.ts', [hunk('delete-hunk')])
+        ]);
+
+        expect(plan).toEqual({
+            files: ['src/active.ts'],
+            excludedFiles: ['src/deleted.ts'],
+            excludedHunkIdsByPath: {}
+        });
+    });
 });

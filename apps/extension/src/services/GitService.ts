@@ -234,27 +234,52 @@ export class GitService implements vscode.Disposable {
             return;
         }
 
-        const statusMap = new Map(status.map(file => [file.path, file]));
+        const statusMap = new Map<string, FileStatus[]>();
+        for (const file of status) {
+            const entries = statusMap.get(file.path) || [];
+            entries.push(file);
+            statusMap.set(file.path, entries);
+        }
+        const filesToCopyFromIndex: string[] = [];
         const filesToDirectAdd: string[] = [];
-        const filesToUpdate: string[] = [];
+        const filesToRemove: string[] = [];
 
         for (const filePath of filePaths) {
-            const fileStatus = statusMap.get(filePath);
+            const entries = statusMap.get(filePath) || [];
             const repoPath = this.toRepoPath(filePath);
 
-            if (fileStatus?.status === 'D') {
-                filesToUpdate.push(repoPath);
-            } else {
+            if (entries.some(entry => entry.status === 'C' || entry.status === 'U')) {
+                throw new Error(`Resolve conflicts before committing ${filePath}`);
+            }
+
+            const stagedEntry = entries.find(entry => entry.staged && entry.status !== 'D' && entry.status !== '?');
+            const worktreeEntry = entries.find(entry => !entry.staged);
+
+            if (stagedEntry) {
+                filesToCopyFromIndex.push(repoPath);
+            }
+
+            if (worktreeEntry?.status === 'D' || (!worktreeEntry && entries.some(entry => entry.status === 'D'))) {
+                filesToRemove.push(repoPath);
+            } else if (!stagedEntry || worktreeEntry) {
                 filesToDirectAdd.push(repoPath);
             }
         }
 
-        if (filesToDirectAdd.length > 0) {
-            await git.add(filesToDirectAdd);
+        for (const repoPath of filesToCopyFromIndex) {
+            const indexEntry = await this.git.raw(['ls-files', '-s', '--', repoPath]);
+            const match = indexEntry.match(/^(\d+)\s+([0-9a-f]+)\s+\d+\t(.+)$/m);
+            if (match) {
+                await git.raw(['update-index', '--add', '--cacheinfo', `${match[1]},${match[2]},${repoPath}`]);
+            }
         }
 
-        if (filesToUpdate.length > 0) {
-            await git.raw(['add', '-u', '--', ...filesToUpdate]);
+        if (filesToRemove.length > 0) {
+            await git.raw(['update-index', '--remove', '--', ...filesToRemove]);
+        }
+
+        if (filesToDirectAdd.length > 0) {
+            await git.add(filesToDirectAdd);
         }
     }
 
@@ -864,9 +889,10 @@ export class GitService implements vscode.Disposable {
 
     private async applyCommitPlanToIndex(git: SimpleGit, plan: CommitPlan, status: FileStatus[]): Promise<void> {
         await this.stageFilesInGit(git, plan.files, status);
+        const stagedPlanFiles = new Set(plan.files);
 
         for (const [filePath, hunkIds] of Object.entries(plan.excludedHunkIdsByPath)) {
-            if (hunkIds.length === 0) {
+            if (hunkIds.length === 0 || !stagedPlanFiles.has(filePath)) {
                 continue;
             }
 
@@ -913,9 +939,14 @@ export class GitService implements vscode.Disposable {
             }
         }
 
-        await this._excludeInactiveFromIndex();
-
         const args: string[] = ['commit', '--amend'];
+
+        if (files && files.length === 0) {
+            args.push('--only');
+        } else {
+            await this._excludeInactiveFromIndex();
+        }
+
         if (message) {
             args.push('-m', message);
         } else {
@@ -983,7 +1014,7 @@ export class GitService implements vscode.Disposable {
 
         // For HEAD commit, use --amend
         if (headHash.trim() === hash) {
-            await this.git.raw(['commit', '--amend', '-m', newMessage]);
+            await this.git.raw(['commit', '--amend', '--only', '-m', newMessage]);
             this.fireChange();
             return;
         }

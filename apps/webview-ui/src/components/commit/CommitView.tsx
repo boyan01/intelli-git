@@ -354,7 +354,10 @@ export function CommitView({ rebaseStatus }: CommitViewProps) {
         }
 
         const activeGroup = changelists.find(group => group.isActive);
-        return new Set(activeGroup?.items.filter(file => file.status !== '?').map(file => file.path) || []);
+        const next = new Set(activeGroup?.items.map(file => file.path) || []);
+        const untrackedGroup = changelists.find(group => group.id === 'untracked-changes');
+        untrackedGroup?.items.forEach(file => next.add(file.path));
+        return next;
     }, [changelistState.mode, changelists, files]);
 
     useEffect(() => {

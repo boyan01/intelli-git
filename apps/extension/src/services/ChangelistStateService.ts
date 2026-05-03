@@ -338,7 +338,8 @@ export class ChangelistStateService {
         return count;
     }
 
-    public buildCommitPlan(status: FileStatus[]): CommitPlan {
+    public buildCommitPlan(status: FileStatus[], requestedFiles?: Iterable<string>): CommitPlan {
+        const requestedFileSet = requestedFiles ? new Set(requestedFiles) : undefined;
         const grouped = new Map<string, FileStatus[]>();
         for (const file of status) {
             const list = grouped.get(file.path) || [];
@@ -352,7 +353,13 @@ export class ChangelistStateService {
 
         for (const [path, entries] of grouped.entries()) {
             const assignment = this.state.assignments[path];
-            if (entries.some(entry => entry.status === '?') && !assignment?.fileListId) {
+            if (entries.some(entry => entry.status === '?')) {
+                const listId = assignment?.fileListId || (requestedFileSet?.has(path) ? this.state.activeListId : undefined);
+                if (listId === this.state.activeListId) {
+                    files.add(path);
+                } else if (listId) {
+                    excludedFiles.add(path);
+                }
                 continue;
             }
 
@@ -378,7 +385,7 @@ export class ChangelistStateService {
                     excludedFiles.add(path);
                 }
 
-                if (excludedHunks.length > 0) {
+                if (excludedHunks.length > 0 && excludedHunks.length < hunks.length) {
                     excludedHunkIdsByPath[path] = excludedHunks;
                 }
 
