@@ -418,6 +418,27 @@ describe('GitService staging inactive changes', () => {
         const status = await git.status();
         expect(status.files.some(file => file.path === 'staged.txt' && file.index === 'A')).toBe(true);
     });
+
+    it('rewords HEAD with a multiline commit message', async () => {
+        fs.writeFileSync(path.join(tempDir, 'initial.txt'), 'initial\n');
+        await git.add('initial.txt');
+        await git.commit('Initial commit');
+
+        const service = new GitService(tempDir, tempDir, git);
+        const headHash = await git.revparse(['HEAD']);
+        const message = [
+            'Reword with body',
+            '',
+            'Explain the change in detail.',
+            '',
+            'Signed-off-by: Intelli Git <intelli-git@example.com>'
+        ].join('\n');
+
+        await service.rewordCommit(headHash.trim(), message);
+
+        const headMessage = await git.raw(['log', '-1', '--format=%B']);
+        expect(headMessage.trim()).toBe(message);
+    });
 });
 
 function createInactiveChangesService(options: {

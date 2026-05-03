@@ -215,6 +215,7 @@
     "Revert": "Revert",
     "Reverted {0}": "Reverted {0}",
     "Revert failed: {0}": "Revert failed: {0}",
+    "Save (Cmd+S) to apply · Close to cancel": "Save (Cmd+S) to apply · Close to cancel",
     "extension.anthropicApiKeyMissing": "Anthropic API key is not configured. Run Intelli: Configure AI Provider.",
     "extension.anthropicApiUrlMissing": "Anthropic API URL is not configured. Please set it in Settings > Intelli Git.",
     "extension.anthropicRequestFailed": "Anthropic API request failed: {0}",

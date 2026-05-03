@@ -118,12 +118,33 @@
     border-bottom: 1px dashed var(--vscode-panel-border);
 }
 
-.commitBody {
-    font-size: 12px;
-    color: var(--vscode-descriptionForeground);
-    line-height: 1.5;
-    margin-bottom: 8px;
+.commitExtraMessage {
     white-space: pre-wrap;
+    font-family: var(--vscode-editor-font-family);
+    margin-bottom: 8px;
+    color: var(--vscode-foreground);
+}
+
+.commitBody {
+    font-size: 11px;
+    line-height: 1.4;
+    opacity: 0.9;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.commitFooter {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px dashed var(--vscode-panel-border);
+    margin-bottom: 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-family: var(--vscode-editor-font-family);
+    font-size: 11px;
+    line-height: 1.4;
+    color: var(--vscode-foreground);
+    opacity: 0.8;
 }
 
 .commitDetailsMeta {

@@ -35,6 +35,10 @@ const SIMPLE_GIT_UNSAFE_ENV_KEYS = new Set([
     'ssh_askpass'
 ]);
 
+const GIT_LOG_RECORD_SEPARATOR = '\x1e';
+const GIT_LOG_FIELD_SEPARATOR = '\x1f';
+const PUSH_COMMIT_LOG_FORMAT = '%x1e%H%x1f%h%x1f%s%x1f%an%x1f%aI%x1f%ae%x1f%P%x1f%b';
+
 
 export class GitService implements vscode.Disposable {
     private git: SimpleGit;
@@ -1397,33 +1401,12 @@ export class GitService implements vscode.Disposable {
                     args.push(`--skip=${options.skip}`);
                 }
 
-                args.push('--format=%H%x00%h%x00%s%x00%an%x00%aI%x00%ae%x00%P');
+                args.push(`--format=${PUSH_COMMIT_LOG_FORMAT}`);
                 args.push(`${remote}/${remoteBranch}..${localBranch}`);
 
                 const result = await this.git.raw(args);
 
-                if (!result.trim()) {
-                    return [];
-                }
-
-                return result.trim().split('\n').map(line => {
-                    const [hash, shortHash, subject, authorName, date, authorEmail, parentsStr] = line.split('\x00');
-                    return {
-                        hash,
-                        shortHash,
-                        subject,
-                        authorName,
-                        date,
-                        authorEmail,
-                        body: '',
-                        files: [],
-                        stats: { additions: 0, deletions: 0 },
-                        parentHashes: parentsStr ? parentsStr.split(' ') : [],
-                        containingBranches: [],
-                        refs: [],
-                        filteredAncestors: []
-                    };
-                });
+                return this.parsePushCommitLog(result);
             } else {
                 // New remote branch: get commits not reachable from any remote
                 return this._getCommitsNotInRemote(localBranch, options.maxCount ?? 20, options.skip);
@@ -1463,7 +1446,7 @@ export class GitService implements vscode.Disposable {
                 '--not',
                 '--remotes',
                 `--max-count=${maxCount}`,
-                '--format=%H%x00%h%x00%s%x00%an%x00%aI%x00%ae%x00%P'
+                `--format=${PUSH_COMMIT_LOG_FORMAT}`
             ];
 
             if (skip) {
@@ -1472,12 +1455,27 @@ export class GitService implements vscode.Disposable {
 
             const result = await this.git.raw(args);
 
-            if (!result.trim()) {
-                return [];
-            }
+            return this.parsePushCommitLog(result);
+        } catch {
+            return [];
+        }
+    }
 
-            return result.trim().split('\n').map(line => {
-                const [hash, shortHash, subject, authorName, date, authorEmail, parentsStr] = line.split('\x00');
+    private parsePushCommitLog(result: string): CommitDetails[] {
+        if (!result.trim()) {
+            return [];
+        }
+
+        return result
+            .split(GIT_LOG_RECORD_SEPARATOR)
+            .map(record => record.trimEnd())
+            .filter(record => record.trim())
+            .map(record => {
+                const [hash, shortHash, subject, authorName, date, authorEmail, parentsStr, ...bodyParts] = record.split(GIT_LOG_FIELD_SEPARATOR);
+                const parentHashes = parentsStr
+                    ? parentsStr.trim().split(' ').filter(Boolean)
+                    : [];
+
                 return {
                     hash,
                     shortHash,
@@ -1485,18 +1483,15 @@ export class GitService implements vscode.Disposable {
                     authorName,
                     date,
                     authorEmail,
-                    body: '',
+                    body: bodyParts.join(GIT_LOG_FIELD_SEPARATOR).trim(),
                     files: [],
                     stats: { additions: 0, deletions: 0 },
-                    parentHashes: parentsStr ? parentsStr.split(' ') : [],
+                    parentHashes,
                     containingBranches: [],
                     refs: [],
                     filteredAncestors: []
                 };
             });
-        } catch {
-            return [];
-        }
     }
 
     private async _remoteBranchExists(remote: string, branch: string): Promise<boolean> {

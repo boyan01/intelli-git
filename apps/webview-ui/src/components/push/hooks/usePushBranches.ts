@@ -7,11 +7,15 @@ export function usePushBranches() {
     const loadPushInitState = useCallback(async () => await rpc.getPushInitState(), []);
 
     // 1. Load Initial State (Local branch & Remotes)
-    const { data: initState } = useRpcData(
+    const {
+        data: initState,
+        loading: isInitStateLoading
+    } = useRpcData(
         loadPushInitState,
         {
             initialValue: { localBranch: '', remotes: [] },
-            refreshOnEvent: true
+            refreshOnEvent: true,
+            cacheKey: 'push.initState'
         }
     );
 
@@ -76,19 +80,31 @@ export function usePushBranches() {
 
     // 5. Load Remote Branches based on selection
     const loadRemoteBranches = useCallback(async () => {
-        if (!selectedRemote) return [];
-        return await rpc.getRemoteBranches(selectedRemote);
+        if (!selectedRemote) {
+            return { remote: '', branches: [] };
+        }
+        return {
+            remote: selectedRemote,
+            branches: await rpc.getRemoteBranches(selectedRemote)
+        };
     }, [selectedRemote]);
 
     const {
-        data: remoteBranches,
-        loading: isRemoteBranchesLoading,
+        data: remoteBranchState,
     } = useRpcData(
         loadRemoteBranches,
         {
-            initialValue: []
+            initialValue: { remote: '', branches: [] },
+            cacheKey: 'push.remoteBranches'
         }
     );
+
+    const hasRemoteBranchSnapshot = remoteBranchState.remote === selectedRemote;
+    const remoteBranches = useMemo(
+        () => hasRemoteBranchSnapshot ? remoteBranchState.branches : [],
+        [hasRemoteBranchSnapshot, remoteBranchState.branches]
+    );
+    const isRemoteBranchesLoading = selectedRemote !== '' && !hasRemoteBranchSnapshot;
 
     const selectedRemoteBranch = useMemo(() => {
         if (selectedRemoteBranchOverride) {
@@ -145,5 +161,6 @@ export function usePushBranches() {
         selectedRemoteBranch,
         setSelectedRemoteBranch: handleSelectedRemoteBranchChange,
         isRemoteBranchesLoading,
+        isInitStateLoading,
     };
 }

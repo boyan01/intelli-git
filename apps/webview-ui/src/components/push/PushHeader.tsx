@@ -9,6 +9,7 @@ export interface PushHeaderProps {
     remoteBranches: string[];
     viewMode: 'commits' | 'changes';
     isLoading?: boolean;
+    showTargetPlaceholder?: boolean;
     onToggleView: () => void;
     onRemoteChange: (remote: string) => void;
     onRemoteBranchChange: (branch: string) => void;
@@ -21,6 +22,7 @@ export const PushHeader: React.FC<PushHeaderProps> = ({
     remoteBranches,
     viewMode,
     isLoading = false,
+    showTargetPlaceholder = false,
     onToggleView,
     onRemoteChange,
     onRemoteBranchChange
@@ -145,7 +147,9 @@ export const PushHeader: React.FC<PushHeaderProps> = ({
                 </div>
 
                 <div className={styles.remoteWrapper}>
-                    {!isEditingBranch ? (
+                    {showTargetPlaceholder ? (
+                        <div className={styles.targetPlaceholder} />
+                    ) : !isEditingBranch ? (
                         <div
                             className={styles.remoteDisplay}
                             ref={remoteRef}

@@ -97,6 +97,14 @@
     border-radius: 2px;
 }
 
+.targetPlaceholder {
+    width: min(220px, 70%);
+    height: 14px;
+    border-radius: 2px;
+    background-color: var(--vscode-editorWidget-border);
+    opacity: 0.45;
+}
+
 .remotePart {
     composes: unifiedFont;
     color: var(--vscode-textLink-foreground);

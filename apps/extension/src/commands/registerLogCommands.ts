@@ -5,6 +5,27 @@ export function registerLogCommands(
     context: vscode.ExtensionContext,
     gitService: GitService
 ) {
+    const commitMessageEditorFiles = new Set<string>();
+    context.subscriptions.push(
+        vscode.languages.registerCodeLensProvider({ scheme: 'file' }, {
+            provideCodeLenses(document) {
+                if (!commitMessageEditorFiles.has(document.uri.fsPath)) {
+                    return [];
+                }
+
+                return [
+                    new vscode.CodeLens(
+                        new vscode.Range(0, 0, 0, 0),
+                        {
+                            title: vscode.l10n.t('Save (Cmd+S) to apply · Close to cancel'),
+                            command: 'workbench.action.files.save'
+                        }
+                    )
+                ];
+            }
+        })
+    );
+
     const getCommitHash = (arg: any): string | undefined => {
         if (!arg) return undefined;
         if (arg.webviewSection === 'gitLogCommit' && arg.hash) return arg.hash;
@@ -160,7 +181,7 @@ export function registerLogCommands(
         })
     );
 
-    // Edit Commit Message (reword) - with button for multiline editor
+    // Edit Commit Message (reword)
     context.subscriptions.push(
         vscode.commands.registerCommand('intelli-git.log.editMessage', async (arg) => {
             const hash = getCommitHash(arg);
@@ -174,107 +195,50 @@ export function registerLogCommands(
             const currentMessage = await gitService.getCommitMessage(hash);
             const shortHash = hash.substring(0, 7);
 
-            // Helper function to open multiline editor
-            const openMultilineEditor = async () => {
-                const tempDir = os.tmpdir();
-                const tempFile = path.join(tempDir, `COMMIT_EDITMSG-${shortHash}-${Date.now()}.txt`);
-                fs.writeFileSync(tempFile, currentMessage, 'utf8');
+            const tempDir = os.tmpdir();
+            const tempFile = path.join(tempDir, `COMMIT_EDITMSG-${shortHash}-${Date.now()}.txt`);
+            fs.writeFileSync(tempFile, currentMessage, 'utf8');
+            commitMessageEditorFiles.add(tempFile);
 
-                const tempUri = vscode.Uri.file(tempFile);
-                const doc = await vscode.workspace.openTextDocument(tempUri);
-                await vscode.window.showTextDocument(doc, { preview: false });
+            const tempUri = vscode.Uri.file(tempFile);
+            const doc = await vscode.workspace.openTextDocument(tempUri);
+            await vscode.window.showTextDocument(doc, { preview: false });
 
-                vscode.window.showInformationMessage(
-                    vscode.l10n.t('Edit the commit message, then save (Cmd+S) to apply.')
-                );
+            let applied = false;
 
-                let applied = false;
+            const saveDisposable = vscode.workspace.onDidSaveTextDocument(async savedDoc => {
+                if (savedDoc.uri.fsPath !== tempFile || applied) return;
 
-                // Trigger reword on save
-                const saveDisposable = vscode.workspace.onDidSaveTextDocument(async savedDoc => {
-                    if (savedDoc.uri.fsPath !== tempFile || applied) return;
-
-                    try {
-                        const newMessage = savedDoc.getText().trim();
-
-                        if (!newMessage) {
-                            vscode.window.showWarningMessage(vscode.l10n.t('Commit message cannot be empty.'));
-                            return;
-                        }
-
-                        if (newMessage === currentMessage) {
-                            vscode.window.showInformationMessage(vscode.l10n.t('No changes detected.'));
-                            return;
-                        }
-
-                        applied = true;
-                        await gitService.rewordCommit(hash, newMessage);
-                    } catch (e: any) {
-                        vscode.window.showErrorMessage(vscode.l10n.t('Failed to edit commit message: {0}', e.message));
-                    }
-                });
-
-                // Cleanup temp file on close
-                const closeDisposable = vscode.workspace.onDidCloseTextDocument(closedDoc => {
-                    if (closedDoc.uri.fsPath !== tempFile) return;
-
-                    saveDisposable.dispose();
-                    closeDisposable.dispose();
-                    try { fs.unlinkSync(tempFile); } catch { /* ignore */ }
-                });
-
-                context.subscriptions.push(saveDisposable, closeDisposable);
-            };
-
-
-            // Create InputBox with button
-            const inputBox = vscode.window.createInputBox();
-            inputBox.title = vscode.l10n.t('Edit Commit Message');
-            inputBox.prompt = vscode.l10n.t('Edit commit message for {0}', shortHash);
-            inputBox.value = currentMessage;
-            inputBox.placeholder = vscode.l10n.t('New commit message');
-
-            // Add button for multiline editor
-            const openEditorButton: vscode.QuickInputButton = {
-                iconPath: new vscode.ThemeIcon('go-to-file'),
-                tooltip: vscode.l10n.t('Open in Editor (multiline)')
-            };
-            inputBox.buttons = [openEditorButton];
-
-            inputBox.onDidTriggerButton(async (button) => {
-                if (button === openEditorButton) {
-                    inputBox.hide();
-                    inputBox.dispose();
-                    await openMultilineEditor();
-                }
-            });
-
-            inputBox.onDidAccept(async () => {
-                const newMessage = inputBox.value.trim();
-                inputBox.hide();
-                inputBox.dispose();
-
+                const newMessage = savedDoc.getText().trim();
                 if (!newMessage) {
                     vscode.window.showWarningMessage(vscode.l10n.t('Commit message cannot be empty.'));
                     return;
                 }
 
                 if (newMessage === currentMessage) {
+                    vscode.window.showInformationMessage(vscode.l10n.t('No changes detected.'));
                     return;
                 }
 
+                applied = true;
                 try {
                     await gitService.rewordCommit(hash, newMessage);
                 } catch (e: any) {
+                    applied = false;
                     vscode.window.showErrorMessage(vscode.l10n.t('Failed to edit commit message: {0}', e.message));
                 }
             });
 
-            inputBox.onDidHide(() => {
-                inputBox.dispose();
+            const closeDisposable = vscode.workspace.onDidCloseTextDocument(closedDoc => {
+                if (closedDoc.uri.fsPath !== tempFile) return;
+
+                saveDisposable.dispose();
+                closeDisposable.dispose();
+                commitMessageEditorFiles.delete(tempFile);
+                try { fs.unlinkSync(tempFile); } catch { /* ignore */ }
             });
 
-            inputBox.show();
+            context.subscriptions.push(saveDisposable, closeDisposable);
         })
     );
 }

@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { getStoredState, updateStoredState } from '../lib/stateCache';
-import type { FileStatus, BranchInfo, BranchListData, LogCommit, CommitViewState } from '@shared/messages';
+import type { FileStatus, BranchInfo, BranchListData, LogCommit, CommitViewState, PushInitState } from '@shared/messages';
 
 /**
  * Schema defining all persistable state keys and their types.
@@ -25,6 +25,11 @@ export interface PersistedStateSchema {
         localBranch: string;
         remote: string;
         remoteBranch: string;
+    };
+    'push.initState': PushInitState;
+    'push.remoteBranches': {
+        remote: string;
+        branches: string[];
     };
 
     // Push Commit Details
@@ -90,6 +95,14 @@ export const stateDefaults: PersistedStateSchema = {
         localBranch: '',
         remote: '',
         remoteBranch: ''
+    },
+    'push.initState': {
+        localBranch: '',
+        remotes: []
+    },
+    'push.remoteBranches': {
+        remote: '',
+        branches: []
     },
 
     // Push Commit Details

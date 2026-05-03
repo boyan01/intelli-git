@@ -1,4 +1,4 @@
-import React, { useRef, useState, useCallback } from 'react';
+import React, { useRef, useState, useCallback, useMemo } from 'react';
 import { rpc } from '@/lib/rpc_client';
 import { useTranslation } from 'react-i18next';
 import type { CommitDetails, FileStatus } from '@shared/messages';
@@ -8,6 +8,8 @@ import { ViewModeToggle } from '../common/ViewModeToggle';
 import { formatRelativeDate } from '../../utils/dateUtils';
 import styles from './CommitAccordionItem.module.css';
 
+const TRAILER_LINE_PATTERN = /^(?:[A-Za-z][A-Za-z0-9-]*(?:-[A-Za-z0-9]+)*|BREAKING CHANGE):\s.+$/;
+
 export interface CommitAccordionItemProps {
     commit: CommitDetails;
     isLatestUnpushed: boolean;
@@ -16,6 +18,44 @@ export interface CommitAccordionItemProps {
     fileViewMode: 'tree' | 'list';
     onFileViewModeChange: (mode: 'tree' | 'list') => void;
     activeFile: { path: string; commitHash?: string } | null;
+}
+
+function splitCommitMessageSections(body: string): { bodyText: string; footerText: string } {
+    const trimmedBody = body.trim();
+    if (!trimmedBody) {
+        return { bodyText: '', footerText: '' };
+    }
+
+    const lines = trimmedBody.split(/\r?\n/);
+    let footerStart = lines.length;
+
+    for (let index = lines.length - 1; index >= 0; index -= 1) {
+        const line = lines[index];
+        const trimmedLine = line.trim();
+
+        if (!trimmedLine) {
+            if (footerStart < lines.length) {
+                break;
+            }
+            continue;
+        }
+
+        if (TRAILER_LINE_PATTERN.test(trimmedLine)) {
+            footerStart = index;
+            continue;
+        }
+
+        break;
+    }
+
+    if (footerStart === lines.length) {
+        return { bodyText: trimmedBody, footerText: '' };
+    }
+
+    return {
+        bodyText: lines.slice(0, footerStart).join('\n').trim(),
+        footerText: lines.slice(footerStart).join('\n').trim()
+    };
 }
 
 export const CommitAccordionItem: React.FC<CommitAccordionItemProps> = ({
@@ -30,6 +70,14 @@ export const CommitAccordionItem: React.FC<CommitAccordionItemProps> = ({
     const { t } = useTranslation();
     const treeRef = useRef<BaseFileTreeRef>(null);
     const [showRelativeTime, setShowRelativeTime] = useState(true);
+    const { bodyText, footerText } = useMemo(
+        () => splitCommitMessageSections(commit.body),
+        [commit.body]
+    );
+    const hasExtendedMessage = bodyText !== '' || footerText !== '';
+    const fullMessage = hasExtendedMessage
+        ? [commit.subject, commit.body].filter(Boolean).join('\n\n')
+        : commit.subject;
 
     const handleOpenFile = useCallback((path: string, preserveFocus: boolean) => {
         const file = commit.files.find(f => f.path === path);
@@ -81,7 +129,7 @@ export const CommitAccordionItem: React.FC<CommitAccordionItemProps> = ({
                 <i className={`codicon codicon-git-commit ${styles.commitIcon} ${isExpanded ? styles.commitIconExpanded : ''}`} />
                 <div className={styles.commitHeaderContent}>
                     <div className={styles.commitTitleRow}>
-                        <span className={styles.commitMessage} title={commit.subject}>
+                        <span className={styles.commitMessage} title={fullMessage}>
                             {commit.subject}
                         </span>
                     </div>
@@ -99,8 +147,15 @@ export const CommitAccordionItem: React.FC<CommitAccordionItemProps> = ({
             {isExpanded && (
                 <div className={styles.commitContent}>
                     <div className={styles.commitDetails}>
-                        {commit.body && (
-                            <div className={styles.commitBody}>{commit.body}</div>
+                        {hasExtendedMessage && (
+                            <div className={styles.commitExtraMessage}>
+                                {bodyText && (
+                                    <div className={styles.commitBody}>{bodyText}</div>
+                                )}
+                                {footerText && (
+                                    <pre className={styles.commitFooter}>{footerText}</pre>
+                                )}
+                            </div>
                         )}
                         <div className={styles.commitDetailsMeta}>
                             <span

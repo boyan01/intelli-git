@@ -24,7 +24,8 @@ export function PushTab() {
         setSelectedRemote,
         selectedRemoteBranch,
         setSelectedRemoteBranch,
-        isRemoteBranchesLoading
+        isRemoteBranchesLoading,
+        isInitStateLoading
     } = usePushBranches();
 
     // 2. Data State (Commits & Push)
@@ -66,6 +67,7 @@ export function PushTab() {
                 remoteBranches={remoteBranches}
                 viewMode={viewMode}
                 isLoading={isRemoteBranchesLoading}
+                showTargetPlaceholder={isInitStateLoading && !selectedRemote && !selectedRemoteBranch}
                 onToggleView={() => setViewMode(m => m === 'commits' ? 'changes' : 'commits')}
                 onRemoteChange={setSelectedRemote}
                 onRemoteBranchChange={setSelectedRemoteBranch}
