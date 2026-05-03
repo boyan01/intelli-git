@@ -235,10 +235,17 @@ async function showDiffForChangelistFile(gitService: GitService, args: Changelis
     }
 
     if (args.staged) {
-        const leftUri = vscode.Uri.parse(`intelli-git-revision://load/${args.path}?${JSON.stringify({ ref: 'HEAD' })}`);
+        const leftUri = vscode.Uri.parse(`intelli-git-revision://load/${args.path}?${JSON.stringify({ ref: 'HEAD', preferStaged: true })}`);
         const rightUri = vscode.Uri.parse(`intelli-git-revision://load/${args.path}?${JSON.stringify({ ref: '' })}`);
         const title = `${path.basename(args.path)} ${i18n.t('(Staged)')}`;
         await vscode.commands.executeCommand('vscode.diff', leftUri, rightUri, title);
+        return;
+    }
+
+    if (args.status === 'D') {
+        const leftUri = vscode.Uri.parse(`intelli-git-revision://load/${args.path}?${JSON.stringify({ ref: 'HEAD', preferStaged: false })}`);
+        const rightUri = vscode.Uri.parse(`intelli-git-revision://load/${args.path}?${JSON.stringify({ ref: 'WORKTREE', preferStaged: false })}`);
+        await vscode.commands.executeCommand('vscode.diff', leftUri, rightUri, path.basename(args.path));
         return;
     }
 
@@ -408,13 +415,19 @@ export function registerChangelistCommands(
             ) {
                 await inactiveChangesService.markHunkActive(args.path, args.hunkId);
             } else if (editorTarget?.inactive && state.mode === 'changes' && target.id !== 'inactive-changes') {
-                await inactiveChangesService.markHunkActive(editorTarget.path, editorTarget.hunk.id);
+                if (editorTarget.fileStatus.status === '?') {
+                    await inactiveChangesService.markActive([editorTarget.path]);
+                } else {
+                    await inactiveChangesService.markHunkActive(editorTarget.path, editorTarget.hunk.id);
+                }
             }
 
             if (args?.webviewSection === 'changelistHunk' && args.hunkId) {
                 await changelistStateService.moveHunks(args.path, [args.hunkId], target.id);
             } else if (args?.webviewSection === 'changelistFile' && args.hunkIds && args.hunkIds.length > 0) {
                 await changelistStateService.moveHunks(args.path, args.hunkIds, target.id);
+            } else if (editorTarget?.fileStatus.status === '?') {
+                await changelistStateService.moveFiles([editorTarget.path], target.id);
             } else if (editorTarget) {
                 await changelistStateService.moveHunks(editorTarget.path, [editorTarget.hunk.id], target.id);
             } else if (args?.path) {
@@ -429,6 +442,11 @@ export function registerChangelistCommands(
     context.subscriptions.push(
         vscode.commands.registerCommand('intelli-git.changelist.openFile', async (args: ChangelistFileContext) => {
             if (args?.path) {
+                if (args.status === 'D') {
+                    await showDiffForChangelistFile(gitService, args);
+                    return;
+                }
+
                 const workspaceRoot = gitService.getWorkspaceRoot();
                 if (workspaceRoot) {
                     const uri = vscode.Uri.file(`${workspaceRoot}/${args.path}`);

@@ -91,7 +91,7 @@ const buildTree = (files: FileStatus[]): TreeNode<FileNodeData>[] => {
                         status: isLast ? file.status : undefined,
                         staged: isLast ? file.staged : undefined,
                         inactive: isLast ? file.inactive : undefined,
-                        hunkIds: isLast ? file.hunks?.map(hunk => hunk.id) : undefined,
+                        hunkIds: isLast && file.status !== '?' ? file.hunks?.map(hunk => hunk.id) : undefined,
                         resolvedCandidate: isLast ? file.resolvedCandidate : undefined,
                         fileCount: 0
                     },
@@ -215,7 +215,7 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
                         status: file.status,
                         staged: file.staged,
                         inactive: file.inactive,
-                        hunkIds: file.hunks?.map(hunk => hunk.id),
+                        hunkIds: file.status !== '?' ? file.hunks?.map(hunk => hunk.id) : undefined,
                         resolvedCandidate: file.resolvedCandidate,
                         fileCount: 1,
                         changelistId: group.id
@@ -398,6 +398,12 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
 
         if (node.data?.isFile) {
             const fileIcon = getFileIcon(node.label);
+            const statusClass = status === 'M' ? styles.statusM :
+                status === 'A' ? styles.statusA :
+                    status === 'D' ? styles.statusD :
+                        status === 'R' ? styles.statusR :
+                            status === '?' ? styles.statusUntracked :
+                                '';
 
             return (
                 <div className={styles.fileItemContent} data-drag-label="true">
@@ -406,7 +412,7 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
                         style={{ color: statusColor || fileIcon.color }}
                         dangerouslySetInnerHTML={{ __html: fileIcon.svg }}
                     />
-                    <span className={styles.name} style={isDeleted ? undefined : { color: statusColor }}>
+                    <span className={`${styles.name} ${statusClass}`} style={isDeleted ? undefined : { color: statusColor }}>
                         {node.label}
                     </span>
                     {showPath && <span className={styles.fileDirPath}>{getDirPath(node.data.path)}</span>}

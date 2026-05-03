@@ -155,9 +155,10 @@
 }
 
 .statusD {
-    color: var(--vscode-foreground);
+    color: var(--vscode-gitDecoration-deletedResourceForeground, #c74e39);
     text-decoration: line-through;
-    opacity: 0.6;
+    text-decoration-color: color-mix(in srgb, currentColor 72%, transparent);
+    opacity: 0.84;
 }
 
 .statusR {

@@ -125,6 +125,44 @@ export class GitService implements vscode.Disposable {
         );
     }
 
+    private async parseUntrackedFileHunks(files: FileStatus[]): Promise<Map<string, GitHunk[]>> {
+        const diffParts: string[] = [];
+
+        for (const file of files) {
+            try {
+                const fullPath = path.join(this._workspaceRoot, file.path);
+                const content = await fs.promises.readFile(fullPath, 'utf8');
+                if (content.length === 0) {
+                    continue;
+                }
+
+                const repoPath = this.toRepoPath(file.path);
+                const lineCount = content.split('\n').length;
+                diffParts.push([
+                    `diff --git a/${repoPath} b/${repoPath}`,
+                    'new file mode 100644',
+                    'index 0000000..1111111',
+                    '--- /dev/null',
+                    `+++ b/${repoPath}`,
+                    `@@ -0,0 +1,${lineCount} @@`,
+                    `+${content.replace(/\n/g, '\n+')}`
+                ].join('\n'));
+            } catch (e) {
+                logger.debug('Failed to parse untracked file hunks', { path: file.path, error: `${e}` });
+            }
+        }
+
+        if (diffParts.length === 0) {
+            return new Map();
+        }
+
+        return parseDiffToFileHunks(
+            diffParts.join('\n'),
+            repoPath => this.toWorkspacePath(repoPath),
+            { idPrefix: 'worktree' }
+        );
+    }
+
     private async hasLocalChanges(): Promise<boolean> {
         const status = await this.git.status();
         return status.files.length > 0;
@@ -367,11 +405,13 @@ export class GitService implements vscode.Disposable {
         // 4. Resolve hunks in bulk. This keeps status refresh responsive for large diffs by
         // avoiding one `git diff` process per changed file.
         const diffStartedAt = Date.now();
-        const shouldResolveHunks = (file: FileStatus) =>
+        const shouldResolveGitHunks = (file: FileStatus) =>
             file.status === 'M' || (file.status === 'A' && file.staged) || file.status === 'D';
+        const shouldAttachHunks = (file: FileStatus) => shouldResolveGitHunks(file) || file.status === '?';
 
-        const hasStagedDiff = files.some(file => file.staged && shouldResolveHunks(file));
-        const hasWorktreeDiff = files.some(file => !file.staged && shouldResolveHunks(file));
+        const hasStagedDiff = files.some(file => file.staged && shouldResolveGitHunks(file));
+        const hasWorktreeDiff = files.some(file => !file.staged && shouldResolveGitHunks(file));
+        const untrackedFiles = files.filter(file => file.status === '?');
         const workspacePathspec = this.getWorkspacePathspecArgs();
 
         try {
@@ -381,6 +421,9 @@ export class GitService implements vscode.Disposable {
             const worktreeHunks = hasWorktreeDiff
                 ? await this.parseWorkspaceDiff(workspacePathspec, 'worktree')
                 : new Map<string, GitHunk[]>();
+            const untrackedHunks = untrackedFiles.length > 0
+                ? await this.parseUntrackedFileHunks(untrackedFiles)
+                : new Map<string, GitHunk[]>();
 
             for (const file of files) {
                 if (this._inactiveChangesService) {
@@ -388,11 +431,13 @@ export class GitService implements vscode.Disposable {
                     file.inactiveHunkIds = this._inactiveChangesService.getInactiveHunkIds(file.path);
                 }
 
-                if (!shouldResolveHunks(file)) {
+                if (!shouldAttachHunks(file)) {
                     continue;
                 }
 
-                const hunks = file.staged ? stagedHunks.get(file.path) : worktreeHunks.get(file.path);
+                const hunks = file.status === '?'
+                    ? untrackedHunks.get(file.path)
+                    : file.staged ? stagedHunks.get(file.path) : worktreeHunks.get(file.path);
                 if (hunks) {
                     file.hunks = hunks;
                     hunkFileCount++;

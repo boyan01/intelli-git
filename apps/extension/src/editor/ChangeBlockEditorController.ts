@@ -15,7 +15,8 @@ export class ChangeBlockEditorController implements vscode.Disposable {
     private readonly decorationType: vscode.TextEditorDecorationType;
     private readonly inactiveDecorationType: vscode.TextEditorDecorationType;
     private readonly disposables: vscode.Disposable[] = [];
-    private updateTimer?: NodeJS.Timeout;
+    private decorationUpdateTimer?: NodeJS.Timeout;
+    private contextUpdateTimer?: NodeJS.Timeout;
 
     constructor(
         private readonly gitService: GitService,
@@ -78,8 +79,11 @@ export class ChangeBlockEditorController implements vscode.Disposable {
     }
 
     public dispose(): void {
-        if (this.updateTimer) {
-            clearTimeout(this.updateTimer);
+        if (this.decorationUpdateTimer) {
+            clearTimeout(this.decorationUpdateTimer);
+        }
+        if (this.contextUpdateTimer) {
+            clearTimeout(this.contextUpdateTimer);
         }
         void vscode.commands.executeCommand('setContext', 'intelli-git.hasCurrentChangeBlock', false);
         void vscode.commands.executeCommand('setContext', 'intelli-git.currentChangeBlockInactive', false);
@@ -94,19 +98,21 @@ export class ChangeBlockEditorController implements vscode.Disposable {
     }
 
     private scheduleUpdate(): void {
-        if (this.updateTimer) {
-            clearTimeout(this.updateTimer);
+        if (this.decorationUpdateTimer) {
+            clearTimeout(this.decorationUpdateTimer);
         }
-        this.updateTimer = setTimeout(() => {
+        this.decorationUpdateTimer = setTimeout(() => {
+            this.decorationUpdateTimer = undefined;
             void this.updateAll();
         }, 150);
     }
 
     private scheduleUpdateContext(): void {
-        if (this.updateTimer) {
-            clearTimeout(this.updateTimer);
+        if (this.contextUpdateTimer) {
+            clearTimeout(this.contextUpdateTimer);
         }
-        this.updateTimer = setTimeout(() => {
+        this.contextUpdateTimer = setTimeout(() => {
+            this.contextUpdateTimer = undefined;
             void this.updateCurrentContext();
         }, 120);
     }
@@ -128,9 +134,7 @@ export class ChangeBlockEditorController implements vscode.Disposable {
             return;
         }
 
-        const decorations = await this.resolver.getDecorations(editor, {
-            showDefaultStagedBlocks: this.isDiffLikeEditor(editor)
-        });
+        const decorations = await this.resolver.getDecorations(editor);
         const labelOptions = decorations.map(decoration => this.createLabelDecoration(editor, decoration));
         const inactiveOptions = decorations
             .filter(decoration => decoration.inactive)
@@ -182,12 +186,7 @@ export class ChangeBlockEditorController implements vscode.Disposable {
         markdown.appendMarkdown('\n\n');
 
         if (info.mode === 'changes') {
-            markdown.appendMarkdown(`[${i18n.t('Move to Changelist...')}](${this.createCommandUri('intelli-git.changelist.moveToList', {
-                webviewSection: 'changelistHunk',
-                path: info.path,
-                hunkId: info.hunk.id,
-                changelistId: info.changelist?.id
-            })})`);
+            markdown.appendMarkdown(`[${i18n.t('Move to Changelist...')}](${this.createCommandUri('intelli-git.changelist.moveToList', this.createMoveCommandArg(info))})`);
         } else {
             markdown.appendMarkdown(`[${info.inactive ? i18n.t('Move to Active Changes') : i18n.t('Mark as Inactive Changes')}](${this.createCommandUri(info.inactive ? 'intelli-git.moveHunkToActive' : 'intelli-git.moveHunkToInactive', {
                 path: info.path,
@@ -297,12 +296,7 @@ export class ChangeBlockEditorController implements vscode.Disposable {
             moveAction.command = {
                 command: 'intelli-git.changelist.moveToList',
                 title: i18n.t('Move to Changelist...'),
-                arguments: [{
-                    webviewSection: 'changelistHunk',
-                    path: info.path,
-                    hunkId: info.hunk.id,
-                    changelistId: info.changelist?.id
-                }]
+                arguments: [this.createMoveCommandArg(info)]
             };
             actions.push(moveAction);
         } else {
@@ -336,5 +330,25 @@ export class ChangeBlockEditorController implements vscode.Disposable {
 
     private createCommandUri(command: string, arg: unknown): vscode.Uri {
         return vscode.Uri.parse(`command:${command}?${encodeURIComponent(JSON.stringify([arg]))}`);
+    }
+
+    private createMoveCommandArg(info: EditorHunkInfo): unknown {
+        if (info.fileStatus.status === '?') {
+            return {
+                webviewSection: 'changelistFile',
+                path: info.path,
+                paths: [info.path],
+                status: info.fileStatus.status,
+                changelistId: info.changelist?.id,
+                changelistMode: info.mode
+            };
+        }
+
+        return {
+            webviewSection: 'changelistHunk',
+            path: info.path,
+            hunkId: info.hunk.id,
+            changelistId: info.changelist?.id
+        };
     }
 }

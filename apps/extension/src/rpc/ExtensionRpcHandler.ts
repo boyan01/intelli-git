@@ -264,14 +264,27 @@ export class ExtensionRpcHandler {
         });
     }
 
-    openDiff = async (filePath: string, staged?: boolean): Promise<void> => {
-        if (staged) {
+    openDiff = async (filePathOrArgs: string | [string, boolean?], staged?: boolean): Promise<void> => {
+        const [filePath, effectiveStaged] = Array.isArray(filePathOrArgs)
+            ? [filePathOrArgs[0], filePathOrArgs[1]]
+            : [filePathOrArgs, staged];
+
+        if (effectiveStaged) {
             // HEAD vs Index
-            const leftUri = vscode.Uri.parse(`intelli-git-revision://load/${filePath}?${JSON.stringify({ ref: 'HEAD' })}`);
+            const leftUri = vscode.Uri.parse(`intelli-git-revision://load/${filePath}?${JSON.stringify({ ref: 'HEAD', preferStaged: true })}`);
             const rightUri = vscode.Uri.parse(`intelli-git-revision://load/${filePath}?${JSON.stringify({ ref: '' })}`);
             const title = `${path.basename(filePath)} ${i18n.t('(Staged)')}`;
             await vscode.commands.executeCommand('vscode.diff', leftUri, rightUri, title);
         } else {
+            const status = await this.gitService.getStatus();
+            const target = status.find(file => file.path === filePath && !file.staged) || status.find(file => file.path === filePath);
+            if (target?.status === 'D') {
+                const leftUri = vscode.Uri.parse(`intelli-git-revision://load/${filePath}?${JSON.stringify({ ref: 'HEAD', preferStaged: false })}`);
+                const rightUri = vscode.Uri.parse(`intelli-git-revision://load/${filePath}?${JSON.stringify({ ref: 'WORKTREE', preferStaged: false })}`);
+                await vscode.commands.executeCommand('vscode.diff', leftUri, rightUri, path.basename(filePath));
+                return;
+            }
+
             const workspaceRoot = this.gitService.getWorkspaceRoot();
             const uri = vscode.Uri.file(`${workspaceRoot}/${filePath}`);
             await vscode.commands.executeCommand('git.openChange', uri);
@@ -562,7 +575,11 @@ export class ExtensionRpcHandler {
                 preserveFocus: params.preserveFocus ?? false
             });
         } catch {
-            // File doesn't exist, possibly deleted
+            const status = await this.gitService.getStatus();
+            const deleted = status.some(file => file.path === params.path && file.status === 'D');
+            if (deleted) {
+                await this.openDiff(params.path, status.find(file => file.path === params.path && file.status === 'D')?.staged);
+            }
         }
     };
 

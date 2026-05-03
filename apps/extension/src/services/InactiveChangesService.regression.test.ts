@@ -59,3 +59,24 @@ test('InactiveChangesService clears whole-file inactive state when its only hunk
     assert.equal(service.isInactive(path), false);
     assert.deepEqual(service.getInactiveHunkIds(path), []);
 });
+
+test('InactiveChangesService treats inactive untracked directories as inactive child files', async () => {
+    const context = createExtensionContext();
+    const service = new InactiveChangesService(context as never);
+
+    await service.markInactive(['docs/gdxg/']);
+
+    assert.equal(service.isInactive('docs/gdxg/1241241.dart'), true);
+
+    service.syncWithStatus([
+        {
+            path: 'docs/gdxg/1241241.dart',
+            status: '?',
+            staged: false,
+            hunks: [createHunk('docs/gdxg/1241241.dart:worktree:0:0:1:1:new', 0, 1, 0, 1)]
+        }
+    ]);
+
+    assert.equal(service.isInactive('docs/gdxg/1241241.dart'), true);
+    assert.deepEqual(service.getInactiveFiles(), ['docs/gdxg/1241241.dart']);
+});

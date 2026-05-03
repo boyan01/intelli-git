@@ -9,6 +9,17 @@ interface InactiveData {
 
 export type InactiveChangesSnapshot = InactiveData;
 
+function normalizeInactivePath(filePath: string): string {
+    return filePath.replace(/\\/g, '/').replace(/\/+$/, '');
+}
+
+function isSameOrDescendantPath(filePath: string, inactivePath: string): boolean {
+    const normalizedFilePath = normalizeInactivePath(filePath);
+    const normalizedInactivePath = normalizeInactivePath(inactivePath);
+    return normalizedFilePath === normalizedInactivePath ||
+        normalizedFilePath.startsWith(`${normalizedInactivePath}/`);
+}
+
 export class InactiveChangesService {
     private static readonly STORAGE_KEY_V2 = 'ideaCommitPanel.inactiveChangesV2';
     private state: InactiveData = { files: {} };
@@ -58,7 +69,9 @@ export class InactiveChangesService {
     }
 
     public isInactive(filePath: string): boolean {
-        return !!this.state.files[filePath]?.all;
+        return Object.entries(this.state.files).some(([inactivePath, info]) =>
+            Boolean(info.all && isSameOrDescendantPath(filePath, inactivePath))
+        );
     }
 
     public async markInactive(files: string[]): Promise<void> {
@@ -161,10 +174,22 @@ export class InactiveChangesService {
         let changed = false;
 
         Object.keys(this.state.files).forEach(path => {
-            if (!validPaths.has(path)) {
-                delete this.state.files[path];
-                changed = true;
+            if (validPaths.has(path)) {
+                return;
             }
+
+            const fileInfo = this.state.files[path];
+            const descendantPaths = fileInfo.all
+                ? Array.from(validPaths).filter(validPath => isSameOrDescendantPath(validPath, path))
+                : [];
+            if (descendantPaths.length > 0) {
+                descendantPaths.forEach(descendantPath => {
+                    this.state.files[descendantPath] = { all: true };
+                });
+            }
+
+            delete this.state.files[path];
+            changed = true;
         });
 
         for (const [path, fileInfo] of Object.entries(this.state.files)) {

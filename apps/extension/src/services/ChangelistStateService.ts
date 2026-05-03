@@ -290,7 +290,12 @@ export class ChangelistStateService {
             const assignment = this.state.assignments[path] || {};
 
             if (hunks.length > 0) {
-                const nextHunkIds = remapHunkValues(hunks, assignment.hunkListIds, () => this.state.activeListId);
+                const inheritedListId = assignment.fileListId;
+                const nextHunkIds = remapHunkValues(
+                    hunks,
+                    assignment.hunkListIds,
+                    () => inheritedListId || this.state.activeListId
+                );
 
                 if (JSON.stringify(nextHunkIds) !== JSON.stringify(assignment.hunkListIds || {})) {
                     assignment.hunkListIds = nextHunkIds;

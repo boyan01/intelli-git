@@ -1,4 +1,5 @@
 let changelistMode = 'staged';
+const executedCommands: Array<{ command: string; args: unknown[] }> = [];
 
 export class EventEmitter<T> {
     public readonly event = (_listener: (event: T) => unknown) => ({ dispose() { } });
@@ -30,6 +31,30 @@ export const workspace = {
     }
 };
 
+class MockUri {
+    constructor(public readonly value: string) { }
+
+    public static parse(value: string): MockUri {
+        return new MockUri(value);
+    }
+
+    public static file(value: string): MockUri {
+        return new MockUri(`file://${value}`);
+    }
+
+    public toString(): string {
+        return this.value;
+    }
+}
+
+export const Uri = MockUri;
+
+export const commands = {
+    async executeCommand(command: string, ...args: unknown[]): Promise<void> {
+        executedCommands.push({ command, args });
+    }
+};
+
 export const DiagnosticSeverity = {
     Error: 0
 } as const;
@@ -46,4 +71,12 @@ export function __setChangelistMode(mode: string): void {
 
 export function __getChangelistMode(): string {
     return changelistMode;
+}
+
+export function __getExecutedCommands(): Array<{ command: string; args: unknown[] }> {
+    return executedCommands;
+}
+
+export function __resetExecutedCommands(): void {
+    executedCommands.length = 0;
 }

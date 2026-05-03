@@ -213,6 +213,13 @@ describe('GitService staging inactive changes', () => {
         const status = await service.getStatus();
         const deletedStatus = status.find(file => file.path === 'src/deleted.txt' && file.status === 'D');
         expect(deletedStatus).toBeTruthy();
+        expect(deletedStatus?.hunks).toHaveLength(1);
+        expect(deletedStatus?.hunks?.[0]).toMatchObject({
+            oldStart: 1,
+            oldLineCount: 1,
+            newStart: 0,
+            newLineCount: 0
+        });
 
         await service.commitChangelistPlan('Delete tracked file', false, {
             files: ['src/deleted.txt'],
@@ -236,6 +243,13 @@ describe('GitService staging inactive changes', () => {
         const status = await service.getStatus();
         const untrackedStatus = status.find(file => file.path === 'src/new.txt' && file.status === '?');
         expect(untrackedStatus).toBeTruthy();
+        expect(untrackedStatus?.hunks).toHaveLength(1);
+        expect(untrackedStatus?.hunks?.[0]).toMatchObject({
+            oldStart: 0,
+            oldLineCount: 0,
+            newStart: 1,
+            newLineCount: 2
+        });
 
         await service.commitChangelistPlan('Add untracked file', false, {
             files: ['src/new.txt'],

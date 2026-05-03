@@ -5,6 +5,12 @@ import type { ChangelistStateService } from '../services/ChangelistStateService'
 import type { GitService } from '../services/GitService';
 import type { InactiveChangesService } from '../services/InactiveChangesService';
 import type * as vscode from 'vscode';
+import * as vscodeMock from 'vscode';
+
+const vscodeTestMock = vscodeMock as unknown as {
+    __getExecutedCommands(): Array<{ command: string; args: unknown[] }>;
+    __resetExecutedCommands(): void;
+};
 
 function createStagedChangelistState(): ChangelistState {
     return {
@@ -54,5 +60,25 @@ describe('ExtensionRpcHandler commit', () => {
         });
 
         expect(commitAmend).toHaveBeenCalledWith('Amend partial staging', undefined);
+    });
+});
+
+describe('ExtensionRpcHandler openDiff', () => {
+    it('accepts RpcPeer multi-argument payloads for deleted files', async () => {
+        vscodeTestMock.__resetExecutedCommands();
+        const handler = createHandler({
+            getStatus: vi.fn().mockResolvedValue([
+                { path: 'src/deleted.txt', status: 'D', staged: false }
+            ])
+        });
+
+        await handler.openDiff(['src/deleted.txt', false]);
+
+        const commands = vscodeTestMock.__getExecutedCommands();
+        expect(commands).toHaveLength(1);
+        expect(commands[0].command).toBe('vscode.diff');
+        expect(String(commands[0].args[0])).toContain('"ref":"HEAD"');
+        expect(String(commands[0].args[0])).toContain('"preferStaged":false');
+        expect(String(commands[0].args[1])).toContain('"ref":"WORKTREE"');
     });
 });

@@ -162,15 +162,17 @@ export class EditorHunkResolver {
             preferStaged = false;
         } else if (uri.scheme === 'intelli-git-revision') {
             let ref = '';
+            let queryPreferStaged: boolean | undefined;
             try {
                 const query = uri.query ? JSON.parse(uri.query) : {};
                 ref = query.ref || '';
+                queryPreferStaged = typeof query.preferStaged === 'boolean' ? query.preferStaged : undefined;
             } catch {
                 ref = '';
             }
             filePath = path.join(workspaceRoot, uri.path.startsWith('/') ? uri.path.substring(1) : uri.path);
             side = ref === 'HEAD' ? 'original' : 'modified';
-            preferStaged = true;
+            preferStaged = queryPreferStaged ?? true;
         } else if (uri.scheme === 'git') {
             filePath = uri.path;
             preferStaged = uri.authority === 'index';
@@ -237,7 +239,7 @@ export class EditorHunkResolver {
         };
     }
 
-    public async getDecorations(editor: vscode.TextEditor, options: { showDefaultStagedBlocks?: boolean } = {}): Promise<EditorHunkDecoration[]> {
+    public async getDecorations(editor: vscode.TextEditor): Promise<EditorHunkDecoration[]> {
         const target = this.getDocumentTarget(editor.document);
         if (!target) {
             return [];
@@ -249,13 +251,22 @@ export class EditorHunkResolver {
         const result: EditorHunkDecoration[] = [];
 
         for (const fileStatus of matchingFiles) {
-            if (mode === 'staged' && target.preferStaged !== undefined && fileStatus.staged !== target.preferStaged) {
+            const allowStagedWholeFileInWorktreeEditor = target.preferStaged === false &&
+                fileStatus.staged &&
+                this.isWholeFileStatus(fileStatus.status);
+
+            if (
+                mode === 'staged' &&
+                target.preferStaged !== undefined &&
+                fileStatus.staged !== target.preferStaged &&
+                !allowStagedWholeFileInWorktreeEditor
+            ) {
                 continue;
             }
 
             for (const hunk of fileStatus.hunks || []) {
                 const info = this.createHunkInfo(target.relativePath, target.side, fileStatus, hunk);
-                const label = this.getDecorationLabel(info, options);
+                const label = this.getDecorationLabel(info);
                 if (!label) {
                     continue;
                 }
@@ -316,19 +327,13 @@ export class EditorHunkResolver {
         };
     }
 
-    private getDecorationLabel(info: EditorHunkInfo, options: { showDefaultStagedBlocks?: boolean }): string | undefined {
+    private getDecorationLabel(info: EditorHunkInfo): string | undefined {
         if (info.mode === 'staged') {
             if (info.inactive && info.fileStatus.staged) {
                 return `${i18n.t('Staged')} · ${i18n.t('Inactive')}`;
             }
             if (info.inactive) {
                 return i18n.t('Inactive');
-            }
-            if (info.fileStatus.staged) {
-                return i18n.t('Staged');
-            }
-            if (options.showDefaultStagedBlocks) {
-                return i18n.t('Unstaged');
             }
             return undefined;
         }
@@ -342,5 +347,9 @@ export class EditorHunkResolver {
         }
 
         return undefined;
+    }
+
+    private isWholeFileStatus(status: string): boolean {
+        return status === '?' || status === 'A' || status === 'D';
     }
 }

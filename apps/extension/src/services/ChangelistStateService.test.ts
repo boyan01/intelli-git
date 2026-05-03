@@ -178,6 +178,29 @@ describe('ChangelistStateService', () => {
         });
     });
 
+    it('preserves whole-file changelist assignments when tracked files gain hunks', async () => {
+        const service = createService();
+        const review = await service.createList('Review');
+        await service.moveFiles(['src/added.ts'], review.id);
+
+        service.syncWithStatus([
+            {
+                path: 'src/added.ts',
+                status: 'A',
+                staged: true,
+                hunks: [hunk('src/added.ts:index:0:0:1:1:added')]
+            }
+        ]);
+
+        expect(service.getState().assignments).toEqual({
+            'src/added.ts': {
+                hunkListIds: {
+                    'src/added.ts:index:0:0:1:1:added': review.id
+                }
+            }
+        });
+    });
+
     it('builds a commit plan that includes only active changelist hunks', async () => {
         const service = createService();
         const review = await service.createList('Review');
