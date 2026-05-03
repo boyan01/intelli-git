@@ -91,7 +91,12 @@ export class InactiveChangesService {
     public async markHunkActive(path: string, hunkId: string): Promise<void> {
         const fileInfo = this.state.files[path];
         if (fileInfo && fileInfo.hunkIds) {
-            fileInfo.hunkIds = fileInfo.hunkIds.filter(id => id !== hunkId);
+            const equivalentIds = new Set([
+                hunkId,
+                hunkId.replace(':index:', ':worktree:'),
+                hunkId.replace(':worktree:', ':index:')
+            ]);
+            fileInfo.hunkIds = fileInfo.hunkIds.filter(id => !equivalentIds.has(id));
             if (fileInfo.hunkIds.length === 0 && !fileInfo.all) {
                 delete this.state.files[path];
             }

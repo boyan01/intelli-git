@@ -592,7 +592,7 @@
         },
         {
           "command": "intelli-git.changelist.moveToList",
-          "when": "(webviewSection == 'changelistFile' || webviewSection == 'changelistHunk') && changelistMode == 'changes' && isConflict != true && isInactive != true && isUntracked != true",
+          "when": "(webviewSection == 'changelistFile' || webviewSection == 'changelistHunk') && changelistMode == 'changes' && isConflict != true && isInactive != true",
           "group": "1_modification@0"
         },
         {

@@ -245,7 +245,15 @@ export class ExtensionRpcHandler {
         return status.map(file => {
             const isFileInactive = !!this.inactiveChangesService?.isInactive(file.path);
             const inactiveHunkIds = this.inactiveChangesService?.getInactiveHunkIds(file.path) || [];
-            const hasStagedInactive = file.staged && (isFileInactive || (file.hunks?.some(h => inactiveHunkIds.includes(h.id))));
+            const inactiveHunkIdSet = new Set(inactiveHunkIds);
+            const hasStagedInactive = file.staged && (
+                isFileInactive ||
+                file.hunks?.some(hunk =>
+                    inactiveHunkIdSet.has(hunk.id) ||
+                    inactiveHunkIdSet.has(hunk.id.replace(':index:', ':worktree:')) ||
+                    inactiveHunkIdSet.has(hunk.id.replace(':worktree:', ':index:'))
+                )
+            );
 
             return {
                 ...file,
@@ -700,10 +708,12 @@ export class ExtensionRpcHandler {
 
     moveFilesToChangelist = async (params: { paths: string[]; targetListId: string }): Promise<void> => {
         await this.changelistStateService?.moveFiles(params.paths, params.targetListId);
+        await vscode.commands.executeCommand('intelli-git.refreshChangeBlockDecorations');
     };
 
     moveHunksToChangelist = async (params: { path: string; hunkIds: string[]; targetListId: string }): Promise<void> => {
         await this.changelistStateService?.moveHunks(params.path, params.hunkIds, params.targetListId);
+        await vscode.commands.executeCommand('intelli-git.refreshChangeBlockDecorations');
     };
 
     pickBranch = async (): Promise<void> => {

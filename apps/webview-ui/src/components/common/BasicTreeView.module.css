@@ -30,23 +30,25 @@
 
 .stickyNode {
     background-color: var(--vscode-sideBar-background, var(--vscode-editor-background));
-    box-shadow: 0 1px 0 var(--vscode-sideBar-border, var(--vscode-widget-border, transparent));
     pointer-events: auto;
 }
 
 .node:hover {
-    background-color: var(--vscode-list-hoverBackground);
+    background-color: var(--vscode-sideBar-background, var(--vscode-editor-background));
+    box-shadow: inset 0 0 0 9999px var(--vscode-list-hoverBackground, transparent);
 }
 
 /* Inactive selection (when tree loses focus) */
 .node.selected {
-    background-color: var(--vscode-list-inactiveSelectionBackground);
+    background-color: var(--vscode-sideBar-background, var(--vscode-editor-background));
+    box-shadow: inset 0 0 0 9999px var(--vscode-list-inactiveSelectionBackground, transparent);
     color: var(--vscode-list-inactiveSelectionForeground, inherit);
 }
 
 /* Active selection (when tree has focus) */
 .root:focus-within .node.selected {
-    background-color: var(--vscode-list-activeSelectionBackground);
+    background-color: var(--vscode-sideBar-background, var(--vscode-editor-background));
+    box-shadow: inset 0 0 0 9999px var(--vscode-list-activeSelectionBackground, transparent);
     color: var(--vscode-list-activeSelectionForeground);
 }
 
@@ -57,7 +59,8 @@
 }
 
 .root:focus-within .node.focused:not(.selected):hover {
-    background-color: transparent;
+    background-color: var(--vscode-sideBar-background, var(--vscode-editor-background));
+    box-shadow: inset 0 0 0 9999px var(--vscode-list-hoverBackground, transparent);
 }
 
 .twistie {
@@ -177,7 +180,8 @@
 }
 
 .node.dragOver {
-    background-color: var(--vscode-list-dropBackground);
+    background-color: var(--vscode-sideBar-background, var(--vscode-editor-background));
+    box-shadow: inset 0 0 0 9999px var(--vscode-list-dropBackground, transparent);
     outline: 1px dashed var(--vscode-focusBorder);
     outline-offset: -1px;
 }

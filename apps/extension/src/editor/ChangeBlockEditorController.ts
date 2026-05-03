@@ -170,7 +170,7 @@ export class ChangeBlockEditorController implements vscode.Disposable {
                 parts.push(i18n.t('Inactive'));
             }
         } else {
-            if (info.changelist && !info.isDefaultChangelist) {
+            if (info.changelist && !info.isActiveChangelist) {
                 parts.push(info.changelist.name);
             }
             if (info.inactive) {

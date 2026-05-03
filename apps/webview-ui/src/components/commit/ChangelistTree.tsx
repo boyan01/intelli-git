@@ -30,6 +30,7 @@ export interface ChangelistTreeRef {
 interface FileNodeData {
     path: string;
     isFile: boolean;
+    hunkIds?: string[];
     isRoot?: boolean;
     isInactiveGroup?: boolean;
     isStagedGroup?: boolean;
@@ -90,6 +91,7 @@ const buildTree = (files: FileStatus[]): TreeNode<FileNodeData>[] => {
                         status: isLast ? file.status : undefined,
                         staged: isLast ? file.staged : undefined,
                         inactive: isLast ? file.inactive : undefined,
+                        hunkIds: isLast ? file.hunks?.map(hunk => hunk.id) : undefined,
                         resolvedCandidate: isLast ? file.resolvedCandidate : undefined,
                         fileCount: 0
                     },
@@ -143,6 +145,13 @@ const prefixNodes = (nodes: TreeNode<FileNodeData>[], prefix: string, listId?: s
 
 function getAllMoveData(node: TreeNode<FileNodeData>): { paths: string[]; hunkMap: Record<string, string[]> } {
     if (node.data?.isFile) {
+        if (node.data.hunkIds && node.data.hunkIds.length > 0) {
+            return {
+                paths: [],
+                hunkMap: { [node.data.path]: node.data.hunkIds }
+            };
+        }
+
         return {
             paths: [node.data.path],
             hunkMap: {}
@@ -206,6 +215,7 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
                         status: file.status,
                         staged: file.staged,
                         inactive: file.inactive,
+                        hunkIds: file.hunks?.map(hunk => hunk.id),
                         resolvedCandidate: file.resolvedCandidate,
                         fileCount: 1,
                         changelistId: group.id
@@ -462,10 +472,13 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
             webviewSection: 'changelistFile',
             path: node.data.path,
             paths: [node.data.path],
+            hunkIds: node.data.hunkIds,
             status: node.data.status,
             isStaged: Boolean(node.data.staged),
             isConflict: node.data.status === 'C' || node.data.status === 'U',
-            isInactive: Boolean(node.data.inactive || node.id.startsWith('inactive-changes/')),
+            isInactive: changelistState.mode === 'staged'
+                ? Boolean(node.data.inactive || node.id.startsWith('inactive-changes/'))
+                : false,
             isUntracked: node.data.status === '?',
             hasConflict,
             hasInactive,
@@ -481,14 +494,13 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
 
     const isDraggable = useCallback((node: TreeNode<FileNodeData>) => {
         if (node.id.startsWith('amend/')) return false;
-        if (node.id.startsWith('untracked-changes/')) return false;
 
         if (changelistState.mode === 'changes') {
-            if (node.id.startsWith('inactive-changes/')) return false;
             return Boolean(node.data?.isFile || (!node.data?.isRoot && node.children));
         }
 
         if (changelistState.mode === 'staged') {
+            if (node.id.startsWith('untracked-changes/')) return false;
             return Boolean(node.data?.isFile || (!node.data?.isRoot && node.children));
         }
 
@@ -535,6 +547,20 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
         const paths = moveData.paths;
 
         if (changelistState.mode === 'changes') {
+            const sourceChangelistId = draggedNode.data?.changelistId;
+            const shouldActivateLegacyInactive = sourceChangelistId === 'inactive-changes' && targetListId !== 'inactive-changes';
+
+            if (shouldActivateLegacyInactive && paths.length > 0) {
+                await rpc.markFilesActive(paths);
+            }
+            if (shouldActivateLegacyInactive) {
+                for (const [path, hunkIds] of Object.entries(moveData.hunkMap)) {
+                    for (const hunkId of hunkIds) {
+                        await rpc.markHunkActive({ path, hunkId });
+                    }
+                }
+            }
+
             if (paths.length > 0) {
                 await rpc.moveFilesToChangelist({ paths, targetListId });
             }

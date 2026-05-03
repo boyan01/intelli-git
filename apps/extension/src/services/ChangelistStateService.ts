@@ -16,6 +16,22 @@ export interface CommitPlan {
     excludedHunkIdsByPath: Record<string, string[]>;
 }
 
+function hasEquivalentHunkId(hunkId: string, hunkIds: Set<string>): boolean {
+    return hunkIds.has(hunkId) ||
+        hunkIds.has(hunkId.replace(':index:', ':worktree:')) ||
+        hunkIds.has(hunkId.replace(':worktree:', ':index:'));
+}
+
+function getEquivalentHunkAssignment(hunkId: string, hunkListIds?: Record<string, string>): string | undefined {
+    if (!hunkListIds) {
+        return undefined;
+    }
+
+    return hunkListIds[hunkId] ||
+        hunkListIds[hunkId.replace(':index:', ':worktree:')] ||
+        hunkListIds[hunkId.replace(':worktree:', ':index:')];
+}
+
 export class ChangelistStateService {
     private static readonly STORAGE_KEY = 'ideaCommitPanel.changelists.v1';
     private static readonly MODE_STORAGE_KEY = 'ideaCommitPanel.changelistMode.v1';
@@ -335,11 +351,11 @@ export class ChangelistStateService {
         const excludedHunkIdsByPath: Record<string, string[]> = {};
 
         for (const [path, entries] of grouped.entries()) {
-            if (entries.some(entry => entry.status === '?')) {
+            const assignment = this.state.assignments[path];
+            if (entries.some(entry => entry.status === '?') && !assignment?.fileListId) {
                 continue;
             }
 
-            const assignment = this.state.assignments[path];
             const hunks = Array.from(new Map(
                 entries.flatMap(entry => (entry.hunks || []).map(hunk => [hunk.id, hunk]))
             ).values());
@@ -353,7 +369,7 @@ export class ChangelistStateService {
 
             if (hunks.length > 0) {
                 const excludedHunks = hunks
-                    .filter(hunk => inactiveHunkIds.has(hunk.id) || (assignment?.hunkListIds?.[hunk.id] || this.state.activeListId) !== this.state.activeListId)
+                    .filter(hunk => hasEquivalentHunkId(hunk.id, inactiveHunkIds) || (getEquivalentHunkAssignment(hunk.id, assignment?.hunkListIds) || this.state.activeListId) !== this.state.activeListId)
                     .map(hunk => hunk.id);
 
                 if (excludedHunks.length < hunks.length) {

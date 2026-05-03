@@ -37,7 +37,30 @@ function hasOnlyInactiveHunks(file: { inactive?: boolean; hunks?: GitHunk[]; ina
         return false;
     }
 
-    return file.hunks.every(hunk => file.inactiveHunkIds?.includes(hunk.id));
+    return file.hunks.every(hunk => isInactiveHunkId(hunk.id, file.inactiveHunkIds));
+}
+
+function getEquivalentHunkIds(hunkId: string): string[] {
+    return [
+        hunkId,
+        hunkId.replace(':index:', ':worktree:'),
+        hunkId.replace(':worktree:', ':index:')
+    ];
+}
+
+function isInactiveHunkId(hunkId: string, inactiveHunkIds?: string[]): boolean {
+    if (!inactiveHunkIds || inactiveHunkIds.length === 0) {
+        return false;
+    }
+
+    const inactiveSet = new Set(inactiveHunkIds);
+    return getEquivalentHunkIds(hunkId).some(id => inactiveSet.has(id));
+}
+
+function getAssignedHunkListId(hunkId: string, assignment?: ChangelistAssignment): string | undefined {
+    return getEquivalentHunkIds(hunkId)
+        .map(id => assignment?.hunkListIds?.[id])
+        .find((id): id is string => Boolean(id));
 }
 
 function getInactiveHunks(file: { hunks?: GitHunk[]; inactiveHunkIds?: string[] }): GitHunk[] {
@@ -45,7 +68,7 @@ function getInactiveHunks(file: { hunks?: GitHunk[]; inactiveHunkIds?: string[] 
         return [];
     }
 
-    return file.hunks.filter(hunk => file.inactiveHunkIds?.includes(hunk.id));
+    return file.hunks.filter(hunk => isInactiveHunkId(hunk.id, file.inactiveHunkIds));
 }
 
 function getActiveHunks(file: { hunks?: GitHunk[]; inactiveHunkIds?: string[] }): GitHunk[] {
@@ -53,7 +76,7 @@ function getActiveHunks(file: { hunks?: GitHunk[]; inactiveHunkIds?: string[] })
         return [];
     }
 
-    return file.hunks.filter(hunk => !file.inactiveHunkIds?.includes(hunk.id));
+    return file.hunks.filter(hunk => !isInactiveHunkId(hunk.id, file.inactiveHunkIds));
 }
 
 function getLogicalStatus(entries: FileStatus[]): FileStatus['status'] {
@@ -144,17 +167,33 @@ function buildChangelists(files: FileStatus[], changelistState: ChangelistState,
     const untrackedFiles: FileStatus[] = [];
 
     logicalFiles.forEach(file => {
-        if (file.status === '?') {
-            untrackedFiles.push(toDisplayFile(file));
-            return;
-        }
-
         if (file.inactive) {
-            inactiveFiles.push(toDisplayFile(file));
+            if (changelistState.mode === 'changes') {
+                const group = changelistGroups.get(INACTIVE_CHANGELIST_ID);
+                if (group) {
+                    group.push(toDisplayFile(file));
+                }
+            } else {
+                inactiveFiles.push(toDisplayFile(file));
+            }
             return;
         }
 
         const assignment: ChangelistAssignment | undefined = changelistState.assignments[file.path];
+
+        if (file.status === '?') {
+            if (changelistState.mode === 'changes' && assignment?.fileListId) {
+                const group = changelistGroups.get(assignment.fileListId);
+                if (group) {
+                    group.push(toDisplayFile(file));
+                    return;
+                }
+            }
+
+            untrackedFiles.push(toDisplayFile(file));
+            return;
+        }
+
         const inactiveHunks = getInactiveHunks(file);
         const activeHunks = getActiveHunks(file);
 
@@ -175,7 +214,7 @@ function buildChangelists(files: FileStatus[], changelistState: ChangelistState,
             const hunksByList = new Map<string, GitHunk[]>();
 
             activeHunks.forEach(hunk => {
-                const listId = assignment?.hunkListIds?.[hunk.id] || changelistState.activeListId;
+                const listId = getAssignedHunkListId(hunk.id, assignment) || changelistState.activeListId;
                 const group = hunksByList.get(listId) || [];
                 group.push(hunk);
                 hunksByList.set(listId, group);

@@ -13,6 +13,7 @@ interface ChangelistFileContext {
     webviewSection: 'changelistFile';
     path: string;
     paths?: string[];
+    hunkIds?: string[];
     status?: string;
     isStaged?: boolean;
     isInactive?: boolean;
@@ -144,6 +145,7 @@ async function resolveEditorChangeBlockTargetFromArgs(
                 side: fileStatus.staged ? 'original' : 'modified',
                 inactive: Boolean(fileStatus.inactive || fileStatus.inactiveHunkIds?.includes(hunk.id) || fileStatus.inactiveHunkIds?.includes(toWorktreeHunkId(hunk.id))),
                 isDefaultChangelist: true,
+                isActiveChangelist: true,
                 mode: 'staged',
                 matchingFiles,
                 targetLine: hunk.newStart
@@ -386,8 +388,33 @@ export function registerChangelistCommands(
                 return;
             }
 
+            if (
+                args?.webviewSection === 'changelistFile' &&
+                args.changelistMode === 'changes' &&
+                args.changelistId === 'inactive-changes' &&
+                target.id !== 'inactive-changes'
+            ) {
+                if (args.hunkIds && args.hunkIds.length > 0) {
+                    await Promise.all(args.hunkIds.map(hunkId => inactiveChangesService.markHunkActive(args.path, hunkId)));
+                } else {
+                    await inactiveChangesService.markActive([args.path]);
+                }
+            }
+
+            if (
+                args?.webviewSection === 'changelistHunk' &&
+                state.mode === 'changes' &&
+                target.id !== 'inactive-changes'
+            ) {
+                await inactiveChangesService.markHunkActive(args.path, args.hunkId);
+            } else if (editorTarget?.inactive && state.mode === 'changes' && target.id !== 'inactive-changes') {
+                await inactiveChangesService.markHunkActive(editorTarget.path, editorTarget.hunk.id);
+            }
+
             if (args?.webviewSection === 'changelistHunk' && args.hunkId) {
                 await changelistStateService.moveHunks(args.path, [args.hunkId], target.id);
+            } else if (args?.webviewSection === 'changelistFile' && args.hunkIds && args.hunkIds.length > 0) {
+                await changelistStateService.moveHunks(args.path, args.hunkIds, target.id);
             } else if (editorTarget) {
                 await changelistStateService.moveHunks(editorTarget.path, [editorTarget.hunk.id], target.id);
             } else if (args?.path) {

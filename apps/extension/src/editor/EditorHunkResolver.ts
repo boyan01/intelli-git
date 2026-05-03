@@ -22,6 +22,7 @@ export interface EditorHunkInfo {
     inactive: boolean;
     changelist?: ChangelistInfo;
     isDefaultChangelist: boolean;
+    isActiveChangelist: boolean;
     mode: 'staged' | 'changes';
 }
 
@@ -125,6 +126,14 @@ function toWorktreeHunkId(hunkId: string): string {
     return hunkId.replace(':index:', ':worktree:');
 }
 
+function getEquivalentHunkIds(hunkId: string): string[] {
+    return [
+        hunkId,
+        hunkId.replace(':index:', ':worktree:'),
+        hunkId.replace(':worktree:', ':index:')
+    ];
+}
+
 export class EditorHunkResolver {
     private statusCache?: { status: FileStatus[]; time: number };
 
@@ -208,11 +217,12 @@ export class EditorHunkResolver {
 
         const status = await this.getStatus();
         const matchingFiles = status.filter(file => file.path === target.relativePath);
+        const mode = this.changelistStateService.getState().mode;
         const match = findBestHunkMatch(
             matchingFiles,
             undefined,
             line,
-            target.preferStaged,
+            mode === 'staged' ? target.preferStaged : undefined,
             target.side
         );
 
@@ -235,10 +245,11 @@ export class EditorHunkResolver {
 
         const status = await this.getStatus();
         const matchingFiles = status.filter(file => file.path === target.relativePath);
+        const mode = this.changelistStateService.getState().mode;
         const result: EditorHunkDecoration[] = [];
 
         for (const fileStatus of matchingFiles) {
-            if (target.preferStaged !== undefined && fileStatus.staged !== target.preferStaged) {
+            if (mode === 'staged' && target.preferStaged !== undefined && fileStatus.staged !== target.preferStaged) {
                 continue;
             }
 
@@ -282,12 +293,15 @@ export class EditorHunkResolver {
     private createHunkInfo(path: string, side: EditorDiffSide, fileStatus: FileStatus, hunk: GitHunk): EditorHunkInfo {
         const state = this.changelistStateService.getState();
         const assignment = state.assignments[path];
-        const worktreeHunkId = toWorktreeHunkId(hunk.id);
+        const equivalentHunkIds = getEquivalentHunkIds(hunk.id);
         const inactiveHunkIds = new Set(fileStatus.inactiveHunkIds || this.inactiveChangesService.getInactiveHunkIds(path));
-        const inactive = !!fileStatus.inactive || inactiveHunkIds.has(hunk.id) || inactiveHunkIds.has(worktreeHunkId);
-        const listId = assignment?.hunkListIds?.[hunk.id] || assignment?.hunkListIds?.[worktreeHunkId] || assignment?.fileListId || state.activeListId;
+        const inactive = !!fileStatus.inactive || equivalentHunkIds.some(hunkId => inactiveHunkIds.has(hunkId));
+        const listId = equivalentHunkIds
+            .map(hunkId => assignment?.hunkListIds?.[hunkId])
+            .find((id): id is string => Boolean(id)) || assignment?.fileListId || state.activeListId;
         const changelist = state.lists.find(list => list.id === listId);
         const isDefaultChangelist = !changelist || changelist.id === 'changes';
+        const isActiveChangelist = listId === state.activeListId;
 
         return {
             path,
@@ -297,6 +311,7 @@ export class EditorHunkResolver {
             inactive,
             changelist,
             isDefaultChangelist,
+            isActiveChangelist,
             mode: state.mode
         };
     }
@@ -322,7 +337,7 @@ export class EditorHunkResolver {
             return i18n.t('Inactive');
         }
 
-        if (info.changelist && !info.isDefaultChangelist) {
+        if (info.changelist && !info.isActiveChangelist) {
             return info.changelist.name;
         }
 
