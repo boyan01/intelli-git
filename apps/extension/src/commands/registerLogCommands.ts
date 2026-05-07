@@ -95,6 +95,25 @@ export function registerLogCommands(
         })
     );
 
+    context.subscriptions.push(
+        vscode.commands.registerCommand('intelli-git.log.openOnGitHub', async (arg) => {
+            const hash = getCommitHash(arg);
+            if (!hash) return;
+
+            try {
+                const repositoryUrl = await gitService.getGitHubRepositoryUrl();
+                if (!repositoryUrl) {
+                    vscode.window.showInformationMessage(vscode.l10n.t('No GitHub remote found for this repository.'));
+                    return;
+                }
+
+                await vscode.env.openExternal(vscode.Uri.parse(`${repositoryUrl}/commit/${hash}`));
+            } catch (e: any) {
+                vscode.window.showErrorMessage(vscode.l10n.t('Failed to open commit on GitHub: {0}', e.message));
+            }
+        })
+    );
+
     // Create Branch
     context.subscriptions.push(
         vscode.commands.registerCommand('intelli-git.log.createBranch', async (arg) => {

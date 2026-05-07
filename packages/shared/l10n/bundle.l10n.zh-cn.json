@@ -266,6 +266,8 @@
     "Updated {0}": "已更新 {0}",
     "Force updated {0}": "已强制更新 {0}",
     "Branch {0} has diverged from remote. Force update will discard local commits.": "分支 {0} 与远程分歧。强制更新将丢弃本地提交。",
+    "No GitHub remote found for this repository.": "当前仓库没有 GitHub remote。",
+    "Failed to open commit on GitHub: {0}": "无法在 GitHub 中打开提交: {0}",
     "Force Update": "强制更新",
     "Commit Options": "提交选项",
     "Push after Commit": "提交后推送",

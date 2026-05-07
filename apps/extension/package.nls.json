@@ -44,6 +44,7 @@
   "intelli-git.commands.log.resetMixed.title": "Reset Current Branch to Here (Mixed)",
   "intelli-git.commands.log.resetHard.title": "Reset Current Branch to Here (Hard)",
   "intelli-git.commands.log.checkout.title": "Checkout Commit",
+  "intelli-git.commands.log.openOnGitHub.title": "View on GitHub",
   "intelli-git.commands.log.createBranch.title": "Create Branch...",
   "intelli-git.commands.log.cherryPick.title": "Cherry-pick",
   "intelli-git.commands.log.revert.title": "Revert Commit",

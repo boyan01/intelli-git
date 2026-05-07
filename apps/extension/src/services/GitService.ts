@@ -39,6 +39,33 @@ const GIT_LOG_RECORD_SEPARATOR = '\x1e';
 const GIT_LOG_FIELD_SEPARATOR = '\x1f';
 const PUSH_COMMIT_LOG_FORMAT = '%x1e%H%x1f%h%x1f%s%x1f%an%x1f%aI%x1f%ae%x1f%P%x1f%b';
 
+function getGitHubRepositoryUrl(remoteUrl: string): string | undefined {
+    const normalized = remoteUrl.trim().replace(/\.git\/?$/, '');
+    if (!normalized) {
+        return undefined;
+    }
+
+    try {
+        const url = new URL(normalized);
+        if (url.hostname.toLowerCase() !== 'github.com') {
+            return undefined;
+        }
+
+        const pathParts = url.pathname.replace(/^\/+|\/+$/g, '').split('/');
+        if (pathParts.length < 2) {
+            return undefined;
+        }
+
+        return `https://github.com/${pathParts[0]}/${pathParts[1]}`;
+    } catch {
+        const sshMatch = normalized.match(/^(?:[^@]+@)?github\.com[:/]([^/]+)\/(.+)$/i);
+        if (!sshMatch) {
+            return undefined;
+        }
+
+        return `https://github.com/${sshMatch[1]}/${sshMatch[2]}`;
+    }
+}
 
 export class GitService implements vscode.Disposable {
     private git: SimpleGit;
@@ -1222,6 +1249,41 @@ export class GitService implements vscode.Disposable {
             console.error('Error getting remotes:', e);
             return [];
         }
+    }
+
+    public async getGitHubRepositoryUrl(): Promise<string | undefined> {
+        const remotes = await this.git.getRemotes(true);
+        for (const remote of remotes) {
+            const refs = remote.refs as { fetch?: string; push?: string };
+            const remoteUrl = refs.fetch || refs.push;
+            if (!remoteUrl) {
+                continue;
+            }
+
+            const repositoryUrl = getGitHubRepositoryUrl(remoteUrl);
+            if (repositoryUrl) {
+                return repositoryUrl;
+            }
+        }
+
+        return undefined;
+    }
+
+    public async getRemoteProvider(): Promise<'github' | undefined> {
+        const remotes = await this.git.getRemotes(true);
+        for (const remote of remotes) {
+            const refs = remote.refs as { fetch?: string; push?: string };
+            const remoteUrl = refs.fetch || refs.push;
+            if (!remoteUrl) {
+                continue;
+            }
+
+            if (getGitHubRepositoryUrl(remoteUrl)) {
+                return 'github';
+            }
+        }
+
+        return undefined;
     }
 
     public async getRemoteBranches(): Promise<string[]> {

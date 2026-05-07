@@ -60,6 +60,12 @@ export async function activate(context: vscode.ExtensionContext) {
         void vscode.commands.executeCommand('setContext', 'intelli-git.hasMultipleRepositories', repositories.length > 1);
     };
 
+    const updateRemoteProviderContext = async () => {
+        const gitService = repositoryManager.getActiveService();
+        const provider = gitService ? await gitService.getRemoteProvider() : undefined;
+        await vscode.commands.executeCommand('setContext', 'intelli-git.gitRemoteProvider', provider || '');
+    };
+
     const updateChangelistModeContext = () => {
         const mode = repositoryManager.getActiveService()?.changelistStateService?.getState().mode || 'staged';
         void vscode.commands.executeCommand('setContext', 'intelli-git.changelistMode', mode);
@@ -71,6 +77,7 @@ export async function activate(context: vscode.ExtensionContext) {
         branchStatusBar?.update();
         gitLogStatusBar?.update();
         changeBlockEditorController?.refresh();
+        void updateRemoteProviderContext();
     };
 
     const bindActiveRepository = () => {
@@ -81,6 +88,7 @@ export async function activate(context: vscode.ExtensionContext) {
         const changelistStateService = gitService?.changelistStateService;
         if (!gitService || !inactiveChangesService || !changelistStateService) {
             updateRepositoryContext();
+            void updateRemoteProviderContext();
             updateChangelistModeContext();
             return;
         }
@@ -108,6 +116,7 @@ export async function activate(context: vscode.ExtensionContext) {
         );
 
         updateRepositoryContext();
+        void updateRemoteProviderContext();
         updateChangelistModeContext();
     };
 

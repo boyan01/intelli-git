@@ -44,6 +44,7 @@
   "intelli-git.commands.log.resetMixed.title": "重置当前分支到此提交 (Mixed)",
   "intelli-git.commands.log.resetHard.title": "重置当前分支到此提交 (Hard)",
   "intelli-git.commands.log.checkout.title": "检出提交",
+  "intelli-git.commands.log.openOnGitHub.title": "在 GitHub 中查看",
   "intelli-git.commands.log.createBranch.title": "创建分支...",
   "intelli-git.commands.log.cherryPick.title": "遴选",
   "intelli-git.commands.log.revert.title": "还原提交",
