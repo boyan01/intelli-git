@@ -3,8 +3,15 @@ const path = require('path');
 const { execSync } = require('child_process');
 
 const packageJsonPath = path.join(__dirname, '../package.json');
-const originalPackageJson = fs.readFileSync(packageJsonPath, 'utf8');
-const packageData = JSON.parse(originalPackageJson);
+const packageRoot = path.resolve(__dirname, '..');
+const originalPackageJsonOnDisk = fs.readFileSync(packageJsonPath, 'utf8');
+const packageData = JSON.parse(originalPackageJsonOnDisk);
+const baseVersion = packageData.version.replace(/(?:-dev\.\d+)+$/, '');
+const originalPackageJson = baseVersion === packageData.version
+    ? originalPackageJsonOnDisk
+    : `${JSON.stringify({ ...packageData, version: baseVersion }, null, 2)}\n`;
+const baseContentUrl = process.env.VSCE_BASE_CONTENT_URL || 'https://raw.githubusercontent.com/boyan01/intelli-git/main/apps/extension';
+const baseImagesUrl = process.env.VSCE_BASE_IMAGES_URL || 'https://boyan01.github.io/intelli_git';
 
 function formatDatePart(value) {
     return String(value).padStart(2, '0');
@@ -28,8 +35,7 @@ try {
 
     // 2. Modify version to include timestamp (SemVer compliant)
     // E.g. 0.0.1 -> 0.0.1-dev.202603301430
-    const originalVersion = packageData.version;
-    const newVersion = `${originalVersion}-dev.${buildTimestamp}`;
+    const newVersion = `${baseVersion}-dev.${buildTimestamp}`;
 
     packageData.version = newVersion;
     console.log(`Temporary Version: ${newVersion}`);
@@ -45,8 +51,9 @@ try {
         fs.mkdirSync(outDir, { recursive: true });
     }
     const outFilePath = path.join(outDir, `${packageData.name}-${newVersion}.vsix`);
+    const outFileArg = path.relative(packageRoot, outFilePath);
 
-    execSync(`vsce package --allow-missing-repository --skip-license -o "${outFilePath}"`, { stdio: ['ignore', process.stdout, process.stderr] });
+    execSync(`vsce package --allow-missing-repository --skip-license --baseContentUrl "${baseContentUrl}" --baseImagesUrl "${baseImagesUrl}" -o "${outFileArg}"`, { stdio: ['ignore', process.stdout, process.stderr] });
 
     console.log(`\nSuccessfully packaged version to: ${outFilePath}`);
 
