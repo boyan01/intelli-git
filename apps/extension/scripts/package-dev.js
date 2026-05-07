@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { execSync } = require('child_process');
+const { execFileSync, execSync } = require('child_process');
 
 const packageJsonPath = path.join(__dirname, '../package.json');
 const packageRoot = path.resolve(__dirname, '..');
@@ -12,6 +12,8 @@ const originalPackageJson = baseVersion === packageData.version
     : `${JSON.stringify({ ...packageData, version: baseVersion }, null, 2)}\n`;
 const baseContentUrl = process.env.VSCE_BASE_CONTENT_URL || 'https://raw.githubusercontent.com/boyan01/intelli-git/main/apps/extension';
 const baseImagesUrl = process.env.VSCE_BASE_IMAGES_URL || 'https://boyan01.github.io/intelli_git';
+const shouldInstall = process.argv.includes('--install');
+const vscodeCli = process.env.VSCODE_CLI || 'code';
 
 function formatDatePart(value) {
     return String(value).padStart(2, '0');
@@ -56,6 +58,12 @@ try {
     execSync(`vsce package --allow-missing-repository --skip-license --baseContentUrl "${baseContentUrl}" --baseImagesUrl "${baseImagesUrl}" -o "${outFileArg}"`, { stdio: ['ignore', process.stdout, process.stderr] });
 
     console.log(`\nSuccessfully packaged version to: ${outFilePath}`);
+
+    if (shouldInstall) {
+        console.log(`Installing extension with ${vscodeCli}...`);
+        execFileSync(vscodeCli, ['--install-extension', outFilePath, '--force'], { stdio: ['ignore', process.stdout, process.stderr] });
+        console.log('Successfully installed extension.');
+    }
 
 } catch (error) {
     console.error('Packaging failed:', error);

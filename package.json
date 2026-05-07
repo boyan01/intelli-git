@@ -13,6 +13,7 @@
     "watch:extension": "concurrently -n \"extension,webview\" -c \"cyan,magenta\" \"npm run watch --workspace intelli-git\" \"npm run watch --workspace webview-ui\"",
     "package:extension": "npm run package --workspace=intelli-git",
     "package:extension:dev": "MODE=dev npm run package:dev --workspace=intelli-git",
+    "install:extension:dev": "MODE=dev npm run package:dev --workspace=intelli-git -- --install",
     "publish:extension:marketplace": "npm run publish:marketplace --workspace=intelli-git",
     "lint": "npm run lint --workspaces --if-present",
     "test": "npm run test --workspaces --if-present"
