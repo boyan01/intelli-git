@@ -138,6 +138,11 @@ export interface LogOptions {
     until?: string;
 }
 
+export interface GitLogRevealRequest {
+    hash?: string;
+    path?: string;
+}
+
 export interface ExtensionMethods {
     getRepositories: () => Promise<Array<{ name: string; path: string; isSubmodule: boolean }>>;
     getActiveRepository: () => Promise<string | undefined>;
@@ -182,6 +187,7 @@ export interface ExtensionMethods {
     getBranchListData: () => Promise<BranchListData>;
     getLog: (options: LogOptions) => Promise<LogCommit[]>;
     getCommitDetails: (hash: string) => Promise<CommitDetails>;
+    getPendingGitLogReveal: () => Promise<GitLogRevealRequest | undefined>;
     pickBranchForFilter: () => Promise<string | undefined>;
     pickPaths: () => Promise<string[] | undefined>;
     getAuthors: () => Promise<string[]>;
@@ -222,6 +228,7 @@ export interface PushCommitsData {
 
 export interface WebviewMethods {
     activeFileChange: (params: { path: string; commitHash?: string }) => void;
+    revealLog: (params: GitLogRevealRequest) => void;
     refresh: () => void;
     switchTab: (tab: 'commit' | 'stash' | 'push') => void;
 }

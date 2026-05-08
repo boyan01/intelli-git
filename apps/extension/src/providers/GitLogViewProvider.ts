@@ -1,10 +1,13 @@
 import * as vscode from 'vscode';
+import type { GitLogRevealRequest } from '@shared/messages';
 import { BaseWebviewProvider, WebviewProviderOptions } from './BaseWebviewProvider';
+import type { ExtensionRpcHandlerOptions } from '../rpc';
 
 export class GitLogViewProvider extends BaseWebviewProvider implements vscode.WebviewViewProvider {
 
     public static readonly viewType = 'intelli-git.logView';
     private _view?: vscode.WebviewView;
+    private _pendingReveal?: GitLogRevealRequest;
 
     constructor(options: WebviewProviderOptions) {
         super(options);
@@ -16,6 +19,16 @@ export class GitLogViewProvider extends BaseWebviewProvider implements vscode.We
 
     protected getInitialRoute(): string {
         return '/git-log';
+    }
+
+    protected getRpcHandlerOptions(): Partial<ExtensionRpcHandlerOptions> {
+        return {
+            consumePendingGitLogReveal: () => {
+                const pendingReveal = this._pendingReveal;
+                this._pendingReveal = undefined;
+                return pendingReveal;
+            }
+        };
     }
 
     public resolveWebviewView(
@@ -39,5 +52,18 @@ export class GitLogViewProvider extends BaseWebviewProvider implements vscode.We
 
     public isVisible(): boolean {
         return this._view?.visible === true;
+    }
+
+    public async revealLog(params: GitLogRevealRequest): Promise<void> {
+        this._pendingReveal = params;
+
+        if (!this._view) {
+            await vscode.commands.executeCommand('intelli-git.logView.focus');
+            return;
+        }
+
+        this._view.show?.();
+        this._pendingReveal = undefined;
+        await this._rpc?.proxy.revealLog(params);
     }
 }

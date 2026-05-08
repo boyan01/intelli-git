@@ -368,6 +368,17 @@ export class GitService implements vscode.Disposable {
         return this._workspaceRoot;
     }
 
+    public getBlameCommitForLine = async (filePath: string, line: number): Promise<string | null> => {
+        const repoPath = this.toRepoPath(filePath);
+        const output = await this.git.raw(['blame', '--porcelain', '-L', `${line},${line}`, '--', repoPath]);
+        const firstLine = output.split(/\r?\n/, 1)[0]?.trim();
+        const hash = firstLine?.split(/\s+/)[0];
+        if (!hash || /^0+$/.test(hash)) {
+            return null;
+        }
+        return hash;
+    };
+
     private hasConflictMarkers(filePath: string): boolean {
         try {
             const absPath = path.join(this._workspaceRoot, filePath);

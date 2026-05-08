@@ -54,6 +54,45 @@ describe('GitService git environment handling', () => {
     });
 });
 
+describe('GitService blame lookup', () => {
+    let tempDir: string;
+    let git: SimpleGit;
+
+    beforeEach(async () => {
+        tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'intelli-git-blame-test-'));
+        git = simpleGit(tempDir);
+        await git.init();
+        await git.addConfig('user.name', 'Test User');
+        await git.addConfig('user.email', 'test@example.com');
+    });
+
+    afterEach(() => {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+    });
+
+    it('returns the committed hash for a blamed line', async () => {
+        fs.writeFileSync(path.join(tempDir, 'tracked.txt'), 'first\nsecond\n');
+        await git.add('tracked.txt');
+        await git.commit('Initial commit');
+
+        const service = new GitService(tempDir, tempDir, git);
+        const expectedHash = (await git.revparse(['HEAD'])).trim();
+
+        await expect(service.getBlameCommitForLine('tracked.txt', 1)).resolves.toBe(expectedHash);
+    });
+
+    it('returns null for an uncommitted line', async () => {
+        fs.writeFileSync(path.join(tempDir, 'tracked.txt'), 'first\n');
+        await git.add('tracked.txt');
+        await git.commit('Initial commit');
+        fs.writeFileSync(path.join(tempDir, 'tracked.txt'), 'first\nsecond\n');
+
+        const service = new GitService(tempDir, tempDir, git);
+
+        await expect(service.getBlameCommitForLine('tracked.txt', 2)).resolves.toBeNull();
+    });
+});
+
 describe('GitService staging inactive changes', () => {
     let tempDir: string;
     let git: SimpleGit;

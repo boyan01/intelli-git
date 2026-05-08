@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import type { LogOptions } from '@shared/messages';
-import { rpc } from '../../../lib/rpc_client';
+import { rpc, rpcEvents } from '../../../lib/rpc_client';
 import styles from './FilterToolbar.module.css';
 import { DateFilter } from './DateFilter';
 import { UserFilter } from './UserFilter';
@@ -30,6 +30,19 @@ export const FilterToolbar: React.FC<FilterToolbarProps> = ({ onFilterChange, ex
             setBranch(externalBranch);
         }
     }, [externalBranch, setBranch]);
+
+    useEffect(() => {
+        return rpcEvents.revealLog.subscribe(({ hash, path }) => {
+            setBranch('all');
+            setSearch(hash ?? '');
+            setRegexMode(false);
+            setCaseSensitive(false);
+            setAuthors([]);
+            setPaths(path ? [path] : []);
+            setSince(undefined);
+            setUntil(undefined);
+        });
+    }, [setBranch, setSearch, setRegexMode, setCaseSensitive, setAuthors, setPaths, setSince, setUntil]);
 
 
     const isInitialMount = useRef(true);

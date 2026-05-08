@@ -3,7 +3,7 @@ import { CommitViewProvider, GitLogViewProvider, StashContentProvider, RevisionC
 import { RepositoryManager } from './services/RepositoryManager';
 import { createGitWatcher } from './services/GitRepositoryWatcher';
 import { BranchStatusBar, GitLogStatusBar } from './ui';
-import { registerStashCommands, registerNavigationCommands, registerBranchCommands, registerLogCommands, registerLogFileCommands, registerChangelistCommands, registerAiCommands } from './commands';
+import { registerStashCommands, registerNavigationCommands, registerBranchCommands, registerLogCommands, registerLogFileCommands, registerChangelistCommands, registerAiCommands, registerEditorGitCommands } from './commands';
 import { logger } from './utils/logger';
 import { ChangeBlockEditorController } from './editor/ChangeBlockEditorController';
 
@@ -107,6 +107,7 @@ export async function activate(context: vscode.ExtensionContext) {
         registerLogCommands(repoContext, gitService);
         registerLogFileCommands(repoContext, gitService);
         registerChangelistCommands(repoContext, gitService, inactiveChangesService, changelistStateService, provider);
+        registerEditorGitCommands(repoContext, gitService, gitLogProvider);
 
         repoBoundDisposables.push(
             branchStatusBar,

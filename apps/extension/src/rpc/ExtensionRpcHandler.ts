@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { RpcPeer } from '@shared/rpc';
-import type { WebviewMethods, ExtensionMethods, FileStatus, ChangelistFileSelection, ChangelistState } from '@shared/messages';
+import type { WebviewMethods, ExtensionMethods, FileStatus, ChangelistFileSelection, ChangelistState, GitLogRevealRequest } from '@shared/messages';
 import { GitService } from '../services/GitService';
 import { RepositoryManager } from '../services/RepositoryManager';
 import { ChangelistStateService } from '../services/ChangelistStateService';
@@ -20,6 +20,7 @@ export interface ExtensionRpcHandlerOptions {
     onDispose?: () => void;
     onChangelistSelectionChange?: (selection: ChangelistFileSelection | null) => void;
     onChangelistFocusChange?: (focused: boolean) => void;
+    consumePendingGitLogReveal?: () => GitLogRevealRequest | undefined;
 }
 
 /**
@@ -32,6 +33,7 @@ export class ExtensionRpcHandler {
     private onDispose: () => void;
     private onChangelistSelectionChange?: (selection: ChangelistFileSelection | null) => void;
     private onChangelistFocusChange?: (focused: boolean) => void;
+    private consumePendingGitLogReveal?: () => GitLogRevealRequest | undefined;
     private _lastRebaseStatus?: string;
 
     constructor(options: ExtensionRpcHandlerOptions) {
@@ -40,6 +42,7 @@ export class ExtensionRpcHandler {
         this.onDispose = options.onDispose || (() => { });
         this.onChangelistSelectionChange = options.onChangelistSelectionChange;
         this.onChangelistFocusChange = options.onChangelistFocusChange;
+        this.consumePendingGitLogReveal = options.consumePendingGitLogReveal;
     }
 
     private get gitService(): GitService {
@@ -143,6 +146,7 @@ export class ExtensionRpcHandler {
                 getBranchListData: (...args) => this.gitService.getBranchListData(...args),
                 getLog: (...args) => this.gitService.getLog(...args),
                 getCommitDetails: (...args) => this.gitService.getCommitDetails(...args),
+                getPendingGitLogReveal: this.getPendingGitLogReveal,
                 pickBranchForFilter: this.pickBranchForFilter,
                 pickPaths: this.pickPaths,
                 getAuthors: (...args) => this.gitService.getAuthors(...args),
@@ -169,6 +173,10 @@ export class ExtensionRpcHandler {
             }
         )
     }
+
+    getPendingGitLogReveal = async (): Promise<GitLogRevealRequest | undefined> => {
+        return this.consumePendingGitLogReveal?.();
+    };
 
 
     push = async (params: { force: boolean; pushTags: boolean; noVerify?: boolean; remote: string; branch: string }): Promise<void> => {

@@ -147,6 +147,14 @@
         "title": "%intelli-git.commands.focusGitLog.title%"
       },
       {
+        "command": "intelli-git.openLogAtCurrentBlame",
+        "title": "%intelli-git.commands.openLogAtCurrentBlame.title%"
+      },
+      {
+        "command": "intelli-git.showFileHistory",
+        "title": "%intelli-git.commands.showFileHistory.title%"
+      },
+      {
         "command": "intelli-git.branch.checkout",
         "title": "%intelli-git.commands.branch.checkout.title%"
       },
@@ -358,6 +366,12 @@
         "mac": "cmd+d",
         "key": "ctrl+d",
         "when": "intelli-git.hasSelectedChangelistFile && intelli-git.changelistTreeFocus"
+      }
+    ],
+    "submenus": [
+      {
+        "id": "intelli-git.editorGit",
+        "label": "%intelli-git.submenus.editorGit.label%"
       }
     ],
     "menus": {
@@ -682,24 +696,41 @@
       ],
       "editor/context": [
         {
+          "submenu": "intelli-git.editorGit",
+          "when": "editorTextFocus && (resourceScheme == file || intelli-git.hasCurrentChangeBlock)",
+          "group": "7_modification@0"
+        }
+      ],
+      "intelli-git.editorGit": [
+        {
+          "command": "intelli-git.openLogAtCurrentBlame",
+          "when": "resourceScheme == file && editorTextFocus",
+          "group": "1_history@1"
+        },
+        {
+          "command": "intelli-git.showFileHistory",
+          "when": "resourceScheme == file && editorTextFocus",
+          "group": "1_history@2"
+        },
+        {
           "command": "intelli-git.moveHunkToInactive",
           "when": "intelli-git.hasCurrentChangeBlock && intelli-git.currentChangeBlockInactive != true && intelli-git.changelistMode == 'staged'",
-          "group": "7_modification@1"
+          "group": "2_changes@1"
         },
         {
           "command": "intelli-git.moveHunkToActive",
           "when": "intelli-git.hasCurrentChangeBlock && intelli-git.currentChangeBlockInactive == true && intelli-git.changelistMode == 'staged'",
-          "group": "7_modification@2"
+          "group": "2_changes@2"
         },
         {
           "command": "intelli-git.changelist.moveToList",
           "when": "intelli-git.hasCurrentChangeBlock && intelli-git.changelistMode == 'changes'",
-          "group": "7_modification@1"
+          "group": "2_changes@1"
         },
         {
           "command": "intelli-git.revealCurrentChangeBlock",
           "when": "intelli-git.hasCurrentChangeBlock",
-          "group": "7_modification@9"
+          "group": "2_changes@9"
         }
       ],
       "scm/change/title": [

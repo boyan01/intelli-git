@@ -11,6 +11,7 @@ import { formatRelativeDate } from '../../utils/dateUtils';
 import { CommitDetailsView } from '../common/CommitDetailsView';
 import { usePersistedState } from '../../hooks/usePersistedState';
 import type { CommitDetails } from '@shared/messages';
+import { rpc, rpcEvents } from '../../lib/rpc_client';
 
 interface LogListPanelProps {
     onSelectionChange?: (commits: string[]) => void;
@@ -153,6 +154,55 @@ export const LogListPanel: React.FC<LogListPanelProps> = ({
         initialSelection: cachedSelectedHashes,
         onSelectionPersist: setCachedSelectedHashes
     });
+    const pendingRevealHashRef = useRef<string | null>(null);
+
+    useEffect(() => {
+        let cancelled = false;
+        rpc.getPendingGitLogReveal()
+            .then(params => {
+                if (!cancelled && params) {
+                    rpcEvents.revealLog.emit(params);
+                }
+            })
+            .catch(error => {
+                console.error('Failed to consume pending Git Log reveal', error);
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
+    useEffect(() => {
+        return rpcEvents.revealLog.subscribe(({ hash }) => {
+            if (!hash) {
+                pendingRevealHashRef.current = null;
+                if (containerRef.current) {
+                    containerRef.current.scrollTop = 0;
+                }
+                setCachedScrollTop(0);
+                setScrollTop(0);
+                return;
+            }
+
+            pendingRevealHashRef.current = hash;
+            const index = commits.findIndex(c => c.hash === hash);
+            if (index !== -1) {
+                handleJumpToCommit(hash);
+                pendingRevealHashRef.current = null;
+            }
+        });
+    }, [commits, handleJumpToCommit, setCachedScrollTop]);
+
+    useEffect(() => {
+        const hash = pendingRevealHashRef.current;
+        if (!hash) return;
+
+        const index = commits.findIndex(c => c.hash === hash);
+        if (index === -1) return;
+
+        handleJumpToCommit(hash);
+        pendingRevealHashRef.current = null;
+    }, [commits, handleJumpToCommit]);
 
     const handleRowClickWithHover = useCallback((e: React.MouseEvent, commit: Parameters<typeof handleRowClick>[1]) => {
         const clickedHash = commit.hash;
