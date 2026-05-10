@@ -2,86 +2,98 @@
     position: relative;
     display: inline-flex;
     align-items: center;
+    gap: 4px;
     margin-left: 6px;
+    min-width: 0;
+    max-width: min(46%, 280px);
+    flex-shrink: 1;
     vertical-align: middle;
 }
 
+.wrap {
+    margin-left: 0;
+    max-width: 100%;
+    flex-wrap: wrap;
+}
+
+.wrap .label {
+    max-width: 180px;
+}
+
+.fullNames .label {
+    max-width: none;
+}
+
+.fullNames .text {
+    overflow: visible;
+    text-overflow: clip;
+}
+
 .label {
-    display: inline-block;
-    padding: 0 4px;
-    border-radius: 3px;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    height: 16px;
+    min-width: 0;
+    padding: 0 5px;
+    border-radius: 4px;
     font-size: 11px;
     line-height: 16px;
     border: 1px solid transparent;
     white-space: nowrap;
     max-width: 120px;
-    overflow: hidden;
-    text-overflow: ellipsis;
     font-weight: 500;
+    box-sizing: border-box;
 }
 
 .head {
-    background-color: color-mix(in srgb, #ffd700 25%, var(--vscode-editor-background, #1e1e1e));
-    border-color: #b8960a;
+    background-color: color-mix(in srgb, var(--vscode-charts-yellow, #cca700) 16%, transparent);
+    border-color: color-mix(in srgb, var(--vscode-charts-yellow, #cca700) 48%, transparent);
     color: var(--vscode-editorWarning-foreground, #cca700);
 }
 
 .local {
-    background-color: color-mix(in srgb, #4bbe4b 20%, var(--vscode-editor-background, #1e1e1e));
-    border-color: #3d8b3d;
+    background-color: color-mix(in srgb, var(--vscode-gitDecoration-untrackedResourceForeground, #73c991) 14%, transparent);
+    border-color: color-mix(in srgb, var(--vscode-gitDecoration-untrackedResourceForeground, #73c991) 42%, transparent);
     color: var(--vscode-gitDecoration-untrackedResourceForeground, #73c991);
 }
 
 .remote {
-    background-color: color-mix(in srgb, #8a6ec8 20%, var(--vscode-editor-background, #1e1e1e));
-    border-color: #6b4fa0;
-    color: var(--vscode-symbolIcon-methodForeground, #b180d7);
+    background-color: color-mix(in srgb, var(--vscode-charts-blue, #3794ff) 14%, transparent);
+    border-color: color-mix(in srgb, var(--vscode-charts-blue, #3794ff) 42%, transparent);
+    color: var(--vscode-charts-blue, #3794ff);
 }
 
 .tag {
-    background-color: color-mix(in srgb, #dc823c 20%, var(--vscode-editor-background, #1e1e1e));
-    border-color: #a86230;
-    color: var(--vscode-editorCodeLens-foreground, #e0a050);
+    background-color: color-mix(in srgb, var(--vscode-charts-orange, #d18616) 16%, transparent);
+    border-color: color-mix(in srgb, var(--vscode-charts-orange, #d18616) 52%, transparent);
+    color: var(--vscode-charts-orange, #d18616);
 }
 
-.stackWrapper {
-    position: relative;
-    display: inline-flex;
-    align-items: center;
-    padding-bottom: 2px;
-    padding-right: 2px;
-    vertical-align: middle;
-    margin-top: -1px;
+.icon:global(.codicon[class*='codicon-']) {
+    flex: 0 0 auto;
+    font: normal normal normal 11px/1 codicon;
+    color: currentColor;
 }
 
-.stackWrapper>.label:not(.stackedLabel) {
-    position: relative;
-    z-index: 2;
-}
-
-.stackedLabel {
-    position: absolute;
-    top: 2px;
-    left: 2px;
-    right: 0;
-    bottom: 0;
-    min-width: auto;
-    min-height: auto;
-    z-index: 1;
-    opacity: 0.6;
+.text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .extraBadge {
-    position: absolute;
-    top: -6px;
-    right: -8px;
-    background-color: var(--vscode-badge-background, #4d4d4d);
-    color: var(--vscode-badge-foreground, #fff);
+    flex: 0 0 auto;
+    height: 16px;
+    padding: 0 4px;
+    border: 1px solid var(--vscode-badge-background, #4d4d4d);
+    border-radius: 4px;
+    background-color: color-mix(in srgb, var(--vscode-badge-background, #4d4d4d) 16%, transparent);
+    color: var(--vscode-descriptionForeground);
     font-size: 9px;
-    line-height: 12px;
-    padding: 0 3px;
-    border-radius: 6px;
+    line-height: 14px;
     font-weight: 600;
+    box-sizing: border-box;
 }
 
 .tooltip {
@@ -99,6 +111,9 @@
 }
 
 .tooltipItem {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
     font-size: 12px;
     line-height: 18px;
     white-space: nowrap;

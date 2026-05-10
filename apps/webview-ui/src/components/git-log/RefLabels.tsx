@@ -8,9 +8,20 @@ interface Ref {
 
 interface RefLabelsProps {
     refs: Ref[];
+    maxVisible?: number;
+    wrap?: boolean;
+    truncate?: boolean;
 }
 
 const MAX_LABEL_LENGTH = 16;
+const VISIBLE_REF_COUNT = 2;
+
+const REF_PRIORITY: Record<Ref['type'], number> = {
+    head: 0,
+    tag: 1,
+    local: 2,
+    remote: 3
+};
 
 function shortenRefName(name: string): string {
     if (name.length <= MAX_LABEL_LENGTH) return name;
@@ -41,7 +52,24 @@ function getTypeClass(type: string, name: string): string {
     }
 }
 
-export const RefLabels: React.FC<RefLabelsProps> = ({ refs }) => {
+function getTypeIcon(type: Ref['type'], name: string): string {
+    if (name.includes('HEAD')) return 'git-branch';
+    if (type === 'tag') return 'tag';
+    if (type === 'remote') return 'cloud';
+    return 'git-branch';
+}
+
+function sortRefsForDisplay(refs: Ref[]): Ref[] {
+    return refs
+        .map((ref, index) => ({ ref, index }))
+        .sort((a, b) => {
+            const priorityDelta = REF_PRIORITY[a.ref.type] - REF_PRIORITY[b.ref.type];
+            return priorityDelta === 0 ? a.index - b.index : priorityDelta;
+        })
+        .map(({ ref }) => ref);
+}
+
+export const RefLabels: React.FC<RefLabelsProps> = ({ refs, maxVisible = VISIBLE_REF_COUNT, wrap = false, truncate = true }) => {
     const [showTooltip, setShowTooltip] = useState(false);
     const containerRef = useRef<HTMLSpanElement>(null);
     const tooltipRef = useRef<HTMLDivElement>(null);
@@ -60,38 +88,41 @@ export const RefLabels: React.FC<RefLabelsProps> = ({ refs }) => {
 
     if (!refs || refs.length === 0) return null;
 
-    const firstRef = refs[0];
-    const secondRef = refs.length > 1 ? refs[1] : null;
-    const extraCount = refs.length - 2;
-    const shortName = shortenRefName(firstRef.name);
-    const isShortened = shortName !== firstRef.name;
+    const displayRefs = sortRefsForDisplay(refs);
+    const visibleRefs = displayRefs.slice(0, Math.max(1, maxVisible));
+    const extraCount = displayRefs.length - visibleRefs.length;
+    const hasShortenedRef = truncate && displayRefs.some(ref => shortenRefName(ref.name) !== ref.name);
+    const shouldShowTooltip = extraCount > 0 || hasShortenedRef;
 
     return (
         <span
             ref={containerRef}
-            className={styles.container}
+            className={`${styles.container} ${wrap ? styles.wrap : ''} ${truncate ? '' : styles.fullNames}`}
             onMouseEnter={() => setShowTooltip(true)}
             onMouseLeave={() => setShowTooltip(false)}
         >
-            <span className={styles.stackWrapper}>
-                {secondRef && (
+            {visibleRefs.map((ref, index) => {
+                const displayName = truncate ? shortenRefName(ref.name) : ref.name;
+                return (
                     <span
-                        className={`${styles.label} ${styles.stackedLabel} ${getTypeClass(secondRef.type, secondRef.name)}`}
-                    />
-                )}
-                <span className={`${styles.label} ${getTypeClass(firstRef.type, firstRef.name)}`}>
-                    {shortName}
-                </span>
-                {extraCount > 0 && (
-                    <span className={styles.extraBadge}>+{extraCount}</span>
-                )}
-            </span>
+                        key={`${ref.type}:${ref.name}:${index}`}
+                        className={`${styles.label} ${getTypeClass(ref.type, ref.name)}`}
+                    >
+                        <i className={`codicon codicon-${getTypeIcon(ref.type, ref.name)} ${styles.icon}`} aria-hidden="true" />
+                        <span className={styles.text}>{displayName}</span>
+                    </span>
+                );
+            })}
+            {extraCount > 0 && (
+                <span className={styles.extraBadge}>+{extraCount}</span>
+            )}
 
-            {showTooltip && (secondRef || isShortened) && (
+            {showTooltip && shouldShowTooltip && (
                 <div ref={tooltipRef} className={styles.tooltip}>
-                    {refs.map((ref, i) => (
+                    {displayRefs.map((ref, i) => (
                         <div key={i} className={`${styles.tooltipItem} ${getTypeClass(ref.type, ref.name)}`}>
-                            {ref.name}
+                            <i className={`codicon codicon-${getTypeIcon(ref.type, ref.name)} ${styles.icon}`} aria-hidden="true" />
+                            <span>{ref.name}</span>
                         </div>
                     ))}
                 </div>

@@ -5,6 +5,7 @@ import { SplitPane } from './SplitPane';
 import { ViewModeToggle } from './ViewModeToggle';
 import { BaseFileTree } from '../file-tree/BaseFileTree';
 import type { BaseFileTreeRef } from '../file-tree/BaseFileTree';
+import { RefLabels } from '../git-log/RefLabels';
 import { useTranslation } from 'react-i18next';
 import { usePersistedState } from '../../hooks/usePersistedState';
 import styles from './CommitDetailsView.module.css';
@@ -98,6 +99,11 @@ export const CommitDetailsView: React.FC<CommitDetailsViewProps> = ({
             name: b,
             type: b.includes('/') ? 'remote' : 'local'
         }));
+    }, [commit, showBranches]);
+
+    const tagRefs = useMemo<RefInfo[]>(() => {
+        if (!commit || !showBranches) return [];
+        return commit.refs.filter(ref => ref.type === 'tag');
     }, [commit, showBranches]);
 
     const formattedDate = useMemo(() => {
@@ -195,12 +201,16 @@ export const CommitDetailsView: React.FC<CommitDetailsViewProps> = ({
                     <div className={styles.metaHash}>
                         {commit.hash}
                     </div>
+                    {tagRefs.length > 0 && (
+                        <div className={`${styles.metaRow} ${styles.refRow}`}>
+                            <span className={styles.metaLabel}>{t('Tags')}:</span>
+                            <RefLabels refs={tagRefs} maxVisible={tagRefs.length} wrap truncate={false} />
+                        </div>
+                    )}
                     {containingBranchesRefs.length > 0 && (
-                        <div className={styles.metaRow}>
+                        <div className={`${styles.metaRow} ${styles.refRow}`}>
                             <span className={styles.metaLabel}>{t('Branches')}:</span>
-                            {containingBranchesRefs.map(ref => (
-                                <div key={ref.name} className={styles.branchItem}>{ref.name}</div>
-                            ))}
+                            <RefLabels refs={containingBranchesRefs} maxVisible={containingBranchesRefs.length} wrap truncate={false} />
                         </div>
                     )}
                 </div>

@@ -2204,8 +2204,8 @@ export class GitService implements vscode.Disposable {
 
     public getCommitDetails = async (hash: string): Promise<CommitDetails> => {
         try {
-            const showMsg = await this.git.show([hash, '--format=%B%x00%P%x00%an%x00%ae%x00%aI%x00%h', '--no-patch']);
-            const [fullMessage, parentsStr, authorName, authorEmail, date, shortHash] = showMsg.split('\0');
+            const showMsg = await this.git.show([hash, '--format=%B%x00%P%x00%an%x00%ae%x00%aI%x00%h%x00%D', '--no-patch']);
+            const [fullMessage, parentsStr, authorName, authorEmail, date, shortHash, refsStr] = showMsg.split('\0');
 
             const files = await this.getCommitFiles(hash) as CommitFile[];
 
@@ -2245,7 +2245,7 @@ export class GitService implements vscode.Disposable {
                 authorEmail: authorEmail?.trim() || '',
                 date: date?.trim() || '',
                 containingBranches,
-                refs: [],
+                refs: this._parseRefs(refsStr?.trim() || ''),
                 filteredAncestors: []
             };
         } catch (e) {
