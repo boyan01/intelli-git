@@ -65,6 +65,7 @@ export interface PersistedStateSchema {
     'gitLog.selectedHashes': string[];
     'gitLog.branchSplitRatio': number;
     'gitLog.detailsSplitRatio': number;
+    'gitLog.commitDetailsSplitRatio': number;
 }
 
 export const stateDefaults: PersistedStateSchema = {
@@ -142,8 +143,9 @@ export const stateDefaults: PersistedStateSchema = {
     'gitLog.commits': [],
     'gitLog.scrollTop': 0,
     'gitLog.selectedHashes': [],
-    'gitLog.branchSplitRatio': 0,
-    'gitLog.detailsSplitRatio': 0.68,
+    'gitLog.branchSplitRatio': 0.2,
+    'gitLog.detailsSplitRatio': 0.7,
+    'gitLog.commitDetailsSplitRatio': 0.6,
 };
 
 function serialize<K extends keyof PersistedStateSchema>(

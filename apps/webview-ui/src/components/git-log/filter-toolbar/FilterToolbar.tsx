@@ -131,8 +131,6 @@ export const FilterToolbar: React.FC<FilterToolbarProps> = ({ onFilterChange, ex
                 </button>
             </div>
 
-            <div className={styles.separator} />
-
             {/* Branch filter */}
             <button
                 className={`${styles.filterButton} ${styles.branchButton}`}

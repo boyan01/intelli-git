@@ -71,7 +71,7 @@ export function GitLogView() {
         <div ref={containerRef} className={styles.container}>
             <SplitPane
                 direction="horizontal"
-                defaultSize={200}
+                defaultRatio={0.2}
                 minSize={0}
                 ratio={branchSplitRatio}
                 onRatioChange={setBranchSplitRatio}
@@ -82,7 +82,7 @@ export function GitLogView() {
                     ) : (
                         <SplitPane
                             direction="horizontal"
-                            defaultRatio={0.68}
+                            defaultRatio={0.7}
                             minSize={200}
                             ratio={detailsSplitRatio}
                             onRatioChange={setDetailsSplitRatio}

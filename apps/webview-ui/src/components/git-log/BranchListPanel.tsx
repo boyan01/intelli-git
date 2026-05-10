@@ -389,27 +389,16 @@ export const BranchListPanel: React.FC<BranchListPanelProps> = ({ onBranchDouble
     return (
         <div className={styles.container}>
             <div className={styles.searchContainer}>
-                <input
-                    type="text"
-                    className={styles.searchInput}
-                    placeholder={t('Filter branches...')}
-                    value={filterText}
-                    onChange={(e) => setFilterText(e.target.value)}
-                />
-                <button
-                    className={styles.toolbarButton}
-                    onClick={() => treeRef.current?.expandAll()}
-                    title="Expand all"
-                >
-                    <i className="codicon codicon-expand-all" />
-                </button>
-                <button
-                    className={styles.toolbarButton}
-                    onClick={() => treeRef.current?.collapseAll()}
-                    title="Collapse all"
-                >
-                    <i className="codicon codicon-collapse-all" />
-                </button>
+                <div className={styles.searchBox}>
+                    <span className={`${styles.searchIcon} codicon codicon-search`} />
+                    <input
+                        type="text"
+                        className={styles.searchInput}
+                        placeholder={t('Filter branches...')}
+                        value={filterText}
+                        onChange={(e) => setFilterText(e.target.value)}
+                    />
+                </div>
             </div>
 
             <div

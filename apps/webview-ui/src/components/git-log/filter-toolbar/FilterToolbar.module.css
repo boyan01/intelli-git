@@ -1,10 +1,10 @@
 .container {
     display: flex;
     align-items: center;
-    height: 22px;
-    padding: 0 8px;
+    height: 30px;
+    padding: 0 0px;
     background-color: var(--vscode-titleBar-activeBackground);
-    gap: 2px;
+    gap: 4px;
 }
 
 .searchBox {
@@ -14,10 +14,15 @@
     border: 1px solid var(--vscode-input-border);
     border-radius: 2px;
     padding: 0 4px;
-    flex: 1;
-    max-width: 120px;
-    height: 18px;
-    gap: 1px;
+    flex: 1 1 220px;
+    min-width: 130px;
+    max-width: 180px;
+    height: 24px;
+    gap: 2px;
+}
+
+.searchBox:focus-within {
+    border-color: var(--vscode-focusBorder);
 }
 
 .searchInput {
@@ -26,14 +31,14 @@
     border: none;
     outline: none;
     color: var(--vscode-input-foreground);
-    font-size: 12px;
+    font-size: 13px;
     padding: 0 4px;
     min-width: 0;
 }
 
 .searchIcon {
     opacity: 0.6;
-    font-size: 12px;
+    font-size: 14px;
     display: flex;
     align-items: center;
 }
@@ -46,8 +51,10 @@
     border: none;
     color: var(--vscode-foreground);
     cursor: pointer;
-    padding: 1px 3px;
-    font-size: 10px;
+    padding: 0 3px;
+    min-width: 20px;
+    height: 20px;
+    font-size: 11px;
     border-radius: 2px;
     opacity: 0.6;
     font-family: monospace;
@@ -68,13 +75,13 @@
     border: none;
     color: var(--vscode-foreground);
     cursor: pointer;
-    padding: 0 3px;
-    font-size: 11px;
+    padding: 0 2px;
+    font-size: 12px;
     white-space: nowrap;
-    height: 18px;
+    height: 24px;
     border-radius: 2px;
     outline: none;
-    gap: 1px;
+    gap: 0px;
 }
 
 .filterButton:hover {
@@ -86,11 +93,11 @@
 }
 
 .branchButton {
-    max-width: 150px;
+    max-width: 170px;
 }
 
 .pathButton {
-    max-width: 140px;
+    max-width: 160px;
 }
 
 .ellipsis {
@@ -101,9 +108,9 @@
 
 .separator {
     width: 1px;
-    height: 16px;
+    height: 20px;
     background-color: var(--vscode-widget-border);
-    margin: 0 4px;
+    margin: 0 2px;
 }
 
 .iconButton {
@@ -131,15 +138,23 @@
 }
 
 .iconSmall {
-    font-size: 10px;
+    font-size: 12px;
     opacity: 0.7;
 }
 
+.iconSmall:global(.codicon[class*='codicon-']) {
+    font: normal normal normal 12px/1 codicon;
+}
+
 .iconMedium {
-    font-size: 11px;
+    font-size: 14px;
     opacity: 0.7;
     border-radius: 2px;
     padding: 1px;
+}
+
+.iconMedium:global(.codicon[class*='codicon-']) {
+    font: normal normal normal 14px/1 codicon;
 }
 
 .iconMedium:hover {

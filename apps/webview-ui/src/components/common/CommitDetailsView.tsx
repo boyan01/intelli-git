@@ -6,6 +6,7 @@ import { ViewModeToggle } from './ViewModeToggle';
 import { BaseFileTree } from '../file-tree/BaseFileTree';
 import type { BaseFileTreeRef } from '../file-tree/BaseFileTree';
 import { useTranslation } from 'react-i18next';
+import { usePersistedState } from '../../hooks/usePersistedState';
 import styles from './CommitDetailsView.module.css';
 
 export interface CommitDetailsViewProps {
@@ -33,6 +34,7 @@ export const CommitDetailsView: React.FC<CommitDetailsViewProps> = ({
     const [files, setFiles] = useState<CommitFile[]>([]);
     const [viewMode, setViewMode] = useState<'tree' | 'list'>('tree');
     const [showDetails, setShowDetails] = useState(true);
+    const [detailsSplitRatio, setDetailsSplitRatio] = usePersistedState('gitLog.commitDetailsSplitRatio');
     const treeRef = useRef<BaseFileTreeRef>(null);
 
     useEffect(() => {
@@ -217,7 +219,9 @@ export const CommitDetailsView: React.FC<CommitDetailsViewProps> = ({
                 direction="vertical"
                 first={filesView}
                 second={detailsView}
-                defaultRatio={0.65}
+                defaultRatio={0.6}
+                ratio={detailsSplitRatio}
+                onRatioChange={setDetailsSplitRatio}
                 minSize={80}
             />
         </div>
