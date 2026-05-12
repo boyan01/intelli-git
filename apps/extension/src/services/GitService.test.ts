@@ -54,6 +54,42 @@ describe('GitService git environment handling', () => {
     });
 });
 
+describe('GitService repository scope', () => {
+    let tempDir: string;
+    let git: SimpleGit;
+
+    beforeEach(async () => {
+        tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'intelli-git-scope-test-'));
+        git = simpleGit(tempDir);
+        await git.init();
+        await git.addConfig('user.name', 'Test User');
+        await git.addConfig('user.email', 'test@example.com');
+    });
+
+    afterEach(() => {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+    });
+
+    it('preserves workspace scope when the opened folder is inside the git root', async () => {
+        fs.mkdirSync(path.join(tempDir, 'app'), { recursive: true });
+        fs.writeFileSync(path.join(tempDir, 'root.txt'), 'base\n');
+        fs.writeFileSync(path.join(tempDir, 'app', 'scoped.txt'), 'base\n');
+        await git.add(['root.txt', 'app/scoped.txt']);
+        await git.commit('Initial commit');
+
+        fs.writeFileSync(path.join(tempDir, 'root.txt'), 'changed\n');
+        fs.writeFileSync(path.join(tempDir, 'app', 'scoped.txt'), 'changed\n');
+
+        const workspaceRoot = path.join(tempDir, 'app');
+        const service = await GitService.create(workspaceRoot);
+        const status = await service.getStatus();
+
+        expect(service.getWorkspaceRoot()).toBe(fs.realpathSync(workspaceRoot));
+        expect(service.getGitRoot()).toBe(fs.realpathSync(tempDir));
+        expect(status.map(file => file.path)).toEqual(['scoped.txt']);
+    });
+});
+
 describe('GitService blame lookup', () => {
     let tempDir: string;
     let git: SimpleGit;
@@ -477,6 +513,109 @@ describe('GitService staging inactive changes', () => {
 
         const headMessage = await git.raw(['log', '-1', '--format=%B']);
         expect(headMessage.trim()).toBe(message);
+    });
+});
+
+describe('GitService mutation change events', () => {
+    let tempDir: string;
+    let git: SimpleGit;
+
+    beforeEach(async () => {
+        tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'intelli-git-events-test-'));
+        git = simpleGit(tempDir);
+        await git.init();
+        await git.addConfig('user.name', 'Test User');
+        await git.addConfig('user.email', 'test@example.com');
+    });
+
+    afterEach(() => {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+    });
+
+    it('fires after stage and unstage mutations', async () => {
+        fs.writeFileSync(path.join(tempDir, 'tracked.txt'), 'base\n');
+        await git.add('tracked.txt');
+        await git.commit('Initial commit');
+        fs.writeFileSync(path.join(tempDir, 'tracked.txt'), 'changed\n');
+
+        const service = new GitService(tempDir, tempDir, git);
+        let fireCount = 0;
+        service.onDidChange(() => fireCount++);
+
+        await service.stageFile('tracked.txt');
+        await service.unstageFile('tracked.txt');
+
+        expect(fireCount).toBe(2);
+    });
+
+    it('fires after stash mutations', async () => {
+        fs.writeFileSync(path.join(tempDir, 'tracked.txt'), 'base\n');
+        await git.add('tracked.txt');
+        await git.commit('Initial commit');
+        fs.writeFileSync(path.join(tempDir, 'tracked.txt'), 'changed\n');
+
+        const service = new GitService(tempDir, tempDir, git);
+        let fireCount = 0;
+        service.onDidChange(() => fireCount++);
+
+        await service.stash('test stash');
+
+        expect(fireCount).toBe(1);
+    });
+
+    it('fires after committing a changelist plan', async () => {
+        fs.writeFileSync(path.join(tempDir, 'tracked.txt'), 'base\n');
+        await git.add('tracked.txt');
+        await git.commit('Initial commit');
+        fs.writeFileSync(path.join(tempDir, 'tracked.txt'), 'changed\n');
+
+        const service = new GitService(tempDir, tempDir, git);
+        const status = await service.getStatus();
+        let fireCount = 0;
+        service.onDidChange(() => fireCount++);
+
+        await service.commitChangelistPlan('Commit active changelist', false, {
+            files: ['tracked.txt'],
+            excludedFiles: [],
+            excludedHunkIdsByPath: {}
+        }, status);
+
+        expect(fireCount).toBe(1);
+    });
+
+    it('fires after applying a patch through the public mutation API', async () => {
+        fs.writeFileSync(path.join(tempDir, 'tracked.txt'), 'base\n');
+        await git.add('tracked.txt');
+        await git.commit('Initial commit');
+        fs.writeFileSync(path.join(tempDir, 'tracked.txt'), 'changed\n');
+
+        const patch = await git.diff(['--', 'tracked.txt']);
+        await git.checkout(['--', 'tracked.txt']);
+
+        const service = new GitService(tempDir, tempDir, git);
+        let fireCount = 0;
+        service.onDidChange(() => fireCount++);
+
+        await service.applyPatch(patch);
+
+        expect(fireCount).toBe(1);
+    });
+
+    it('fires after branch switch mutations', async () => {
+        fs.writeFileSync(path.join(tempDir, 'tracked.txt'), 'base\n');
+        await git.add('tracked.txt');
+        await git.commit('Initial commit');
+        const initialBranch = (await git.branch()).current;
+        await git.checkoutLocalBranch('feature');
+        await git.checkout(initialBranch);
+
+        const service = new GitService(tempDir, tempDir, git);
+        let fireCount = 0;
+        service.onDidChange(() => fireCount++);
+
+        await service.switchBranch('feature');
+
+        expect(fireCount).toBe(1);
     });
 });
 

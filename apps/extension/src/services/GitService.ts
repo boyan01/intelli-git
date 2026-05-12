@@ -39,6 +39,14 @@ const GIT_LOG_RECORD_SEPARATOR = '\x1e';
 const GIT_LOG_FIELD_SEPARATOR = '\x1f';
 const PUSH_COMMIT_LOG_FORMAT = '%x1e%H%x1f%h%x1f%s%x1f%an%x1f%aI%x1f%ae%x1f%P%x1f%b';
 
+function normalizeExistingPath(filePath: string): string {
+    try {
+        return path.normalize(fs.realpathSync(filePath));
+    } catch {
+        return path.normalize(filePath);
+    }
+}
+
 function getGitHubRepositoryUrl(remoteUrl: string): string | undefined {
     const normalized = remoteUrl.trim().replace(/\.git\/?$/, '');
     if (!normalized) {
@@ -76,7 +84,7 @@ export class GitService implements vscode.Disposable {
     private _onDidChange = new vscode.EventEmitter<void>();
 
     /**
-     * Fired when Git state changes (commit, reset, branch switch, etc.)
+     * Fired after this service completes a Git mutation. Repository watchers handle external changes.
      */
     public readonly onDidChange = this._onDidChange.event;
 
@@ -89,8 +97,8 @@ export class GitService implements vscode.Disposable {
     }
 
     constructor(workspaceRoot: string, gitRoot: string, git: SimpleGit, inactiveChangesService?: InactiveChangesService, changelistStateService?: ChangelistStateService) {
-        this._workspaceRoot = workspaceRoot;
-        this._gitRoot = gitRoot;
+        this._workspaceRoot = normalizeExistingPath(workspaceRoot);
+        this._gitRoot = normalizeExistingPath(gitRoot);
         this.git = git;
         this._inactiveChangesService = inactiveChangesService;
         this._changelistStateService = changelistStateService;
@@ -368,6 +376,10 @@ export class GitService implements vscode.Disposable {
         return this._workspaceRoot;
     }
 
+    public getGitRoot(): string {
+        return this._gitRoot;
+    }
+
     public getBlameCommitForLine = async (filePath: string, line: number): Promise<string | null> => {
         const repoPath = this.toRepoPath(filePath);
         const output = await this.git.raw(['blame', '--porcelain', '-L', `${line},${line}`, '--', repoPath]);
@@ -563,13 +575,18 @@ export class GitService implements vscode.Disposable {
             throw new Error('fatal: unable to generate diff for ' + filePath + ': index corrupt');
         }
         await this._stageFilesWithSupport([filePath]);
+        this.fireChange();
     }
 
     public async stageFiles(filePaths: string[]): Promise<void> {
         if (typeof __IS_EXPIRED__ !== 'undefined' && __IS_EXPIRED__) {
             throw new Error('fatal: too many files to stage: batch process failed');
         }
+        if (!filePaths || filePaths.length === 0) {
+            return;
+        }
         await this._stageFilesWithSupport(filePaths);
+        this.fireChange();
     }
 
     private async _stageFilesWithSupport(filePaths: string[]): Promise<void> {
@@ -631,7 +648,7 @@ export class GitService implements vscode.Disposable {
                 const combinedPatch = this.buildPatchFromHunks(inactiveHunks);
 
                 try {
-                    await this.applyPatch(combinedPatch, true, true);
+                    await this.applyPatchWithGit(this.git, combinedPatch, true, true);
                 } catch (e) {
                     console.error(`Failed to exclude hunks for ${filePath}:`, e);
                 }
@@ -641,6 +658,7 @@ export class GitService implements vscode.Disposable {
 
     public async unstageFile(filePath: string): Promise<void> {
         await this.git.reset(['HEAD', '--', this.toRepoPath(filePath)]);
+        this.fireChange();
     }
 
     public async unstageFiles(filePaths: string[]): Promise<void> {
@@ -649,6 +667,7 @@ export class GitService implements vscode.Disposable {
         }
 
         await this.git.reset(['HEAD', '--', ...filePaths.map(filePath => this.toRepoPath(filePath))]);
+        this.fireChange();
     }
 
     public async resolveConflict(filePath: string, side: 'ours' | 'theirs'): Promise<void> {
@@ -660,11 +679,13 @@ export class GitService implements vscode.Disposable {
         const keepDeleted = side === 'ours' ? !hasOurs : !hasTheirs;
         if (keepDeleted) {
             await this.git.raw(['rm', '--', repoPath]);
+            this.fireChange();
             return;
         }
 
         await this.git.raw(['checkout', `--${side}`, '--', repoPath]);
         await this.git.add(repoPath);
+        this.fireChange();
     }
 
     public async stageAll(): Promise<void> {
@@ -676,6 +697,7 @@ export class GitService implements vscode.Disposable {
 
         if (filesToStage.length > 0) {
             await this._stageFilesWithSupport(filesToStage);
+            this.fireChange();
         }
     }
 
@@ -688,6 +710,7 @@ export class GitService implements vscode.Disposable {
 
         if (filesToStage.length > 0) {
             await this._stageFilesWithSupport(filesToStage);
+            this.fireChange();
         }
     }
 
@@ -698,6 +721,7 @@ export class GitService implements vscode.Disposable {
             const rel = path.relative(this._gitRoot, this._workspaceRoot);
             await this.git.reset(['HEAD', '--', rel]);
         }
+        this.fireChange();
     }
 
     public async stash(message?: string, files?: string[], includeUntracked: boolean = false, stagedOnly: boolean = false): Promise<void> {
@@ -720,6 +744,7 @@ export class GitService implements vscode.Disposable {
             args.push('--', rel);
         }
         await this.git.stash(args);
+        this.fireChange();
     }
 
     public async rollbackFiles(files: string[]): Promise<void> {
@@ -767,6 +792,7 @@ export class GitService implements vscode.Disposable {
                 // Remove untracked files
                 await this.git.clean('f', ['-d', '--', ...toClean.map(f => this.toRepoPath(f))]);
             }
+            this.fireChange();
         } catch (e) {
             console.error('Rollback failed:', e);
             throw e;
@@ -853,6 +879,7 @@ export class GitService implements vscode.Disposable {
 
     public async applyPatch(patch: string, reverse: boolean = false, cached: boolean = false): Promise<void> {
         await this.applyPatchWithGit(this.git, patch, reverse, cached);
+        this.fireChange();
     }
 
     private async applyPatchWithGit(git: SimpleGit, patch: string, reverse: boolean = false, cached: boolean = false): Promise<void> {
@@ -897,7 +924,7 @@ export class GitService implements vscode.Disposable {
             }
 
             try {
-                await this.applyPatch(this.buildPatchFromHunks(inactiveHunks), true, true);
+                await this.applyPatchWithGit(this.git, this.buildPatchFromHunks(inactiveHunks), true, true);
             } catch (e) {
                 console.error(`Failed to exclude inactive hunks from index for ${file.path}:`, e);
                 throw e;
@@ -907,22 +934,27 @@ export class GitService implements vscode.Disposable {
 
     public async applyStash(index: number): Promise<void> {
         await this.git.stash(['apply', `stash@{${index}}`]);
+        this.fireChange();
     }
 
     public async popStash(index: number): Promise<void> {
         await this.git.stash(['pop', `stash@{${index}}`]);
+        this.fireChange();
     }
     public async dropStash(index: number): Promise<void> {
         await this.git.stash(['drop', `stash@{${index}}`]);
+        this.fireChange();
     }
 
     public async popLatestStash(): Promise<void> {
         await this.git.stash(['pop']);
+        this.fireChange();
     }
 
     public async discardAllChanges(): Promise<void> {
         await this.git.reset(['--hard']);
         await this.git.clean('f', ['-d']);
+        this.fireChange();
     }
 
     public async commit(message: string, files?: string[]): Promise<void> {
@@ -1159,6 +1191,7 @@ export class GitService implements vscode.Disposable {
      */
     public async setUpstreamBranch(remote: string, remoteBranch: string): Promise<void> {
         await this.git.raw(['branch', '--set-upstream-to', `${remote}/${remoteBranch}`]);
+        this.fireChange();
     }
 
     /**
@@ -1309,6 +1342,7 @@ export class GitService implements vscode.Disposable {
 
     public async fetch(): Promise<void> {
         await this.git.fetch(['--all', '--prune']);
+        this.fireChange();
     }
 
     /**
@@ -1328,6 +1362,7 @@ export class GitService implements vscode.Disposable {
             } else {
                 await this.git.fetch([remote, `${branch}:${branch}`]);
             }
+            this.fireChange();
             return 'success';
         } catch (e: any) {
             if (e.message && e.message.includes('non-fast-forward')) {
@@ -1426,6 +1461,7 @@ export class GitService implements vscode.Disposable {
 
     public async createBranch(branchName: string): Promise<void> {
         await this.git.checkoutLocalBranch(branchName);
+        this.fireChange();
     }
 
     public async checkoutRemoteBranch(remoteBranch: string, force: boolean = false): Promise<void> {
@@ -1636,10 +1672,12 @@ export class GitService implements vscode.Disposable {
         const status = await this.getRebaseStatus();
         if (status === 'merging') {
             await this.git.raw(['merge', '--abort']);
+            this.fireChange();
             return;
         }
 
         await this.git.rebase(['--abort']);
+        this.fireChange();
     }
 
     public async continueRebase(message?: string): Promise<void> {
@@ -1665,10 +1703,12 @@ export class GitService implements vscode.Disposable {
         const gitWithEditorBypass = this.createEditorGit({ GIT_EDITOR: 'true' });
         if (status === 'merging') {
             await gitWithEditorBypass.raw(['merge', '--continue']);
+            this.fireChange();
             return;
         }
 
         await gitWithEditorBypass.rebase(['--continue']);
+        this.fireChange();
     }
 
     public async getRebaseCommitMessage(): Promise<string> {
@@ -1740,19 +1780,23 @@ export class GitService implements vscode.Disposable {
             args.push('--no-verify');
         }
         await this.git.push(remote, branch, args);
+        this.fireChange();
     }
 
     public async pushTags(remote: string): Promise<void> {
         await this.git.pushTags(remote);
+        this.fireChange();
     }
 
     public async renameBranch(oldName: string, newName: string): Promise<void> {
         await this.git.branch(['-m', oldName, newName]);
+        this.fireChange();
     }
 
     public async deleteBranches(branches: string[], force: boolean = false): Promise<void> {
         const args = force ? ['-D'] : ['-d'];
         await this.git.branch([...args, ...branches]);
+        this.fireChange();
     }
 
     public async getTags(): Promise<string[]> {
@@ -1893,11 +1937,14 @@ export class GitService implements vscode.Disposable {
 
     public async merge(branchName: string): Promise<void> {
         await this.git.merge([branchName]);
+        this.fireChange();
     }
 
     public async checkoutAndRebase(branch: string, targetBranch: string): Promise<void> {
-        await this.switchBranch(branch);
-        await this.rebaseOnto(targetBranch);
+        await this.withTemporaryStash(`checkout ${branch} and rebase onto ${targetBranch}`, async () => {
+            await this.git.checkout(branch);
+            await this.git.rebase([targetBranch]);
+        });
     }
 
     public async pullWithRebase(remote: string, branch: string): Promise<void> {
@@ -1908,10 +1955,12 @@ export class GitService implements vscode.Disposable {
 
     public async pullWithMerge(remote: string, branch: string): Promise<void> {
         await this.git.pull(remote, branch);
+        this.fireChange();
     }
 
     public async createBranchFrom(newBranch: string, fromBranch: string): Promise<void> {
         await this.git.checkout(['-b', newBranch, fromBranch]);
+        this.fireChange();
     }
 
     public async reset(mode: 'soft' | 'mixed' | 'hard', commit: string): Promise<void> {

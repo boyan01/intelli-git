@@ -1,5 +1,6 @@
 import React, { useMemo, useCallback, useRef } from 'react';
 import type { ChangelistGroup, ChangelistState, FileStatus, LastCommitInfo } from '@shared/messages';
+import type { ChangelistBackgroundContext, ChangelistFileContext, ChangelistFolderContext, ChangelistRootContext } from '@shared/webviewContext';
 import { useTranslation } from 'react-i18next';
 import { BasicTreeView } from '../common/BasicTreeView';
 import type { TreeNode, BasicTreeViewRef } from '../common/BasicTreeView';
@@ -456,7 +457,7 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
                     hasUntracked,
                     changelistMode: changelistState.mode,
                     preventDefaultContextMenuItems: true
-                };
+                } satisfies ChangelistRootContext;
             }
 
             return {
@@ -472,7 +473,7 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
                 changelistId: node.data?.changelistId,
                 changelistMode: changelistState.mode,
                 preventDefaultContextMenuItems: true
-            };
+            } satisfies ChangelistFolderContext;
         }
         return {
             webviewSection: 'changelistFile',
@@ -495,7 +496,7 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
             changelistId: node.data.changelistId,
             changelistMode: changelistState.mode,
             preventDefaultContextMenuItems: true
-        };
+        } satisfies ChangelistFileContext;
     }, [changelistState.lists, changelistState.mode]);
 
     const isDraggable = useCallback((node: TreeNode<FileNodeData>) => {
@@ -653,7 +654,7 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
                 webviewSection: 'changelistBackground',
                 changelistMode: changelistState.mode,
                 preventDefaultContextMenuItems: true
-            } : undefined}
+            } satisfies ChangelistBackgroundContext : undefined}
         />
     );
 });

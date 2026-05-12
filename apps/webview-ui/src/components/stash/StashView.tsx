@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { StashItem, CommitFile, FileStatus } from '@shared/messages';
+import type { StashItemContext } from '@shared/webviewContext';
 import { useTranslation } from 'react-i18next';
 import { useRpcData } from '../../hooks/useRpcData';
 import { usePersistedState } from '../../hooks/usePersistedState';
@@ -103,7 +104,7 @@ export function StashView() {
                                 webviewSection: 'stashItem',
                                 stashIndex: stash.index,
                                 selectedStashFile: selectedFile,
-                            })}
+                            } satisfies StashItemContext)}
                             onClick={() => handleStashClick(stash.index)}
                             onDoubleClick={() => handleStashDoubleClick(stash.index)}
                         >

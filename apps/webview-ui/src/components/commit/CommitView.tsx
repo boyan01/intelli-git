@@ -8,295 +8,11 @@ import { usePersistedState } from '../../hooks/usePersistedState';
 import { useRpcData } from '../../hooks/useRpcData';
 import styles from './CommitView.module.css';
 import { rpc, rpcEvents } from '../../lib/rpc_client';
-import type { BranchInfo, ChangelistAssignment, ChangelistGroup, ChangelistState, FileStatus, GitHunk, LastCommitInfo } from '@shared/messages';
-
-const INACTIVE_CHANGELIST_ID = 'inactive-changes';
+import type { BranchInfo, ChangelistState, FileStatus, LastCommitInfo } from '@shared/messages';
+import { buildChangelists, getFileStats, getSelectedFiles, hasTrackedChanges, INACTIVE_CHANGELIST_ID } from './changelistModel';
 
 interface CommitViewProps {
     rebaseStatus?: BranchInfo['rebaseStatus'];
-}
-
-type LogicalFile = {
-    path: string;
-    status: FileStatus['status'];
-    entries: FileStatus[];
-    hunks: GitHunk[];
-    inactive: boolean;
-    inactiveHunkIds: string[];
-    resolvedCandidate?: boolean;
-    error?: boolean;
-    hasStagedInactive?: boolean;
-};
-
-function hasOnlyInactiveHunks(file: { inactive?: boolean; hunks?: GitHunk[]; inactiveHunkIds?: string[] }): boolean {
-    if (file.inactive) {
-        return true;
-    }
-
-    if (!file.hunks || file.hunks.length === 0 || !file.inactiveHunkIds || file.inactiveHunkIds.length === 0) {
-        return false;
-    }
-
-    return file.hunks.every(hunk => isInactiveHunkId(hunk.id, file.inactiveHunkIds));
-}
-
-function getEquivalentHunkIds(hunkId: string): string[] {
-    return [
-        hunkId,
-        hunkId.replace(':index:', ':worktree:'),
-        hunkId.replace(':worktree:', ':index:')
-    ];
-}
-
-function isInactiveHunkId(hunkId: string, inactiveHunkIds?: string[]): boolean {
-    if (!inactiveHunkIds || inactiveHunkIds.length === 0) {
-        return false;
-    }
-
-    const inactiveSet = new Set(inactiveHunkIds);
-    return getEquivalentHunkIds(hunkId).some(id => inactiveSet.has(id));
-}
-
-function getAssignedHunkListId(hunkId: string, assignment?: ChangelistAssignment): string | undefined {
-    return getEquivalentHunkIds(hunkId)
-        .map(id => assignment?.hunkListIds?.[id])
-        .find((id): id is string => Boolean(id));
-}
-
-function getInactiveHunks(file: { hunks?: GitHunk[]; inactiveHunkIds?: string[] }): GitHunk[] {
-    if (!file.hunks || !file.inactiveHunkIds || file.inactiveHunkIds.length === 0) {
-        return [];
-    }
-
-    return file.hunks.filter(hunk => isInactiveHunkId(hunk.id, file.inactiveHunkIds));
-}
-
-function getActiveHunks(file: { hunks?: GitHunk[]; inactiveHunkIds?: string[] }): GitHunk[] {
-    if (!file.hunks || file.hunks.length === 0) {
-        return [];
-    }
-
-    return file.hunks.filter(hunk => !isInactiveHunkId(hunk.id, file.inactiveHunkIds));
-}
-
-function getLogicalStatus(entries: FileStatus[]): FileStatus['status'] {
-    if (entries.some(entry => entry.status === 'C' || entry.status === 'U')) {
-        return 'C';
-    }
-    if (entries.some(entry => entry.status === '?')) {
-        return '?';
-    }
-    if (entries.some(entry => entry.status === 'D')) {
-        return 'D';
-    }
-    if (entries.some(entry => entry.status === 'A')) {
-        return 'A';
-    }
-    return entries[0]?.status || 'M';
-}
-
-function buildLogicalFiles(files: FileStatus[]): LogicalFile[] {
-    const grouped = new Map<string, FileStatus[]>();
-    files.forEach(file => {
-        const entries = grouped.get(file.path) || [];
-        entries.push(file);
-        grouped.set(file.path, entries);
-    });
-
-    return Array.from(grouped.entries()).map(([path, entries]) => {
-        const hunks = Array.from(new Map(
-            entries.flatMap(entry => (entry.hunks || []).map(hunk => [hunk.id, hunk]))
-        ).values());
-        const inactiveHunkIds = Array.from(new Set(entries.flatMap(entry => entry.inactiveHunkIds || [])));
-
-        return {
-            path,
-            status: getLogicalStatus(entries),
-            entries,
-            hunks,
-            inactive: entries.some(entry => entry.inactive),
-            inactiveHunkIds,
-            resolvedCandidate: entries.some(entry => entry.resolvedCandidate),
-            error: entries.some(entry => entry.error),
-            hasStagedInactive: entries.some(entry => entry.hasStagedInactive)
-        };
-    });
-}
-
-function toDisplayFile(file: LogicalFile, hunks?: GitHunk[], inactive = file.inactive): FileStatus {
-    return {
-        path: file.path,
-        status: file.status,
-        staged: false,
-        inactive,
-        hunks,
-        inactiveHunkIds: file.inactiveHunkIds,
-        resolvedCandidate: file.resolvedCandidate,
-        error: file.error,
-        hasStagedInactive: file.hasStagedInactive
-    };
-}
-
-function toActiveFileStatus(file: FileStatus): FileStatus | undefined {
-    if (file.inactive || hasOnlyInactiveHunks(file)) {
-        return undefined;
-    }
-
-    const activeHunks = getActiveHunks(file);
-    if (file.hunks && file.hunks.length > 0) {
-        if (activeHunks.length === 0) {
-            return undefined;
-        }
-
-        return {
-            ...file,
-            hunks: activeHunks,
-            inactive: false
-        };
-    }
-
-    return file;
-}
-
-function buildChangelists(files: FileStatus[], changelistState: ChangelistState, t: (key: string) => string): ChangelistGroup[] {
-    const logicalFiles = buildLogicalFiles(files);
-    const changelistGroups = new Map<string, FileStatus[]>();
-    changelistState.lists.forEach(list => changelistGroups.set(list.id, []));
-
-    const inactiveFiles: FileStatus[] = [];
-    const untrackedFiles: FileStatus[] = [];
-
-    logicalFiles.forEach(file => {
-        if (file.inactive) {
-            if (changelistState.mode === 'changes') {
-                const group = changelistGroups.get(INACTIVE_CHANGELIST_ID);
-                if (group) {
-                    group.push(toDisplayFile(file));
-                }
-            } else {
-                inactiveFiles.push(toDisplayFile(file));
-            }
-            return;
-        }
-
-        const assignment: ChangelistAssignment | undefined = changelistState.assignments[file.path];
-
-        if (file.status === '?') {
-            if (changelistState.mode === 'changes' && assignment?.fileListId) {
-                const group = changelistGroups.get(assignment.fileListId);
-                if (group) {
-                    group.push(toDisplayFile(file));
-                    return;
-                }
-            }
-
-            untrackedFiles.push(toDisplayFile(file));
-            return;
-        }
-
-        const inactiveHunks = getInactiveHunks(file);
-        const activeHunks = getActiveHunks(file);
-
-        if (inactiveHunks.length > 0 && changelistState.mode === 'changes') {
-            const group = changelistGroups.get(INACTIVE_CHANGELIST_ID);
-            if (group) {
-                group.push(toDisplayFile(file, inactiveHunks, true));
-            }
-        } else if (inactiveHunks.length > 0) {
-            inactiveFiles.push(toDisplayFile(file, inactiveHunks, true));
-        }
-
-        if (file.hunks.length > 0) {
-            if (activeHunks.length === 0) {
-                return;
-            }
-
-            const hunksByList = new Map<string, GitHunk[]>();
-
-            activeHunks.forEach(hunk => {
-                const listId = getAssignedHunkListId(hunk.id, assignment) || changelistState.activeListId;
-                const group = hunksByList.get(listId) || [];
-                group.push(hunk);
-                hunksByList.set(listId, group);
-            });
-
-            hunksByList.forEach((hunks, listId) => {
-                const group = changelistGroups.get(listId);
-                if (group) {
-                    group.push(toDisplayFile(file, hunks));
-                }
-            });
-            return;
-        }
-
-        const listId = assignment?.fileListId || changelistState.activeListId;
-        const group = changelistGroups.get(listId);
-        if (group) {
-            group.push(toDisplayFile(file));
-        }
-    });
-
-    const result: ChangelistGroup[] = [];
-
-    if (changelistState.mode === 'staged') {
-        const stagedFiles = files
-            .filter(file => file.staged && file.status !== '?')
-            .map(toActiveFileStatus)
-            .filter((file): file is FileStatus => Boolean(file));
-        const changesFiles = files
-            .filter(file => !file.staged && file.status !== '?')
-            .map(toActiveFileStatus)
-            .filter((file): file is FileStatus => Boolean(file));
-
-        result.push({
-            id: 'staged-changes',
-            name: t('Staged Changes'),
-            isDefault: false,
-            isActive: false,
-            items: stagedFiles
-        });
-
-        result.push({
-            id: 'changes',
-            name: t('Changes'),
-            isDefault: true,
-            isActive: true,
-            items: changesFiles
-        });
-    } else {
-        changelistState.lists.forEach(list => {
-            result.push({
-                id: list.id,
-                name: list.name,
-                isDefault: list.isDefault,
-                isActive: list.isActive,
-                items: changelistGroups.get(list.id) || []
-            });
-        });
-    }
-
-    if (untrackedFiles.length > 0) {
-        result.push({
-            id: 'untracked-changes',
-            name: t('Untracked Changes'),
-            isDefault: false,
-            isActive: false,
-            items: untrackedFiles
-        });
-    }
-
-    if (changelistState.mode === 'staged') {
-        result.push({
-            id: INACTIVE_CHANGELIST_ID,
-            name: t('Inactive Changes'),
-            isDefault: false,
-            isActive: false,
-            items: inactiveFiles,
-            hasWarning: inactiveFiles.some(file => file.hasStagedInactive)
-        });
-    }
-
-    return result;
 }
 
 export function CommitView({ rebaseStatus }: CommitViewProps) {
@@ -316,13 +32,15 @@ export function CommitView({ rebaseStatus }: CommitViewProps) {
         initialValue: {
             files: [] as FileStatus[],
             changelistState: initialChangelistState,
-            workspaceRoot: ''
+            workspaceRoot: '',
+            hasRepository: true
         },
         cacheKey: 'commit.viewState'
     });
     const files = commitViewState.files;
     const changelistState = commitViewState.changelistState;
     const workspaceRoot = commitViewState.workspaceRoot;
+    const hasRepository = commitViewState.hasRepository !== false;
 
     const changelists = useMemo(() => buildChangelists(files, changelistState, t), [files, changelistState, t]);
     const [activeFile, setActiveFile] = useState<string | null>(null);
@@ -348,17 +66,7 @@ export function CommitView({ rebaseStatus }: CommitViewProps) {
         return rpcEvents.activeFileChange.subscribe(handleActiveFile);
     }, []);
 
-    const selectedFiles = useMemo(() => {
-        if (changelistState.mode === 'staged') {
-            return new Set(files.filter(file => file.staged && !hasOnlyInactiveHunks(file)).map(file => file.path));
-        }
-
-        const activeGroup = changelists.find(group => group.isActive);
-        const next = new Set(activeGroup?.items.map(file => file.path) || []);
-        const untrackedGroup = changelists.find(group => group.id === 'untracked-changes');
-        untrackedGroup?.items.forEach(file => next.add(file.path));
-        return next;
-    }, [changelistState.mode, changelists, files]);
+    const selectedFiles = useMemo(() => getSelectedFiles(files, changelists, changelistState), [files, changelists, changelistState]);
 
     useEffect(() => {
         const requestId = ++lastCommitInfoRequestRef.current;
@@ -396,34 +104,9 @@ export function CommitView({ rebaseStatus }: CommitViewProps) {
         });
     }, [setExpandedIds]);
 
-    const fileStats = useMemo(() => {
-        let added = 0;
-        let modified = 0;
-        let deleted = 0;
+    const fileStats = useMemo(() => getFileStats(changelists, selectedFiles), [changelists, selectedFiles]);
 
-        changelists.forEach(group => {
-            group.items.forEach(file => {
-                if (!selectedFiles.has(file.path)) {
-                    return;
-                }
-
-                const status = file.status.trim().toUpperCase();
-                if (status.startsWith('A') || status === '?' || status === 'U') {
-                    added++;
-                } else if (status.startsWith('D')) {
-                    deleted++;
-                } else {
-                    modified++;
-                }
-            });
-        });
-
-        return { added, modified, deleted };
-    }, [changelists, selectedFiles]);
-
-    const hasTrackedChanges = useMemo(() => {
-        return files.some(file => !hasOnlyInactiveHunks(file) && file.status !== '?' && file.status !== 'C' && file.status !== 'U' && !file.staged);
-    }, [files]);
+    const hasTracked = useMemo(() => hasTrackedChanges(files), [files]);
 
     const handleCommitSuccess = useCallback(() => {
         savedMessageRef.current = null;
@@ -436,7 +119,7 @@ export function CommitView({ rebaseStatus }: CommitViewProps) {
                 viewMode={viewMode}
                 changelistState={changelistState}
                 selectedFiles={selectedFiles}
-                hasTrackedChanges={hasTrackedChanges}
+                hasTrackedChanges={hasTracked}
                 onViewModeChange={setViewMode}
                 onExpandAll={() => {
                     const allIds = new Set(expandedIds);
@@ -451,7 +134,9 @@ export function CommitView({ rebaseStatus }: CommitViewProps) {
             />
 
             <div className={styles.fileListContainer}>
-                {changelists.length === 0 ? (
+                {!hasRepository ? (
+                    loading ? null : <div className={styles.emptyState}>{t('No Git repository found')}</div>
+                ) : changelists.length === 0 ? (
                     loading ? null : <div className={styles.emptyState}>{t('No changes')}</div>
                 ) : (
                     <ChangelistTree

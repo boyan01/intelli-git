@@ -2,6 +2,8 @@
 
 梳理日期：2026-05-12
 
+最近更新：2026-05-12，本轮已完成 P0/P1 中最直接影响 correctness 的边界修复，以及一组低风险结构清理。本文档现在同时记录已落地状态和剩余 backlog。
+
 这份文档记录 Intelli Git 当前从代码结构、边界设计、架构演进角度值得做的事项。范围只包含能降低真实产品风险、让后续功能更稳的工作；不建议做纯粹为了“看起来更分层”的大改，也不建议加只负责改名转发的 thin wrapper。
 
 ## 当前结构概览
@@ -33,7 +35,9 @@ React webview
 
   commit/
     CommitView
-      -> commit state, hunk grouping, changelist grouping, selection, amend/rebase state
+      -> commit view state, amend/rebase state, rendering
+    changelistModel
+      -> hunk grouping, changelist grouping, selected files, stats
     ChangelistTree
       -> tree rendering, context payloads, drag/drop, file commands
 
@@ -46,9 +50,41 @@ React webview
       -> RPC contracts and shared domain types
     packages/shared/rpc.ts
       -> typed RPC peer
+    packages/shared/webviewContext.ts
+      -> typed native webview context-menu payload sections
 ```
 
-当前大方向是对的：`changelist` 和 `inactive changes` 的 durable state 放在 extension host，webview 负责 rendering 和 interaction dispatch，native VS Code context menu 通过 `data-vscode-context` 驱动。主要问题不是缺框架，而是几个边界还不够稳：多仓库 identity、启动生命周期、超大 service/RPC 文件、webview 组件里混入过多 domain 计算，以及测试覆盖还没有压住这些边界。
+当前大方向是对的：`changelist` 和 `inactive changes` 的 durable state 放在 extension host，webview 负责 rendering 和 interaction dispatch，native VS Code context menu 通过 `data-vscode-context` 驱动。本轮已经处理多仓库 identity、初始 no-repo activation、commit/changelist webview domain logic、Git mutation refresh contract、context payload typing 和一部分 common UI 边界。剩余主要问题集中在超大 `GitService`、超宽 `ExtensionRpcHandler`、native command/RPC changelist 行为复用，以及 persisted state ownership。
+
+## 2026-05-12 实施状态
+
+已完成：
+
+- Repository scope 使用 `RepositoryScope` 表达 `workspaceRoot`、`gitRoot`、`repoPath`、`name` 和 `isSubmodule`，子目录打开仓库时不再静默扩大 workspace scope。
+- revision/stash content URI 携带 repo identity；明确 scoped URI 找不到 repo 时不 fallback 到 active repo，避免 active repository 切换后读错内容。
+- activation 不再因为初始无 Git repo 直接 early return；global providers、global commands、content providers、watcher 和 repository listeners 会先注册。
+- no-repository 状态下，commit view、git log、stash、branch/push 相关 read RPC 返回空状态，而不是依赖 `No active repository` 异常。
+- `CommitView.tsx` 中的纯 commit/changelist 计算已抽到 `apps/webview-ui/src/components/commit/changelistModel.ts`，并增加 webview-side unit tests。
+- `GitService.onDidChange` contract 已收敛为：service 内成功完成的 Git mutation 触发事件，repository watcher 负责 external changes detection。
+- `data-vscode-context` 已有 shared section/type contract：`packages/shared/webviewContext.ts`，并有轻量测试校验 package menu section。
+- `RefLabels` 已移到 common，旧 `RefLabel.tsx` 和 Vite template `App.css` 已删除，顺手修正了一个 hardcoded `No data` 文案。
+
+自动验证已通过：
+
+```bash
+npm run compile
+npm run lint
+npm run test
+git diff --check
+```
+
+尚未完成：
+
+- `GitService` 还没有物理拆成 working-tree、index/commit、branch/remote、log 等 behavior slices。
+- `ExtensionRpcHandler` 仍是单个大入口；本轮只补了 no-repo read fallback，没有做 feature ownership 拆分。
+- native commands 和 RPC 的 changelist mutation workflow 仍未合并成共享 operation layer。
+- webview persisted state schema 还没有按 feature 收敛。
+- `BasicTreeView` 仍保持原状，等待下一次具体 tree 行为改动时再抽 tested helper/hook。
 
 ## 设计原则
 
@@ -60,6 +96,8 @@ React webview
 - 大结构移动前先补行为测试，尤其是 commit/changelist、多仓库、context menu 和 refresh contract。
 
 ## P0: 修正 Repository Scope 和 Identity 边界
+
+状态：已完成本轮主修复，后续只保留更复杂 multi-root/submodule 手动回归。
 
 证据：
 
@@ -75,15 +113,20 @@ React webview
 
 建议设计：
 
-- 引入真正表达 repo identity 的模型，例如 `RepositoryScope`，包含 `workspaceRoot`、`gitRoot`、`repoPath`、`name`、`isSubmodule`。
-- 让 `RepositoryManager` 继续负责 scope resolution 和 active repository selection。
-- revision/stash/content URI 携带足够 repo identity，或者 provider 通过 URI root 反查目标 service。
-- 增加 regression tests：
-  - workspace 打开在 repo 子目录内
-  - multi-root workspace 切 active repository
-  - revision/stash content 在 active repository 切换前后仍读同一个 repo
+- 已引入 `RepositoryScope`，包含 `workspaceRoot`、`gitRoot`、`repoPath`、`name`、`isSubmodule`。
+- `RepositoryManager` 继续负责 scope resolution 和 active repository selection。
+- revision/stash/content URI 已携带 repo identity；legacy URI 仍 fallback active repo，scoped URI 解析失败返回空内容。
+- 已补自动测试：
+  - workspace 打开在 repo 子目录内时 status 仍按 workspace scope 返回。
+  - repository-aware revision/stash content provider 不受 active repo fallback 误读影响。
+- 仍建议手动回归：
+  - multi-root workspace 切 active repository。
+  - submodule repo 选择与内容打开。
+  - active repository 切换前打开的 diff tab 在切换后仍显示原 repo 内容。
 
 ## P1: 让 Activation 在初始无 Git Repo 时可恢复
+
+状态：已完成核心生命周期修复。
 
 证据：
 
@@ -97,12 +140,15 @@ React webview
 
 建议设计：
 
-- 先注册 global providers、global commands、content providers 和 repository listeners，再处理 active repository 是否存在。
-- repo-bound disposables 继续放在现有 `bindActiveRepository()` 这类生命周期里。
-- webview 通过 RPC 渲染明确的 no-repository state，而不是依赖 activation abort。
-- 补一个小型测试或集成 harness，覆盖 activation 后 repository 才出现的情况。
+- 已先注册 global providers、global commands、content providers 和 repository listeners，再处理 active repository 是否存在。
+- repo-bound disposables 继续放在 `bindActiveRepository()` 生命周期里。
+- webview 通过 RPC 渲染明确 no-repository state。
+- read-heavy RPC 在 no-repository 状态返回空模型。
+- 后续可补真实 VS Code integration harness，覆盖 activation 后 repository 才出现的流程；当前已有 unit-level no-repo read fallback coverage。
 
 ## P1: 从 React Rendering 中抽出 Commit/Changelist Domain Logic
+
+状态：已完成核心抽取。
 
 证据：
 
@@ -116,18 +162,23 @@ React webview
 
 建议设计：
 
-- 把纯计算抽到类似 `apps/webview-ui/src/components/commit/changelistModel.ts` 的模块。
-- React components 只保留 view state、event handler 和 rendering。
-- 增加 webview-side unit tests：
-  - staged mode groups
-  - changes mode active list selection
-  - inactive file/hunk handling
-  - untracked group behavior
-  - file-only tree expectations
+- 已把纯计算抽到 `apps/webview-ui/src/components/commit/changelistModel.ts`。
+- `CommitView.tsx` 现在主要保留 view state、event handler 和 rendering。
+- 已增加 webview-side unit tests：
+  - staged mode groups。
+  - changes mode active list selection。
+  - inactive file/hunk handling。
+  - untracked group behavior。
+
+仍需注意：
+
+- `ChangelistTree.tsx` 仍负责 tree building、context payload、drag/drop mutation dispatch。它没有 hunk child nodes，但如果后续继续改 tree behavior，应围绕具体行为再抽 tested helper，不要机械拆文件。
 
 这类抽取有真实价值，因为它让 domain rules 可测试。不要新建只把 props 传回原组件的 hook/helper。
 
 ## P1: 按真实职责拆分 `GitService`
+
+状态：未完成。本轮只修了 scope、path canonicalization、`getGitRoot()` 和 mutation event contract，没有物理拆 service。
 
 证据：
 
@@ -147,7 +198,15 @@ React webview
 
 第一步可以保持 public call sites 稳定，但只能作为迁移手段。被抽出的模块必须拥有实际行为和测试，不能变成一堆 one-method pass-through wrappers。
 
+更新建议：
+
+- 优先从 `GitLogService` 或 `GitBranchRemoteService` 开始拆，因为输入输出边界相对清楚，且对 commit precision 的风险小于 staging/temporary index。
+- `GitWorkingTreeService` 和 `GitIndexCommitService` 要更谨慎：它们涉及 path scope、inactive hunk、temporary index、active changelist commit plan，拆分前先增加更强的 status/commit-plan tests。
+- 不要先创建只改名转发的 facade。每个新 service 必须拥有 cohesive behavior 和对应测试。
+
 ## P1: 明确 Git Mutation 的 Refresh Contract
+
+状态：已完成核心 contract 收敛。
 
 证据：
 
@@ -161,18 +220,24 @@ React webview
 
 建议设计：
 
-- 明确选择一种 contract，并写进代码注释和测试：
-  - 所有成功的 git mutation 都由 `GitService` fire `onDidChange`
-  - 或者 `GitService` 完全不负责 UI refresh，caller 必须显式触发
-- 更推荐第一种，让 watcher 只负责 external changes detection。
-- 增加代表性 mutation tests：
+- 已选择并写入 contract：service 内成功完成的 Git mutation 由 `GitService` fire `onDidChange`，watcher 只负责 external changes detection。
+- 已补代表性 mutation tests：
   - `stageFile`
   - `unstageFile`
   - `stash`
+  - `applyPatch`
   - `commitChangelistPlan`
-  - branch switch/update
+  - branch switch
+- 已补齐 `applyPatch`、rebase continue/abort、branch mutation、stash mutation 等路径的事件触发。
+- `checkoutAndRebase()` 已避免通过两个 public mutation method 触发中间态双刷新。
+
+后续注意：
+
+- 每新增一个 mutating Git method，都应明确是否触发 `fireChange()`，并补最小测试或把它放在已有 covered workflow 内。
 
 ## P2: 收窄 `ExtensionRpcHandler`
+
+状态：未完成。仅完成 no-repository read fallback，未拆 feature ownership。
 
 证据：
 
@@ -195,6 +260,12 @@ React webview
   - webview state RPC
 - 用 typed、prefixed operations 替代泛型 workspace state RPC。
 - 暂不改 `RpcPeer`；问题是 method ownership，不是 transport。
+
+更新建议：
+
+- 拆分前先把当前 no-repo fallback 作为 contract 保留下来：read methods 返回空模型，write/mutation methods 可以继续抛明确错误。
+- 第一批可从 read-only git log/stash/push query methods 开始，因为它们已经有空模型 fallback，比较容易迁移到 feature-specific handler。
+- 泛型 `getWorkspaceState<T>` / `updateWorkspaceState<T>` 仍是边界偏宽的问题，后续要用 typed、prefixed operations 替代。
 
 ## P2: 合并 Native Command 和 RPC 的 Changelist 行为链路
 
@@ -220,6 +291,8 @@ React webview
 
 ## P2: 给 `data-vscode-context` 建 Typed Contract
 
+状态：已完成基础 typed section contract。
+
 证据：
 
 - `apps/webview-ui/src/components/commit/ChangelistTree.tsx`、`apps/webview-ui/src/components/git-log/LogListPanel.tsx`、`apps/webview-ui/src/components/stash/StashView.tsx` 都在各自文件里拼 native menu context payload。
@@ -231,12 +304,18 @@ React webview
 
 建议设计：
 
-- 增加 shared context payload types，例如 `packages/shared/webviewContext.ts`。
-- 覆盖 section discriminants：`changelistFile`、`changelistRoot`、`gitLogCommit`、`stashItem`、`gitLogCommitFile`。
-- 只有在 builder 会 validate 或 normalize context shape 时才加 builder；不要只是把 object literal 换个名字。
-- 可以加一个轻量测试，校验已知 section names 和 `apps/extension/package.json` menu clauses 对齐。
+- 已增加 `packages/shared/webviewContext.ts`。
+- 已覆盖主要 section discriminants：`changelistFile`、`changelistRoot`、`changelistFolder`、`changelistBackground`、`gitLogCommit`、`stashItem`、`gitLogCommitFile` 等。
+- 已在 webview object literals 上用 `satisfies` 绑定类型，没有引入无行为 builder。
+- 已加轻量测试校验已知 section names 和 `apps/extension/package.json` menu clauses 对齐。
+
+后续注意：
+
+- 新增 native webview context menu 时，必须同步更新 `webviewContext.ts` 和 menu section alignment test。
 
 ## P2: 清理 Webview Common 边界
+
+状态：已完成本轮列出的低风险清理。
 
 证据：
 
@@ -246,9 +325,9 @@ React webview
 
 建议工作：
 
-- 把共享的 ref chip components 移到 `components/common` 或 `components/ref-labels`。
-- 删除确认无人引用的 UI 残留文件，删除前用 `rg` 查清引用。
-- 顺手修掉碰到的硬编码 user-facing text，按现有 l10n bundle 规则处理。
+- 已把 `RefLabels` 移到 `components/common`。
+- 已删除无人引用的 `components/git-log/RefLabel.tsx` 和 Vite template `src/App.css`。
+- 已修正碰到的 hardcoded `No data` 文案，并加入 l10n bundle。
 
 ## P2: 明确 Webview Persisted State Ownership
 
@@ -281,20 +360,23 @@ React webview
 
 ## Test and Verification Backlog
 
-结构改动前后建议补这些覆盖：
+已补自动覆盖：
 
 - `RepositoryManager` 的 workspace-root 与 git-root scope 测试。
 - repository-aware revision/stash content provider 测试。
 - `GitService.onDidChange` mutation event tests。
 - webview commit/changelist model tests。
 - native menu context payload tests。
-- 手动回归：
-  - staged mode 和 changes mode 切换
-  - active changelist commit 排除其他 changelists
-  - inactive files 和 inactive hunks 不进入 commit
-  - untracked changes 仍是独立 group
-  - changelist root、file、blank area、git log commit、stash item 的右键菜单
-  - multi-root workspace active repository switch
+
+仍建议手动回归：
+
+- staged mode 和 changes mode 切换。
+- active changelist commit 排除其他 changelists。
+- inactive files 和 inactive hunks 不进入 commit。
+- untracked changes 仍是独立 group。
+- changelist root、file、blank area、git log commit、stash item 的右键菜单。
+- multi-root workspace active repository switch。
+- subdir workspace 下 git log file diff、compare local、open repository version、revert/cherry-pick/create patch。
 
 常用命令：
 
@@ -307,35 +389,33 @@ npm run package:extension:dev
 
 ## Suggested PR Sequence
 
-1. Repository scope and activation lifecycle。
-   - 修 initial no-repo activation behavior。
-   - 让 revision/stash providers repository-aware。
-   - 补 repository lifecycle tests。
+已完成：
 
-2. Commit/changelist webview model extraction。
-   - 抽 pure grouping 和 selection logic。
-   - 增加 focused unit tests。
-   - 保持 UI behavior 不变。
+- Repository scope and activation lifecycle。
+- Commit/changelist webview model extraction。
+- Git mutation event contract。
+- Native menu context typed contract。
+- Low-risk webview common cleanup。
 
-3. Git mutation event contract。
-   - 选择并记录 refresh contract。
-   - 统一 successful mutation events。
-   - 只有在测试证明不需要时，才删除 redundant manual refresh。
+下一步建议：
 
-4. GitService behavior slices。
+1. GitService behavior slices。
    - 一次只抽一个 cohesive area。
    - 可以先从 log 或 commit-plan code 开始，因为输入输出边界清楚。
    - 保持 public behavior 稳定。
 
-5. RPC and command operation cleanup。
+2. RPC and command operation cleanup。
    - 按 feature 拆 handler ownership。
    - 用 typed operations 替代 generic workspace-state RPC。
    - 在 native commands 和 RPC 之间共享 changelist operation behavior。
 
-6. Low-risk cleanup。
-   - 移动 shared ref labels。
-   - 删除 confirmed-dead files。
-   - 修碰到的 hardcoded user-facing strings。
+3. Webview persisted state ownership。
+   - 把 feature-specific state schema 移近对应 feature module。
+   - 为 stale keys 增加 typed migration 或 cleanup policy。
+
+4. Tree behavior focused extraction。
+   - 只在下一次改 selection、drag/drop、keyboard navigation 或 virtualization 时做。
+   - 围绕具体行为抽 tested pure helpers 或 focused hook。
 
 ## 暂不值得做
 

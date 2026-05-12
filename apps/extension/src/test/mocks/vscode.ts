@@ -2,11 +2,26 @@ let changelistMode = 'staged';
 const executedCommands: Array<{ command: string; args: unknown[] }> = [];
 
 export class EventEmitter<T> {
-    public readonly event = (_listener: (event: T) => unknown) => ({ dispose() { } });
+    private listeners = new Set<(event: T) => unknown>();
 
-    public fire(_event: T): void { }
+    public readonly event = (listener: (event: T) => unknown) => {
+        this.listeners.add(listener);
+        return {
+            dispose: () => {
+                this.listeners.delete(listener);
+            }
+        };
+    };
 
-    public dispose(): void { }
+    public fire(event: T): void {
+        for (const listener of this.listeners) {
+            listener(event);
+        }
+    }
+
+    public dispose(): void {
+        this.listeners.clear();
+    }
 }
 
 export const ConfigurationTarget = {
@@ -32,7 +47,14 @@ export const workspace = {
 };
 
 class MockUri {
-    constructor(public readonly value: string) { }
+    public readonly path: string;
+    public readonly query: string;
+
+    constructor(public readonly value: string, parts?: { path?: string; query?: string }) {
+        const [withoutQuery, query = ''] = value.split('?');
+        this.path = parts?.path ?? withoutQuery.replace(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\/[^/]*/, '');
+        this.query = parts?.query ?? query;
+    }
 
     public static parse(value: string): MockUri {
         return new MockUri(value);
@@ -40,6 +62,15 @@ class MockUri {
 
     public static file(value: string): MockUri {
         return new MockUri(`file://${value}`);
+    }
+
+    public with(parts: { query?: string }): MockUri {
+        const base = this.value.split('?')[0];
+        const query = parts.query ?? this.query;
+        return new MockUri(query ? `${base}?${query}` : base, {
+            path: this.path,
+            query
+        });
     }
 
     public toString(): string {

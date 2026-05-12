@@ -10,6 +10,8 @@
     "Close": "Close",
     "Loading...": "Loading...",
     "No changes": "No changes",
+    "No Git repository found": "No Git repository found",
+    "No data": "No data",
     "Changes": "Changes",
     "Untracked Changes": "Untracked Changes",
     "Conflicting Changes": "Conflicting Changes",

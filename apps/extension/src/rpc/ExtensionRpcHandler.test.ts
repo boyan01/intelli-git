@@ -27,6 +27,9 @@ function createStagedChangelistState(): ChangelistState {
 function createHandler(gitService: Partial<GitService>): ExtensionRpcHandler {
     // Add getActiveService to the gitService mock or wrap it
     const gitServiceMock = gitService as GitService;
+    if (!gitServiceMock.getWorkspaceRoot) {
+        (gitServiceMock as unknown as { getWorkspaceRoot: () => string }).getWorkspaceRoot = () => '/workspace';
+    }
     // We mock properties accessed via get inactiveChangesService / changelistStateService
     Object.defineProperty(gitServiceMock, 'inactiveChangesService', {
         get: () => ({} as InactiveChangesService)
@@ -40,6 +43,13 @@ function createHandler(gitService: Partial<GitService>): ExtensionRpcHandler {
     return new ExtensionRpcHandler({
         context: {} as vscode.ExtensionContext,
         repositoryManager: { getActiveService: () => gitServiceMock } as any,
+    });
+}
+
+function createNoRepoHandler(): ExtensionRpcHandler {
+    return new ExtensionRpcHandler({
+        context: {} as vscode.ExtensionContext,
+        repositoryManager: { getActiveService: () => undefined } as any,
     });
 }
 
@@ -68,6 +78,28 @@ describe('ExtensionRpcHandler commit', () => {
         });
 
         expect(commitAmend).toHaveBeenCalledWith('Amend partial staging', undefined);
+    });
+});
+
+describe('ExtensionRpcHandler no repository state', () => {
+    it('returns empty read models instead of throwing', async () => {
+        const handler = createNoRepoHandler();
+
+        await expect(handler.getCommitViewState()).resolves.toMatchObject({
+            files: [],
+            workspaceRoot: '',
+            hasRepository: false
+        });
+        await expect(handler.getStashList()).resolves.toEqual([]);
+        await expect(handler.getBranchListData()).resolves.toEqual({
+            currentBranch: '',
+            localBranches: [],
+            localBranchesInfo: [],
+            remoteBranches: {},
+            tags: []
+        });
+        await expect(handler.getLog({})).resolves.toEqual([]);
+        await expect(handler.getWorkspaceRoot()).resolves.toBe('');
     });
 });
 

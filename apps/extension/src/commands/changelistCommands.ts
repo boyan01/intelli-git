@@ -8,6 +8,7 @@ import { CommitViewProvider } from '../providers/CommitViewProvider';
 import { i18n } from '../utils/i18n';
 import { logger } from '../utils/logger';
 import { EditorHunkResolver, findBestHunkMatch, type EditorHunkMatchTarget } from '../editor/EditorHunkResolver';
+import { createRevisionContentUri } from '../utils/repositoryContentUri';
 
 interface ChangelistFileContext {
     webviewSection: 'changelistFile';
@@ -235,16 +236,16 @@ async function showDiffForChangelistFile(gitService: GitService, args: Changelis
     }
 
     if (args.staged) {
-        const leftUri = vscode.Uri.parse(`intelli-git-revision://load/${args.path}?${JSON.stringify({ ref: 'HEAD', preferStaged: true })}`);
-        const rightUri = vscode.Uri.parse(`intelli-git-revision://load/${args.path}?${JSON.stringify({ ref: '' })}`);
+        const leftUri = createRevisionContentUri(gitService, args.path, { ref: 'HEAD', preferStaged: true });
+        const rightUri = createRevisionContentUri(gitService, args.path, { ref: '' });
         const title = `${path.basename(args.path)} ${i18n.t('(Staged)')}`;
         await vscode.commands.executeCommand('vscode.diff', leftUri, rightUri, title);
         return;
     }
 
     if (args.status === 'D') {
-        const leftUri = vscode.Uri.parse(`intelli-git-revision://load/${args.path}?${JSON.stringify({ ref: 'HEAD', preferStaged: false })}`);
-        const rightUri = vscode.Uri.parse(`intelli-git-revision://load/${args.path}?${JSON.stringify({ ref: 'WORKTREE', preferStaged: false })}`);
+        const leftUri = createRevisionContentUri(gitService, args.path, { ref: 'HEAD', preferStaged: false });
+        const rightUri = createRevisionContentUri(gitService, args.path, { ref: 'WORKTREE', preferStaged: false });
         await vscode.commands.executeCommand('vscode.diff', leftUri, rightUri, path.basename(args.path));
         return;
     }

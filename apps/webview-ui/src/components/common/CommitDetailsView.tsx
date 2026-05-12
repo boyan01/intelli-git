@@ -5,7 +5,7 @@ import { SplitPane } from './SplitPane';
 import { ViewModeToggle } from './ViewModeToggle';
 import { BaseFileTree } from '../file-tree/BaseFileTree';
 import type { BaseFileTreeRef } from '../file-tree/BaseFileTree';
-import { RefLabels } from '../git-log/RefLabels';
+import { RefLabels } from './RefLabels';
 import { useTranslation } from 'react-i18next';
 import { usePersistedState } from '../../hooks/usePersistedState';
 import styles from './CommitDetailsView.module.css';

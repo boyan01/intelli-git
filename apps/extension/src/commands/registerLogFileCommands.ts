@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { GitService } from '../services/GitService';
 import * as path from 'path';
+import { createRevisionContentUri } from '../utils/repositoryContentUri';
 
 export function registerLogFileCommands(
     context: vscode.ExtensionContext,
@@ -26,9 +27,9 @@ export function registerLogFileCommands(
             const leftRef = data.status?.startsWith('A') ? '' : (data.parentHash || `${data.commitHash}^`);
             const rightRef = data.status?.startsWith('D') ? '4b825dc642cb6eb9a060e54bf8d69288fbee4904' : data.commitHash;
 
-            const repoPath = gitService.toRepoPath(data.path);
-            const leftUri = vscode.Uri.parse(`intelli-git-revision://load/${repoPath}?${JSON.stringify({ ref: leftRef })}`);
-            const rightUri = vscode.Uri.parse(`intelli-git-revision://load/${repoPath}?${JSON.stringify({ ref: rightRef })}`);
+            const repoPath = data.path;
+            const leftUri = createRevisionContentUri(gitService, repoPath, { ref: leftRef, pathKind: 'repo' });
+            const rightUri = createRevisionContentUri(gitService, repoPath, { ref: rightRef, pathKind: 'repo' });
             const title = `${path.basename(data.path)} (${leftRef.substring(0, 7) || 'None'} ↔ ${rightRef.substring(0, 7)})`;
 
             await vscode.commands.executeCommand('vscode.diff', leftUri, rightUri, title);
@@ -43,10 +44,10 @@ export function registerLogFileCommands(
 
             const commitHash = data.commitHash;
             const filePath = data.path;
-            const repoPath = gitService.toRepoPath(filePath);
+            const repoPath = filePath;
 
-            const revisionUri = vscode.Uri.parse(`intelli-git-revision://load/${repoPath}?${JSON.stringify({ ref: commitHash })}`);
-            const localUri = vscode.Uri.file(path.join(gitService.getWorkspaceRoot(), filePath));
+            const revisionUri = createRevisionContentUri(gitService, repoPath, { ref: commitHash, pathKind: 'repo' });
+            const localUri = vscode.Uri.file(path.join(gitService.getGitRoot(), repoPath));
 
             const fileName = path.basename(filePath);
             const title = `${fileName} (${commitHash.substring(0, 7)}) ↔ Local`;
@@ -61,8 +62,8 @@ export function registerLogFileCommands(
             const data = getCommandArgs(arg);
             if (!data || !data.isFile || data.status === 'D') return;
 
-            const repoPath = gitService.toRepoPath(data.path);
-            const revisionUri = vscode.Uri.parse(`intelli-git-revision://load/${repoPath}?${JSON.stringify({ ref: data.commitHash })}`);
+            const repoPath = data.path;
+            const revisionUri = createRevisionContentUri(gitService, repoPath, { ref: data.commitHash, pathKind: 'repo' });
 
             await vscode.window.showTextDocument(revisionUri, { preview: false });
         })
@@ -75,7 +76,7 @@ export function registerLogFileCommands(
             if (!data) return;
 
             try {
-                const repoPath = gitService.toRepoPath(data.path);
+                const repoPath = data.path;
                 const patch = await gitService.getFileDiff(data.commitHash, repoPath);
 
                 if (!patch) {
@@ -98,7 +99,7 @@ export function registerLogFileCommands(
             if (!data) return;
 
             try {
-                const repoPath = gitService.toRepoPath(data.path);
+                const repoPath = data.path;
                 const patch = await gitService.getFileDiff(data.commitHash, repoPath);
 
                 if (!patch) {
@@ -120,7 +121,7 @@ export function registerLogFileCommands(
             const data = getCommandArgs(arg);
             if (!data) return;
 
-            const repoPath = gitService.toRepoPath(data.path);
+            const repoPath = data.path;
             const patch = await gitService.getFileDiff(data.commitHash, repoPath);
 
             if (!patch) {

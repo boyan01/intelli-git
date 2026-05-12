@@ -4,7 +4,7 @@ import styles from './LogListPanel.module.css';
 import { computeGraph, LONG_DISTANCE_THRESHOLD } from './graphUtils';
 import { GraphColumn, CELL_WIDTH } from './GraphColumn';
 import { FilterToolbar } from './filter-toolbar/FilterToolbar';
-import { RefLabels } from './RefLabels';
+import { RefLabels } from '../common/RefLabels';
 import { useLogCommitLoader } from './hooks/useLogCommitLoader';
 import { useCommitSelection } from './hooks/useCommitSelection';
 import { formatRelativeDate } from '../../utils/dateUtils';
@@ -12,6 +12,7 @@ import { CommitDetailsView } from '../common/CommitDetailsView';
 import { usePersistedState } from '../../hooks/usePersistedState';
 import type { CommitDetails } from '@shared/messages';
 import { rpc, rpcEvents } from '../../lib/rpc_client';
+import type { GitLogCommitContext } from '@shared/webviewContext';
 
 interface LogListPanelProps {
     onSelectionChange?: (commits: string[]) => void;
@@ -355,7 +356,7 @@ export const LogListPanel: React.FC<LogListPanelProps> = ({
                                             subject: commit.subject,
                                             isUnpushed: unpushedCommits.has(commit.hash),
                                             isLatestUnpushed: commit.hash === latestUnpushedHash
-                                        })}
+                                        } satisfies GitLogCommitContext)}
                                     >
                                         <div className={styles.graphCol} style={{ width: rowGraphWidth }}>
                                             {graphNode && (

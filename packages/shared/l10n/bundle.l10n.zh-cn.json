@@ -10,6 +10,8 @@
     "Close": "关闭",
     "Loading...": "加载中...",
     "No changes": "没有更改",
+    "No Git repository found": "未找到 Git 仓库",
+    "No data": "没有数据",
     "Changes": "更改",
     "Untracked Changes": "未跟踪的更改",
     "Conflicting Changes": "有冲突的更改",

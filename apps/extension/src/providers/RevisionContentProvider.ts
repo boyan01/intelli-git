@@ -1,6 +1,7 @@
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { RepositoryManager } from '../services/RepositoryManager';
+import { getContentPathFromUri, parseRepositoryContentQuery, type RevisionContentQuery } from '../utils/repositoryContentUri';
 
 export class RevisionContentProvider implements vscode.TextDocumentContentProvider {
     onDidChange?: vscode.Event<vscode.Uri> | undefined;
@@ -8,21 +9,26 @@ export class RevisionContentProvider implements vscode.TextDocumentContentProvid
     constructor(private readonly repositoryManager: RepositoryManager) { }
 
     async provideTextDocumentContent(uri: vscode.Uri): Promise<string> {
-        // URI format: intelli-git-revision://load/<file-path>?{"ref":"<commit-hash>"}
+        // URI format: intelli-git-revision://load/<file-path>?{"ref":"<commit-hash>","repoPath":"<repo-identity>"}
 
         try {
-            const query = JSON.parse(uri.query);
+            const query = parseRepositoryContentQuery<RevisionContentQuery>(uri);
             const ref = query.ref;
-            const filePath = uri.path.startsWith('/') ? uri.path.substring(1) : uri.path;
+            const filePath = getContentPathFromUri(uri);
 
             if (ref === undefined || !filePath) {
                 return '';
             }
 
-            const gitService = this.repositoryManager.getActiveService();
+            const gitService = query.repoPath
+                ? this.repositoryManager.getService(query.repoPath)
+                : this.repositoryManager.getActiveService();
             if (!gitService) {
                 return '';
             }
+
+            const pathKind = query.pathKind || 'repo';
+            const repoPath = pathKind === 'workspace' ? gitService.toRepoPath(filePath) : filePath;
 
             if (ref === 'WORKTREE') {
                 const workspaceRoot = gitService.getWorkspaceRoot();
@@ -30,8 +36,13 @@ export class RevisionContentProvider implements vscode.TextDocumentContentProvid
                     return '';
                 }
 
+                const workspacePath = pathKind === 'repo' ? gitService.toWorkspacePath(filePath) : filePath;
+                if (!workspacePath) {
+                    return '';
+                }
+
                 try {
-                    const uri = vscode.Uri.file(path.join(workspaceRoot, filePath));
+                    const uri = vscode.Uri.file(path.join(workspaceRoot, workspacePath));
                     const content = await vscode.workspace.fs.readFile(uri);
                     return Buffer.from(content).toString('utf8');
                 } catch {
@@ -39,7 +50,7 @@ export class RevisionContentProvider implements vscode.TextDocumentContentProvid
                 }
             }
 
-            return await gitService.getFileContent(ref, filePath);
+            return await gitService.getFileContent(ref, repoPath);
         } catch (e) {
             console.error('RevisionContentProvider error:', e);
             return '';

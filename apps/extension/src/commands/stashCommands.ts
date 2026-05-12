@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { GitService } from '../services/GitService';
 import { CommitViewProvider } from '../providers/CommitViewProvider';
+import { createStashContentUri } from '../utils/repositoryContentUri';
 
 /**
  * Register stash-related commands
@@ -57,12 +58,8 @@ export function registerStashCommands(
 
                 const stashRef = `stash@{${args.stashIndex}}`;
                 const parentRef = `${stashRef}^`;
-                const leftUri = vscode.Uri.parse(`intelli-git-stash://stash/${encodeURIComponent(parentRef)}/${filePath}`).with({
-                    query: JSON.stringify({ ref: parentRef, path: filePath })
-                });
-                const rightUri = vscode.Uri.parse(`intelli-git-stash://stash/${encodeURIComponent(stashRef)}/${filePath}`).with({
-                    query: JSON.stringify({ ref: stashRef, path: filePath })
-                });
+                const leftUri = createStashContentUri(gitService, parentRef, filePath);
+                const rightUri = createStashContentUri(gitService, stashRef, filePath);
 
                 await vscode.commands.executeCommand('vscode.diff', leftUri, rightUri, `${filePath} (Stash@{${args.stashIndex}})`, {
                     preview: true,

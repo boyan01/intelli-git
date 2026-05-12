@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import * as fs from 'fs';
 import * as path from 'path';
 import simpleGit from 'simple-git';
 import { GitService } from './GitService';
@@ -6,15 +7,26 @@ import { InactiveChangesService } from './InactiveChangesService';
 import { ChangelistStateService } from './ChangelistStateService';
 import { logger } from '../utils/logger';
 
-export interface RepositoryInfo {
+export interface RepositoryScope {
     name: string;
+    repoPath: string;
     path: string;
+    workspaceRoot: string;
+    gitRoot: string;
     isSubmodule: boolean;
 }
 
 interface RepositoryEntry {
     service: GitService;
-    info: RepositoryInfo;
+    info: RepositoryScope;
+}
+
+function normalizeExistingPath(filePath: string): string {
+    try {
+        return path.normalize(fs.realpathSync(filePath));
+    } catch {
+        return path.normalize(filePath);
+    }
 }
 
 export class RepositoryManager implements vscode.Disposable {
@@ -41,20 +53,25 @@ export class RepositoryManager implements vscode.Disposable {
 
     private async scanRepositories() {
         const workspaceFolders = vscode.workspace.workspaceFolders || [];
-        const newRepos = new Map<string, { isSubmodule: boolean }>();
+        const newRepos = new Map<string, RepositoryScope>();
         let globalStateMigrationRepoPath: string | undefined;
 
         for (const [index, folder] of workspaceFolders.entries()) {
-            const folderPath = folder.uri.fsPath;
+            const folderPath = normalizeExistingPath(folder.uri.fsPath);
             try {
                 const git = simpleGit(folderPath);
                 const isRepo = await git.checkIsRepo();
                 if (isRepo) {
                     const topLevel = await git.revparse(['--show-toplevel']);
-                    const rootPath = path.normalize(topLevel.trim());
-                    newRepos.set(rootPath, { isSubmodule: false });
+                    const rootPath = normalizeExistingPath(topLevel.trim());
+                    const scope = this.createRepositoryScope({
+                        workspaceRoot: folderPath,
+                        gitRoot: rootPath,
+                        isSubmodule: false
+                    });
+                    newRepos.set(scope.repoPath, scope);
                     if (index === 0) {
-                        globalStateMigrationRepoPath = rootPath;
+                        globalStateMigrationRepoPath = scope.repoPath;
                     }
 
                     // Find submodules
@@ -69,8 +86,12 @@ export class RepositoryManager implements vscode.Disposable {
                                 const parts = line.trim().split(/\s+/);
                                 if (parts.length >= 2) {
                                     const subPath = parts[1];
-                                    const absoluteSubPath = path.normalize(path.join(rootPath, subPath));
-                                    newRepos.set(absoluteSubPath, { isSubmodule: true });
+                                    const absoluteSubPath = normalizeExistingPath(path.join(rootPath, subPath));
+                                    newRepos.set(absoluteSubPath, this.createRepositoryScope({
+                                        workspaceRoot: absoluteSubPath,
+                                        gitRoot: absoluteSubPath,
+                                        isSubmodule: true
+                                    }));
                                 }
                             }
                         }
@@ -95,16 +116,10 @@ export class RepositoryManager implements vscode.Disposable {
         }
 
         // Add new repos and update metadata for existing repos
-        for (const [repoPath, repoMetadata] of newRepos.entries()) {
-            const info: RepositoryInfo = {
-                name: path.basename(repoPath),
-                path: repoPath,
-                isSubmodule: repoMetadata.isSubmodule
-            };
-
+        for (const [repoPath, info] of newRepos.entries()) {
             const existing = this.repositories.get(repoPath);
             if (existing) {
-                if (existing.info.isSubmodule !== info.isSubmodule || existing.info.name !== info.name) {
+                if (!this.isSameScope(existing.info, info)) {
                     existing.info = info;
                     changed = true;
                 }
@@ -116,7 +131,7 @@ export class RepositoryManager implements vscode.Disposable {
                     const shouldMigrateGlobalState = repoPath === globalStateMigrationRepoPath;
                     const inactiveService = new InactiveChangesService(this.context, repoPath, shouldMigrateGlobalState);
                     const changelistService = new ChangelistStateService(this.context, repoPath, shouldMigrateGlobalState);
-                    const gitService = await GitService.create(repoPath, inactiveService, changelistService);
+                    const gitService = await GitService.create(info.workspaceRoot, inactiveService, changelistService);
                     this.repositories.set(repoPath, { service: gitService, info });
                     changed = true;
                 } catch (e) {
@@ -127,12 +142,34 @@ export class RepositoryManager implements vscode.Disposable {
 
         if (changed) {
             if (!this.activeRepoPath || !this.repositories.has(this.activeRepoPath)) {
-                // Set first as active
-                this.activeRepoPath = this.repositories.keys().next().value;
+                const nextRepoPath = this.repositories.keys().next().value;
+                this.activeRepoPath = nextRepoPath;
                 this._onDidChangeActiveRepo.fire(this.activeRepoPath);
             }
             this._onDidChangeRepositories.fire();
         }
+    }
+
+    private createRepositoryScope(input: { workspaceRoot: string; gitRoot: string; isSubmodule: boolean }): RepositoryScope {
+        const repoPath = normalizeExistingPath(input.workspaceRoot);
+        const gitRoot = normalizeExistingPath(input.gitRoot);
+        return {
+            name: path.basename(repoPath),
+            repoPath,
+            path: repoPath,
+            workspaceRoot: repoPath,
+            gitRoot,
+            isSubmodule: input.isSubmodule
+        };
+    }
+
+    private isSameScope(a: RepositoryScope, b: RepositoryScope): boolean {
+        return a.name === b.name
+            && a.repoPath === b.repoPath
+            && a.path === b.path
+            && a.workspaceRoot === b.workspaceRoot
+            && a.gitRoot === b.gitRoot
+            && a.isSubmodule === b.isSubmodule;
     }
 
     public getActiveService(): GitService | undefined {
@@ -142,11 +179,25 @@ export class RepositoryManager implements vscode.Disposable {
         return undefined;
     }
 
+    public getService(repoPath: string | undefined): GitService | undefined {
+        if (!repoPath) {
+            return undefined;
+        }
+        return this.repositories.get(normalizeExistingPath(repoPath))?.service;
+    }
+
     public getActiveRepoPath(): string | undefined {
         return this.activeRepoPath;
     }
 
-    public getRepositories(): RepositoryInfo[] {
+    public getActiveScope(): RepositoryScope | undefined {
+        if (!this.activeRepoPath) {
+            return undefined;
+        }
+        return this.repositories.get(this.activeRepoPath)?.info;
+    }
+
+    public getRepositories(): RepositoryScope[] {
         const repos = Array.from(this.repositories.values()).map(entry => entry.info);
         // Sort: main repos first, then submodules, then alphabetically
         return repos.sort((a, b) => {

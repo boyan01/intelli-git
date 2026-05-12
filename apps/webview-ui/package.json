@@ -8,6 +8,7 @@
     "watch": "vite build --watch",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
+    "test": "vitest run --config vitest.config.ts",
     "preview": "vite preview"
   },
   "dependencies": {

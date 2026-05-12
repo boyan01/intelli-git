@@ -63,6 +63,7 @@ export interface CommitViewState {
     files: FileStatus[];
     changelistState: ChangelistState;
     workspaceRoot: string;
+    hasRepository?: boolean;
 }
 
 export interface ChangelistFileSelection {
@@ -143,8 +144,17 @@ export interface GitLogRevealRequest {
     path?: string;
 }
 
+export interface RepositoryInfo {
+    name: string;
+    path: string;
+    repoPath: string;
+    workspaceRoot: string;
+    gitRoot: string;
+    isSubmodule: boolean;
+}
+
 export interface ExtensionMethods {
-    getRepositories: () => Promise<Array<{ name: string; path: string; isSubmodule: boolean }>>;
+    getRepositories: () => Promise<RepositoryInfo[]>;
     getActiveRepository: () => Promise<string | undefined>;
     setActiveRepository: (repoPath: string) => Promise<boolean>;
     log(params: { message: string; type?: 'info' | 'error' | 'warn' | 'debug' }): Promise<void>;

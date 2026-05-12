@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { RpcPeer } from '@shared/rpc';
-import type { WebviewMethods, ExtensionMethods, FileStatus, ChangelistFileSelection, ChangelistState, GitLogRevealRequest } from '@shared/messages';
+import type { WebviewMethods, ExtensionMethods, FileStatus, ChangelistFileSelection, ChangelistState, GitLogRevealRequest, BranchInfo, BranchListData, CommitDetails, CommitFile, LogCommit, LogOptions, PushCommitsData, PushInitState } from '@shared/messages';
 import { GitService } from '../services/GitService';
 import { RepositoryManager } from '../services/RepositoryManager';
 import { ChangelistStateService } from '../services/ChangelistStateService';
@@ -13,6 +13,7 @@ import { i18n } from '../utils/i18n';
 import { AiProvider, DEFAULT_COMMIT_MESSAGE_PROMPT } from '../services/ai';
 import { logger } from '../utils/logger';
 import { getAiApiKey } from '../utils/aiSecrets';
+import { createRevisionContentUri, createStashContentUri } from '../utils/repositoryContentUri';
 
 export interface ExtensionRpcHandlerOptions {
     context: vscode.ExtensionContext;
@@ -54,11 +55,11 @@ export class ExtensionRpcHandler {
     }
 
     private get inactiveChangesService(): InactiveChangesService | undefined {
-        return this.gitService.inactiveChangesService;
+        return this.repositoryManager.getActiveService()?.inactiveChangesService;
     }
 
     private get changelistStateService(): ChangelistStateService | undefined {
-        return this.gitService.changelistStateService;
+        return this.repositoryManager.getActiveService()?.changelistStateService;
     }
 
     log = (params: { message: string, type?: 'info' | 'error' | 'warn' | 'debug' }): Promise<void> => {
@@ -100,6 +101,97 @@ export class ExtensionRpcHandler {
         return this.repositoryManager.setActiveRepository(repoPath);
     };
 
+    getPushInitState = async (): Promise<PushInitState> => {
+        return this.repositoryManager.getActiveService()?.getPushInitState() ?? {
+            localBranch: '',
+            remotes: []
+        };
+    };
+
+    getRemoteBranches = async (remote: string): Promise<string[]> => {
+        return await this.repositoryManager.getActiveService()?.getRemoteBranchesForRemote(remote) ?? [];
+    };
+
+    getPushCommits = async (params: { remote: string; branch: string; limit?: number; skip?: number }): Promise<PushCommitsData> => {
+        return await this.repositoryManager.getActiveService()?.getPushCommits(params) ?? {
+            commits: [],
+            hasMore: false,
+            totalCount: 0
+        };
+    };
+
+    getCommitFiles = async (hash: string): Promise<CommitFile[]> => {
+        return await this.repositoryManager.getActiveService()?.getCommitFiles(hash) ?? [];
+    };
+
+    getMultiCommitFiles = async (hashes: string[]): Promise<CommitFile[]> => {
+        return await this.repositoryManager.getActiveService()?.getMultiCommitFiles(hashes) ?? [];
+    };
+
+    getBranchInfo = async (): Promise<BranchInfo> => {
+        return await this.repositoryManager.getActiveService()?.getRpcBranchInfo() ?? {
+            current: '',
+            all: [],
+            rebaseStatus: 'none'
+        };
+    };
+
+    getStashList = async () => {
+        return await this.repositoryManager.getActiveService()?.getStashList() ?? [];
+    };
+
+    getStashFiles = async (index: number): Promise<CommitFile[]> => {
+        return await this.repositoryManager.getActiveService()?.getStashFilesAsCommitFiles(index) ?? [];
+    };
+
+    getBranchListData = async (): Promise<BranchListData> => {
+        return await this.repositoryManager.getActiveService()?.getBranchListData() ?? {
+            currentBranch: '',
+            localBranches: [],
+            localBranchesInfo: [],
+            remoteBranches: {},
+            tags: []
+        };
+    };
+
+    getLog = async (options: LogOptions): Promise<LogCommit[]> => {
+        return await this.repositoryManager.getActiveService()?.getLog(options) ?? [];
+    };
+
+    getCommitDetails = async (hash: string): Promise<CommitDetails> => {
+        return await this.repositoryManager.getActiveService()?.getCommitDetails(hash) ?? {
+            hash,
+            shortHash: hash.substring(0, 7),
+            subject: '',
+            authorName: '',
+            authorEmail: '',
+            date: '',
+            body: '',
+            files: [],
+            stats: { additions: 0, deletions: 0 },
+            parentHashes: [],
+            containingBranches: [],
+            refs: [],
+            filteredAncestors: []
+        };
+    };
+
+    getAuthors = async (): Promise<string[]> => {
+        return await this.repositoryManager.getActiveService()?.getAuthors() ?? [];
+    };
+
+    getCurrentUser = async (): Promise<string> => {
+        return await this.repositoryManager.getActiveService()?.getCurrentUser() ?? '';
+    };
+
+    getWorkspaceRoot = async (): Promise<string> => {
+        return this.repositoryManager.getActiveService()?.getWorkspaceRoot() ?? '';
+    };
+
+    getLastCommitInfo = async () => {
+        return await this.repositoryManager.getActiveService()?.getLastCommitInfo() ?? null;
+    };
+
     registerAll(rpc: RpcPeer<WebviewMethods, ExtensionMethods>) {
         rpc.registerAll(
             {
@@ -107,11 +199,11 @@ export class ExtensionRpcHandler {
                 getActiveRepository: this.getActiveRepository,
                 setActiveRepository: this.setActiveRepository,
                 log: this.log,
-                getPushInitState: (...args) => this.gitService.getPushInitState(...args),
-                getRemoteBranches: (...args) => this.gitService.getRemoteBranchesForRemote(...args),
-                getPushCommits: (...args) => this.gitService.getPushCommits(...args),
-                getCommitFiles: (...args) => this.gitService.getCommitFiles(...args),
-                getMultiCommitFiles: (...args) => this.gitService.getMultiCommitFiles(...args),
+                getPushInitState: this.getPushInitState,
+                getRemoteBranches: this.getRemoteBranches,
+                getPushCommits: this.getPushCommits,
+                getCommitFiles: this.getCommitFiles,
+                getMultiCommitFiles: this.getMultiCommitFiles,
                 push: this.push,
                 openDiff: this.openDiff,
                 closeWebView: this.closeWebView,
@@ -119,9 +211,9 @@ export class ExtensionRpcHandler {
                 getStatus: this.getStatus,
                 getChangelistState: this.getChangelistState,
                 getCommitViewState: this.getCommitViewState,
-                getBranchInfo: (...args) => this.gitService.getRpcBranchInfo(...args),
-                getStashList: (...args) => this.gitService.getStashList(...args),
-                getStashFiles: (...args) => this.gitService.getStashFilesAsCommitFiles(...args),
+                getBranchInfo: this.getBranchInfo,
+                getStashList: this.getStashList,
+                getStashFiles: this.getStashFiles,
                 commit: this.commit,
                 stage: this.stage,
                 stageFiles: this.stageFiles,
@@ -143,19 +235,19 @@ export class ExtensionRpcHandler {
                 resolveConflict: this.resolveConflict,
                 openFile: this.openFile,
                 openStashDiff: this.openStashDiff,
-                getBranchListData: (...args) => this.gitService.getBranchListData(...args),
-                getLog: (...args) => this.gitService.getLog(...args),
-                getCommitDetails: (...args) => this.gitService.getCommitDetails(...args),
+                getBranchListData: this.getBranchListData,
+                getLog: this.getLog,
+                getCommitDetails: this.getCommitDetails,
                 getPendingGitLogReveal: this.getPendingGitLogReveal,
                 pickBranchForFilter: this.pickBranchForFilter,
                 pickPaths: this.pickPaths,
-                getAuthors: (...args) => this.gitService.getAuthors(...args),
-                getCurrentUser: (...args) => this.gitService.getCurrentUser(...args),
+                getAuthors: this.getAuthors,
+                getCurrentUser: this.getCurrentUser,
                 getWorkspaceState: this.getWorkspaceState,
                 updateWorkspaceState: this.updateWorkspaceState,
                 getUnpushedCommits: this.getUnpushedCommits,
-                getWorkspaceRoot: async () => this.gitService.getWorkspaceRoot(),
-                getLastCommitInfo: async () => this.gitService.getLastCommitInfo(),
+                getWorkspaceRoot: this.getWorkspaceRoot,
+                getLastCommitInfo: this.getLastCommitInfo,
                 showErrorMessage: this.showErrorMessage,
                 markHunkInactive: this.markHunkInactive,
                 markHunkActive: this.markHunkActive,
@@ -226,7 +318,12 @@ export class ExtensionRpcHandler {
     };
 
     private async getStatusWithState(): Promise<FileStatus[]> {
-        const status = await this.gitService.getStatus();
+        const gitService = this.repositoryManager.getActiveService();
+        if (!gitService) {
+            return [];
+        }
+
+        const status = await gitService.getStatus();
         this.inactiveChangesService?.syncWithStatus(status);
         this.changelistStateService?.syncWithStatus(status);
 
@@ -238,14 +335,29 @@ export class ExtensionRpcHandler {
     };
 
     getChangelistState = async () => {
-        const status = await this.gitService.getStatus();
+        const gitService = this.repositoryManager.getActiveService();
+        if (!gitService) {
+            return this.getCurrentChangelistState();
+        }
+
+        const status = await gitService.getStatus();
         this.changelistStateService?.syncWithStatus(status);
         return this.getCurrentChangelistState();
     };
 
     getCommitViewState = async () => {
         const startedAt = Date.now();
-        const status = await this.gitService.getStatus();
+        const gitService = this.repositoryManager.getActiveService();
+        if (!gitService) {
+            return {
+                files: [],
+                changelistState: this.getCurrentChangelistState(),
+                workspaceRoot: '',
+                hasRepository: false
+            };
+        }
+
+        const status = await gitService.getStatus();
         this.inactiveChangesService?.syncWithStatus(status);
         this.changelistStateService?.syncWithStatus(status);
         const files = this.decorateStatus(status);
@@ -262,7 +374,8 @@ export class ExtensionRpcHandler {
         return {
             files,
             changelistState,
-            workspaceRoot: this.gitService.getWorkspaceRoot()
+            workspaceRoot: gitService.getWorkspaceRoot(),
+            hasRepository: true
         };
     };
 
@@ -305,16 +418,16 @@ export class ExtensionRpcHandler {
 
         if (effectiveStaged) {
             // HEAD vs Index
-            const leftUri = vscode.Uri.parse(`intelli-git-revision://load/${filePath}?${JSON.stringify({ ref: 'HEAD', preferStaged: true })}`);
-            const rightUri = vscode.Uri.parse(`intelli-git-revision://load/${filePath}?${JSON.stringify({ ref: '' })}`);
+            const leftUri = createRevisionContentUri(this.gitService, filePath, { ref: 'HEAD', preferStaged: true });
+            const rightUri = createRevisionContentUri(this.gitService, filePath, { ref: '' });
             const title = `${path.basename(filePath)} ${i18n.t('(Staged)')}`;
             await vscode.commands.executeCommand('vscode.diff', leftUri, rightUri, title);
         } else {
             const status = await this.gitService.getStatus();
             const target = status.find(file => file.path === filePath && !file.staged) || status.find(file => file.path === filePath);
             if (target?.status === 'D') {
-                const leftUri = vscode.Uri.parse(`intelli-git-revision://load/${filePath}?${JSON.stringify({ ref: 'HEAD', preferStaged: false })}`);
-                const rightUri = vscode.Uri.parse(`intelli-git-revision://load/${filePath}?${JSON.stringify({ ref: 'WORKTREE', preferStaged: false })}`);
+                const leftUri = createRevisionContentUri(this.gitService, filePath, { ref: 'HEAD', preferStaged: false });
+                const rightUri = createRevisionContentUri(this.gitService, filePath, { ref: 'WORKTREE', preferStaged: false });
                 await vscode.commands.executeCommand('vscode.diff', leftUri, rightUri, path.basename(filePath));
                 return;
             }
@@ -338,8 +451,8 @@ export class ExtensionRpcHandler {
     };
 
     openCommitDiff = async (params: { path: string; leftRef: string; rightRef: string; preserveFocus?: boolean }): Promise<void> => {
-        const leftUri = vscode.Uri.parse(`intelli-git-revision://load/${params.path}?${JSON.stringify({ ref: params.leftRef })}`);
-        const rightUri = vscode.Uri.parse(`intelli-git-revision://load/${params.path}?${JSON.stringify({ ref: params.rightRef })}`);
+        const leftUri = createRevisionContentUri(this.gitService, params.path, { ref: params.leftRef, pathKind: 'repo' });
+        const rightUri = createRevisionContentUri(this.gitService, params.path, { ref: params.rightRef, pathKind: 'repo' });
         const title = `${path.basename(params.path)} (${params.leftRef.substring(0, 7)} ↔ ${params.rightRef.substring(0, 7)})`;
         vscode.commands.executeCommand('vscode.diff', leftUri, rightUri, title, {
             preserveFocus: params.preserveFocus ?? false
@@ -347,22 +460,21 @@ export class ExtensionRpcHandler {
     };
 
     pickPaths = async (): Promise<string[] | undefined> => {
-        const workspaceRoot = this.gitService.getWorkspaceRoot();
+        const workspaceRoot = this.repositoryManager.getActiveService()?.getWorkspaceRoot();
+        if (!workspaceRoot) {
+            vscode.window.showWarningMessage(i18n.t('extension.noRoot'));
+            return undefined;
+        }
 
         const result = await vscode.window.showOpenDialog({
             canSelectFiles: true,
             canSelectFolders: true,
             canSelectMany: true,
             openLabel: i18n.t('extension.selectPath'),
-            defaultUri: workspaceRoot ? vscode.Uri.file(workspaceRoot) : undefined
+            defaultUri: vscode.Uri.file(workspaceRoot)
         });
 
         if (!result || result.length === 0) {
-            return undefined;
-        }
-
-        if (!workspaceRoot) {
-            vscode.window.showWarningMessage(i18n.t('extension.noRoot'));
             return undefined;
         }
 
@@ -399,7 +511,12 @@ export class ExtensionRpcHandler {
     };
 
     pickBranchForFilter = async (): Promise<string | undefined> => {
-        const branchData = await this.gitService.getBranchListData();
+        const gitService = this.repositoryManager.getActiveService();
+        if (!gitService) {
+            return undefined;
+        }
+
+        const branchData = await gitService.getBranchListData();
 
         interface BranchQuickPickItem extends vscode.QuickPickItem {
             branch: string;
@@ -622,12 +739,8 @@ export class ExtensionRpcHandler {
         const parentRef = `${stashRef}^`;
         const filePath = params.path;
 
-        const leftUri = vscode.Uri.parse(`intelli-git-stash://stash/${encodeURIComponent(parentRef)}/${filePath}`).with({
-            query: JSON.stringify({ ref: parentRef, path: filePath })
-        });
-        const rightUri = vscode.Uri.parse(`intelli-git-stash://stash/${encodeURIComponent(stashRef)}/${filePath}`).with({
-            query: JSON.stringify({ ref: stashRef, path: filePath })
-        });
+        const leftUri = createStashContentUri(this.gitService, parentRef, filePath);
+        const rightUri = createStashContentUri(this.gitService, stashRef, filePath);
 
         const title = `${path.basename(filePath)} (Stash@{${params.index}})`;
         await vscode.commands.executeCommand('vscode.diff', leftUri, rightUri, title, {
@@ -945,7 +1058,12 @@ export class ExtensionRpcHandler {
     };
 
     getUnpushedCommits = async (): Promise<string[]> => {
-        const unpushed = await this.gitService.getUnpushedCommits();
+        const gitService = this.repositoryManager.getActiveService();
+        if (!gitService) {
+            return [];
+        }
+
+        const unpushed = await gitService.getUnpushedCommits();
         return Array.from(unpushed);
     };
 }

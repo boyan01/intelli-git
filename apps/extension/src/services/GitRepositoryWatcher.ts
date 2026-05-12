@@ -102,7 +102,7 @@ export class FileSystemGitWatcher implements vscode.Disposable {
 
     public readonly onChange = this.onChangeEmitter.event;
 
-    constructor(_workspaceRoot: string) {
+    constructor(_workspaceRoots: string[]) {
         // Watch all files including .git directory
         const watcher = vscode.workspace.createFileSystemWatcher('**/*');
         watcher.onDidChange(this.handleChange);
@@ -150,7 +150,7 @@ export class FileSystemGitWatcher implements vscode.Disposable {
  */
 export async function createGitWatcher(
     _context: vscode.ExtensionContext,
-    workspaceRoot: string
+    workspaceRoots: string[]
 ): Promise<vscode.Disposable & { onChange: vscode.Event<void> }> {
     const vsCodeWatcher = new VSCodeGitWatcher();
 
@@ -163,5 +163,5 @@ export async function createGitWatcher(
 
     // Fallback to FileSystemWatcher
     vsCodeWatcher.dispose();
-    return new FileSystemGitWatcher(workspaceRoot);
+    return new FileSystemGitWatcher(workspaceRoots);
 }

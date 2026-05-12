@@ -3,7 +3,7 @@ import { CommitViewProvider, GitLogViewProvider, StashContentProvider, RevisionC
 import { RepositoryManager } from './services/RepositoryManager';
 import { createGitWatcher } from './services/GitRepositoryWatcher';
 import { BranchStatusBar, GitLogStatusBar } from './ui';
-import { registerStashCommands, registerNavigationCommands, registerBranchCommands, registerLogCommands, registerLogFileCommands, registerChangelistCommands, registerAiCommands, registerEditorGitCommands } from './commands';
+import { registerStashCommands, registerGlobalNavigationCommands, registerNavigationCommands, registerBranchCommands, registerLogCommands, registerLogFileCommands, registerChangelistCommands, registerAiCommands, registerEditorGitCommands } from './commands';
 import { logger } from './utils/logger';
 import { ChangeBlockEditorController } from './editor/ChangeBlockEditorController';
 
@@ -11,11 +11,8 @@ export async function activate(context: vscode.ExtensionContext) {
     logger.initLogger(context);
     logger.info('Intelli Git is now active!');
 
-    const workspaceFolders = vscode.workspace.workspaceFolders;
-
-    if (!workspaceFolders || workspaceFolders.length === 0) {
+    if (!vscode.workspace.workspaceFolders || vscode.workspace.workspaceFolders.length === 0) {
         logger.info('Intelli Git: No workspace opened.');
-        return;
     }
 
     // Initialize RepositoryManager
@@ -25,7 +22,6 @@ export async function activate(context: vscode.ExtensionContext) {
 
     if (!repositoryManager.getActiveService()) {
         logger.info('Intelli Git: No git repository found.');
-        return;
     }
 
     // Initialize providers
@@ -43,6 +39,8 @@ export async function activate(context: vscode.ExtensionContext) {
     let gitLogStatusBar: GitLogStatusBar | undefined;
     let changeBlockEditorController: ChangeBlockEditorController | undefined;
     let repoBoundDisposables: vscode.Disposable[] = [];
+    let gitWatcherDisposables: vscode.Disposable[] = [];
+    let gitWatcherGeneration = 0;
 
     const disposeRepoBoundDisposables = () => {
         for (const disposable of repoBoundDisposables.splice(0)) {
@@ -54,6 +52,38 @@ export async function activate(context: vscode.ExtensionContext) {
     };
 
     context.subscriptions.push({ dispose: disposeRepoBoundDisposables });
+
+    const disposeGitWatcher = () => {
+        for (const disposable of gitWatcherDisposables.splice(0)) {
+            disposable.dispose();
+        }
+    };
+
+    context.subscriptions.push({ dispose: disposeGitWatcher });
+
+    const resetGitWatcher = async () => {
+        const generation = ++gitWatcherGeneration;
+        disposeGitWatcher();
+
+        const folders = vscode.workspace.workspaceFolders;
+        if (!folders || folders.length === 0) {
+            return;
+        }
+
+        const watcher = await createGitWatcher(context, folders.map(folder => folder.uri.fsPath));
+        if (generation !== gitWatcherGeneration) {
+            watcher.dispose();
+            return;
+        }
+
+        gitWatcherDisposables.push(
+            watcher.onChange(() => {
+                repositoryManager.initialize().catch(e => logger.error('Failed to rescan repositories after git watcher change', e));
+                triggerRefresh();
+            }),
+            watcher
+        );
+    };
 
     const updateRepositoryContext = () => {
         const repositories = repositoryManager.getRepositories();
@@ -102,7 +132,7 @@ export async function activate(context: vscode.ExtensionContext) {
         changeBlockEditorController = new ChangeBlockEditorController(gitService, inactiveChangesService, changelistStateService, provider);
 
         registerStashCommands(repoContext, gitService, provider);
-        registerNavigationCommands(repoContext, gitService, branchStatusBar, gitLogProvider, provider);
+        registerNavigationCommands(repoContext, branchStatusBar, provider);
         registerBranchCommands(repoContext, gitService, provider);
         registerLogCommands(repoContext, gitService);
         registerLogFileCommands(repoContext, gitService);
@@ -138,6 +168,7 @@ export async function activate(context: vscode.ExtensionContext) {
     );
 
     registerAiCommands(context);
+    registerGlobalNavigationCommands(context, gitLogProvider);
     bindActiveRepository();
 
     // Register Author Context Menu Commands
@@ -198,11 +229,8 @@ export async function activate(context: vscode.ExtensionContext) {
         })
     );
 
-    // Git watcher: uses VS Code Git extension API, falls back to FileSystemWatcher
-    createGitWatcher(context, workspaceFolders[0].uri.fsPath).then(watcher => {
-        context.subscriptions.push(watcher.onChange(triggerRefresh));
-        context.subscriptions.push(watcher);
-    });
+    // Git watcher: uses VS Code Git extension API, falls back to FileSystemWatcher.
+    void resetGitWatcher();
 
     context.subscriptions.push(
         repositoryManager.onDidChangeActiveRepo(() => {
@@ -219,6 +247,7 @@ export async function activate(context: vscode.ExtensionContext) {
         vscode.workspace.onDidChangeWorkspaceFolders(() => {
             branchStatusBar?.update();
             gitLogStatusBar?.update();
+            void resetGitWatcher();
         })
     );
 

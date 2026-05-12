@@ -367,7 +367,7 @@ export const BranchListPanel: React.FC<BranchListPanelProps> = ({ onBranchDouble
     }, [data]);
     const renderTreeContent = () => {
         if (!data && isLoading) return null;
-        if (!data) return <div className={styles.noData}>No data</div>;
+        if (!data) return <div className={styles.noData}>{t('No data')}</div>;
         return (
             <BasicTreeView
                 ref={treeRef}
