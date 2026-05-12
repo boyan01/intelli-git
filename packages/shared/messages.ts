@@ -144,6 +144,13 @@ export interface GitLogRevealRequest {
     path?: string;
 }
 
+export interface ChangelistMoveRequest {
+    targetListId: string;
+    paths?: string[];
+    hunksByPath?: Record<string, string[]>;
+    activateInactive?: boolean;
+}
+
 export interface RepositoryInfo {
     name: string;
     path: string;
@@ -202,8 +209,6 @@ export interface ExtensionMethods {
     pickPaths: () => Promise<string[] | undefined>;
     getAuthors: () => Promise<string[]>;
     getCurrentUser: () => Promise<string>;
-    getWorkspaceState: <T>(key: string) => Promise<T | undefined>;
-    updateWorkspaceState: <T>(key: string, value: T) => Promise<void>;
     getUnpushedCommits: () => Promise<string[]>;
     getWorkspaceRoot: () => Promise<string>;
     getLastCommitInfo: () => Promise<LastCommitInfo | null>;
@@ -217,6 +222,7 @@ export interface ExtensionMethods {
     renameChangelist: (params: { id: string; name?: string }) => Promise<ChangelistInfo | null>;
     deleteChangelist: (id: string) => Promise<void>;
     setActiveChangelist: (id: string) => Promise<void>;
+    moveChangesToChangelist: (params: ChangelistMoveRequest) => Promise<void>;
     moveFilesToChangelist: (params: { paths: string[]; targetListId: string }) => Promise<void>;
     moveHunksToChangelist: (params: { path: string; hunkIds: string[]; targetListId: string }) => Promise<void>;
     setActiveChangelistFile: (params: ChangelistFileSelection | null) => Promise<void>;

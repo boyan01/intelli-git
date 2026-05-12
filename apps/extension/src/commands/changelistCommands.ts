@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
-import type { ChangelistFileSelection, ChangelistMode, FileStatus, GitHunk } from '@shared/messages';
+import type { ChangelistFileSelection, FileStatus, GitHunk } from '@shared/messages';
 import { GitService } from '../services/GitService';
 import { ChangelistStateService } from '../services/ChangelistStateService';
 import { InactiveChangesService } from '../services/InactiveChangesService';
@@ -9,6 +9,7 @@ import { i18n } from '../utils/i18n';
 import { logger } from '../utils/logger';
 import { EditorHunkResolver, findBestHunkMatch, type EditorHunkMatchTarget } from '../editor/EditorHunkResolver';
 import { createRevisionContentUri } from '../utils/repositoryContentUri';
+import { ChangelistOperations, createDefaultRefreshDecorations } from '../operations/ChangelistOperations';
 
 interface ChangelistFileContext {
     webviewSection: 'changelistFile';
@@ -268,17 +269,16 @@ export function registerChangelistCommands(
     provider: CommitViewProvider
 ): void {
     const editorHunkResolver = new EditorHunkResolver(gitService, inactiveChangesService, changelistStateService);
-
-    const setChangelistMode = async (mode: ChangelistMode) => {
-        if (changelistStateService.getState().mode === mode) {
+    const changelistOperations = new ChangelistOperations({
+        gitService,
+        inactiveChangesService,
+        changelistStateService,
+        refreshCommitView: () => provider.rpc?.refresh(),
+        refreshDecorations: createDefaultRefreshDecorations(),
+        setModeContext: async mode => {
             await vscode.commands.executeCommand('setContext', 'intelli-git.changelistMode', mode);
-            return;
         }
-
-        await changelistStateService.setMode(mode);
-        await vscode.commands.executeCommand('setContext', 'intelli-git.changelistMode', mode);
-        provider.rpc?.refresh();
-    };
+    });
 
     for (const [command, mode] of [
         ['intelli-git.changelistMode.staged', 'staged'],
@@ -288,7 +288,7 @@ export function registerChangelistCommands(
     ] as const) {
         context.subscriptions.push(
             vscode.commands.registerCommand(command, async () => {
-                await setChangelistMode(mode);
+                await changelistOperations.setMode(mode);
             })
         );
     }
@@ -302,8 +302,7 @@ export function registerChangelistCommands(
             if (!changelistName?.trim()) {
                 return;
             }
-            await changelistStateService.createList(changelistName.trim());
-            provider.rpc?.refresh();
+            await changelistOperations.createList(changelistName.trim());
         })
     );
 
@@ -323,8 +322,7 @@ export function registerChangelistCommands(
             if (!changelistName?.trim()) {
                 return;
             }
-            await changelistStateService.renameList(args.changelistId, changelistName.trim());
-            provider.rpc?.refresh();
+            await changelistOperations.renameList(args.changelistId, changelistName.trim());
         })
     );
 
@@ -347,8 +345,7 @@ export function registerChangelistCommands(
                     return;
                 }
             }
-            await changelistStateService.deleteList(args.changelistId);
-            provider.rpc?.refresh();
+            await changelistOperations.deleteList(args.changelistId);
         })
     );
 
@@ -357,8 +354,7 @@ export function registerChangelistCommands(
             if (!args?.changelistId) {
                 return;
             }
-            await changelistStateService.setActiveList(args.changelistId);
-            provider.rpc?.refresh();
+            await changelistOperations.setActiveList(args.changelistId);
         })
     );
 
@@ -396,47 +392,32 @@ export function registerChangelistCommands(
                 return;
             }
 
-            if (
-                args?.webviewSection === 'changelistFile' &&
-                args.changelistMode === 'changes' &&
-                args.changelistId === 'inactive-changes' &&
-                target.id !== 'inactive-changes'
-            ) {
-                if (args.hunkIds && args.hunkIds.length > 0) {
-                    await Promise.all(args.hunkIds.map(hunkId => inactiveChangesService.markHunkActive(args.path, hunkId)));
-                } else {
-                    await inactiveChangesService.markActive([args.path]);
-                }
-            }
-
-            if (
-                args?.webviewSection === 'changelistHunk' &&
-                state.mode === 'changes' &&
-                target.id !== 'inactive-changes'
-            ) {
-                await inactiveChangesService.markHunkActive(args.path, args.hunkId);
-            } else if (editorTarget?.inactive && state.mode === 'changes' && target.id !== 'inactive-changes') {
-                if (editorTarget.fileStatus.status === '?') {
-                    await inactiveChangesService.markActive([editorTarget.path]);
-                } else {
-                    await inactiveChangesService.markHunkActive(editorTarget.path, editorTarget.hunk.id);
-                }
-            }
-
+            const hunksByPath: Record<string, string[]> = {};
+            const paths: string[] = [];
+            let activateInactive = false;
             if (args?.webviewSection === 'changelistHunk' && args.hunkId) {
-                await changelistStateService.moveHunks(args.path, [args.hunkId], target.id);
+                hunksByPath[args.path] = [args.hunkId];
+                activateInactive = state.mode === 'changes' && target.id !== 'inactive-changes';
             } else if (args?.webviewSection === 'changelistFile' && args.hunkIds && args.hunkIds.length > 0) {
-                await changelistStateService.moveHunks(args.path, args.hunkIds, target.id);
+                hunksByPath[args.path] = args.hunkIds;
+                activateInactive = args.changelistMode === 'changes' && args.changelistId === 'inactive-changes' && target.id !== 'inactive-changes';
             } else if (editorTarget?.fileStatus.status === '?') {
-                await changelistStateService.moveFiles([editorTarget.path], target.id);
+                paths.push(editorTarget.path);
+                activateInactive = editorTarget.inactive && state.mode === 'changes' && target.id !== 'inactive-changes';
             } else if (editorTarget) {
-                await changelistStateService.moveHunks(editorTarget.path, [editorTarget.hunk.id], target.id);
+                hunksByPath[editorTarget.path] = [editorTarget.hunk.id];
+                activateInactive = editorTarget.inactive && state.mode === 'changes' && target.id !== 'inactive-changes';
             } else if (args?.path) {
-                await changelistStateService.moveFiles([args.path], target.id);
+                paths.push(args.path);
+                activateInactive = args.webviewSection === 'changelistFile' && args.changelistMode === 'changes' && args.changelistId === 'inactive-changes' && target.id !== 'inactive-changes';
             }
 
-            provider.rpc?.refresh();
-            await vscode.commands.executeCommand('intelli-git.refreshChangeBlockDecorations');
+            await changelistOperations.moveChangesToChangelist({
+                targetListId: target.id,
+                paths,
+                hunksByPath,
+                activateInactive
+            });
         })
     );
 
@@ -543,20 +524,7 @@ export function registerChangelistCommands(
         vscode.commands.registerCommand('intelli-git.changelist.markInactive', async (args: ChangelistTargetContext) => {
             const paths = getTargetPaths(args);
             if (paths.length > 0) {
-                await inactiveChangesService.markInactive(paths);
-
-                // Keep inactive files out of commit index, including mixed staged/unstaged entries.
-                const status = await gitService.getStatus();
-                const stagedPaths = Array.from(new Set(
-                    status
-                        .filter(file => paths.includes(file.path) && file.staged)
-                        .map(file => file.path)
-                ));
-                if (stagedPaths.length > 0) {
-                    await gitService.unstageFiles(stagedPaths);
-                }
-
-                provider.rpc?.refresh();
+                await changelistOperations.markFilesInactive(paths);
             }
         })
     );
@@ -565,8 +533,7 @@ export function registerChangelistCommands(
         vscode.commands.registerCommand('intelli-git.changelist.markActive', async (args: ChangelistTargetContext) => {
             const paths = getTargetPaths(args);
             if (paths.length > 0) {
-                await inactiveChangesService.markActive(paths);
-                provider.rpc?.refresh();
+                await changelistOperations.markFilesActive(paths);
             }
         })
     );

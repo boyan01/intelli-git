@@ -7,7 +7,6 @@ import { BaseFileTree } from '../file-tree/BaseFileTree';
 import type { BaseFileTreeRef } from '../file-tree/BaseFileTree';
 import { RefLabels } from './RefLabels';
 import { useTranslation } from 'react-i18next';
-import { usePersistedState } from '../../hooks/usePersistedState';
 import styles from './CommitDetailsView.module.css';
 
 export interface CommitDetailsViewProps {
@@ -19,6 +18,8 @@ export interface CommitDetailsViewProps {
     onClose?: () => void;
     isPinned?: boolean;
     onPin?: () => void;
+    detailsSplitRatio?: number;
+    onDetailsSplitRatioChange?: (ratio: number) => void;
 }
 
 export const CommitDetailsView: React.FC<CommitDetailsViewProps> = ({
@@ -29,14 +30,18 @@ export const CommitDetailsView: React.FC<CommitDetailsViewProps> = ({
     onFileInteraction,
     onClose,
     isPinned = false,
-    onPin
+    onPin,
+    detailsSplitRatio,
+    onDetailsSplitRatioChange
 }) => {
     const { t } = useTranslation();
     const [files, setFiles] = useState<CommitFile[]>([]);
     const [viewMode, setViewMode] = useState<'tree' | 'list'>('tree');
     const [showDetails, setShowDetails] = useState(true);
-    const [detailsSplitRatio, setDetailsSplitRatio] = usePersistedState('gitLog.commitDetailsSplitRatio');
+    const [localDetailsSplitRatio, setLocalDetailsSplitRatio] = useState(0.6);
     const treeRef = useRef<BaseFileTreeRef>(null);
+    const effectiveDetailsSplitRatio = detailsSplitRatio ?? localDetailsSplitRatio;
+    const handleDetailsSplitRatioChange = onDetailsSplitRatioChange ?? setLocalDetailsSplitRatio;
 
     useEffect(() => {
         const fetchFiles = async () => {
@@ -230,8 +235,8 @@ export const CommitDetailsView: React.FC<CommitDetailsViewProps> = ({
                 first={filesView}
                 second={detailsView}
                 defaultRatio={0.6}
-                ratio={detailsSplitRatio}
-                onRatioChange={setDetailsSplitRatio}
+                ratio={effectiveDetailsSplitRatio}
+                onRatioChange={handleDetailsSplitRatioChange}
                 minSize={80}
             />
         </div>

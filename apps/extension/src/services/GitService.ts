@@ -1,11 +1,12 @@
 import simpleGit, { SimpleGit, StatusResult } from 'simple-git';
 import * as vscode from 'vscode';
-import type { BranchInfo, LogCommit, LogOptions, CommitDetails, RefInfo, FileStatus, CommitFile, PushInitState, PushCommitsData, BranchListData, GitStatusCode, GitHunk } from '@shared/messages';
+import type { BranchInfo, CommitDetails, FileStatus, CommitFile, PushInitState, PushCommitsData, BranchListData, GitStatusCode, GitHunk } from '@shared/messages';
 import { logger } from '../utils/logger';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { parseDiffToFileHunks } from '../utils/diffParser';
+import { GitLogService } from './GitLogService';
 import type { ChangelistStateService, ChangelistStateSnapshot, CommitPlan } from './ChangelistStateService';
 import type { InactiveChangesService, InactiveChangesSnapshot } from './InactiveChangesService';
 
@@ -82,6 +83,7 @@ export class GitService implements vscode.Disposable {
     private _inactiveChangesService?: InactiveChangesService;
     private _changelistStateService?: ChangelistStateService;
     private _onDidChange = new vscode.EventEmitter<void>();
+    public readonly log: GitLogService;
 
     /**
      * Fired after this service completes a Git mutation. Repository watchers handle external changes.
@@ -102,6 +104,11 @@ export class GitService implements vscode.Disposable {
         this.git = git;
         this._inactiveChangesService = inactiveChangesService;
         this._changelistStateService = changelistStateService;
+        this.log = new GitLogService(this.git, {
+            toRepoPath: filePath => this.toRepoPath(filePath),
+            toWorkspacePath: repoPath => this.toWorkspacePath(repoPath),
+            getWorkspaceRoot: () => this.getWorkspaceRoot()
+        });
     }
 
     public static async create(workspaceRoot: string, inactiveChangesService?: InactiveChangesService, changelistStateService?: ChangelistStateService): Promise<GitService> {
@@ -148,6 +155,7 @@ export class GitService implements vscode.Disposable {
      * Notify listeners that Git state has changed.
      */
     private fireChange() {
+        this.log.invalidateGraphCache();
         this._onDidChange.fire();
     }
 
@@ -1104,7 +1112,7 @@ export class GitService implements vscode.Disposable {
             if (!log.latest) return null;
 
             const hash = log.latest.hash;
-            const files = await this.getCommitFiles(hash);
+            const files = await this.log.getCommitFiles(hash);
             const message = await this.getCommitMessage(hash);
 
             return {
@@ -1739,41 +1747,6 @@ export class GitService implements vscode.Disposable {
         return '';
     }
 
-    public getCommitFiles = async (hash: string): Promise<CommitFile[]> => {
-        try {
-            const result = await this.git.show([hash, '--name-status', '--pretty=format:']);
-            const lines = result.split('\n').filter(l => l.trim());
-            return lines.map(line => {
-                const [status, ...pathParts] = line.split('\t');
-                const repoPath = pathParts.join('\t');
-                const wsPath = this.toWorkspacePath(repoPath);
-                return {
-                    path: repoPath,
-                    displayPath: wsPath || repoPath,
-                    status: status as GitStatusCode
-                };
-            });
-        } catch (e) {
-            console.error('Error getting commit files:', e);
-            return [];
-        }
-    };
-
-    public getMultiCommitFiles = async (hashes: string[]): Promise<CommitFile[]> => {
-        const fileMap = new Map<string, CommitFile>();
-        for (const hash of hashes) {
-            try {
-                const files = await this.getCommitFiles(hash);
-                for (const file of files) {
-                    fileMap.set(file.path, file);
-                }
-            } catch {
-                // ignore
-            }
-        }
-        return Array.from(fileMap.values());
-    };
-
     public async forcePush(remote: string, branch: string, options?: { noVerify?: boolean }): Promise<void> {
         const args: string[] = ['--force'];
         if (options?.noVerify) {
@@ -1867,7 +1840,7 @@ export class GitService implements vscode.Disposable {
         // Fetch files for each commit
         const commitsWithFiles = await Promise.all(
             commits.map(async (commit) => {
-                const files = await this.getCommitFiles(commit.hash);
+                const files = await this.log.getCommitFiles(commit.hash);
                 return { ...commit, files };
             })
         );
@@ -2007,318 +1980,5 @@ export class GitService implements vscode.Disposable {
         this.fireChange();
     }
 
-    public getLog = async (options: LogOptions): Promise<LogCommit[]> => {
-        try {
-            const args = ['log', '--date=iso'];
-
-            // Format: Hash, ShortHash, Subject, Author, Email, Date, Parents, Refs
-            // Separator: %x00 (null char) to avoid collision
-            const format = '%H%x00%h%x00%s%x00%an%x00%ae%x00%aI%x00%P%x00%D';
-            args.push(`--format=${format}`);
-
-            // Check if search looks like a commit hash (7-40 hex characters)
-            let searchAsHash: string | null = null;
-            if (options.search) {
-                const isHexPattern = /^[0-9a-fA-F]{7,40}$/.test(options.search);
-                logger.info('[getLog] search:', options.search, 'isHexPattern:', isHexPattern);
-                if (isHexPattern) {
-                    try {
-                        const resolved = await this.git.revparse([options.search]);
-                        logger.info('[getLog] revparse result:', resolved);
-                        if (resolved && resolved.trim()) {
-                            searchAsHash = resolved.trim();
-                        }
-                    } catch (e) {
-                        logger.info('[getLog] revparse error:', e);
-                    }
-                }
-            }
-
-            if (searchAsHash) {
-                // Search by commit hash: show only this exact commit
-                args.push('-n', '1', searchAsHash);
-            } else {
-                // Normal search mode
-                if (options.maxCount) {
-                    args.push(`-n`, options.maxCount.toString());
-                }
-
-                if (options.skip) {
-                    args.push(`--skip=${options.skip}`);
-                }
-
-                if (options.authors && options.authors.length > 0) {
-                    const escapeRegex = (s: string) => s.replace(/[[\]{}()*+?.\\^$|]/g, '\\$&');
-                    const authorPattern = options.authors.map(escapeRegex).join('\\|');
-                    args.push(`--author=${authorPattern}`);
-                }
-
-                if (options.search) {
-                    if (options.regexMode) {
-                        args.push('-E');
-                    } else {
-                        args.push('--fixed-strings');
-                    }
-                    args.push(`--grep=${options.search}`);
-                    if (!options.caseSensitive) {
-                        args.push('-i');
-                    }
-                }
-            }
-
-            // Branch filtering - skip if searching by hash (hash already specifies the commit)
-            if (!searchAsHash) {
-                if (options.branch) {
-                    if (options.branch === 'all') {
-                        args.push('--all');
-                    } else if (options.branch === 'HEAD') {
-                        // Default behavior (HEAD and ancestry)
-                    } else if (options.branch.includes(',')) {
-                        // Multiple branches: split and add each as separate argument
-                        const branches = options.branch.split(',').map(b => b.trim()).filter(Boolean);
-                        args.push(...branches);
-                    } else {
-                        args.push(options.branch);
-                    }
-                } else {
-                    args.push('--all');
-                }
-            }
-
-            if (options.since) {
-                args.push(`--since=${options.since}`);
-            }
-            if (options.until) {
-                args.push(`--until=${options.until}`);
-            }
-
-
-
-            // Graph order matters. --topo-order is good for graphs.
-            args.push('--topo-order');
-
-            // Path filtering: supports multiple paths
-            if (options.paths && options.paths.length > 0) {
-                args.push('--', ...options.paths.map(p => this.toRepoPath(p)));
-            } else if (options.fileFilter) {
-                args.push('--', this.toRepoPath(options.fileFilter));
-            }
-
-            logger.info('[getLog] git', args.join(' '));
-            const result = await this.git.raw(args);
-
-            if (!result) return [];
-
-            const commits: LogCommit[] = result.split('\n')
-                .filter(line => line.trim())
-                .map(line => {
-                    const [hash, shortHash, subject, authorName, authorEmail, date, parentsStr, refsStr] = line.split('\0');
-
-                    return {
-                        hash,
-                        shortHash,
-                        subject,
-                        authorName,
-                        authorEmail,
-                        date,
-                        parentHashes: parentsStr ? parentsStr.split(' ') : [],
-                        refs: this._parseRefs(refsStr),
-                        body: '',
-                        files: [],
-                        stats: { additions: 0, deletions: 0 },
-                        containingBranches: [],
-                        filteredAncestors: []
-                    };
-                });
-
-            // In filtered mode (search or specific branch), calculate filteredAncestors using in-memory graph
-            const isFilteredMode = !!options.search || (options.branch && options.branch !== 'all' && options.branch !== 'HEAD');
-
-            if (isFilteredMode && commits.length > 1) {
-                await this.ensureGraphLoaded();
-
-                const commitHashToIdx = new Map<string, number>();
-                commits.forEach((c, i) => commitHashToIdx.set(c.hash, i));
-
-                for (let i = 0; i < commits.length; i++) {
-                    const commit = commits[i];
-
-                    // Check if any direct parent is visible
-                    const hasVisibleParent = commit.parentHashes.some(ph => commitHashToIdx.has(ph));
-
-                    if (!hasVisibleParent) {
-                        // Use BFS to find the nearest visible ancestor
-                        // We only care about ancestors that appear LATER in the list (idx > i)
-                        const visibleAncestor = this.findNearestVisibleAncestor(commit.hash, new Set(commits.slice(i + 1).map(c => c.hash)));
-
-                        if (visibleAncestor) {
-                            commit.filteredAncestors = [visibleAncestor];
-                        }
-                    }
-                }
-            }
-
-            return commits;
-        } catch (e) {
-            console.error('getLog error:', e);
-            return [];
-        }
-    }
-
-    getAuthors = async (): Promise<string[]> => {
-        if (!this.git) return [];
-
-        const root = this.getWorkspaceRoot();
-        if (!root) return [];
-
-        try {
-            const logResult = await this.git.raw(['log', '--format=%aN']);
-            if (!logResult) return [];
-
-            const authors = new Set(logResult.split('\n').map(a => a.trim()).filter(a => !!a));
-            return Array.from(authors).sort();
-        } catch (e) {
-            console.error('getAuthors error:', e);
-            return [];
-        }
-    }
-
-    getCurrentUser = async (): Promise<string> => {
-        if (!this.git) return '';
-        try {
-            const result = await this.git.raw(['config', 'user.name']);
-            return result ? result.trim() : '';
-        } catch (e) {
-            console.error('getCurrentUser error:', e);
-            return '';
-        }
-    }
-
-    private graphCache: Map<string, string[]> | null = null;
-
-    private async ensureGraphLoaded(): Promise<void> {
-        if (this.graphCache) return;
-
-        try {
-            // Load all commits with their parents: "hash parent1 parent2..."
-            const result = await this.git.raw(['rev-list', '--all', '--parents']);
-            this.graphCache = new Map();
-
-            result.split('\n').forEach(line => {
-                if (!line) return;
-                const parts = line.split(' ');
-                const hash = parts[0];
-                const parents = parts.slice(1);
-                this.graphCache!.set(hash, parents);
-            });
-        } catch (e) {
-            console.error('Failed to load commit graph:', e);
-            this.graphCache = new Map();
-        }
-    }
-
-    private findNearestVisibleAncestor(startHash: string, visibleHashes: Set<string>): string | null {
-        if (!this.graphCache) return null;
-
-        const queue: string[] = [...(this.graphCache.get(startHash) || [])];
-        const visited = new Set<string>();
-
-        let iterations = 0;
-        const MAX_SEARCH_DEPTH = 5000;
-
-        while (queue.length > 0) {
-            iterations++;
-            if (iterations > MAX_SEARCH_DEPTH) break;
-
-            const current = queue.shift()!;
-            if (visited.has(current)) continue;
-            visited.add(current);
-
-            if (visibleHashes.has(current)) {
-                return current;
-            }
-
-            const parents = this.graphCache.get(current);
-            if (parents) {
-                for (const p of parents) {
-                    if (!visited.has(p)) {
-                        queue.push(p);
-                    }
-                }
-            }
-        }
-
-        return null;
-    }
-
-    public getCommitDetails = async (hash: string): Promise<CommitDetails> => {
-        try {
-            const showMsg = await this.git.show([hash, '--format=%B%x00%P%x00%an%x00%ae%x00%aI%x00%h%x00%D', '--no-patch']);
-            const [fullMessage, parentsStr, authorName, authorEmail, date, shortHash, refsStr] = showMsg.split('\0');
-
-            const files = await this.getCommitFiles(hash) as CommitFile[];
-
-            // Get containing branches
-            let containingBranches: string[] = [];
-            try {
-                const branchOutput = await this.git.branch(['--contains', hash]);
-                containingBranches = branchOutput.all;
-            } catch {
-                // Ignore error if commit is not reachable
-            }
-
-            const shortstat = await this.git.show([hash, '--format=', '--shortstat']);
-            let additions = 0;
-            let deletions = 0;
-            if (shortstat) {
-                const addMatch = shortstat.match(/(\d+) insertion/);
-                const delMatch = shortstat.match(/(\d+) deletion/);
-                if (addMatch) additions = parseInt(addMatch[1], 10);
-                if (delMatch) deletions = parseInt(delMatch[1], 10);
-            }
-
-            // Split fullMessage into subject and body
-            const messageLines = (fullMessage?.trim() || '').split('\n');
-            const subject = messageLines[0] || '';
-            const body = messageLines.slice(1).join('\n').trim() || undefined;
-
-            return {
-                hash,
-                shortHash: shortHash?.trim() || hash.substring(0, 8),
-                subject,
-                body: body || '',
-                files,
-                stats: { additions, deletions },
-                parentHashes: parentsStr ? parentsStr.trim().split(' ') : [],
-                authorName: authorName?.trim() || '',
-                authorEmail: authorEmail?.trim() || '',
-                date: date?.trim() || '',
-                containingBranches,
-                refs: this._parseRefs(refsStr?.trim() || ''),
-                filteredAncestors: []
-            };
-        } catch (e) {
-            console.error('getCommitDetails error:', e);
-            throw e;
-        }
-    }
-
-    private _parseRefs(refsStr: string): RefInfo[] {
-        if (!refsStr) return [];
-
-        return refsStr.split(', ').filter(Boolean).map(ref => {
-            ref = ref.trim();
-            if (ref.startsWith('HEAD -> ')) {
-                return { name: ref.replace('HEAD -> ', ''), type: 'head' };
-            }
-            if (ref.startsWith('tag: ')) {
-                return { name: ref.replace('tag: ', ''), type: 'tag' };
-            }
-            if (ref.includes('/')) {
-                return { name: ref, type: 'remote' };
-            }
-            return { name: ref, type: 'local' };
-        });
-    }
 }
 export { FileStatus };

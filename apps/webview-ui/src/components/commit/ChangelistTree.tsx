@@ -555,27 +555,12 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
 
         if (changelistState.mode === 'changes') {
             const sourceChangelistId = draggedNode.data?.changelistId;
-            const shouldActivateLegacyInactive = sourceChangelistId === 'inactive-changes' && targetListId !== 'inactive-changes';
-
-            if (shouldActivateLegacyInactive && paths.length > 0) {
-                await rpc.markFilesActive(paths);
-            }
-            if (shouldActivateLegacyInactive) {
-                for (const [path, hunkIds] of Object.entries(moveData.hunkMap)) {
-                    for (const hunkId of hunkIds) {
-                        await rpc.markHunkActive({ path, hunkId });
-                    }
-                }
-            }
-
-            if (paths.length > 0) {
-                await rpc.moveFilesToChangelist({ paths, targetListId });
-            }
-            for (const [path, hunkIds] of Object.entries(moveData.hunkMap)) {
-                if (hunkIds.length > 0) {
-                    await rpc.moveHunksToChangelist({ path, hunkIds, targetListId });
-                }
-            }
+            await rpc.moveChangesToChangelist({
+                targetListId,
+                paths,
+                hunksByPath: moveData.hunkMap,
+                activateInactive: sourceChangelistId === 'inactive-changes' && targetListId !== 'inactive-changes'
+            });
         } else if (changelistState.mode === 'staged') {
             if (paths.length === 0) return;
 

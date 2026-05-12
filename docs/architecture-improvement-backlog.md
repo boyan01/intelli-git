@@ -2,7 +2,7 @@
 
 梳理日期：2026-05-12
 
-最近更新：2026-05-12，本轮已完成 P0/P1 中最直接影响 correctness 的边界修复，以及一组低风险结构清理。本文档现在同时记录已落地状态和剩余 backlog。
+最近更新：2026-05-12，本轮已完成 P0/P1 中最直接影响 correctness 的边界修复、首个 `GitService` behavior slice、RPC ownership 收窄、changelist operation layer、以及 webview persisted state ownership 收敛。本文档现在同时记录已落地状态和明确 deferred 的后续候选项。
 
 这份文档记录 Intelli Git 当前从代码结构、边界设计、架构演进角度值得做的事项。范围只包含能降低真实产品风险、让后续功能更稳的工作；不建议做纯粹为了“看起来更分层”的大改，也不建议加只负责改名转发的 thin wrapper。
 
@@ -18,15 +18,24 @@ VS Code extension host
 
   services/
     GitService
-      -> status, hunks, staging, commit, stash, branch, push, rebase, log, file content
+      -> status, hunks, staging, commit, stash, branch, push, rebase, file content
+    GitLogService
+      -> log loading, commit details, graph cache, ref parsing, authors
     ChangelistStateService
       -> changelist invariants, hunk assignment, active-list commit plan
     InactiveChangesService
       -> inactive file and hunk state
+  operations/
+    ChangelistOperations
+      -> shared changelist/inactive mutation workflows and decorator refresh side effects
 
   rpc/
     ExtensionRpcHandler
-      -> webview RPC entry point, VS Code dialogs, git operations, AI provider calls
+      -> webview RPC composition root, VS Code dialogs, remaining git operations, AI provider calls
+    GitReadRpcHandler
+      -> no-repository-safe git log/stash/push/read models
+    ChangelistRpcHandler
+      -> changelist/inactive RPC request shape and native input/confirmation
 
 React webview
   App.tsx
@@ -44,6 +53,8 @@ React webview
   git-log/
     GitLogView
       -> BranchListPanel + LogListPanel + CommitDetailsView
+    persistedState
+      -> git log feature-owned persisted keys and defaults
 
   shared/
     packages/shared/messages.ts
@@ -54,7 +65,7 @@ React webview
       -> typed native webview context-menu payload sections
 ```
 
-当前大方向是对的：`changelist` 和 `inactive changes` 的 durable state 放在 extension host，webview 负责 rendering 和 interaction dispatch，native VS Code context menu 通过 `data-vscode-context` 驱动。本轮已经处理多仓库 identity、初始 no-repo activation、commit/changelist webview domain logic、Git mutation refresh contract、context payload typing 和一部分 common UI 边界。剩余主要问题集中在超大 `GitService`、超宽 `ExtensionRpcHandler`、native command/RPC changelist 行为复用，以及 persisted state ownership。
+当前大方向是对的：`changelist` 和 `inactive changes` 的 durable state 放在 extension host，webview 负责 rendering 和 interaction dispatch，native VS Code context menu 通过 `data-vscode-context` 驱动。本轮已经处理多仓库 identity、初始 no-repo activation、commit/changelist webview domain logic、Git mutation refresh contract、context payload typing、首个 `GitService` read-only slice、RPC feature ownership、native command/RPC changelist 行为复用，以及 webview persisted state ownership。`BasicTreeView` 继续保持 deferred：等下一次 tree selection、drag/drop、keyboard navigation 或 virtualization 的真实行为改动再抽 tested helper/hook。
 
 ## 2026-05-12 实施状态
 
@@ -66,8 +77,15 @@ React webview
 - no-repository 状态下，commit view、git log、stash、branch/push 相关 read RPC 返回空状态，而不是依赖 `No active repository` 异常。
 - `CommitView.tsx` 中的纯 commit/changelist 计算已抽到 `apps/webview-ui/src/components/commit/changelistModel.ts`，并增加 webview-side unit tests。
 - `GitService.onDidChange` contract 已收敛为：service 内成功完成的 Git mutation 触发事件，repository watcher 负责 external changes detection。
+- `GitLogService` 已从 `GitService` 物理拆出，拥有 log loading、commit details、commit files、authors、graph cache 和 ref parsing；`GitService.fireChange()` 会 invalidate log graph cache。
+- `GitReadRpcHandler` 已承接 no-repository-safe git log/stash/push/read RPC；`ChangelistRpcHandler` 已承接 changelist/inactive mutation RPC；`ExtensionRpcHandler` 保持 composition root。
+- 泛型 `getWorkspaceState<T>` / `updateWorkspaceState<T>` RPC 已从 shared contract 和 handler 注册中移除。
+- `ChangelistOperations` 已合并 native command 和 RPC 共用的 changelist/inactive mutation workflow，包含 inactive activation、index reconciliation、changelist move 和 decoration refresh。
+- changes mode 下 webview drag/drop 已改为单次 `moveChangesToChangelist` RPC，避免 webview 侧串多次 RPC 造成半更新。
 - `data-vscode-context` 已有 shared section/type contract：`packages/shared/webviewContext.ts`，并有轻量测试校验 package menu section。
 - `RefLabels` 已移到 common，旧 `RefLabel.tsx` 和 Vite template `App.css` 已删除，顺手修正了一个 hardcoded `No data` 文案。
+- webview persisted state schema 已拆到 feature-owned `persistedState.ts`，由 `persistedStateRegistry.ts` 聚合；stale historical keys 已从 active schema 移除并保留 legacy allowlist。
+- `CommitDetailsView` 不再直接持有 git-log persisted key，`gitLog.commitDetailsSplitRatio` 由 `GitLogView` 传入。
 
 自动验证已通过：
 
@@ -78,12 +96,9 @@ npm run test
 git diff --check
 ```
 
-尚未完成：
+明确 deferred：
 
-- `GitService` 还没有物理拆成 working-tree、index/commit、branch/remote、log 等 behavior slices。
-- `ExtensionRpcHandler` 仍是单个大入口；本轮只补了 no-repo read fallback，没有做 feature ownership 拆分。
-- native commands 和 RPC 的 changelist mutation workflow 仍未合并成共享 operation layer。
-- webview persisted state schema 还没有按 feature 收敛。
+- `GitWorkingTreeService`、`GitIndexCommitService`、`GitBranchRemoteService` 仍是后续候选 slice。不要为了完成清单一次性机械拆；它们涉及 path scope、inactive hunk、temporary index、active changelist commit plan 和 dirty-worktree protection，必须在对应行为增强或测试补强时逐个抽。
 - `BasicTreeView` 仍保持原状，等待下一次具体 tree 行为改动时再抽 tested helper/hook。
 
 ## 设计原则
@@ -178,29 +193,32 @@ git diff --check
 
 ## P1: 按真实职责拆分 `GitService`
 
-状态：未完成。本轮只修了 scope、path canonicalization、`getGitRoot()` 和 mutation event contract，没有物理拆 service。
+状态：已完成首个 cohesive slice。`GitLogService` 已物理拆出并拥有真实 read-only history 行为；working-tree、index/commit、branch/remote 继续作为 deferred slice，等对应行为变更或测试补强时逐个抽。
 
 证据：
 
-- `apps/extension/src/services/GitService.ts` 超过 2,000 行，当前覆盖 working tree status、hunk parsing、staging、temporary index commit plan、stash、branch、push、rebase、log graph、commit details 和 file content。
+- `apps/extension/src/services/GitLogService.ts` 负责 log loading、commit details、commit files、multi-commit files、authors、current user、graph cache、filtered ancestor stitching 和 ref parsing。
+- `apps/extension/src/services/GitService.ts` 保留 Git mutation、working tree、branch/remote、stash、commit plan 等后续候选 slice；不再直接持有 git-log implementation。
+- `GitService.fireChange()` 会调用 `GitLogService.invalidateGraphCache()`，避免 mutation 后复用 stale graph。
+- `apps/extension/src/services/GitLogService.test.ts` 覆盖 hash search、path scope、commit details、stats、refs、authors 和 filtered ancestor。
 
 为什么值得做：
 
 - 修改一个功能区时，被迫同时理解大量无关 git workflow。
 - 文件内部已经自然分成几个风险区：status/hunks、index/commit、branch/remote、log graph。
 
-建议拆分方向：
+后续候选拆分方向：
 
 - `GitWorkingTreeService`: status、hunk parsing、diagnostics decoration inputs、path conversion。
 - `GitIndexCommitService`: staging support、temporary index、active changelist commit plan application。
 - `GitBranchRemoteService`: branch、checkout、push、pull、fetch、rebase、merge。
 - `GitLogService`: log loading、commit details、graph cache、ref parsing、authors。
 
-第一步可以保持 public call sites 稳定，但只能作为迁移手段。被抽出的模块必须拥有实际行为和测试，不能变成一堆 one-method pass-through wrappers。
+已经落地的 `GitLogService` 没有在 `GitService` 上保留一组 one-method pass-through；RPC 和内部 push/last-commit 路径直接使用 `gitService.log`。
 
 更新建议：
 
-- 优先从 `GitLogService` 或 `GitBranchRemoteService` 开始拆，因为输入输出边界相对清楚，且对 commit precision 的风险小于 staging/temporary index。
+- 下一个优先候选可以是 `GitBranchRemoteService`，因为输入输出边界相对清楚，且对 commit precision 的风险小于 staging/temporary index。
 - `GitWorkingTreeService` 和 `GitIndexCommitService` 要更谨慎：它们涉及 path scope、inactive hunk、temporary index、active changelist commit plan，拆分前先增加更强的 status/commit-plan tests。
 - 不要先创建只改名转发的 facade。每个新 service 必须拥有 cohesive behavior 和对应测试。
 
@@ -237,17 +255,18 @@ git diff --check
 
 ## P2: 收窄 `ExtensionRpcHandler`
 
-状态：未完成。仅完成 no-repository read fallback，未拆 feature ownership。
+状态：已完成第一批 feature ownership 拆分。
 
 证据：
 
-- `apps/extension/src/rpc/ExtensionRpcHandler.ts` 在一个类里注册了几乎整个 `ExtensionMethods` surface。
-- 它同时处理 git operations、VS Code input dialogs、AI provider selection、commit generation、workspace state read/write、changelist operations 和 error display。
-- `packages/shared/messages.ts` 暴露了泛型 `getWorkspaceState<T>` 和 `updateWorkspaceState<T>` RPC methods。
+- `apps/extension/src/rpc/GitReadRpcHandler.ts` 承接 no-repository-safe git log/stash/push/read methods。
+- `apps/extension/src/rpc/ChangelistRpcHandler.ts` 承接 changelist/inactive mutation RPC shape、输入框和删除确认。
+- `apps/extension/src/rpc/ExtensionRpcHandler.ts` 仍注册完整 `ExtensionMethods` surface，但现在作为 RPC composition root，而不是把所有 feature ownership 都写在单个类里。
+- `packages/shared/messages.ts` 已移除泛型 `getWorkspaceState<T>` 和 `updateWorkspaceState<T>` RPC methods。
 
 为什么值得做：
 
-- webview 当前可以通过泛型 RPC 写任意 workspace-state key，边界偏宽。
+- webview 不再能通过泛型 RPC 写任意 workspace-state key。
 - feature-specific error handling 和 UI side effects 全混在一个 handler 里，后续审计成本高。
 
 建议设计：
@@ -263,16 +282,21 @@ git diff --check
 
 更新建议：
 
-- 拆分前先把当前 no-repo fallback 作为 contract 保留下来：read methods 返回空模型，write/mutation methods 可以继续抛明确错误。
-- 第一批可从 read-only git log/stash/push query methods 开始，因为它们已经有空模型 fallback，比较容易迁移到 feature-specific handler。
-- 泛型 `getWorkspaceState<T>` / `updateWorkspaceState<T>` 仍是边界偏宽的问题，后续要用 typed、prefixed operations 替代。
+- no-repo fallback contract 已保留：read methods 返回空模型，write/mutation methods 仍由具体 handler 决定 no-op 或明确错误。
+- 后续如果继续扩 RPC 面，优先给新增 feature 建 dedicated handler；不要回到单个类里堆全部实现。
+- 如果将来确实需要 extension-backed persisted state，应加 typed、prefixed operation，不要恢复任意 key 泛型 workspace-state RPC。
 
 ## P2: 合并 Native Command 和 RPC 的 Changelist 行为链路
 
+状态：已完成核心 operation layer。
+
 证据：
 
-- `apps/extension/src/commands/changelistCommands.ts` 和 `apps/extension/src/rpc/ExtensionRpcHandler.ts` 都会执行 changelist 和 inactive-change mutations。
-- 一些流程还需要在 mutation 后 refresh editor decorations 和 webview。
+- `apps/extension/src/operations/ChangelistOperations.ts` 负责 shared changelist/inactive mutation workflow。
+- native commands 继续负责 VS Code input、confirmation 和 quick pick。
+- `ChangelistRpcHandler` 继续负责 webview RPC request/response shape。
+- `apps/webview-ui/src/components/commit/ChangelistTree.tsx` changes-mode drag/drop 已改用单次 `moveChangesToChangelist` RPC。
+- `apps/extension/src/operations/ChangelistOperations.test.ts` 覆盖 inactive file unstage reconciliation，以及 inactive file/hunk move 到 changelist 的组合 workflow。
 
 为什么值得做：
 
@@ -281,7 +305,7 @@ git diff --check
 
 建议设计：
 
-- 只在有真实行为组合的地方加 operation layer，例如 changelist mutation workflow 同时负责：
+- 已只在有真实行为组合的地方加 operation layer，例如 changelist mutation workflow 同时负责：
   - state mutation
   - inactive-change reconciliation
   - 必要时调整 index
@@ -331,16 +355,23 @@ git diff --check
 
 ## P2: 明确 Webview Persisted State Ownership
 
+状态：已完成 feature-owned schema 收敛。
+
 证据：
 
-- `apps/webview-ui/src/hooks/usePersistedState.ts` 持有全局 persisted-state schema。
-- git log filters 分散在 toolbar state、loader 和 cache behavior 之间。
-- 一些 persisted keys 看起来是历史遗留或 feature-specific。
+- `apps/webview-ui/src/components/commit/persistedState.ts`
+- `apps/webview-ui/src/components/local-changes/persistedState.ts`
+- `apps/webview-ui/src/components/push/persistedState.ts`
+- `apps/webview-ui/src/components/stash/persistedState.ts`
+- `apps/webview-ui/src/components/git-log/persistedState.ts`
+- `apps/webview-ui/src/lib/persistedStateRegistry.ts`
+- `apps/webview-ui/src/lib/persistedStateRegistry.test.ts`
 
 建议设计：
 
-- 把 feature-specific state schema 移近对应 feature module。
-- 为 stale keys 增加 typed migration 或 cleanup policy。
+- feature-specific state schema 已移近对应 feature module。
+- stale keys 已从 active schema 移除，并在 `legacyPersistedKeys` 保留 allowlist 防止未来误复用。
+- `usePersistedState`、`useRpcData` 和 `useLogCommitLoader` 现在使用同一套 serialize/deserialize 规则。
 - 继续使用 `vscode.getState()` 和 `vscode.setState()` 作为 backing store；不需要引入全局状态库。
 
 ## P3: Tree 宽文件先不机械拆
@@ -365,7 +396,10 @@ git diff --check
 - `RepositoryManager` 的 workspace-root 与 git-root scope 测试。
 - repository-aware revision/stash content provider 测试。
 - `GitService.onDidChange` mutation event tests。
+- `GitLogService` log/details/ref/author/path-scope tests。
+- `ChangelistOperations` inactive reconciliation and move workflow tests。
 - webview commit/changelist model tests。
+- webview persisted state registry tests。
 - native menu context payload tests。
 
 仍建议手动回归：
@@ -394,26 +428,21 @@ npm run package:extension:dev
 - Repository scope and activation lifecycle。
 - Commit/changelist webview model extraction。
 - Git mutation event contract。
+- Git log behavior slice。
+- RPC read/changelist ownership split。
+- Changelist operation layer shared by native commands and RPC。
 - Native menu context typed contract。
 - Low-risk webview common cleanup。
+- Webview persisted state ownership。
 
 下一步建议：
 
-1. GitService behavior slices。
+1. Remaining GitService behavior slices。
    - 一次只抽一个 cohesive area。
-   - 可以先从 log 或 commit-plan code 开始，因为输入输出边界清楚。
+   - 下一个候选是 branch/remote；working-tree 和 index/commit 需要先补更强测试。
    - 保持 public behavior 稳定。
 
-2. RPC and command operation cleanup。
-   - 按 feature 拆 handler ownership。
-   - 用 typed operations 替代 generic workspace-state RPC。
-   - 在 native commands 和 RPC 之间共享 changelist operation behavior。
-
-3. Webview persisted state ownership。
-   - 把 feature-specific state schema 移近对应 feature module。
-   - 为 stale keys 增加 typed migration 或 cleanup policy。
-
-4. Tree behavior focused extraction。
+2. Tree behavior focused extraction。
    - 只在下一次改 selection、drag/drop、keyboard navigation 或 virtualization 时做。
    - 围绕具体行为抽 tested pure helpers 或 focused hook。
 

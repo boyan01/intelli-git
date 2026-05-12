@@ -2,7 +2,8 @@ import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import type { LogCommit, LogOptions } from '@shared/messages';
 import { rpc, rpcEvents } from '../../../lib/rpc_client';
 import { LONG_DISTANCE_THRESHOLD } from '../graphUtils';
-import { getCachedValue, updateStoredState } from '../../../lib/stateCache';
+import { getStoredState, updateStoredState } from '../../../lib/stateCache';
+import { deserializePersistedValue, serializePersistedValue } from '../../../lib/persistedStateRegistry';
 
 interface UseLogCommitLoaderResult {
     commits: LogCommit[];
@@ -36,14 +37,15 @@ function filtersEqual(left: Partial<LogOptions>, right: Partial<LogOptions>): bo
 
 // Build initial filters from cached values to match FilterToolbar's initial state
 function getInitialFilters(): Partial<LogOptions> {
-    const branch = getCachedValue('gitLog.filter.branch', 'all');
-    const search = getCachedValue('gitLog.filter.search', '');
-    const regexMode = getCachedValue('gitLog.filter.regexMode', false);
-    const caseSensitive = getCachedValue('gitLog.filter.caseSensitive', false);
-    const authors = getCachedValue('gitLog.filter.authors', [] as string[]);
-    const paths = getCachedValue('gitLog.filter.paths', [] as string[]);
-    const since = getCachedValue('gitLog.filter.since', undefined as string | undefined);
-    const until = getCachedValue('gitLog.filter.until', undefined as string | undefined);
+    const state = getStoredState();
+    const branch = deserializePersistedValue('gitLog.filter.branch', state['gitLog.filter.branch']);
+    const search = deserializePersistedValue('gitLog.filter.search', state['gitLog.filter.search']);
+    const regexMode = deserializePersistedValue('gitLog.filter.regexMode', state['gitLog.filter.regexMode']);
+    const caseSensitive = deserializePersistedValue('gitLog.filter.caseSensitive', state['gitLog.filter.caseSensitive']);
+    const authors = deserializePersistedValue('gitLog.filter.authors', state['gitLog.filter.authors']);
+    const paths = deserializePersistedValue('gitLog.filter.paths', state['gitLog.filter.paths']);
+    const since = deserializePersistedValue('gitLog.filter.since', state['gitLog.filter.since']);
+    const until = deserializePersistedValue('gitLog.filter.until', state['gitLog.filter.until']);
 
     return {
         branch: branch === 'all' ? undefined : branch,
@@ -59,7 +61,7 @@ function getInitialFilters(): Partial<LogOptions> {
 
 export const useLogCommitLoader = (): UseLogCommitLoaderResult => {
     const [commits, setCommits] = useState<LogCommit[]>(() =>
-        getCachedValue('gitLog.commits', [])
+        deserializePersistedValue('gitLog.commits', getStoredState()['gitLog.commits'])
     );
     const [loading, setLoading] = useState(false);
     const [hasMore, setHasMore] = useState(true);
@@ -118,7 +120,7 @@ export const useLogCommitLoader = (): UseLogCommitLoaderResult => {
 
                 setCommits(prev => {
                     const result = isResetLoad ? newCommits : [...prev, ...newCommits];
-                    updateStoredState('gitLog.commits', result);
+                    updateStoredState('gitLog.commits', serializePersistedValue('gitLog.commits', result));
                     commitsLengthRef.current = result.length;
                     return result;
                 });

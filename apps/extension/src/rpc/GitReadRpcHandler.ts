@@ -1,0 +1,124 @@
+import type {
+    BranchInfo,
+    BranchListData,
+    CommitDetails,
+    CommitFile,
+    GitLogRevealRequest,
+    LogCommit,
+    LogOptions,
+    PushCommitsData,
+    PushInitState
+} from '@shared/messages';
+import type { RepositoryManager } from '../services/RepositoryManager';
+
+export class GitReadRpcHandler {
+    constructor(
+        private readonly repositoryManager: RepositoryManager,
+        private readonly consumePendingGitLogReveal?: () => GitLogRevealRequest | undefined
+    ) { }
+
+    getPushInitState = async (): Promise<PushInitState> => {
+        return this.repositoryManager.getActiveService()?.getPushInitState() ?? {
+            localBranch: '',
+            remotes: []
+        };
+    };
+
+    getRemoteBranches = async (remote: string): Promise<string[]> => {
+        return await this.repositoryManager.getActiveService()?.getRemoteBranchesForRemote(remote) ?? [];
+    };
+
+    getPushCommits = async (params: { remote: string; branch: string; limit?: number; skip?: number }): Promise<PushCommitsData> => {
+        return await this.repositoryManager.getActiveService()?.getPushCommits(params) ?? {
+            commits: [],
+            hasMore: false,
+            totalCount: 0
+        };
+    };
+
+    getCommitFiles = async (hash: string): Promise<CommitFile[]> => {
+        return await this.repositoryManager.getActiveService()?.log.getCommitFiles(hash) ?? [];
+    };
+
+    getMultiCommitFiles = async (hashes: string[]): Promise<CommitFile[]> => {
+        return await this.repositoryManager.getActiveService()?.log.getMultiCommitFiles(hashes) ?? [];
+    };
+
+    getBranchInfo = async (): Promise<BranchInfo> => {
+        return await this.repositoryManager.getActiveService()?.getRpcBranchInfo() ?? {
+            current: '',
+            all: [],
+            rebaseStatus: 'none'
+        };
+    };
+
+    getStashList = async () => {
+        return await this.repositoryManager.getActiveService()?.getStashList() ?? [];
+    };
+
+    getStashFiles = async (index: number): Promise<CommitFile[]> => {
+        return await this.repositoryManager.getActiveService()?.getStashFilesAsCommitFiles(index) ?? [];
+    };
+
+    getBranchListData = async (): Promise<BranchListData> => {
+        return await this.repositoryManager.getActiveService()?.getBranchListData() ?? {
+            currentBranch: '',
+            localBranches: [],
+            localBranchesInfo: [],
+            remoteBranches: {},
+            tags: []
+        };
+    };
+
+    getLog = async (options: LogOptions): Promise<LogCommit[]> => {
+        return await this.repositoryManager.getActiveService()?.log.getLog(options) ?? [];
+    };
+
+    getCommitDetails = async (hash: string): Promise<CommitDetails> => {
+        return await this.repositoryManager.getActiveService()?.log.getCommitDetails(hash) ?? {
+            hash,
+            shortHash: hash.substring(0, 7),
+            subject: '',
+            authorName: '',
+            authorEmail: '',
+            date: '',
+            body: '',
+            files: [],
+            stats: { additions: 0, deletions: 0 },
+            parentHashes: [],
+            containingBranches: [],
+            refs: [],
+            filteredAncestors: []
+        };
+    };
+
+    getPendingGitLogReveal = async (): Promise<GitLogRevealRequest | undefined> => {
+        return this.consumePendingGitLogReveal?.();
+    };
+
+    getAuthors = async (): Promise<string[]> => {
+        return await this.repositoryManager.getActiveService()?.log.getAuthors() ?? [];
+    };
+
+    getCurrentUser = async (): Promise<string> => {
+        return await this.repositoryManager.getActiveService()?.log.getCurrentUser() ?? '';
+    };
+
+    getWorkspaceRoot = async (): Promise<string> => {
+        return this.repositoryManager.getActiveService()?.getWorkspaceRoot() ?? '';
+    };
+
+    getLastCommitInfo = async () => {
+        return await this.repositoryManager.getActiveService()?.getLastCommitInfo() ?? null;
+    };
+
+    getUnpushedCommits = async (): Promise<string[]> => {
+        const gitService = this.repositoryManager.getActiveService();
+        if (!gitService) {
+            return [];
+        }
+
+        const unpushed = await gitService.getUnpushedCommits();
+        return Array.from(unpushed);
+    };
+}

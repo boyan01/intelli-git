@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { RpcPeer } from '@shared/rpc';
-import type { WebviewMethods, ExtensionMethods, FileStatus, ChangelistFileSelection, ChangelistState, GitLogRevealRequest, BranchInfo, BranchListData, CommitDetails, CommitFile, LogCommit, LogOptions, PushCommitsData, PushInitState } from '@shared/messages';
+import type { WebviewMethods, ExtensionMethods, FileStatus, ChangelistFileSelection, ChangelistState, GitLogRevealRequest } from '@shared/messages';
 import { GitService } from '../services/GitService';
 import { RepositoryManager } from '../services/RepositoryManager';
 import { ChangelistStateService } from '../services/ChangelistStateService';
@@ -14,6 +14,9 @@ import { AiProvider, DEFAULT_COMMIT_MESSAGE_PROMPT } from '../services/ai';
 import { logger } from '../utils/logger';
 import { getAiApiKey } from '../utils/aiSecrets';
 import { createRevisionContentUri, createStashContentUri } from '../utils/repositoryContentUri';
+import { ChangelistOperations, createDefaultRefreshDecorations } from '../operations/ChangelistOperations';
+import { GitReadRpcHandler } from './GitReadRpcHandler';
+import { ChangelistRpcHandler } from './ChangelistRpcHandler';
 
 export interface ExtensionRpcHandlerOptions {
     context: vscode.ExtensionContext;
@@ -34,7 +37,8 @@ export class ExtensionRpcHandler {
     private onDispose: () => void;
     private onChangelistSelectionChange?: (selection: ChangelistFileSelection | null) => void;
     private onChangelistFocusChange?: (focused: boolean) => void;
-    private consumePendingGitLogReveal?: () => GitLogRevealRequest | undefined;
+    private gitReadRpcHandler: GitReadRpcHandler;
+    private changelistRpcHandler: ChangelistRpcHandler;
     private _lastRebaseStatus?: string;
 
     constructor(options: ExtensionRpcHandlerOptions) {
@@ -43,7 +47,11 @@ export class ExtensionRpcHandler {
         this.onDispose = options.onDispose || (() => { });
         this.onChangelistSelectionChange = options.onChangelistSelectionChange;
         this.onChangelistFocusChange = options.onChangelistFocusChange;
-        this.consumePendingGitLogReveal = options.consumePendingGitLogReveal;
+        this.gitReadRpcHandler = new GitReadRpcHandler(this.repositoryManager, options.consumePendingGitLogReveal);
+        this.changelistRpcHandler = new ChangelistRpcHandler(
+            () => this.getChangelistOperations(),
+            () => this.changelistStateService
+        );
     }
 
     private get gitService(): GitService {
@@ -60,6 +68,22 @@ export class ExtensionRpcHandler {
 
     private get changelistStateService(): ChangelistStateService | undefined {
         return this.repositoryManager.getActiveService()?.changelistStateService;
+    }
+
+    private getChangelistOperations(): ChangelistOperations | undefined {
+        const gitService = this.repositoryManager.getActiveService();
+        const inactiveChangesService = gitService?.inactiveChangesService;
+        const changelistStateService = gitService?.changelistStateService;
+        if (!gitService || !inactiveChangesService || !changelistStateService) {
+            return undefined;
+        }
+
+        return new ChangelistOperations({
+            gitService,
+            inactiveChangesService,
+            changelistStateService,
+            refreshDecorations: createDefaultRefreshDecorations()
+        });
     }
 
     log = (params: { message: string, type?: 'info' | 'error' | 'warn' | 'debug' }): Promise<void> => {
@@ -101,97 +125,6 @@ export class ExtensionRpcHandler {
         return this.repositoryManager.setActiveRepository(repoPath);
     };
 
-    getPushInitState = async (): Promise<PushInitState> => {
-        return this.repositoryManager.getActiveService()?.getPushInitState() ?? {
-            localBranch: '',
-            remotes: []
-        };
-    };
-
-    getRemoteBranches = async (remote: string): Promise<string[]> => {
-        return await this.repositoryManager.getActiveService()?.getRemoteBranchesForRemote(remote) ?? [];
-    };
-
-    getPushCommits = async (params: { remote: string; branch: string; limit?: number; skip?: number }): Promise<PushCommitsData> => {
-        return await this.repositoryManager.getActiveService()?.getPushCommits(params) ?? {
-            commits: [],
-            hasMore: false,
-            totalCount: 0
-        };
-    };
-
-    getCommitFiles = async (hash: string): Promise<CommitFile[]> => {
-        return await this.repositoryManager.getActiveService()?.getCommitFiles(hash) ?? [];
-    };
-
-    getMultiCommitFiles = async (hashes: string[]): Promise<CommitFile[]> => {
-        return await this.repositoryManager.getActiveService()?.getMultiCommitFiles(hashes) ?? [];
-    };
-
-    getBranchInfo = async (): Promise<BranchInfo> => {
-        return await this.repositoryManager.getActiveService()?.getRpcBranchInfo() ?? {
-            current: '',
-            all: [],
-            rebaseStatus: 'none'
-        };
-    };
-
-    getStashList = async () => {
-        return await this.repositoryManager.getActiveService()?.getStashList() ?? [];
-    };
-
-    getStashFiles = async (index: number): Promise<CommitFile[]> => {
-        return await this.repositoryManager.getActiveService()?.getStashFilesAsCommitFiles(index) ?? [];
-    };
-
-    getBranchListData = async (): Promise<BranchListData> => {
-        return await this.repositoryManager.getActiveService()?.getBranchListData() ?? {
-            currentBranch: '',
-            localBranches: [],
-            localBranchesInfo: [],
-            remoteBranches: {},
-            tags: []
-        };
-    };
-
-    getLog = async (options: LogOptions): Promise<LogCommit[]> => {
-        return await this.repositoryManager.getActiveService()?.getLog(options) ?? [];
-    };
-
-    getCommitDetails = async (hash: string): Promise<CommitDetails> => {
-        return await this.repositoryManager.getActiveService()?.getCommitDetails(hash) ?? {
-            hash,
-            shortHash: hash.substring(0, 7),
-            subject: '',
-            authorName: '',
-            authorEmail: '',
-            date: '',
-            body: '',
-            files: [],
-            stats: { additions: 0, deletions: 0 },
-            parentHashes: [],
-            containingBranches: [],
-            refs: [],
-            filteredAncestors: []
-        };
-    };
-
-    getAuthors = async (): Promise<string[]> => {
-        return await this.repositoryManager.getActiveService()?.getAuthors() ?? [];
-    };
-
-    getCurrentUser = async (): Promise<string> => {
-        return await this.repositoryManager.getActiveService()?.getCurrentUser() ?? '';
-    };
-
-    getWorkspaceRoot = async (): Promise<string> => {
-        return this.repositoryManager.getActiveService()?.getWorkspaceRoot() ?? '';
-    };
-
-    getLastCommitInfo = async () => {
-        return await this.repositoryManager.getActiveService()?.getLastCommitInfo() ?? null;
-    };
-
     registerAll(rpc: RpcPeer<WebviewMethods, ExtensionMethods>) {
         rpc.registerAll(
             {
@@ -199,11 +132,11 @@ export class ExtensionRpcHandler {
                 getActiveRepository: this.getActiveRepository,
                 setActiveRepository: this.setActiveRepository,
                 log: this.log,
-                getPushInitState: this.getPushInitState,
-                getRemoteBranches: this.getRemoteBranches,
-                getPushCommits: this.getPushCommits,
-                getCommitFiles: this.getCommitFiles,
-                getMultiCommitFiles: this.getMultiCommitFiles,
+                getPushInitState: this.gitReadRpcHandler.getPushInitState,
+                getRemoteBranches: this.gitReadRpcHandler.getRemoteBranches,
+                getPushCommits: this.gitReadRpcHandler.getPushCommits,
+                getCommitFiles: this.gitReadRpcHandler.getCommitFiles,
+                getMultiCommitFiles: this.gitReadRpcHandler.getMultiCommitFiles,
                 push: this.push,
                 openDiff: this.openDiff,
                 closeWebView: this.closeWebView,
@@ -211,9 +144,9 @@ export class ExtensionRpcHandler {
                 getStatus: this.getStatus,
                 getChangelistState: this.getChangelistState,
                 getCommitViewState: this.getCommitViewState,
-                getBranchInfo: this.getBranchInfo,
-                getStashList: this.getStashList,
-                getStashFiles: this.getStashFiles,
+                getBranchInfo: this.gitReadRpcHandler.getBranchInfo,
+                getStashList: this.gitReadRpcHandler.getStashList,
+                getStashFiles: this.gitReadRpcHandler.getStashFiles,
                 commit: this.commit,
                 stage: this.stage,
                 stageFiles: this.stageFiles,
@@ -235,41 +168,35 @@ export class ExtensionRpcHandler {
                 resolveConflict: this.resolveConflict,
                 openFile: this.openFile,
                 openStashDiff: this.openStashDiff,
-                getBranchListData: this.getBranchListData,
-                getLog: this.getLog,
-                getCommitDetails: this.getCommitDetails,
-                getPendingGitLogReveal: this.getPendingGitLogReveal,
+                getBranchListData: this.gitReadRpcHandler.getBranchListData,
+                getLog: this.gitReadRpcHandler.getLog,
+                getCommitDetails: this.gitReadRpcHandler.getCommitDetails,
+                getPendingGitLogReveal: this.gitReadRpcHandler.getPendingGitLogReveal,
                 pickBranchForFilter: this.pickBranchForFilter,
                 pickPaths: this.pickPaths,
-                getAuthors: this.getAuthors,
-                getCurrentUser: this.getCurrentUser,
-                getWorkspaceState: this.getWorkspaceState,
-                updateWorkspaceState: this.updateWorkspaceState,
-                getUnpushedCommits: this.getUnpushedCommits,
-                getWorkspaceRoot: this.getWorkspaceRoot,
-                getLastCommitInfo: this.getLastCommitInfo,
+                getAuthors: this.gitReadRpcHandler.getAuthors,
+                getCurrentUser: this.gitReadRpcHandler.getCurrentUser,
+                getUnpushedCommits: this.gitReadRpcHandler.getUnpushedCommits,
+                getWorkspaceRoot: this.gitReadRpcHandler.getWorkspaceRoot,
+                getLastCommitInfo: this.gitReadRpcHandler.getLastCommitInfo,
                 showErrorMessage: this.showErrorMessage,
-                markHunkInactive: this.markHunkInactive,
-                markHunkActive: this.markHunkActive,
-                markFilesInactive: this.markFilesInactive,
-                markFilesActive: this.markFilesActive,
-                setChangelistMode: this.setChangelistMode,
-                createChangelist: this.createChangelist,
-                renameChangelist: this.renameChangelist,
-                deleteChangelist: this.deleteChangelist,
-                setActiveChangelist: this.setActiveChangelist,
-                moveFilesToChangelist: this.moveFilesToChangelist,
-                moveHunksToChangelist: this.moveHunksToChangelist,
+                markHunkInactive: this.changelistRpcHandler.markHunkInactive,
+                markHunkActive: this.changelistRpcHandler.markHunkActive,
+                markFilesInactive: this.changelistRpcHandler.markFilesInactive,
+                markFilesActive: this.changelistRpcHandler.markFilesActive,
+                setChangelistMode: this.changelistRpcHandler.setChangelistMode,
+                createChangelist: this.changelistRpcHandler.createChangelist,
+                renameChangelist: this.changelistRpcHandler.renameChangelist,
+                deleteChangelist: this.changelistRpcHandler.deleteChangelist,
+                setActiveChangelist: this.changelistRpcHandler.setActiveChangelist,
+                moveChangesToChangelist: this.changelistRpcHandler.moveChangesToChangelist,
+                moveFilesToChangelist: this.changelistRpcHandler.moveFilesToChangelist,
+                moveHunksToChangelist: this.changelistRpcHandler.moveHunksToChangelist,
                 setActiveChangelistFile: this.setActiveChangelistFile,
                 setChangelistTreeFocus: this.setChangelistTreeFocus
             }
         )
     }
-
-    getPendingGitLogReveal = async (): Promise<GitLogRevealRequest | undefined> => {
-        return this.consumePendingGitLogReveal?.();
-    };
-
 
     push = async (params: { force: boolean; pushTags: boolean; noVerify?: boolean; remote: string; branch: string }): Promise<void> => {
         const branches = await this.gitService.getBranches();
@@ -781,105 +708,6 @@ export class ExtensionRpcHandler {
         vscode.window.showErrorMessage(message);
     };
 
-    markHunkInactive = async (params: { path: string; hunkId: string }): Promise<void> => {
-        await this.inactiveChangesService?.markHunkInactive(params.path, params.hunkId);
-    };
-
-    markHunkActive = async (params: { path: string; hunkId: string }): Promise<void> => {
-        await this.inactiveChangesService?.markHunkActive(params.path, params.hunkId);
-    };
-
-    markFilesInactive = async (paths: string[]): Promise<void> => {
-        if (!this.inactiveChangesService || paths.length === 0) return;
-        await this.inactiveChangesService.markInactive(paths);
-
-        const status = await this.gitService.getStatus();
-        const stagedPaths = Array.from(new Set(
-            status
-                .filter(file => paths.includes(file.path) && file.staged)
-                .map(file => file.path)
-        ));
-        if (stagedPaths.length > 0) {
-            await this.gitService.unstageFiles(stagedPaths);
-        }
-    };
-
-    markFilesActive = async (paths: string[]): Promise<void> => {
-        if (!this.inactiveChangesService || paths.length === 0) return;
-        await this.inactiveChangesService.markActive(paths);
-    };
-
-    setChangelistMode = async (mode: 'staged' | 'changes'): Promise<void> => {
-        await this.changelistStateService?.setMode(mode);
-    };
-
-    createChangelist = async (name?: string) => {
-        const changelistName = (name || await vscode.window.showInputBox({
-            prompt: i18n.t('extension.enterChangelistName'),
-            value: i18n.t('Changes')
-        }))?.trim();
-
-        if (!changelistName) {
-            return null;
-        }
-
-        return this.changelistStateService?.createList(changelistName) || null;
-    };
-
-    renameChangelist = async (params: { id: string; name?: string }) => {
-        const current = this.changelistStateService?.getState().lists.find(list => list.id === params.id);
-        if (!current) {
-            return null;
-        }
-
-        const changelistName = (params.name || await vscode.window.showInputBox({
-            prompt: i18n.t('extension.enterChangelistName'),
-            value: current.name
-        }))?.trim();
-
-        if (!changelistName) {
-            return null;
-        }
-
-        return this.changelistStateService?.renameList(params.id, changelistName) || null;
-    };
-
-    deleteChangelist = async (id: string): Promise<void> => {
-        const target = this.changelistStateService?.getState().lists.find(list => list.id === id);
-        if (!target) {
-            return;
-        }
-
-        const itemCount = this.changelistStateService?.getListItemCount(id) || 0;
-        if (itemCount > 0) {
-            const confirmed = await vscode.window.showWarningMessage(
-                i18n.t('extension.changelistNotEmpty', target.name),
-                { modal: true },
-                i18n.t('Delete')
-            );
-
-            if (confirmed !== i18n.t('Delete')) {
-                return;
-            }
-        }
-
-        await this.changelistStateService?.deleteList(id);
-    };
-
-    setActiveChangelist = async (id: string): Promise<void> => {
-        await this.changelistStateService?.setActiveList(id);
-    };
-
-    moveFilesToChangelist = async (params: { paths: string[]; targetListId: string }): Promise<void> => {
-        await this.changelistStateService?.moveFiles(params.paths, params.targetListId);
-        await vscode.commands.executeCommand('intelli-git.refreshChangeBlockDecorations');
-    };
-
-    moveHunksToChangelist = async (params: { path: string; hunkIds: string[]; targetListId: string }): Promise<void> => {
-        await this.changelistStateService?.moveHunks(params.path, params.hunkIds, params.targetListId);
-        await vscode.commands.executeCommand('intelli-git.refreshChangeBlockDecorations');
-    };
-
     pickBranch = async (): Promise<void> => {
         await vscode.commands.executeCommand('intelli-git.showBranchPicker');
     };
@@ -1049,21 +877,4 @@ export class ExtensionRpcHandler {
         return model;
     }
 
-    getWorkspaceState = async <T>(key: string): Promise<T | undefined> => {
-        return this.context.workspaceState.get<T>(key);
-    };
-
-    updateWorkspaceState = async <T>(key: string, value: T): Promise<void> => {
-        await this.context.workspaceState.update(key, value);
-    };
-
-    getUnpushedCommits = async (): Promise<string[]> => {
-        const gitService = this.repositoryManager.getActiveService();
-        if (!gitService) {
-            return [];
-        }
-
-        const unpushed = await gitService.getUnpushedCommits();
-        return Array.from(unpushed);
-    };
 }

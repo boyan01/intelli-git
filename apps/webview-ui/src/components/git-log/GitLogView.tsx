@@ -21,6 +21,7 @@ export function GitLogView() {
 
     const [branchSplitRatio, setBranchSplitRatio] = usePersistedState('gitLog.branchSplitRatio');
     const [detailsSplitRatio, setDetailsSplitRatio] = usePersistedState('gitLog.detailsSplitRatio');
+    const [commitDetailsSplitRatio, setCommitDetailsSplitRatio] = usePersistedState('gitLog.commitDetailsSplitRatio');
 
     const handleBranchDoubleClick = useCallback((branch: string) => {
         setBranchFilter(branch);
@@ -64,6 +65,8 @@ export function GitLogView() {
             selectedHashes={selectedHashes}
             commit={commitDetails}
             showBranches={true}
+            detailsSplitRatio={commitDetailsSplitRatio}
+            onDetailsSplitRatioChange={setCommitDetailsSplitRatio}
         />
     );
 

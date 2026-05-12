@@ -1,7 +1,8 @@
 import { useState, useCallback, useEffect } from 'react';
 import { rpcEvents } from '../lib/rpc_client';
-import { getCachedValue, updateStoredState } from '../lib/stateCache';
+import { getStoredState, updateStoredState } from '../lib/stateCache';
 import type { PersistedStateSchema } from './usePersistedState';
+import { deserializePersistedValue, serializePersistedValue } from '../lib/persistedStateRegistry';
 
 interface UseRpcDataOptions<T, K extends keyof PersistedStateSchema | undefined = undefined> {
     initialValue: T;
@@ -14,9 +15,9 @@ interface UseRpcDataOptions<T, K extends keyof PersistedStateSchema | undefined 
  * Supports optional caching to vscode state for instant display on reopen.
  *
  * @example
- * const { data: files } = useRpcData(() => rpc.getStatus(), {
- *     initialValue: [] as FileStatus[],
- *     cacheKey: 'commit.files'
+ * const { data: viewState } = useRpcData(() => rpc.getCommitViewState(), {
+ *     initialValue: initialCommitViewState,
+ *     cacheKey: 'commit.viewState'
  * });
  */
 export function useRpcData<T, K extends keyof PersistedStateSchema | undefined = undefined>(
@@ -27,7 +28,11 @@ export function useRpcData<T, K extends keyof PersistedStateSchema | undefined =
 
     const [data, setData] = useState<T>(() => {
         if (cacheKey) {
-            return getCachedValue(cacheKey, initialValue);
+            const stored = getStoredState()[cacheKey];
+            if (stored === undefined || stored === null) {
+                return initialValue;
+            }
+            return deserializePersistedValue(cacheKey, stored) as T;
         }
         return initialValue;
     });
@@ -40,7 +45,7 @@ export function useRpcData<T, K extends keyof PersistedStateSchema | undefined =
             const result = await fetcher();
             setData(result);
             if (cacheKey) {
-                updateStoredState(cacheKey, result);
+                updateStoredState(cacheKey, serializePersistedValue(cacheKey, result as PersistedStateSchema[NonNullable<K>]));
             }
         } catch (e) {
             setError(e instanceof Error ? e : new Error(String(e)));

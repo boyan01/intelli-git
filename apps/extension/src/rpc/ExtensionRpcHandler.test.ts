@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ExtensionRpcHandler } from './ExtensionRpcHandler';
+import { GitReadRpcHandler } from './GitReadRpcHandler';
 import type { ChangelistState } from '@shared/messages';
 import type { ChangelistStateService } from '../services/ChangelistStateService';
 import type { GitService } from '../services/GitService';
@@ -84,22 +85,23 @@ describe('ExtensionRpcHandler commit', () => {
 describe('ExtensionRpcHandler no repository state', () => {
     it('returns empty read models instead of throwing', async () => {
         const handler = createNoRepoHandler();
+        const readHandler = new GitReadRpcHandler({ getActiveService: () => undefined } as any);
 
         await expect(handler.getCommitViewState()).resolves.toMatchObject({
             files: [],
             workspaceRoot: '',
             hasRepository: false
         });
-        await expect(handler.getStashList()).resolves.toEqual([]);
-        await expect(handler.getBranchListData()).resolves.toEqual({
+        await expect(readHandler.getStashList()).resolves.toEqual([]);
+        await expect(readHandler.getBranchListData()).resolves.toEqual({
             currentBranch: '',
             localBranches: [],
             localBranchesInfo: [],
             remoteBranches: {},
             tags: []
         });
-        await expect(handler.getLog({})).resolves.toEqual([]);
-        await expect(handler.getWorkspaceRoot()).resolves.toBe('');
+        await expect(readHandler.getLog({})).resolves.toEqual([]);
+        await expect(readHandler.getWorkspaceRoot()).resolves.toBe('');
     });
 });
 
