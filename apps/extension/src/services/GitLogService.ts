@@ -112,7 +112,7 @@ export class GitLogService {
             if (!searchAsHash) {
                 if (options.branch) {
                     if (options.branch === 'all') {
-                        args.push('--all');
+                        args.push('--exclude=refs/stash', '--all');
                     } else if (options.branch === 'HEAD') {
                         // Default behavior already uses HEAD ancestry.
                     } else if (options.branch.includes(',')) {
@@ -122,7 +122,7 @@ export class GitLogService {
                         args.push(options.branch);
                     }
                 } else {
-                    args.push('--all');
+                    args.push('--exclude=refs/stash', '--all');
                 }
             }
 
@@ -133,7 +133,7 @@ export class GitLogService {
                 args.push(`--until=${options.until}`);
             }
 
-            args.push('--topo-order');
+            args.push('--author-date-order');
 
             if (options.paths && options.paths.length > 0) {
                 args.push('--', ...options.paths.map(p => this.options.toRepoPath(p)));

@@ -123,6 +123,7 @@ export const LogListPanel: React.FC<LogListPanelProps> = ({
         commits,
         loading,
         hasMore,
+        filters,
         unpushedCommits,
         latestUnpushedHash,
         loadMore,
@@ -218,7 +219,11 @@ export const LogListPanel: React.FC<LogListPanelProps> = ({
     }, [handleRowClick, isNarrowMode, startShowTimer, hoveredHash]);
 
     // Compute graph data
-    const graph = useMemo(() => computeGraph(commits, hasMore), [commits, hasMore]);
+    const preferDefaultBranchLane = !filters.branch;
+    const graph = useMemo(
+        () => computeGraph(commits, hasMore, { preferDefaultBranchLane }),
+        [commits, hasMore, preferDefaultBranchLane]
+    );
 
     useEffect(() => {
         if (!containerRef.current) return;

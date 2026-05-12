@@ -39,6 +39,7 @@ export const GraphColumn: React.FC<GraphColumnProps> = ({
 }) => {
     const DOT_RADIUS = 5;
     const STROKE_WIDTH = 3;
+    const [hoveredArrowIndex, setHoveredArrowIndex] = React.useState<number | null>(null);
 
     const getPath = (line: GraphLine) => {
         const x1 = line.x1 * CELL_WIDTH + CELL_WIDTH / 2;
@@ -68,20 +69,38 @@ export const GraphColumn: React.FC<GraphColumnProps> = ({
         const arrowPath = isDown
             ? `M ${x} ${arrowY} L ${x - arrowSize} ${arrowY - arrowSize * 1.5} L ${x + arrowSize} ${arrowY - arrowSize * 1.5} Z`
             : `M ${x} ${arrowY} L ${x - arrowSize} ${arrowY + arrowSize * 1.5} L ${x + arrowSize} ${arrowY + arrowSize * 1.5} Z`;
+        const hitAreaY = isDown ? arrowY - 15 : arrowY;
+        const isArrowHovered = hoveredArrowIndex === index;
 
         return (
             <g
                 key={`arrow-${index}`}
                 style={{ cursor: 'pointer' }}
+                onMouseEnter={() => setHoveredArrowIndex(index)}
+                onMouseLeave={() => setHoveredArrowIndex(null)}
                 onClick={(e) => {
                     e.stopPropagation();
                     onJumpToCommit?.(line.targetCommitHash!);
                 }}
             >
+                {isArrowHovered && (
+                    <rect
+                        x={x - 9}
+                        y={hitAreaY + 1}
+                        width={18}
+                        height={13}
+                        rx={3}
+                        fill={line.color}
+                        fillOpacity={0.12}
+                        stroke={line.color}
+                        strokeOpacity={0.75}
+                        strokeWidth={1}
+                    />
+                )}
                 {/* Larger hit area */}
                 <rect
                     x={x - 10}
-                    y={isDown ? arrowY - 15 : arrowY}
+                    y={hitAreaY}
                     width={20}
                     height={15}
                     fill="transparent"
@@ -90,8 +109,8 @@ export const GraphColumn: React.FC<GraphColumnProps> = ({
                 <path
                     d={arrowPath}
                     fill={line.color}
-                    stroke={line.color}
-                    strokeWidth={1}
+                    stroke={isArrowHovered ? 'var(--vscode-focusBorder)' : line.color}
+                    strokeWidth={isArrowHovered ? 2 : 1}
                     strokeLinejoin="round"
                 />
             </g>

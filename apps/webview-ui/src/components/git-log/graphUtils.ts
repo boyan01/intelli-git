@@ -36,6 +36,10 @@ export interface GraphNode {
     maxX: number;
 }
 
+export interface ComputeGraphOptions {
+    preferDefaultBranchLane?: boolean;
+}
+
 interface LaneInfo {
     targetHash: string;
     sourceRowIndex: number;
@@ -54,10 +58,100 @@ interface SuspendedConnection {
     isDashed?: boolean;
 }
 
-export function computeGraph(commits: LogCommit[], hasMore: boolean = true): Map<string, GraphNode> {
+function getDefaultBranchNameRank(name: string): number | null {
+    const normalizedName = name.toLowerCase();
+    const refName = normalizedName.includes(' -> ')
+        ? normalizedName.split(' -> ').pop()?.trim() ?? normalizedName
+        : normalizedName;
+
+    if (refName === 'main' || refName === 'origin/main') return 0;
+    if (refName === 'master' || refName === 'origin/master') return 1;
+    return null;
+}
+
+function getDefaultBranchRefRank(ref: LogCommit['refs'][number], hasRemoteHead: boolean): number | null {
+    const branchNameRank = getDefaultBranchNameRank(ref.name);
+    if (branchNameRank === null || ref.type === 'tag') return null;
+
+    const refRank = ref.type === 'head' || ref.type === 'local'
+        ? 0
+        : hasRemoteHead ? 1 : 2;
+
+    return branchNameRank * 3 + refRank;
+}
+
+function findDefaultBranchTipHash(commits: LogCommit[]): string | null {
+    let best: { hash: string; rank: number; commitIndex: number } | null = null;
+
+    for (let commitIndex = 0; commitIndex < commits.length; commitIndex++) {
+        const commit = commits[commitIndex];
+        const refs = commit.refs ?? [];
+        const hasRemoteHead = refs.some(ref => ref.name.toLowerCase().endsWith('/head'));
+
+        for (const ref of refs) {
+            const rank = getDefaultBranchRefRank(ref, hasRemoteHead);
+            if (rank === null) continue;
+
+            if (
+                best === null
+                || rank < best.rank
+                || (rank === best.rank && commitIndex < best.commitIndex)
+            ) {
+                best = { hash: commit.hash, rank, commitIndex };
+            }
+        }
+    }
+
+    return best?.hash ?? null;
+}
+
+function buildDefaultBranchHashes(commits: LogCommit[]): Set<string> {
+    const tipHash = findDefaultBranchTipHash(commits);
+    const hashes = new Set<string>();
+    if (!tipHash) return hashes;
+
+    const commitByHash = new Map(commits.map(commit => [commit.hash, commit]));
+    let currentHash: string | undefined = tipHash;
+    while (currentHash && !hashes.has(currentHash)) {
+        const commit = commitByHash.get(currentHash);
+        if (!commit) break;
+
+        hashes.add(currentHash);
+        currentHash = commit.parentHashes[0];
+    }
+
+    return hashes;
+}
+
+export function computeGraph(
+    commits: LogCommit[],
+    hasMore: boolean = true,
+    options: ComputeGraphOptions = {}
+): Map<string, GraphNode> {
     const graph = new Map<string, GraphNode>();
     const lanes: (LaneInfo | null)[] = [];
     const commitIndexMap = new Map<string, number>();
+    const defaultBranchHashes = options.preferDefaultBranchLane ? buildDefaultBranchHashes(commits) : new Set<string>();
+    const isDefaultBranchHash = (hash: string | undefined): boolean => !!hash && defaultBranchHashes.has(hash);
+
+    const ensureLaneExists = (index: number): void => {
+        while (lanes.length <= index) {
+            lanes.push(null);
+        }
+    };
+
+    const findEmptyLane = (excludedLanes: Set<number> = new Set()): number => {
+        ensureLaneExists(0);
+
+        for (let i = 0; i < lanes.length; i++) {
+            if (!excludedLanes.has(i) && lanes[i] === null) {
+                return i;
+            }
+        }
+
+        ensureLaneExists(lanes.length);
+        return lanes.length - 1;
+    };
 
     // Suspended long-distance connections that freed their lane
     const suspendedConnections: SuspendedConnection[] = [];
@@ -100,34 +194,35 @@ export function computeGraph(commits: LogCommit[], hasMore: boolean = true): Map
         }
 
         // 1. Find all lanes expecting this commit
-        const expectingLanes: number[] = [];
+        let expectingLanes: number[] = [];
         for (let i = 0; i < lanes.length; i++) {
             if (lanes[i]?.targetHash === hash) {
                 expectingLanes.push(i);
             }
         }
 
+        const isDefaultBranchCommit = isDefaultBranchHash(hash);
+        if (isDefaultBranchCommit && !expectingLanes.includes(0)) {
+            const defaultBranchLane = expectingLanes[0];
+            if (defaultBranchLane !== undefined && lanes[0] === null) {
+                lanes[0] = lanes[defaultBranchLane];
+                lanes[defaultBranchLane] = null;
+                expectingLanes = expectingLanes.map(lane => lane === defaultBranchLane ? 0 : lane);
+            }
+        }
+
         // 2. Determine my column
         let myLaneIndex: number;
-        if (expectingLanes.length > 0) {
-            myLaneIndex = expectingLanes[0];
+        const usableExpectingLanes = expectingLanes;
+        if (isDefaultBranchCommit && (expectingLanes.includes(0) || lanes[0] === null)) {
+            myLaneIndex = 0;
+            ensureLaneExists(myLaneIndex);
+        } else if (usableExpectingLanes.length > 0) {
+            myLaneIndex = usableExpectingLanes[0];
         } else if (reconnectingConnections.length > 0) {
-            // Reconnecting from a suspended connection - find an empty lane
-            const emptyIdx = lanes.findIndex(l => l === null);
-            if (emptyIdx === -1) {
-                myLaneIndex = lanes.length;
-                lanes.push(null);
-            } else {
-                myLaneIndex = emptyIdx;
-            }
+            myLaneIndex = findEmptyLane();
         } else {
-            const emptyIdx = lanes.findIndex(l => l === null);
-            if (emptyIdx === -1) {
-                myLaneIndex = lanes.length;
-                lanes.push(null);
-            } else {
-                myLaneIndex = emptyIdx;
-            }
+            myLaneIndex = findEmptyLane();
         }
 
         const myColor = BRANCH_COLORS[myLaneIndex % BRANCH_COLORS.length];
@@ -135,7 +230,7 @@ export function computeGraph(commits: LogCommit[], hasMore: boolean = true): Map
         maxX = myLaneIndex;
 
         // 3. Draw incoming line from previous row (if not reconnecting)
-        if (expectingLanes.length > 0) {
+        if (usableExpectingLanes.includes(myLaneIndex) && lanes[myLaneIndex] !== null) {
             const laneInfo = lanes[myLaneIndex]!;
             const distance = rowIndex - laneInfo.sourceRowIndex;
             const isLong = distance > LONG_DISTANCE_THRESHOLD;
@@ -159,12 +254,7 @@ export function computeGraph(commits: LogCommit[], hasMore: boolean = true): Map
             // Find the lane that was used for this connection
             let reconnectLane = lanes.findIndex(l => l?.targetHash === hash && l?.sourceHash === conn.sourceHash);
             if (reconnectLane === -1) {
-                // Fallback: find any empty lane
-                reconnectLane = lanes.findIndex(l => l === null);
-                if (reconnectLane === -1) {
-                    reconnectLane = lanes.length;
-                    lanes.push(null);
-                }
+                reconnectLane = findEmptyLane();
             }
 
             if (reconnectLane > maxX) maxX = reconnectLane;
@@ -203,6 +293,7 @@ export function computeGraph(commits: LogCommit[], hasMore: boolean = true): Map
             // Find an empty lane, but skip myLaneIndex and lanes reserved for forks
             let resumeLane = -1;
             let skipped = 0;
+            ensureLaneExists(0);
             for (let i = 0; i < lanes.length; i++) {
                 // Skip current commit's lane
                 if (i === myLaneIndex) continue;
@@ -218,8 +309,7 @@ export function computeGraph(commits: LogCommit[], hasMore: boolean = true): Map
                 }
             }
             if (resumeLane === -1) {
-                resumeLane = lanes.length;
-                lanes.push(null);
+                resumeLane = findEmptyLane(new Set([myLaneIndex]));
             }
 
             if (resumeLane > maxX) maxX = resumeLane;
@@ -409,24 +499,13 @@ export function computeGraph(commits: LogCommit[], hasMore: boolean = true): Map
                     // Find existing lane for this parent, but exclude resuming lanes
                     let parentLaneIndex = lanes.findIndex(l => l?.targetHash === parentHash && !l?.isResuming);
                     if (parentLaneIndex === -1) {
-                        const emptyIdx = lanes.findIndex(l => l === null);
-                        if (emptyIdx === -1) {
-                            parentLaneIndex = lanes.length;
-                            lanes.push({
-                                targetHash: parentHash,
-                                sourceRowIndex: rowIndex,
-                                sourceHash: hash,
-                                color: BRANCH_COLORS[parentLaneIndex % BRANCH_COLORS.length]
-                            });
-                        } else {
-                            parentLaneIndex = emptyIdx;
-                            lanes[parentLaneIndex] = {
-                                targetHash: parentHash,
-                                sourceRowIndex: rowIndex,
-                                sourceHash: hash,
-                                color: BRANCH_COLORS[parentLaneIndex % BRANCH_COLORS.length]
-                            };
-                        }
+                        parentLaneIndex = findEmptyLane();
+                        lanes[parentLaneIndex] = {
+                            targetHash: parentHash,
+                            sourceRowIndex: rowIndex,
+                            sourceHash: hash,
+                            color: BRANCH_COLORS[parentLaneIndex % BRANCH_COLORS.length]
+                        };
                     }
 
                     if (parentLaneIndex > maxX) maxX = parentLaneIndex;

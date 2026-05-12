@@ -9,6 +9,7 @@ interface UseLogCommitLoaderResult {
     commits: LogCommit[];
     loading: boolean;
     hasMore: boolean;
+    filters: Partial<LogOptions>;
     unpushedCommits: Set<string>;
     latestUnpushedHash: string | null;
     loadMore: (reset?: boolean) => Promise<void>;
@@ -154,6 +155,7 @@ export const useLogCommitLoader = (): UseLogCommitLoaderResult => {
         commits,
         loading,
         hasMore,
+        filters,
         unpushedCommits,
         latestUnpushedHash,
         loadMore,

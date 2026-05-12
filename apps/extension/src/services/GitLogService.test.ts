@@ -48,6 +48,13 @@ describe('GitLogService', () => {
         fs.rmSync(tempDir, { recursive: true, force: true });
     });
 
+    async function commitWithAuthorDate(message: string, fileName: string, content: string, date: string) {
+        const filePath = path.join(tempDir, 'app', fileName);
+        fs.writeFileSync(filePath, content);
+        await git.add(filePath);
+        await git.raw(['commit', '--date', date, '-m', message]);
+    }
+
     it('loads scoped log entries and stitches filtered ancestors', async () => {
         const commits = await service.getLog({
             search: 'match',
@@ -57,6 +64,57 @@ describe('GitLogService', () => {
         expect(commits.map(commit => commit.subject)).toEqual(['match head', 'match root']);
         expect(commits[0].filteredAncestors).toEqual([hashes[0]]);
         expect(commits[0].parentHashes).toEqual([hashes[1]]);
+    });
+
+    it('orders visible log entries by author date without breaking ancestry', async () => {
+        await git.checkout(['-B', 'ordering-feature', hashes[0]]);
+        await commitWithAuthorDate(
+            'feature-new',
+            'feature-ordering.txt',
+            'feature\n',
+            '2026-01-04T00:00:00+0000'
+        );
+
+        await git.checkout(['-B', 'ordering-main', hashes[0]]);
+        await commitWithAuthorDate(
+            'main-mid',
+            'main-mid-ordering.txt',
+            'main mid\n',
+            '2026-01-03T00:00:00+0000'
+        );
+        await commitWithAuthorDate(
+            'main-new',
+            'main-new-ordering.txt',
+            'main new\n',
+            '2026-01-05T00:00:00+0000'
+        );
+
+        const commits = await service.getLog({
+            branch: 'ordering-main,ordering-feature',
+            maxCount: 4
+        });
+
+        expect(commits.map(commit => commit.subject)).toEqual([
+            'main-new',
+            'feature-new',
+            'main-mid',
+            'match root'
+        ]);
+    });
+
+    it('excludes stash commits from all-branches logs', async () => {
+        fs.writeFileSync(path.join(tempDir, 'app', 'scoped.txt'), 'one\ntwo\nthree\nstash\n');
+        await git.raw(['stash', 'push', '-m', 'stash-only']);
+
+        const rawAllSubjects = await git.raw(['log', '--all', '--format=%s']);
+        expect(rawAllSubjects).toContain('stash-only');
+
+        const commits = await service.getLog({
+            branch: 'all',
+            maxCount: 20
+        });
+
+        expect(commits.map(commit => commit.subject).join('\n')).not.toContain('stash-only');
     });
 
     it('resolves hash searches to the exact commit', async () => {
