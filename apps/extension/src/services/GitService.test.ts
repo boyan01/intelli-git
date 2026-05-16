@@ -678,6 +678,22 @@ describe('GitService branch remote workflows', () => {
         expect((await git.branch()).current).toBe('feature');
         await expect(service.branchRemote.getUpstreamBranch('feature')).resolves.toBe('origin/feature');
     });
+
+    it('reads merge state from git root when workspace is a repository subdirectory', async () => {
+        fs.mkdirSync(path.join(tempDir, 'app'), { recursive: true });
+        fs.writeFileSync(path.join(tempDir, 'app', 'tracked.txt'), 'base\n');
+        await git.add('app/tracked.txt');
+        await git.commit('Initial commit');
+
+        const gitDir = path.join(tempDir, '.git');
+        fs.writeFileSync(path.join(gitDir, 'MERGE_HEAD'), '0123456789012345678901234567890123456789\n');
+        fs.writeFileSync(path.join(gitDir, 'MERGE_MSG'), 'Merge branch feature\n');
+
+        const service = new GitService(path.join(tempDir, 'app'), tempDir, git);
+
+        await expect(service.branchRemote.getRebaseStatus()).resolves.toBe('merging');
+        await expect(service.branchRemote.getRebaseCommitMessage()).resolves.toBe('Merge branch feature');
+    });
 });
 
 function createInactiveChangesService(options: {
