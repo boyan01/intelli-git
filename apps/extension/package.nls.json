@@ -87,6 +87,7 @@
   "intelli-git.commands.openLogAtCurrentBlame.title": "Open Log at Blame Commit",
   "intelli-git.commands.showFileHistory.title": "Show File History",
   "intelli-git.submenus.editorGit.label": "Intelli Git",
+  "intelli-git.submenus.changelistMode.label": "Change Workflow Mode",
   "intelli-git.commands.ai.selectCopilotModel.title": "Intelli: Select Copilot Model",
   "intelli-git.commands.ai.configureProvider.title": "Intelli: Configure AI Provider",
   "intelli-git.commands.ai.setApiKey.title": "Intelli: Set AI API Key",

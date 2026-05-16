@@ -87,6 +87,7 @@
   "intelli-git.commands.openLogAtCurrentBlame.title": "打开 Blame 提交日志",
   "intelli-git.commands.showFileHistory.title": "显示文件历史",
   "intelli-git.submenus.editorGit.label": "Intelli Git",
+  "intelli-git.submenus.changelistMode.label": "变更模式",
   "intelli-git.commands.ai.selectCopilotModel.title": "Intelli: 选择 Copilot 模型",
   "intelli-git.commands.ai.configureProvider.title": "Intelli: 配置 AI Provider",
   "intelli-git.commands.ai.setApiKey.title": "Intelli: 设置 AI API Key",

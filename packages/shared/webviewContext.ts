@@ -102,7 +102,7 @@ export interface ChangelistFileContext extends BaseWebviewContext {
 
 export interface ChangelistBackgroundContext extends BaseWebviewContext {
     webviewSection: 'changelistBackground';
-    changelistMode: 'changes';
+    changelistMode: 'staged' | 'changes';
     preventDefaultContextMenuItems: true;
 }
 

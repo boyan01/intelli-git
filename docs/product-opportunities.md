@@ -102,37 +102,38 @@ Commit View
 
 ### P1. Core Workflow Differentiation
 
-#### 4. 把 `changelist.mode` 从 hidden setting 提升成 view 内 workflow
+#### 4. 把 `changelist.mode` 保持为轻量 view 内 workflow 入口
 
 证据：
 
 - `intelli-git.changelist.mode` 已是配置项。
 - `CommitToolbar` 只有 changes mode 下才显示 create changelist。
-- view title menu 有 staged / changes mode command，但 commit view 内缺少明确入口。
+- view title menu 已有 staged / changes mode command。
+- 早期 toolbar button / dropdown 入口体验不好，已移除，不应再恢复到 toolbar。
 
 为什么值得做：
 
-`changes` mode 是 Intelli Git 的核心差异化，不应只存在于 settings / view title menu。用户需要在 commit panel 中理解自己正在使用哪种提交模型。
+`changes` mode 是 Intelli Git 的核心差异化，但 mode 切换不应抢占高频 toolbar 空间。更适合保留 view title command，并在 tree/list 显示区域右键菜单提供轻量入口。
 
 ASCII UI:
 
 ```text
 Commit View
 +---------------------------------------------------------+
-| [Mode: Staged v] [Refresh] [Stage tracked] [Tree/List]  |
+| [Refresh] [Stage tracked] [Tree/List]                   |
 +---------------------------------------------------------+
 
-Mode dropdown:
-  * Staged
-    Git index based workflow
-  * Changes
-    IntelliJ-style active changelist workflow
+Tree/List background context menu:
+  Change Workflow Mode >
+    * Staged Mode
+    * Changelist Mode
 ```
 
 建议：
 
-- 在 `CommitToolbar` 加 mode dropdown，直接调用现有 `setChangelistMode`。
-- 保留 view title commands 作为辅助入口。
+- 不恢复 `CommitToolbar` 的 mode button / dropdown。
+- 保留 view title commands 作为主入口。
+- 在 tree/list 显示区域空白处右键菜单提供 `Change Workflow Mode` submenu，submenu 内提供 staged / changes 切换。
 - changes mode 下 active list 仍只用更强文字权重表达，不加 `Active` badge，遵守现有 interaction contract。
 
 #### 5. 让 partial hunk assignment 可感知，但不渲染 hunk children

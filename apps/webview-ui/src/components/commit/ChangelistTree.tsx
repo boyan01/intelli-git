@@ -635,11 +635,11 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
             onDrop={handleDrop}
             getDragData={getDragData}
             getDragLabel={getDragLabel}
-            rootContextData={changelistState.mode === 'changes' ? {
+            rootContextData={{
                 webviewSection: 'changelistBackground',
                 changelistMode: changelistState.mode,
                 preventDefaultContextMenuItems: true
-            } satisfies ChangelistBackgroundContext : undefined}
+            } satisfies ChangelistBackgroundContext}
         />
     );
 });

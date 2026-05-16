@@ -372,6 +372,10 @@
       {
         "id": "intelli-git.editorGit",
         "label": "%intelli-git.submenus.editorGit.label%"
+      },
+      {
+        "id": "intelli-git.changelistMode",
+        "label": "%intelli-git.submenus.changelistMode.label%"
       }
     ],
     "menus": {
@@ -634,6 +638,11 @@
           "group": "1_modification@0"
         },
         {
+          "submenu": "intelli-git.changelistMode",
+          "when": "webviewSection == 'changelistBackground'",
+          "group": "9_mode@1"
+        },
+        {
           "command": "intelli-git.changelist.setActiveList",
           "when": "webviewSection == 'changelistRoot' && changelistMode == 'changes' && canSetActiveChangelist == true",
           "group": "1_modification@0"
@@ -731,6 +740,28 @@
           "command": "intelli-git.revealCurrentChangeBlock",
           "when": "intelli-git.hasCurrentChangeBlock",
           "group": "2_changes@9"
+        }
+      ],
+      "intelli-git.changelistMode": [
+        {
+          "command": "intelli-git.changelistMode.staged.current",
+          "when": "changelistMode == 'staged'",
+          "group": "1_mode@1"
+        },
+        {
+          "command": "intelli-git.changelistMode.staged",
+          "when": "changelistMode != 'staged'",
+          "group": "1_mode@1"
+        },
+        {
+          "command": "intelli-git.changelistMode.changes.current",
+          "when": "changelistMode == 'changes'",
+          "group": "1_mode@2"
+        },
+        {
+          "command": "intelli-git.changelistMode.changes",
+          "when": "changelistMode != 'changes'",
+          "group": "1_mode@2"
         }
       ],
       "scm/change/title": [

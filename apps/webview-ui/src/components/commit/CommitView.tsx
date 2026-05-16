@@ -9,6 +9,7 @@ import { useRpcData } from '../../hooks/useRpcData';
 import styles from './CommitView.module.css';
 import { rpc, rpcEvents } from '../../lib/rpc_client';
 import type { BranchInfo, ChangelistGroup, ChangelistState, FileStatus, LastCommitInfo } from '@shared/messages';
+import type { ChangelistBackgroundContext } from '@shared/webviewContext';
 import { buildChangelists, getFileStats, getSelectedFiles, hasTrackedChanges, INACTIVE_CHANGELIST_ID } from './changelistModel';
 
 interface CommitViewProps {
@@ -268,6 +269,13 @@ export function CommitView({ rebaseStatus }: CommitViewProps) {
     };
 
     const statePanel = renderStatePanel();
+    const backgroundContext: ChangelistBackgroundContext | undefined = hasRepository
+        ? {
+            webviewSection: 'changelistBackground',
+            changelistMode: changelistState.mode,
+            preventDefaultContextMenuItems: true
+        }
+        : undefined;
 
     return (
         <div className={styles.commitView}>
@@ -289,7 +297,10 @@ export function CommitView({ rebaseStatus }: CommitViewProps) {
                 }}
             />
 
-            <div className={styles.fileListContainer}>
+            <div
+                className={styles.fileListContainer}
+                {...(backgroundContext ? { 'data-vscode-context': JSON.stringify(backgroundContext) } : {})}
+            >
                 {statePanel || (
                     <ChangelistTree
                         groups={changelists}
