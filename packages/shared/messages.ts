@@ -249,6 +249,7 @@ export interface PushCommitsData {
 export interface WebviewMethods {
     activeFileChange: (params: { path: string; commitHash?: string }) => void;
     revealLog: (params: GitLogRevealRequest) => void;
+    filterLogByBranch: (params: { branch: string }) => void;
     refresh: () => void;
     switchTab: (tab: 'commit' | 'stash' | 'push') => void;
 }

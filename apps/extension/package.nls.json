@@ -21,6 +21,7 @@
   "intelli-git.commands.stashDrop.title": "Drop",
   "intelli-git.commands.stashShowDiff.title": "Show Diff",
   "intelli-git.commands.branch.checkout.title": "Checkout",
+  "intelli-git.commands.branch.filterLog.title": "Filter Log by Branch",
   "intelli-git.commands.branch.create.title": "Create Branch...",
   "intelli-git.commands.branch.rebase.title": "Rebase onto Current",
   "intelli-git.commands.branch.merge.title": "Merge into Current",

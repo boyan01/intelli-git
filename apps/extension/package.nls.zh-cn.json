@@ -21,6 +21,7 @@
   "intelli-git.commands.stashDrop.title": "删除(Drop)",
   "intelli-git.commands.stashShowDiff.title": "显示差异",
   "intelli-git.commands.branch.checkout.title": "检出",
+  "intelli-git.commands.branch.filterLog.title": "按此分支筛选日志",
   "intelli-git.commands.branch.create.title": "创建分支...",
   "intelli-git.commands.branch.rebase.title": "变基到当前",
   "intelli-git.commands.branch.merge.title": "合并到当前",

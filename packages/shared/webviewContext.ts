@@ -29,6 +29,18 @@ export interface StashItemContext extends BaseWebviewContext {
     selectedStashFile?: string | null;
 }
 
+export interface BranchContext extends BaseWebviewContext {
+    webviewSection: 'localBranch' | 'remoteBranch';
+    branchName: string;
+    fullBranchName: string;
+    hasUpstream?: boolean;
+}
+
+export interface TagContext extends BaseWebviewContext {
+    webviewSection: 'tag';
+    tagName: string;
+}
+
 export interface GitLogCommitContext extends BaseWebviewContext {
     webviewSection: 'gitLogCommit';
     hash: string;
@@ -108,6 +120,8 @@ export interface ChangelistBackgroundContext extends BaseWebviewContext {
 
 export type WebviewContextPayload =
     | StashItemContext
+    | BranchContext
+    | TagContext
     | GitLogCommitContext
     | GitLogCommitFileContext
     | ChangelistRootContext

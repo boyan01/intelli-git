@@ -1,11 +1,11 @@
 import * as vscode from 'vscode';
 import { GitService } from '../services/GitService';
-import { CommitViewProvider } from '../providers/CommitViewProvider';
+import { GitLogViewProvider } from '../providers/GitLogViewProvider';
 
 export function registerBranchCommands(
     context: vscode.ExtensionContext,
     gitService: GitService,
-    _provider?: CommitViewProvider
+    gitLogProvider?: GitLogViewProvider
 ) {
     // Helper to get branch/ref name from arguments
     const getBranchName = (arg: any): string | undefined => {
@@ -33,6 +33,13 @@ export function registerBranchCommands(
     };
 
     context.subscriptions.push(
+        vscode.commands.registerCommand('intelli-git.branch.filterLog', async (arg) => {
+            const branch = getBranchName(arg);
+            if (!branch) return;
+
+            await gitLogProvider?.filterByBranch(branch);
+        }),
+
         vscode.commands.registerCommand('intelli-git.branch.checkout', async (arg) => {
             const branch = getBranchName(arg);
             if (!branch) return;

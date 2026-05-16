@@ -159,6 +159,10 @@
         "title": "%intelli-git.commands.branch.checkout.title%"
       },
       {
+        "command": "intelli-git.branch.filterLog",
+        "title": "%intelli-git.commands.branch.filterLog.title%"
+      },
+      {
         "command": "intelli-git.branch.create",
         "title": "%intelli-git.commands.branch.create.title%"
       },
@@ -381,6 +385,10 @@
     "menus": {
       "commandPalette": [
         {
+          "command": "intelli-git.branch.filterLog",
+          "when": "false"
+        },
+        {
           "command": "intelli-git.changelistMode.staged",
           "when": "false"
         },
@@ -456,6 +464,11 @@
           "command": "intelli-git.stashShowDiff",
           "when": "webviewSection == 'stashItem'",
           "group": "2_view"
+        },
+        {
+          "command": "intelli-git.branch.filterLog",
+          "when": "webviewSection == 'localBranch' || webviewSection == 'remoteBranch'",
+          "group": "0_filter@1"
         },
         {
           "command": "intelli-git.branch.checkout",

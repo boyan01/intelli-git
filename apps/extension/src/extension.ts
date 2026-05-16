@@ -133,7 +133,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
         registerStashCommands(repoContext, gitService, provider);
         registerNavigationCommands(repoContext, branchStatusBar, provider);
-        registerBranchCommands(repoContext, gitService, provider);
+        registerBranchCommands(repoContext, gitService, gitLogProvider);
         registerLogCommands(repoContext, gitService);
         registerLogFileCommands(repoContext, gitService);
         registerChangelistCommands(repoContext, gitService, inactiveChangesService, changelistStateService, provider);

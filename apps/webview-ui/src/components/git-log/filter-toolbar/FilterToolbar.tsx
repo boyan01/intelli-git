@@ -10,7 +10,7 @@ import { usePersistedState } from '../../../hooks/usePersistedState';
 
 interface FilterToolbarProps {
     onFilterChange: (options: Partial<LogOptions>) => void;
-    externalBranch?: string;
+    externalBranch?: { branch: string; requestId: number };
 }
 
 export const FilterToolbar: React.FC<FilterToolbarProps> = ({ onFilterChange, externalBranch }) => {
@@ -28,7 +28,7 @@ export const FilterToolbar: React.FC<FilterToolbarProps> = ({ onFilterChange, ex
     // Sync external branch
     useEffect(() => {
         if (externalBranch !== undefined) {
-            setBranch(externalBranch);
+            setBranch(externalBranch.branch);
         }
     }, [externalBranch, setBranch]);
 

@@ -20,6 +20,7 @@ export class EventStream<T> {
 export const rpcEvents = {
     activeFileChange: new EventStream<{ path: string; commitHash?: string }>(),
     revealLog: new EventStream<GitLogRevealRequest>(),
+    filterLogByBranch: new EventStream<{ branch: string }>(),
     refresh: new EventStream<void>(),
     clearGitLogFilters: new EventStream<'all' | 'branch'>(),
     switchTab: new EventStream<'commit' | 'stash' | 'push'>(),
@@ -46,6 +47,7 @@ export const rpc = _rpc.proxy;
 _rpc.registerAll({
     activeFileChange: (params) => rpcEvents.activeFileChange.emit(params),
     revealLog: (params) => rpcEvents.revealLog.emit(params),
+    filterLogByBranch: (params) => rpcEvents.filterLogByBranch.emit(params),
     refresh: () => rpcEvents.refresh.emit(),
     switchTab: (tab) => rpcEvents.switchTab.emit(tab),
 });

@@ -7,25 +7,39 @@ import { VersionExpiredPanel } from '../common/VersionExpiredPanel';
 import styles from './GitLogView.module.css';
 
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { rpc } from '../../lib/rpc_client';
+import { rpc, rpcEvents } from '../../lib/rpc_client';
 import { usePersistedState } from '../../hooks/usePersistedState';
 import { useRpcData } from '../../hooks/useRpcData';
 
 const NARROW_THRESHOLD = 800;
 
+interface BranchFilterRequest {
+    branch: string;
+    requestId: number;
+}
+
 export function GitLogView() {
     const containerRef = useRef<HTMLDivElement>(null);
     const [selectedHashes, setSelectedHashes] = useState<string[]>([]);
-    const [branchFilter, setBranchFilter] = useState<string | undefined>(undefined);
+    const [branchFilter, setBranchFilter] = useState<BranchFilterRequest | undefined>(undefined);
     const [isNarrowMode, setIsNarrowMode] = useState(false);
 
     const [branchSplitRatio, setBranchSplitRatio] = usePersistedState('gitLog.branchSplitRatio');
     const [detailsSplitRatio, setDetailsSplitRatio] = usePersistedState('gitLog.detailsSplitRatio');
     const [commitDetailsSplitRatio, setCommitDetailsSplitRatio] = usePersistedState('gitLog.commitDetailsSplitRatio');
 
-    const handleBranchDoubleClick = useCallback((branch: string) => {
-        setBranchFilter(branch);
+    const handleBranchFilter = useCallback((branch: string) => {
+        setBranchFilter(previous => ({
+            branch,
+            requestId: (previous?.requestId ?? 0) + 1
+        }));
     }, []);
+
+    useEffect(() => {
+        return rpcEvents.filterLogByBranch.subscribe(({ branch }) => {
+            handleBranchFilter(branch);
+        });
+    }, [handleBranchFilter]);
 
     const loadCommitDetails = useCallback(() => {
         return selectedHashes.length === 1 ? rpc.getCommitDetails(selectedHashes[0]) : Promise.resolve(undefined);
@@ -77,7 +91,7 @@ export function GitLogView() {
                 minSize={0}
                 ratio={branchSplitRatio}
                 onRatioChange={setBranchSplitRatio}
-                first={<BranchListPanel onBranchDoubleClick={handleBranchDoubleClick} />}
+                first={<BranchListPanel onBranchFilter={handleBranchFilter} />}
                 second={
                     isNarrowMode ? (
                         logListPanel

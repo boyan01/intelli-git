@@ -19,7 +19,7 @@ interface BranchNodeData {
 }
 
 interface BranchListPanelProps {
-    onBranchDoubleClick?: (branch: string) => void;
+    onBranchFilter?: (branch: string) => void;
 }
 
 const emptyBranchListData: BranchListData = {
@@ -30,7 +30,7 @@ const emptyBranchListData: BranchListData = {
     tags: []
 };
 
-export const BranchListPanel: React.FC<BranchListPanelProps> = ({ onBranchDoubleClick }) => {
+export const BranchListPanel: React.FC<BranchListPanelProps> = ({ onBranchFilter }) => {
     const { t } = useTranslation();
     const loadBranchListData = useCallback(() => rpc.getBranchListData(), []);
     const { data, loading: isLoading } = useRpcData(
@@ -72,9 +72,9 @@ export const BranchListPanel: React.FC<BranchListPanelProps> = ({ onBranchDouble
 
     const handleDoubleClick = useCallback((node: TreeNode<BranchNodeData>) => {
         if (node.data?.type !== 'folder') {
-            onBranchDoubleClick?.(node.data?.fullPath || node.id);
+            onBranchFilter?.(node.data?.fullPath || node.id);
         }
-    }, [onBranchDoubleClick]);
+    }, [onBranchFilter]);
 
     // Sort branches with priority branches first
     const sortBranchNames = useCallback((names: string[]): string[] => {

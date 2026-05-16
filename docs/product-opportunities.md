@@ -158,25 +158,7 @@ Header
 
 ### P2. Git Log And History Workflows
 
-#### 7. 让 branch panel 的 “Filter Log by Branch” 显式化
-
-证据：
-
-- `BranchListPanel` double click branch 才设置 log branch filter。
-- branch search 当前只过滤 branch tree，不改变 log。
-
-为什么值得做：
-
-用户单击 branch 后自然会期待 log 变化。隐式 double click 不够可发现。
-
-建议：
-
-- branch context menu 加 `Filter Log by Branch`。
-- branch row 支持 `Enter` 触发 filter。
-- filter toolbar 显示 branch chip，并可一键清除。
-- 保留 double click 作为快捷操作。
-
-#### 8. Git Log narrow expanded item 视觉重设计
+#### 7. Git Log narrow expanded item 视觉重设计
 
 证据：
 
@@ -205,7 +187,7 @@ graph   commit subject...                  author  date
 graph   next commit...
 ```
 
-#### 9. Git Log 大仓库性能继续产品化
+#### 8. Git Log 大仓库性能继续产品化
 
 证据：
 
@@ -226,7 +208,7 @@ Git Log 是核心卖点。大仓库里一次明显卡顿，就会让用户回到
 
 ### P2. Push, Remote Providers, And Sync
 
-#### 10. 修正 `Commit & Push` 的 remote / upstream 语义
+#### 9. 修正 `Commit & Push` 的 remote / upstream 语义
 
 证据：
 
@@ -256,7 +238,7 @@ Commit footer
 +---------------------------------------------------------+
 ```
 
-#### 11. Push tab 补 empty、target validation 和 danger guard
+#### 10. Push tab 补 empty、target validation 和 danger guard
 
 证据：
 
@@ -275,7 +257,7 @@ zero outgoing commits 是正常状态；force push 是危险状态。两者都�
 - force push 开启后需要二次确认，并解释 `force-with-lease`。
 - push rejection behind 不再靠 string sentinel 驱动 UI，见 structured result。
 
-#### 12. 把 GitHub-only 外链升级成 provider-aware remote link contract
+#### 11. 把 GitHub-only 外链升级成 provider-aware remote link contract
 
 证据：
 
@@ -295,7 +277,7 @@ zero outgoing commits 是正常状态；force push 是危险状态。两者都�
 
 ### P3. AI Workflow
 
-#### 13. AI generate 增加 provider visibility、test connection 和 no-diff feedback
+#### 12. AI generate 增加 provider visibility、test connection 和 no-diff feedback
 
 证据：
 
@@ -330,7 +312,7 @@ AI generate
 +-------------------------------+
 ```
 
-#### 14. Commit message AI 应支持 scoped generation 和 revision
+#### 13. Commit message AI 应支持 scoped generation 和 revision
 
 证据：
 
@@ -350,7 +332,7 @@ AI generate
 
 ### P3. Quality Bar
 
-#### 15. 加 webview l10n audit
+#### 14. 加 webview l10n audit
 
 证据：
 
@@ -367,7 +349,7 @@ AI generate
 - 扫描明显 JSX text literal，并允许少量 ignore list。
 - 接入 `npm run lint` 或 release audit。
 
-#### 16. 给 custom tree / menu 补 keyboard 和 ARIA 语义
+#### 15. 给 custom tree / menu 补 keyboard 和 ARIA 语义
 
 证据：
 
@@ -382,10 +364,11 @@ VS Code 用户大量依赖键盘。tree / menu 的 keyboard UX 是专业工具�
 
 - `role=tree`、`role=treeitem`、`aria-expanded`、`aria-selected`。
 - `Enter` / `Space` 触发 open/select。
+- branch tree row 支持 `Enter` 触发 `Filter Log by Branch`。
 - context menu key 支持 native webview context menu。
 - filter menu 使用 `role=menu` / `role=menuitemcheckbox`。
 
-#### 17. 收敛重复 control styles，但不要做薄 wrapper
+#### 16. 收敛重复 control styles，但不要做薄 wrapper
 
 证据：
 
@@ -403,7 +386,7 @@ VS Code 用户大量依赖键盘。tree / menu 的 keyboard UX 是专业工具�
 
 ### P4. Release And Support Trust
 
-#### 18. 明确 dev build expiration / release channel 语义
+#### 17. 明确 dev build expiration / release channel 语义
 
 证据：
 
@@ -420,7 +403,7 @@ VS Code 用户大量依赖键盘。tree / menu 的 keyboard UX 是专业工具�
 - expired panel 提供 `Install latest release` / `Open feedback` / `Rebuild dev VSIX` 的明确路径。
 - release checklist 中检查 `__IS_EXPIRED__`、`__BUILD_TIME__`、VSIX content。
 
-#### 19. structured operation result 替代 string sentinel
+#### 18. structured operation result 替代 string sentinel
 
 证据：
 
@@ -454,7 +437,6 @@ push / pull / checkout / rebase / stash recovery 都需要 UI 分支。用字符
 
 ### Milestone 3: Git Log As A Daily Driver
 
-- branch panel explicit filter action。
 - narrow expanded item 视觉重设计。
 - Git Log cache and large-repo performance pass。
 

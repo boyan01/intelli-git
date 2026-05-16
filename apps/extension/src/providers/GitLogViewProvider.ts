@@ -66,4 +66,11 @@ export class GitLogViewProvider extends BaseWebviewProvider implements vscode.We
         this._pendingReveal = undefined;
         await this._rpc?.proxy.revealLog(params);
     }
+
+    public async filterByBranch(branch: string): Promise<void> {
+        if (!branch) return;
+
+        this._view?.show?.();
+        await this._rpc?.proxy.filterLogByBranch({ branch });
+    }
 }

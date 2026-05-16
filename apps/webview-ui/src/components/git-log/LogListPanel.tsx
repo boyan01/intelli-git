@@ -20,7 +20,7 @@ import { useTranslation } from 'react-i18next';
 
 interface LogListPanelProps {
     onSelectionChange?: (commits: string[]) => void;
-    externalBranchFilter?: string;
+    externalBranchFilter?: { branch: string; requestId: number };
     isNarrowMode?: boolean;
     commitDetails?: CommitDetails;
 }
