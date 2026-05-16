@@ -54,7 +54,6 @@ export function GitLogView() {
             onSelectionChange={setSelectedHashes}
             externalBranchFilter={branchFilter}
             isNarrowMode={isNarrowMode}
-            selectedHashes={selectedHashes}
             commitDetails={commitDetails}
         />
     );

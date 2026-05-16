@@ -10,6 +10,7 @@ interface GraphColumnProps {
     isSelected?: boolean;
     isHovered?: boolean;
     hasFocus?: boolean;
+    isExpanded?: boolean;
 }
 
 export const CELL_WIDTH = 16;
@@ -35,11 +36,16 @@ export const GraphColumn: React.FC<GraphColumnProps> = ({
     onJumpToCommit,
     isSelected = false,
     isHovered = false,
-    hasFocus = false
+    hasFocus = false,
+    isExpanded = false
 }) => {
-    const DOT_RADIUS = 5;
-    const STROKE_WIDTH = 3;
+    const DOT_RADIUS = isExpanded ? 6 : 5;
+    const STROKE_WIDTH = isExpanded ? 4 : 3;
     const [hoveredArrowIndex, setHoveredArrowIndex] = React.useState<number | null>(null);
+    const getLineStrokeWidth = (line: GraphLine) => {
+        if (!isExpanded) return 2;
+        return line.x1 === node.column || line.x2 === node.column ? 3 : 2;
+    };
 
     const getPath = (line: GraphLine) => {
         const x1 = line.x1 * CELL_WIDTH + CELL_WIDTH / 2;
@@ -124,7 +130,7 @@ export const GraphColumn: React.FC<GraphColumnProps> = ({
                     <path
                         d={getPath(line)}
                         stroke={line.color}
-                        strokeWidth={2}
+                        strokeWidth={getLineStrokeWidth(line)}
                         fill="none"
                         strokeLinecap={line.isDashed ? 'butt' : 'round'}
                         strokeDasharray={line.isDashed ? '2 3' : undefined}
