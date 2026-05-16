@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import styles from './DateFilter.module.css';
-import { FilterMenu } from './FilterMenu';
+import { FilterMenu, type FilterMenuItem } from './FilterMenu';
 import { useTranslation } from 'react-i18next';
 
 interface DateFilterProps {
@@ -25,6 +25,7 @@ export const DateFilter: React.FC<DateFilterProps> = ({ onChange, initialSince, 
     const [sinceError, setSinceError] = useState(false);
     const [untilError, setUntilError] = useState(false);
     const didMountRef = useRef(false);
+    const sinceInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         if (!didMountRef.current) {
@@ -51,6 +52,12 @@ export const DateFilter: React.FC<DateFilterProps> = ({ onChange, initialSince, 
         }
         // Custom is handled manually on Apply
     }, [filterType, onChange]);
+
+    useEffect(() => {
+        if (showPopup) {
+            sinceInputRef.current?.focus();
+        }
+    }, [showPopup]);
 
     const handleSelect = (type: 'all' | '24h' | '7d' | 'custom') => {
         if (type === 'custom') {
@@ -116,19 +123,33 @@ export const DateFilter: React.FC<DateFilterProps> = ({ onChange, initialSince, 
         }
     };
 
-    const dropdownItems = (
-        <>
-            <div className={styles.dropdownItem} onClick={() => handleSelect('custom')}>{t('Custom...')}</div>
-            <div className={styles.dropdownItem} onClick={() => handleSelect('24h')}>{t('Last 24 Hours')}</div>
-            <div className={styles.dropdownItem} onClick={() => handleSelect('7d')}>{t('Last 7 Days')}</div>
-        </>
-    );
+    const dropdownItems: FilterMenuItem[] = [
+        {
+            id: 'custom',
+            label: t('Custom...'),
+            checked: filterType === 'custom',
+            onSelect: () => handleSelect('custom')
+        },
+        {
+            id: '24h',
+            label: t('Last 24 Hours'),
+            checked: filterType === '24h',
+            onSelect: () => handleSelect('24h')
+        },
+        {
+            id: '7d',
+            label: t('Last 7 Days'),
+            checked: filterType === '7d',
+            onSelect: () => handleSelect('7d')
+        }
+    ];
 
     const popupContent = (
         <>
             <div className={styles.inputGroup}>
                 <span className={styles.inputLabel}>{t('From (Since)')}</span>
                 <input
+                    ref={sinceInputRef}
                     className={`${styles.dateInput} ${sinceError ? styles.invalid : ''}`}
                     placeholder={t('e.g. 2024-01-01 or 3 days ago')}
                     value={customSince}
@@ -171,6 +192,7 @@ export const DateFilter: React.FC<DateFilterProps> = ({ onChange, initialSince, 
             setShowPopup={setShowPopup}
             dropdownItems={dropdownItems}
             popupContent={popupContent}
+            ariaLabel={t('Date')}
         />
     );
 };

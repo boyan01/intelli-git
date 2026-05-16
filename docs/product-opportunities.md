@@ -349,23 +349,7 @@ AI generate
 - 扫描明显 JSX text literal，并允许少量 ignore list。
 - 接入 `npm run lint` 或 release audit。
 
-#### 15. 给 custom filter menu 补 keyboard 和 ARIA 语义
-
-证据：
-
-- filter menu item 多为 `div` + click handler。
-
-为什么值得做：
-
-VS Code 用户大量依赖键盘。menu 的 keyboard UX 是专业工具的基础质量。
-
-建议：
-
-- filter menu 使用 `role=menu` / `role=menuitemcheckbox`。
-- `ArrowUp` / `ArrowDown` 移动菜单焦点。
-- `Enter` / `Space` 切换当前菜单项。
-
-#### 16. 收敛重复 control styles，但不要做薄 wrapper
+#### 15. 收敛重复 control styles，但不要做薄 wrapper
 
 证据：
 
@@ -383,7 +367,7 @@ VS Code 用户大量依赖键盘。menu 的 keyboard UX 是专业工具的基础
 
 ### P4. Release And Support Trust
 
-#### 17. 明确 dev build expiration / release channel 语义
+#### 16. 明确 dev build expiration / release channel 语义
 
 证据：
 
@@ -400,7 +384,7 @@ VS Code 用户大量依赖键盘。menu 的 keyboard UX 是专业工具的基础
 - expired panel 提供 `Install latest release` / `Open feedback` / `Rebuild dev VSIX` 的明确路径。
 - release checklist 中检查 `__IS_EXPIRED__`、`__BUILD_TIME__`、VSIX content。
 
-#### 18. structured operation result 替代 string sentinel
+#### 17. structured operation result 替代 string sentinel
 
 证据：
 

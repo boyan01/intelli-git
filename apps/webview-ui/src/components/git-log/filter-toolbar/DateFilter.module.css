@@ -1,16 +1,3 @@
-.dropdownItem {
-    padding: 4px 8px;
-    cursor: pointer;
-    color: var(--vscode-dropdown-foreground);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-}
-
-.dropdownItem:hover {
-    background-color: var(--vscode-list-hoverBackground);
-}
-
 .inputGroup {
     display: flex;
     flex-direction: column;

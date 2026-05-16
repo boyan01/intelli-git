@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import sharedStyles from './DateFilter.module.css';
 import styles from './UserFilter.module.css';
-import { FilterMenu } from './FilterMenu';
+import { FilterMenu, type FilterMenuItem } from './FilterMenu';
 import { rpc } from '../../../lib/rpc_client';
 import { useTranslation } from 'react-i18next';
 
@@ -202,14 +202,20 @@ export const UserFilter: React.FC<UserFilterProps> = ({ onChange, initialAuthors
         return t('Author');
     };
 
-    const dropdownItems = (
-        <>
-            <div className={sharedStyles.dropdownItem} onClick={handleSelectCustom}>{t('Custom...')}</div>
-            {currentUser && (
-                <div className={sharedStyles.dropdownItem} onClick={handleSelectMe}>{t('Me')} ({currentUser})</div>
-            )}
-        </>
-    );
+    const dropdownItems: FilterMenuItem[] = [
+        {
+            id: 'custom',
+            label: t('Custom...'),
+            checked: filterType === 'custom',
+            onSelect: handleSelectCustom
+        },
+        ...(currentUser ? [{
+            id: 'me',
+            label: `${t('Me')} (${currentUser})`,
+            checked: filterType === 'me',
+            onSelect: handleSelectMe
+        }] : [])
+    ];
 
     return (
         <FilterMenu
@@ -232,6 +238,7 @@ export const UserFilter: React.FC<UserFilterProps> = ({ onChange, initialAuthors
                     allAuthors={allAuthors}
                 />
             }
+            ariaLabel={t('Author')}
         />
     );
 };
