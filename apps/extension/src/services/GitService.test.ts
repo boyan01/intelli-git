@@ -694,6 +694,45 @@ describe('GitService branch remote workflows', () => {
         await expect(service.branchRemote.getRebaseStatus()).resolves.toBe('merging');
         await expect(service.branchRemote.getRebaseCommitMessage()).resolves.toBe('Merge branch feature');
     });
+
+    it('detects GitHub remotes for log actions', async () => {
+        fs.writeFileSync(path.join(tempDir, 'tracked.txt'), 'base\n');
+        await git.add('tracked.txt');
+        await git.commit('Initial commit');
+        await git.addRemote('upstream', 'git@github.com:owner/repo.git');
+
+        const service = new GitService(tempDir, tempDir, git);
+
+        await expect(service.branchRemote.getRemoteProvider()).resolves.toBe('github');
+        await expect(service.branchRemote.getGitHubRepositoryUrl()).resolves.toBe('https://github.com/owner/repo');
+    });
+
+    it('builds push preview data for a new remote branch', async () => {
+        await simpleGit(remoteDir).init(true);
+        fs.writeFileSync(path.join(tempDir, 'tracked.txt'), 'base\n');
+        await git.add('tracked.txt');
+        await git.commit('Initial commit');
+        await git.branch(['-M', 'main']);
+        await git.addRemote('origin', remoteDir);
+        await git.push('origin', 'main');
+
+        await git.checkoutLocalBranch('feature');
+        fs.writeFileSync(path.join(tempDir, 'feature.txt'), 'feature\n');
+        await git.add('feature.txt');
+        await git.commit('Feature commit');
+
+        const service = new GitService(tempDir, tempDir, git);
+        const preview = await service.branchRemote.getPushCommits({
+            remote: 'origin',
+            branch: 'feature'
+        });
+
+        expect(preview.totalCount).toBe(1);
+        expect(preview.hasMore).toBe(false);
+        expect(preview.commits).toHaveLength(1);
+        expect(preview.commits[0].subject).toBe('Feature commit');
+        expect(preview.commits[0].files.map(file => file.path)).toEqual(['feature.txt']);
+    });
 });
 
 function createInactiveChangesService(options: {

@@ -82,6 +82,32 @@ describe('ExtensionRpcHandler commit', () => {
     });
 });
 
+describe('ExtensionRpcHandler push', () => {
+    it('fetches and reports behind count when a normal push is rejected', async () => {
+        const branchRemote = {
+            getBranches: vi.fn().mockResolvedValue({ current: 'main', all: ['main'] }),
+            getUpstreamBranch: vi.fn().mockResolvedValue('origin/main'),
+            push: vi.fn().mockRejectedValue(new Error('non-fast-forward')),
+            fetch: vi.fn().mockResolvedValue(undefined),
+            getBranchStatus: vi.fn().mockResolvedValue({ ahead: 0, behind: 2 })
+        };
+        const handler = createHandler({
+            branchRemote
+        } as unknown as Partial<GitService>);
+
+        await expect(handler.push({
+            force: false,
+            pushTags: false,
+            remote: 'origin',
+            branch: 'main'
+        })).rejects.toThrow('PUSH_REJECTED_BEHIND:2');
+
+        expect(branchRemote.push).toHaveBeenCalledWith('origin', 'main:main', { noVerify: undefined });
+        expect(branchRemote.fetch).toHaveBeenCalledOnce();
+        expect(branchRemote.getBranchStatus).toHaveBeenCalledOnce();
+    });
+});
+
 describe('ExtensionRpcHandler no repository state', () => {
     it('returns empty read models instead of throwing', async () => {
         const handler = createNoRepoHandler();
