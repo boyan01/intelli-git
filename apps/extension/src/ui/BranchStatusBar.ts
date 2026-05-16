@@ -21,7 +21,7 @@ export class BranchStatusBar {
 
     public async update() {
         try {
-            const branches = await this.gitService.getBranches();
+            const branches = await this.gitService.branchRemote.getBranches();
             this.currentBranch = branches.current;
             this.statusBarItem.text = `$(git-branch) ${this.currentBranch}`;
             this.statusBarItem.show();

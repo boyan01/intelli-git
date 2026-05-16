@@ -1,0 +1,707 @@
+import type { SimpleGit } from 'simple-git';
+import * as fs from 'fs';
+import * as path from 'path';
+import type { BranchInfo, BranchListData, CommitDetails, CommitFile, PushCommitsData, PushInitState } from '@shared/messages';
+import { logger } from '../utils/logger';
+
+const GIT_LOG_RECORD_SEPARATOR = '\x1e';
+const GIT_LOG_FIELD_SEPARATOR = '\x1f';
+const PUSH_COMMIT_LOG_FORMAT = '%x1e%H%x1f%h%x1f%s%x1f%an%x1f%aI%x1f%ae%x1f%P%x1f%b';
+
+export interface GitBranchRemoteServiceOptions {
+    git: SimpleGit;
+    gitRoot: string;
+    notifyChanged: () => void;
+    withTemporaryStash: (operationName: string, operation: () => Promise<void>) => Promise<void>;
+    createEditorGit: (envOverrides: NodeJS.ProcessEnv) => SimpleGit;
+    getCommitFiles: (hash: string) => Promise<CommitFile[]>;
+}
+
+function getGitHubRepositoryUrl(remoteUrl: string): string | undefined {
+    const normalized = remoteUrl.trim().replace(/\.git\/?$/, '');
+    if (!normalized) {
+        return undefined;
+    }
+
+    try {
+        const url = new URL(normalized);
+        if (url.hostname.toLowerCase() !== 'github.com') {
+            return undefined;
+        }
+
+        const pathParts = url.pathname.replace(/^\/+|\/+$/g, '').split('/');
+        if (pathParts.length < 2) {
+            return undefined;
+        }
+
+        return `https://github.com/${pathParts[0]}/${pathParts[1]}`;
+    } catch {
+        const sshMatch = normalized.match(/^(?:[^@]+@)?github\.com[:/]([^/]+)\/(.+)$/i);
+        if (!sshMatch) {
+            return undefined;
+        }
+
+        return `https://github.com/${sshMatch[1]}/${sshMatch[2]}`;
+    }
+}
+
+export class GitBranchRemoteService {
+    constructor(private readonly options: GitBranchRemoteServiceOptions) { }
+
+    public async getBranches(): Promise<BranchInfo> {
+        try {
+            const branchSummary = await this.options.git.branchLocal();
+            return {
+                current: branchSummary.current,
+                all: branchSummary.all
+            };
+        } catch (e) {
+            console.error('Error getting branches:', e);
+            return { current: '', all: [] };
+        }
+    }
+
+    public async switchBranch(branchName: string, force: boolean = false): Promise<void> {
+        if (force) {
+            await this.options.git.checkout(['-f', branchName]);
+            this.options.notifyChanged();
+            return;
+        }
+
+        await this.options.withTemporaryStash(`switch branch ${branchName}`, async () => {
+            await this.options.git.checkout(branchName);
+        });
+    }
+
+    public async push(remote: string, branch: string, options?: { noVerify?: boolean }): Promise<void> {
+        const args: string[] = [];
+        if (options?.noVerify) {
+            args.push('--no-verify');
+        }
+        await this.options.git.push(remote, branch, args);
+        this.options.notifyChanged();
+    }
+
+    public async forcePush(remote: string, branch: string, options?: { noVerify?: boolean }): Promise<void> {
+        const args: string[] = ['--force'];
+        if (options?.noVerify) {
+            args.push('--no-verify');
+        }
+        await this.options.git.push(remote, branch, args);
+        this.options.notifyChanged();
+    }
+
+    public async pushTags(remote: string): Promise<void> {
+        await this.options.git.pushTags(remote);
+        this.options.notifyChanged();
+    }
+
+    public async setUpstreamBranch(remote: string, remoteBranch: string): Promise<void> {
+        await this.options.git.raw(['branch', '--set-upstream-to', `${remote}/${remoteBranch}`]);
+        this.options.notifyChanged();
+    }
+
+    public async getUpstreamBranch(localBranch?: string): Promise<string | null> {
+        try {
+            const branchArg = localBranch ? localBranch : 'HEAD';
+            const result = await this.options.git.raw(['rev-parse', '--abbrev-ref', `${branchArg}@{upstream}`]);
+            return result.trim() || null;
+        } catch {
+            return null;
+        }
+    }
+
+    public async pull(): Promise<void> {
+        await this.options.withTemporaryStash('pull --rebase', async () => {
+            await this.options.git.raw(['pull', '--rebase']);
+        });
+    }
+
+    public async getRemotes(): Promise<string[]> {
+        try {
+            const remotes = await this.options.git.getRemotes();
+            return remotes.map(r => r.name);
+        } catch (e) {
+            console.error('Error getting remotes:', e);
+            return [];
+        }
+    }
+
+    public async getGitHubRepositoryUrl(): Promise<string | undefined> {
+        const remotes = await this.options.git.getRemotes(true);
+        for (const remote of remotes) {
+            const refs = remote.refs as { fetch?: string; push?: string };
+            const remoteUrl = refs.fetch || refs.push;
+            if (!remoteUrl) {
+                continue;
+            }
+
+            const repositoryUrl = getGitHubRepositoryUrl(remoteUrl);
+            if (repositoryUrl) {
+                return repositoryUrl;
+            }
+        }
+
+        return undefined;
+    }
+
+    public async getRemoteProvider(): Promise<'github' | undefined> {
+        const repositoryUrl = await this.getGitHubRepositoryUrl();
+        return repositoryUrl ? 'github' : undefined;
+    }
+
+    public async getRemoteBranches(): Promise<string[]> {
+        try {
+            const branches = await this.options.git.branch(['-r']);
+            return branches.all;
+        } catch (e) {
+            console.error('Error getting remote branches:', e);
+            return [];
+        }
+    }
+
+    public async fetch(): Promise<void> {
+        await this.options.git.fetch(['--all', '--prune']);
+        this.options.notifyChanged();
+    }
+
+    public async updateBranch(branch: string, force: boolean = false): Promise<'success' | 'diverged'> {
+        const remotes = await this.getRemotes();
+        const remote = remotes.length > 0 ? remotes[0] : 'origin';
+
+        try {
+            if (force) {
+                await this.options.git.fetch([remote, `+${branch}:${branch}`]);
+            } else {
+                await this.options.git.fetch([remote, `${branch}:${branch}`]);
+            }
+            this.options.notifyChanged();
+            return 'success';
+        } catch (e: any) {
+            if (e.message && e.message.includes('non-fast-forward')) {
+                return 'diverged';
+            }
+            throw e;
+        }
+    }
+
+    public async getIncomingCommitsCount(): Promise<number> {
+        try {
+            const count = await this.options.git.raw(['rev-list', '--count', 'HEAD..@{u}']);
+            return parseInt(count.trim(), 10);
+        } catch {
+            return 0;
+        }
+    }
+
+    public async getBranchStatus(): Promise<{ ahead: number; behind: number }> {
+        try {
+            const result = await this.options.git.raw(['rev-list', '--left-right', '--count', `HEAD...@{u}`]);
+            const [ahead, behind] = result.trim().split(/\s+/).map(n => parseInt(n, 10));
+
+            return { ahead: ahead || 0, behind: behind || 0 };
+        } catch {
+            try {
+                const aheadCount = await this.options.git.raw(['rev-list', '--count', 'HEAD', '--not', '--remotes']);
+                return { ahead: parseInt(aheadCount.trim(), 10) || 0, behind: 0 };
+            } catch {
+                return { ahead: 0, behind: 0 };
+            }
+        }
+    }
+
+    public async getUnpushedCommits(): Promise<Set<string>> {
+        try {
+            const result = await this.options.git.raw(['rev-list', '@{u}..HEAD']);
+            const hashes = result.trim().split('\n').filter(h => h.length > 0);
+            return new Set(hashes);
+        } catch {
+            try {
+                const result = await this.options.git.raw(['log', 'HEAD', '--not', '--remotes', '--format=%H']);
+                const hashes = result.trim().split('\n').filter(h => h.length > 0);
+                return new Set(hashes);
+            } catch {
+                return new Set();
+            }
+        }
+    }
+
+    public async getAllBranchesAheadBehind(): Promise<Map<string, { ahead: number; behind: number; upstream?: string }>> {
+        const result = new Map<string, { ahead: number; behind: number; upstream?: string }>();
+        try {
+            const output = await this.options.git.raw([
+                'for-each-ref',
+                '--format=%(refname:short)%00%(upstream:short)%00%(upstream:track)',
+                'refs/heads'
+            ]);
+
+            for (const line of output.trim().split('\n')) {
+                if (!line) continue;
+                const [branch, upstream, track] = line.split('\0');
+
+                let ahead = 0, behind = 0;
+                if (track) {
+                    const aheadMatch = track.match(/ahead (\d+)/);
+                    const behindMatch = track.match(/behind (\d+)/);
+                    if (aheadMatch) ahead = parseInt(aheadMatch[1], 10);
+                    if (behindMatch) behind = parseInt(behindMatch[1], 10);
+                }
+
+                result.set(branch, {
+                    ahead,
+                    behind,
+                    upstream: upstream || undefined
+                });
+            }
+        } catch {
+            // ignore
+        }
+        return result;
+    }
+
+    public async createBranch(branchName: string): Promise<void> {
+        await this.options.git.checkoutLocalBranch(branchName);
+        this.options.notifyChanged();
+    }
+
+    public async checkoutRemoteBranch(remoteBranch: string, force: boolean = false): Promise<void> {
+        const checkout = async () => {
+            const parts = remoteBranch.split('/');
+            const localBranchName = parts.slice(1).join('/');
+
+            const localBranches = await this.getBranches();
+            if (localBranches.all.includes(localBranchName)) {
+                if (force) {
+                    await this.options.git.checkout(['-f', localBranchName]);
+                } else {
+                    await this.options.git.checkout(localBranchName);
+                }
+            } else {
+                const args = ['-b', localBranchName, '--track', remoteBranch];
+                if (force) {
+                    args.unshift('-f');
+                }
+                await this.options.git.checkout(args);
+            }
+        };
+
+        if (force) {
+            await checkout();
+            this.options.notifyChanged();
+            return;
+        }
+
+        await this.options.withTemporaryStash(`checkout remote branch ${remoteBranch}`, checkout);
+    }
+
+    public async getCommitsToPush(
+        localBranch: string,
+        remote: string,
+        remoteBranch: string,
+        options: { maxCount?: number; skip?: number } = {}
+    ): Promise<CommitDetails[]> {
+        try {
+            const hasRemoteBranch = await this.remoteBranchExists(remote, remoteBranch);
+
+            if (hasRemoteBranch) {
+                const args: string[] = ['log'];
+
+                if (options.maxCount) {
+                    args.push(`--max-count=${options.maxCount}`);
+                }
+
+                if (options.skip) {
+                    args.push(`--skip=${options.skip}`);
+                }
+
+                args.push(`--format=${PUSH_COMMIT_LOG_FORMAT}`);
+                args.push(`${remote}/${remoteBranch}..${localBranch}`);
+
+                const result = await this.options.git.raw(args);
+
+                return this.parsePushCommitLog(result);
+            } else {
+                return this.getCommitsNotInRemote(localBranch, options.maxCount ?? 20, options.skip);
+            }
+        } catch (e) {
+            console.error('Error getting commits to push:', e);
+            return [];
+        }
+    }
+
+    public async getCommitsToPushCount(
+        localBranch: string,
+        remote: string,
+        remoteBranch: string
+    ): Promise<number> {
+        try {
+            const hasRemoteBranch = await this.remoteBranchExists(remote, remoteBranch);
+
+            if (hasRemoteBranch) {
+                const count = await this.options.git.raw(['rev-list', '--count', `${remote}/${remoteBranch}..${localBranch}`]);
+                return parseInt(count.trim(), 10);
+            } else {
+                const count = await this.options.git.raw(['rev-list', '--count', localBranch, '--not', '--remotes']);
+                return parseInt(count.trim(), 10);
+            }
+        } catch {
+            return 0;
+        }
+    }
+
+    private async getCommitsNotInRemote(branch: string, maxCount: number, skip?: number): Promise<CommitDetails[]> {
+        try {
+            const args = [
+                'log',
+                branch,
+                '--not',
+                '--remotes',
+                `--max-count=${maxCount}`,
+                `--format=${PUSH_COMMIT_LOG_FORMAT}`
+            ];
+
+            if (skip) {
+                args.push(`--skip=${skip}`);
+            }
+
+            const result = await this.options.git.raw(args);
+
+            return this.parsePushCommitLog(result);
+        } catch {
+            return [];
+        }
+    }
+
+    private parsePushCommitLog(result: string): CommitDetails[] {
+        if (!result.trim()) {
+            return [];
+        }
+
+        return result
+            .split(GIT_LOG_RECORD_SEPARATOR)
+            .map(record => record.trimEnd())
+            .filter(record => record.trim())
+            .map(record => {
+                const [hash, shortHash, subject, authorName, date, authorEmail, parentsStr, ...bodyParts] = record.split(GIT_LOG_FIELD_SEPARATOR);
+                const parentHashes = parentsStr
+                    ? parentsStr.trim().split(' ').filter(Boolean)
+                    : [];
+
+                return {
+                    hash,
+                    shortHash,
+                    subject,
+                    authorName,
+                    date,
+                    authorEmail,
+                    body: bodyParts.join(GIT_LOG_FIELD_SEPARATOR).trim(),
+                    files: [],
+                    stats: { additions: 0, deletions: 0 },
+                    parentHashes,
+                    containingBranches: [],
+                    refs: [],
+                    filteredAncestors: []
+                };
+            });
+    }
+
+    private async remoteBranchExists(remote: string, branch: string): Promise<boolean> {
+        try {
+            await this.options.git.revparse([`${remote}/${branch}`]);
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    public async getRebaseStatus(): Promise<'none' | 'interactive' | 'merging'> {
+        try {
+            const gitDir = (await this.options.git.revparse(['--git-dir'])).trim();
+            const absoluteGitDir = path.isAbsolute(gitDir)
+                ? gitDir
+                : path.join(this.options.gitRoot, gitDir);
+
+            const rebaseMergeDir = path.join(absoluteGitDir, 'rebase-merge');
+            const rebaseApplyDir = path.join(absoluteGitDir, 'rebase-apply');
+            const mergeHeadFile = path.join(absoluteGitDir, 'MERGE_HEAD');
+
+            if (fs.existsSync(rebaseMergeDir) || fs.existsSync(rebaseApplyDir)) {
+                return 'interactive';
+            }
+
+            if (fs.existsSync(mergeHeadFile)) {
+                return 'merging';
+            }
+
+            return 'none';
+        } catch {
+            return 'none';
+        }
+    }
+
+    public async abortRebase(): Promise<void> {
+        const status = await this.getRebaseStatus();
+        if (status === 'merging') {
+            await this.options.git.raw(['merge', '--abort']);
+            this.options.notifyChanged();
+            return;
+        }
+
+        await this.options.git.rebase(['--abort']);
+        this.options.notifyChanged();
+    }
+
+    public async continueRebase(message?: string): Promise<void> {
+        const status = await this.getRebaseStatus();
+
+        if (message) {
+            try {
+                const gitDir = await this.options.git.revparse(['--git-dir']);
+                const absoluteGitDir = path.isAbsolute(gitDir.trim())
+                    ? gitDir.trim()
+                    : path.join(this.options.gitRoot, gitDir.trim());
+                const rebaseMergeMsg = path.join(absoluteGitDir, 'rebase-merge', 'message');
+                const mergeMsg = path.join(absoluteGitDir, 'MERGE_MSG');
+
+                if (fs.existsSync(rebaseMergeMsg)) {
+                    fs.writeFileSync(rebaseMergeMsg, message, 'utf8');
+                } else if (fs.existsSync(mergeMsg)) {
+                    fs.writeFileSync(mergeMsg, message, 'utf8');
+                }
+            } catch (e) {
+                console.error('Failed to update rebase message:', e);
+            }
+        }
+
+        const gitWithEditorBypass = this.options.createEditorGit({ GIT_EDITOR: 'true' });
+        if (status === 'merging') {
+            await gitWithEditorBypass.raw(['merge', '--continue']);
+            this.options.notifyChanged();
+            return;
+        }
+
+        await gitWithEditorBypass.rebase(['--continue']);
+        this.options.notifyChanged();
+    }
+
+    public async getRebaseCommitMessage(): Promise<string> {
+        try {
+            const gitDir = (await this.options.git.revparse(['--git-dir'])).trim();
+            const absoluteGitDir = path.isAbsolute(gitDir)
+                ? gitDir
+                : path.join(this.options.gitRoot, gitDir);
+
+            logger.info('rebaseMergeMsg gitDir', absoluteGitDir);
+
+            const rebaseMergeMsg = path.join(absoluteGitDir, 'rebase-merge', 'message');
+            const rebaseApplyMsg = path.join(absoluteGitDir, 'rebase-apply', 'msg');
+            const mergeMsg = path.join(absoluteGitDir, 'MERGE_MSG');
+
+            if (fs.existsSync(rebaseMergeMsg)) {
+                return fs.readFileSync(rebaseMergeMsg, 'utf8').trim();
+            } else if (fs.existsSync(rebaseApplyMsg)) {
+                return fs.readFileSync(rebaseApplyMsg, 'utf8').trim();
+            } else if (fs.existsSync(mergeMsg)) {
+                return fs.readFileSync(mergeMsg, 'utf8').trim();
+            }
+        } catch (e) {
+            console.error('Failed to read rebase message:', e);
+        }
+        return '';
+    }
+
+    public async renameBranch(oldName: string, newName: string): Promise<void> {
+        await this.options.git.branch(['-m', oldName, newName]);
+        this.options.notifyChanged();
+    }
+
+    public async deleteBranches(branches: string[], force: boolean = false): Promise<void> {
+        const args = force ? ['-D'] : ['-d'];
+        await this.options.git.branch([...args, ...branches]);
+        this.options.notifyChanged();
+    }
+
+    public async getTags(): Promise<string[]> {
+        const tags = await this.options.git.tags();
+        return tags.all;
+    }
+
+    public async getGroupedRemoteBranches(): Promise<Record<string, string[]>> {
+        const branches = await this.options.git.branch(['-r']);
+        const grouped: Record<string, string[]> = {};
+
+        branches.all.forEach(fullBranchName => {
+            if (fullBranchName.includes('->')) return;
+
+            const parts = fullBranchName.split('/');
+            const remote = parts[0];
+            const branch = parts.slice(1).join('/');
+
+            if (!grouped[remote]) {
+                grouped[remote] = [];
+            }
+            grouped[remote].push(branch);
+        });
+
+        return grouped;
+    }
+
+    public getPushInitState = async (): Promise<PushInitState> => {
+        const branches = await this.getBranches();
+        const remotes = await this.getRemotes();
+        const upstream = await this.getUpstreamBranch(branches.current);
+
+        return {
+            localBranch: branches.current,
+            remotes: remotes.length > 0 ? remotes : ['origin'],
+            upstream: upstream ?? undefined
+        };
+    };
+
+    public getRemoteBranchesForRemote = async (remote: string): Promise<string[]> => {
+        const allRemoteBranches = await this.getRemoteBranches();
+        const prefix = `${remote}/`;
+        return allRemoteBranches
+            .filter(b => b.startsWith(prefix) && !b.includes('HEAD'))
+            .map(b => b.substring(prefix.length));
+    };
+
+    public getPushCommits = async (params: { remote: string; branch: string; limit?: number; skip?: number }): Promise<PushCommitsData> => {
+        const branches = await this.getBranches();
+        const currentBranch = branches.current;
+
+        const limit = params.limit ?? 20;
+        const skip = params.skip ?? 0;
+
+        const [totalCount, commits] = await Promise.all([
+            this.getCommitsToPushCount(currentBranch, params.remote, params.branch),
+            this.getCommitsToPush(
+                currentBranch,
+                params.remote,
+                params.branch,
+                { maxCount: limit, skip }
+            )
+        ]);
+
+        const commitsWithFiles = await Promise.all(
+            commits.map(async (commit) => {
+                const files = await this.options.getCommitFiles(commit.hash);
+                return { ...commit, files };
+            })
+        );
+
+        const hasMore = (skip + commits.length) < totalCount;
+
+        return {
+            commits: commitsWithFiles,
+            hasMore,
+            totalCount
+        };
+    };
+
+    public getRpcBranchInfo = async (): Promise<BranchInfo> => {
+        const [branches, branchStatus, rebaseStatus] = await Promise.all([
+            this.getBranches(),
+            this.getBranchStatus(),
+            this.getRebaseStatus()
+        ]);
+
+        return {
+            current: branches.current,
+            all: branches.all,
+            ahead: branchStatus.ahead,
+            behind: branchStatus.behind,
+            rebaseStatus
+        };
+    };
+
+    public getBranchListData = async (): Promise<BranchListData> => {
+        const [branches, groupedRemote, tags, aheadBehindMap] = await Promise.all([
+            this.getBranches(),
+            this.getGroupedRemoteBranches(),
+            this.getTags(),
+            this.getAllBranchesAheadBehind()
+        ]);
+
+        const localBranchesInfo = branches.all.map((branchName) => {
+            const info = aheadBehindMap.get(branchName) || { ahead: 0, behind: 0 };
+            return {
+                name: branchName,
+                ahead: info.ahead,
+                behind: info.behind,
+                upstream: info.upstream
+            };
+        });
+
+        return {
+            currentBranch: branches.current,
+            localBranches: branches.all,
+            localBranchesInfo,
+            remoteBranches: groupedRemote,
+            tags: tags
+        };
+    };
+
+    public async rebaseOnto(targetBranch: string): Promise<void> {
+        await this.options.withTemporaryStash(`rebase onto ${targetBranch}`, async () => {
+            await this.options.git.rebase([targetBranch]);
+        });
+    }
+
+    public async merge(branchName: string): Promise<void> {
+        await this.options.git.merge([branchName]);
+        this.options.notifyChanged();
+    }
+
+    public async checkoutAndRebase(branch: string, targetBranch: string): Promise<void> {
+        await this.options.withTemporaryStash(`checkout ${branch} and rebase onto ${targetBranch}`, async () => {
+            await this.options.git.checkout(branch);
+            await this.options.git.rebase([targetBranch]);
+        });
+    }
+
+    public async pullWithRebase(remote: string, branch: string): Promise<void> {
+        await this.options.withTemporaryStash(`pull --rebase ${remote}/${branch}`, async () => {
+            await this.options.git.raw(['pull', '--rebase', remote, branch]);
+        });
+    }
+
+    public async pullWithMerge(remote: string, branch: string): Promise<void> {
+        await this.options.git.pull(remote, branch);
+        this.options.notifyChanged();
+    }
+
+    public async createBranchFrom(newBranch: string, fromBranch: string): Promise<void> {
+        await this.options.git.checkout(['-b', newBranch, fromBranch]);
+        this.options.notifyChanged();
+    }
+
+    public async reset(mode: 'soft' | 'mixed' | 'hard', commit: string): Promise<void> {
+        await this.options.git.reset([`--${mode}`, commit]);
+        this.options.notifyChanged();
+    }
+
+    public async cherryPick(commit: string): Promise<void> {
+        await this.options.git.raw(['cherry-pick', commit]);
+        this.options.notifyChanged();
+    }
+
+    public async revert(commit: string): Promise<void> {
+        await this.options.git.revert(commit, ['--no-edit']);
+        this.options.notifyChanged();
+    }
+
+    public async isCommitPushed(commit: string): Promise<boolean> {
+        try {
+            const result = await this.options.git.branch(['-r', '--contains', commit]);
+            return result.all.length > 0;
+        } catch {
+            return false;
+        }
+    }
+
+    public async checkoutCommit(commit: string): Promise<void> {
+        await this.options.git.checkout(commit);
+        this.options.notifyChanged();
+    }
+}

@@ -59,7 +59,7 @@ export class BranchPicker {
             if (button.tooltip === vscode.l10n.t('Fetch from remote')) {
                 quickPick.busy = true;
                 try {
-                    await this.gitService.fetch();
+                    await this.gitService.branchRemote.fetch();
                     await updatePickerState();
                 } catch (e) {
                     vscode.window.showErrorMessage(vscode.l10n.t('Fetch failed: {0}', String(e)));
@@ -94,7 +94,7 @@ export class BranchPicker {
                 if (answer === vscode.l10n.t('Delete')) {
                     quickPick.busy = true;
                     try {
-                        await this.gitService.deleteBranches(branchesToDelete, true);
+                        await this.gitService.branchRemote.deleteBranches(branchesToDelete, true);
                         await updatePickerState();
                     } catch (e) {
                         vscode.window.showErrorMessage(vscode.l10n.t('Failed to delete branches: {0}', String(e)));
@@ -155,7 +155,7 @@ export class BranchPicker {
 
     private async _buildQuickPickItems(): Promise<BranchQuickPickItem[]> {
         const items: BranchQuickPickItem[] = [];
-        const branches = await this.gitService.getBranches();
+        const branches = await this.gitService.branchRemote.getBranches();
 
         if (this.isDeleteMode) {
             branches.all.forEach(branch => {
@@ -172,8 +172,8 @@ export class BranchPicker {
             return items;
         }
 
-        const remoteBranches = await this.gitService.getRemoteBranches();
-        const remotes = await this.gitService.getRemotes();
+        const remoteBranches = await this.gitService.branchRemote.getRemoteBranches();
+        const remotes = await this.gitService.branchRemote.getRemotes();
 
         items.push({
             label: '$(cloud-download) ' + vscode.l10n.t('Fetch'),
@@ -264,7 +264,7 @@ export class BranchPicker {
                     cancellable: false
                 },
                 async () => {
-                    await this.gitService.fetch();
+                    await this.gitService.branchRemote.fetch();
                 }
             );
         } catch (e) {
@@ -281,7 +281,7 @@ export class BranchPicker {
                     cancellable: false
                 },
                 async () => {
-                    await this.gitService.pull();
+                    await this.gitService.branchRemote.pull();
                 }
             );
             vscode.commands.executeCommand('intelli-git.refresh');
@@ -304,7 +304,7 @@ export class BranchPicker {
         if (!branchName) return;
 
         try {
-            await this.gitService.createBranch(branchName);
+            await this.gitService.branchRemote.createBranch(branchName);
             vscode.commands.executeCommand('intelli-git.refresh');
         } catch (e) {
             vscode.window.showErrorMessage(vscode.l10n.t('Failed to create branch: {0}', String(e)));
@@ -344,10 +344,10 @@ export class BranchPicker {
             const remote = parts[0];
             const localBranchName = parts.slice(1).join('/');
 
-            const localBranches = await this.gitService.getBranches();
+            const localBranches = await this.gitService.branchRemote.getBranches();
             if (localBranches.all.includes(localBranchName)) {
                 // Check if local branch is ahead of remote
-                const aheadCount = await this.gitService.getCommitsToPushCount(localBranchName, remote, localBranchName);
+                const aheadCount = await this.gitService.branchRemote.getCommitsToPushCount(localBranchName, remote, localBranchName);
                 if (aheadCount > 0) {
                     const action = await vscode.window.showWarningMessage(
                         vscode.l10n.t('Checkout Remote Branch'),
@@ -366,25 +366,25 @@ export class BranchPicker {
 
                     if (action === vscode.l10n.t('Rebase')) {
                         progress?.report({ message: vscode.l10n.t('Rebasing {0} onto {1}...', localBranchName, branch) });
-                        await this.gitService.switchBranch(localBranchName, force);
-                        await this.gitService.rebaseOnto(branch);
+                        await this.gitService.branchRemote.switchBranch(localBranchName, force);
+                        await this.gitService.branchRemote.rebaseOnto(branch);
                         return;
                     } else if (action === vscode.l10n.t('Delete Local Commits')) {
                         progress?.report({ message: vscode.l10n.t('Resetting {0} to {1}...', localBranchName, branch) });
-                        await this.gitService.switchBranch(localBranchName, force);
-                        await this.gitService.reset('hard', branch);
+                        await this.gitService.branchRemote.switchBranch(localBranchName, force);
+                        await this.gitService.branchRemote.reset('hard', branch);
                         return;
                     }
                 }
 
                 progress?.report({ message: vscode.l10n.t('Pulling {0}...', localBranchName) });
-                await this.gitService.switchBranch(localBranchName, force);
-                await this.gitService.pull();
+                await this.gitService.branchRemote.switchBranch(localBranchName, force);
+                await this.gitService.branchRemote.pull();
             } else {
-                await this.gitService.checkoutRemoteBranch(branch, force);
+                await this.gitService.branchRemote.checkoutRemoteBranch(branch, force);
             }
         } else {
-            await this.gitService.switchBranch(branch, force);
+            await this.gitService.branchRemote.switchBranch(branch, force);
         }
     }
 
@@ -476,7 +476,7 @@ export class BranchPicker {
         if (!newName) return;
 
         try {
-            await this.gitService.renameBranch(branch, newName);
+            await this.gitService.branchRemote.renameBranch(branch, newName);
             vscode.commands.executeCommand('intelli-git.refresh');
         } catch (e) {
             vscode.window.showErrorMessage(vscode.l10n.t('Failed to rename branch: {0}', String(e)));

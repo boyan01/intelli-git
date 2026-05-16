@@ -613,9 +613,70 @@ describe('GitService mutation change events', () => {
         let fireCount = 0;
         service.onDidChange(() => fireCount++);
 
-        await service.switchBranch('feature');
+        await service.branchRemote.switchBranch('feature');
 
         expect(fireCount).toBe(1);
+    });
+});
+
+describe('GitService branch remote workflows', () => {
+    let tempDir: string;
+    let remoteDir: string;
+    let git: SimpleGit;
+
+    beforeEach(async () => {
+        tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'intelli-git-branch-test-'));
+        remoteDir = fs.mkdtempSync(path.join(os.tmpdir(), 'intelli-git-remote-test-'));
+        git = simpleGit(tempDir);
+        await git.init();
+        await git.addConfig('user.name', 'Test User');
+        await git.addConfig('user.email', 'test@example.com');
+    });
+
+    afterEach(() => {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+        fs.rmSync(remoteDir, { recursive: true, force: true });
+    });
+
+    it('switches branches through temporary stash and restores dirty files', async () => {
+        fs.writeFileSync(path.join(tempDir, 'tracked.txt'), 'base\n');
+        await git.add('tracked.txt');
+        await git.commit('Initial commit');
+        await git.branch(['-M', 'main']);
+        await git.checkoutLocalBranch('feature');
+        await git.checkout('main');
+
+        fs.writeFileSync(path.join(tempDir, 'notes.txt'), 'local only\n');
+
+        const service = new GitService(tempDir, tempDir, git);
+        await service.branchRemote.switchBranch('feature');
+
+        expect((await git.branch()).current).toBe('feature');
+        expect(fs.readFileSync(path.join(tempDir, 'notes.txt'), 'utf8')).toBe('local only\n');
+    });
+
+    it('checks out remote branches as tracking local branches', async () => {
+        await simpleGit(remoteDir).init(true);
+        fs.writeFileSync(path.join(tempDir, 'tracked.txt'), 'base\n');
+        await git.add('tracked.txt');
+        await git.commit('Initial commit');
+        await git.branch(['-M', 'main']);
+        await git.addRemote('origin', remoteDir);
+        await git.push('origin', 'main');
+
+        await git.checkoutLocalBranch('feature');
+        fs.writeFileSync(path.join(tempDir, 'feature.txt'), 'feature\n');
+        await git.add('feature.txt');
+        await git.commit('Feature commit');
+        await git.push('origin', 'feature');
+        await git.checkout('main');
+        await git.branch(['-D', 'feature']);
+
+        const service = new GitService(tempDir, tempDir, git);
+        await service.branchRemote.checkoutRemoteBranch('origin/feature');
+
+        expect((await git.branch()).current).toBe('feature');
+        await expect(service.branchRemote.getUpstreamBranch('feature')).resolves.toBe('origin/feature');
     });
 });
 

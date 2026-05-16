@@ -199,11 +199,11 @@ export class ExtensionRpcHandler {
     }
 
     push = async (params: { force: boolean; pushTags: boolean; noVerify?: boolean; remote: string; branch: string }): Promise<void> => {
-        const branches = await this.gitService.getBranches();
+        const branches = await this.gitService.branchRemote.getBranches();
         const currentBranch = branches.current;
 
         // Check if upstream was set before push
-        const hadUpstream = await this.gitService.getUpstreamBranch();
+        const hadUpstream = await this.gitService.branchRemote.getUpstreamBranch();
 
         const pushOptions = {
             noVerify: params.noVerify
@@ -211,32 +211,32 @@ export class ExtensionRpcHandler {
 
         try {
             if (params.force) {
-                await this.gitService.forcePush(params.remote, `${currentBranch}:${params.branch}`, pushOptions);
+                await this.gitService.branchRemote.forcePush(params.remote, `${currentBranch}:${params.branch}`, pushOptions);
             } else {
-                await this.gitService.push(params.remote, `${currentBranch}:${params.branch}`, pushOptions);
+                await this.gitService.branchRemote.push(params.remote, `${currentBranch}:${params.branch}`, pushOptions);
             }
 
             // Auto-set upstream if not previously set and pushing to same-named branch
             if (!hadUpstream && params.branch === currentBranch) {
                 try {
-                    await this.gitService.setUpstreamBranch(params.remote, params.branch);
+                    await this.gitService.branchRemote.setUpstreamBranch(params.remote, params.branch);
                 } catch (e) {
                     logger.error('Failed to set upstream:', e);
                 }
             }
 
             if (params.pushTags) {
-                await this.gitService.pushTags(params.remote);
+                await this.gitService.branchRemote.pushTags(params.remote);
             }
         } catch (error) {
             if (!params.force && this.isBehindPushError(error)) {
                 try {
-                    await this.gitService.fetch();
+                    await this.gitService.branchRemote.fetch();
                 } catch (fetchError) {
                     logger.warn('Fetch after push rejection failed:', fetchError);
                 }
 
-                const branchStatus = await this.gitService.getBranchStatus();
+                const branchStatus = await this.gitService.branchRemote.getBranchStatus();
                 throw new Error(`PUSH_REJECTED_BEHIND:${branchStatus.behind || 1}`, { cause: error });
             }
 
@@ -443,7 +443,7 @@ export class ExtensionRpcHandler {
             return undefined;
         }
 
-        const branchData = await gitService.getBranchListData();
+        const branchData = await gitService.branchRemote.getBranchListData();
 
         interface BranchQuickPickItem extends vscode.QuickPickItem {
             branch: string;
@@ -553,9 +553,9 @@ export class ExtensionRpcHandler {
             }
 
             if (params.push) {
-                const branches = await this.gitService.getBranches();
+                const branches = await this.gitService.branchRemote.getBranches();
                 if (branches.current) {
-                    await this.gitService.push('origin', branches.current);
+                    await this.gitService.branchRemote.push('origin', branches.current);
                 }
             }
         } catch (e) {
@@ -678,7 +678,7 @@ export class ExtensionRpcHandler {
 
     switchBranch = async (branch: string): Promise<void> => {
         try {
-            await this.gitService.switchBranch(branch);
+            await this.gitService.branchRemote.switchBranch(branch);
 
         } catch (e) {
             vscode.window.showErrorMessage(i18n.t('extension.switchBranchFailed', `${e}`));
@@ -687,7 +687,7 @@ export class ExtensionRpcHandler {
 
     pull = async (): Promise<void> => {
         try {
-            await this.gitService.pull();
+            await this.gitService.branchRemote.pull();
             vscode.window.showInformationMessage(i18n.t('extension.pullSuccess'));
         } catch (e) {
             vscode.window.showErrorMessage(i18n.t('extension.pullFailed', `${e}`));
@@ -697,7 +697,7 @@ export class ExtensionRpcHandler {
 
     fetch = async (): Promise<void> => {
         try {
-            await this.gitService.fetch();
+            await this.gitService.branchRemote.fetch();
         } catch (e) {
             logger.error('Fetch failed:', e);
             throw e;
@@ -736,7 +736,7 @@ export class ExtensionRpcHandler {
                 await this.gitService.stageFile(file);
             }
 
-            await this.gitService.continueRebase(params.message);
+            await this.gitService.branchRemote.continueRebase(params.message);
             vscode.window.showInformationMessage(i18n.t('extension.rebaseContinued'));
 
         } catch (e) {
@@ -756,7 +756,7 @@ export class ExtensionRpcHandler {
 
     abortRebase = async (): Promise<void> => {
         try {
-            await this.gitService.abortRebase();
+            await this.gitService.branchRemote.abortRebase();
             vscode.window.showInformationMessage(i18n.t('extension.rebaseAborted'));
 
         } catch (e) {

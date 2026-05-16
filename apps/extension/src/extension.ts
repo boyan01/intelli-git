@@ -92,7 +92,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
     const updateRemoteProviderContext = async () => {
         const gitService = repositoryManager.getActiveService();
-        const provider = gitService ? await gitService.getRemoteProvider() : undefined;
+        const provider = gitService ? await gitService.branchRemote.getRemoteProvider() : undefined;
         await vscode.commands.executeCommand('setContext', 'intelli-git.gitRemoteProvider', provider || '');
     };
 

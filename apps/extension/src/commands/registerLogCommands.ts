@@ -46,7 +46,7 @@ export function registerLogCommands(
             if (!hash) return;
             if (await confirmAction(vscode.l10n.t('Reset current branch to {0} (Soft)?\nChanges will be staged.', hash), vscode.l10n.t('Reset'))) {
                 try {
-                    await gitService.reset('soft', hash);
+                    await gitService.branchRemote.reset('soft', hash);
                     vscode.window.showInformationMessage(vscode.l10n.t('Soft reset successful.'));
                 } catch (e: any) {
                     vscode.window.showErrorMessage(vscode.l10n.t('Reset failed: {0}', e.message));
@@ -58,7 +58,7 @@ export function registerLogCommands(
             if (!hash) return;
             if (await confirmAction(vscode.l10n.t('Reset current branch to {0} (Mixed)?\nChanges will be unstaged.', hash), vscode.l10n.t('Reset'))) {
                 try {
-                    await gitService.reset('mixed', hash);
+                    await gitService.branchRemote.reset('mixed', hash);
                     vscode.window.showInformationMessage(vscode.l10n.t('Mixed reset successful.'));
                 } catch (e: any) {
                     vscode.window.showErrorMessage(vscode.l10n.t('Reset failed: {0}', e.message));
@@ -70,7 +70,7 @@ export function registerLogCommands(
             if (!hash) return;
             if (await confirmAction(vscode.l10n.t('Reset current branch to {0} (Hard)?\nALL LOCAL CHANGES WILL BE LOST.', hash), vscode.l10n.t('Reset Hard'))) {
                 try {
-                    await gitService.reset('hard', hash);
+                    await gitService.branchRemote.reset('hard', hash);
                     vscode.window.showInformationMessage(vscode.l10n.t('Hard reset successful.'));
                 } catch (e: any) {
                     vscode.window.showErrorMessage(vscode.l10n.t('Reset failed: {0}', e.message));
@@ -86,7 +86,7 @@ export function registerLogCommands(
             if (!hash) return;
             if (await confirmAction(vscode.l10n.t('Checkout commit {0}? You will be in detached HEAD state.', hash), vscode.l10n.t('Checkout'))) {
                 try {
-                    await gitService.checkoutCommit(hash);
+                    await gitService.branchRemote.checkoutCommit(hash);
                     vscode.window.showInformationMessage(vscode.l10n.t('Checked out {0}', hash));
                 } catch (e: any) {
                     vscode.window.showErrorMessage(vscode.l10n.t('Checkout failed: {0}', e.message));
@@ -101,7 +101,7 @@ export function registerLogCommands(
             if (!hash) return;
 
             try {
-                const repositoryUrl = await gitService.getGitHubRepositoryUrl();
+                const repositoryUrl = await gitService.branchRemote.getGitHubRepositoryUrl();
                 if (!repositoryUrl) {
                     vscode.window.showInformationMessage(vscode.l10n.t('No GitHub remote found for this repository.'));
                     return;
@@ -127,7 +127,7 @@ export function registerLogCommands(
 
             if (branchName) {
                 try {
-                    await gitService.createBranchFrom(branchName, hash);
+                    await gitService.branchRemote.createBranchFrom(branchName, hash);
                     vscode.window.showInformationMessage(vscode.l10n.t('Created branch {0} at {1}', branchName, hash));
                 } catch (e: any) {
                     vscode.window.showErrorMessage(vscode.l10n.t('Failed to create branch: {0}', e.message));
@@ -144,7 +144,7 @@ export function registerLogCommands(
 
             if (await confirmAction(vscode.l10n.t('Cherry-pick commit {0}?', hash), vscode.l10n.t('Cherry-pick'))) {
                 try {
-                    await gitService.cherryPick(hash);
+                    await gitService.branchRemote.cherryPick(hash);
                     vscode.window.showInformationMessage(vscode.l10n.t('Cherry-picked {0}', hash));
                 } catch (e: any) {
                     vscode.window.showErrorMessage(vscode.l10n.t('Cherry-pick failed: {0}', e.message));
@@ -161,7 +161,7 @@ export function registerLogCommands(
 
             if (await confirmAction(vscode.l10n.t('Revert commit {0}?', hash), vscode.l10n.t('Revert'))) {
                 try {
-                    await gitService.revert(hash);
+                    await gitService.branchRemote.revert(hash);
                     vscode.window.showInformationMessage(vscode.l10n.t('Reverted {0}', hash));
                 } catch (e: any) {
                     vscode.window.showErrorMessage(vscode.l10n.t('Revert failed: {0}', e.message));
@@ -177,7 +177,7 @@ export function registerLogCommands(
             if (!hash) return;
 
             // Check if commit is pushed to remote
-            const isPushed = await gitService.isCommitPushed(hash);
+            const isPushed = await gitService.branchRemote.isCommitPushed(hash);
             if (isPushed) {
                 vscode.window.showWarningMessage(
                     vscode.l10n.t('Cannot undo commit {0}: it has already been pushed to remote.', hash)
@@ -191,7 +191,7 @@ export function registerLogCommands(
             )) {
                 try {
                     // Reset to parent commit, keeping changes staged
-                    await gitService.reset('soft', `${hash}~1`);
+                    await gitService.branchRemote.reset('soft', `${hash}~1`);
                     vscode.window.showInformationMessage(vscode.l10n.t('Commit {0} undone. Changes are now staged.', hash));
                 } catch (e: any) {
                     vscode.window.showErrorMessage(vscode.l10n.t('Undo commit failed: {0}', e.message));

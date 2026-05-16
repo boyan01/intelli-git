@@ -18,18 +18,18 @@ export class GitReadRpcHandler {
     ) { }
 
     getPushInitState = async (): Promise<PushInitState> => {
-        return this.repositoryManager.getActiveService()?.getPushInitState() ?? {
+        return this.repositoryManager.getActiveService()?.branchRemote.getPushInitState() ?? {
             localBranch: '',
             remotes: []
         };
     };
 
     getRemoteBranches = async (remote: string): Promise<string[]> => {
-        return await this.repositoryManager.getActiveService()?.getRemoteBranchesForRemote(remote) ?? [];
+        return await this.repositoryManager.getActiveService()?.branchRemote.getRemoteBranchesForRemote(remote) ?? [];
     };
 
     getPushCommits = async (params: { remote: string; branch: string; limit?: number; skip?: number }): Promise<PushCommitsData> => {
-        return await this.repositoryManager.getActiveService()?.getPushCommits(params) ?? {
+        return await this.repositoryManager.getActiveService()?.branchRemote.getPushCommits(params) ?? {
             commits: [],
             hasMore: false,
             totalCount: 0
@@ -45,7 +45,7 @@ export class GitReadRpcHandler {
     };
 
     getBranchInfo = async (): Promise<BranchInfo> => {
-        return await this.repositoryManager.getActiveService()?.getRpcBranchInfo() ?? {
+        return await this.repositoryManager.getActiveService()?.branchRemote.getRpcBranchInfo() ?? {
             current: '',
             all: [],
             rebaseStatus: 'none'
@@ -61,7 +61,7 @@ export class GitReadRpcHandler {
     };
 
     getBranchListData = async (): Promise<BranchListData> => {
-        return await this.repositoryManager.getActiveService()?.getBranchListData() ?? {
+        return await this.repositoryManager.getActiveService()?.branchRemote.getBranchListData() ?? {
             currentBranch: '',
             localBranches: [],
             localBranchesInfo: [],
@@ -118,7 +118,7 @@ export class GitReadRpcHandler {
             return [];
         }
 
-        const unpushed = await gitService.getUnpushedCommits();
+        const unpushed = await gitService.branchRemote.getUnpushedCommits();
         return Array.from(unpushed);
     };
 }

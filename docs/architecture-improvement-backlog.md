@@ -2,7 +2,7 @@
 
 梳理日期：2026-05-12
 
-最近更新：2026-05-12，本轮已完成 P0/P1 中最直接影响 correctness 的边界修复、首个 `GitService` behavior slice、RPC ownership 收窄、changelist operation layer、以及 webview persisted state ownership 收敛。本文档现在同时记录已落地状态和明确 deferred 的后续候选项。
+最近更新：2026-05-16，本轮在既有 `GitLogService` 之后继续完成 `GitBranchRemoteService` slice，把 branch、remote、push、pull、rebase/merge 和 log history mutation workflow 从 `GitService` 中拆出，并让 extension 侧调用点直接依赖新的 ownership 边界。本文档现在同时记录已落地状态和明确 deferred 的后续候选项。
 
 这份文档记录 Intelli Git 当前从代码结构、边界设计、架构演进角度值得做的事项。范围只包含能降低真实产品风险、让后续功能更稳的工作；不建议做纯粹为了“看起来更分层”的大改，也不建议加只负责改名转发的 thin wrapper。
 
@@ -18,9 +18,11 @@ VS Code extension host
 
   services/
     GitService
-      -> status, hunks, staging, commit, stash, branch, push, rebase, file content
+      -> status, hunks, staging, commit, stash, file content
     GitLogService
       -> log loading, commit details, graph cache, ref parsing, authors
+    GitBranchRemoteService
+      -> branch, remote, push, pull, rebase/merge, branch-list data, log history mutations
     ChangelistStateService
       -> changelist invariants, hunk assignment, active-list commit plan
     InactiveChangesService
@@ -65,7 +67,24 @@ React webview
       -> typed native webview context-menu payload sections
 ```
 
-当前大方向是对的：`changelist` 和 `inactive changes` 的 durable state 放在 extension host，webview 负责 rendering 和 interaction dispatch，native VS Code context menu 通过 `data-vscode-context` 驱动。本轮已经处理多仓库 identity、初始 no-repo activation、commit/changelist webview domain logic、Git mutation refresh contract、context payload typing、首个 `GitService` read-only slice、RPC feature ownership、native command/RPC changelist 行为复用，以及 webview persisted state ownership。`BasicTreeView` 继续保持 deferred：等下一次 tree selection、drag/drop、keyboard navigation 或 virtualization 的真实行为改动再抽 tested helper/hook。
+当前大方向是对的：`changelist` 和 `inactive changes` 的 durable state 放在 extension host，webview 负责 rendering 和 interaction dispatch，native VS Code context menu 通过 `data-vscode-context` 驱动。本轮已经处理多仓库 identity、初始 no-repo activation、commit/changelist webview domain logic、Git mutation refresh contract、context payload typing、`GitLogService` read-only slice、`GitBranchRemoteService` branch/remote slice、RPC feature ownership、native command/RPC changelist 行为复用，以及 webview persisted state ownership。`BasicTreeView` 继续保持 deferred：等下一次 tree selection、drag/drop、keyboard navigation 或 virtualization 的真实行为改动再抽 tested helper/hook。
+
+## 2026-05-16 实施状态
+
+已完成：
+
+- 新增 `apps/extension/src/services/GitBranchRemoteService.ts`，承接 branch、remote、push、pull、rebase/merge、branch-list data、remote provider detection、push commit pagination，以及 reset/cherry-pick/revert/checkout commit 这类 log history mutation workflow。
+- `GitService` 保留 status/hunks、staging、commit/stash、temporary index、file content 和 shared mutation notification primitive；branch/remote 调用点改为直接使用 `gitService.branchRemote`，没有保留一批 one-method pass-through。
+- `GitBranchRemoteService` 继续复用 `GitService` 的 `withTemporaryStash` primitive，因此 dirty-worktree protection 仍会保留 inactive/changelist extension state snapshot 和 restore/reconcile 行为。
+- `getRebaseStatus()` / `getRebaseCommitMessage()` 的 relative `.git` path resolution 现在基于 `gitRoot`，避免 workspace 打开在 repo 子目录时误读 `<workspaceRoot>/.git`。
+- 新增 branch workflow tests：
+  - dirty worktree 下 `switchBranch` 通过 temporary stash 切分支，并恢复 untracked file。
+  - `checkoutRemoteBranch('origin/feature')` 创建 tracking local branch，upstream 指向 `origin/feature`。
+
+当前 deferred：
+
+- `GitWorkingTreeService` 和 `GitIndexCommitService` 仍保持后续候选。它们涉及 path scope、inactive hunk、temporary index、active changelist commit plan，拆分前应先补更强的 status/commit-plan tests。
+- `BasicTreeView` 仍保持原状，等待下一次具体 tree 行为改动时再抽 tested helper/hook。
 
 ## 2026-05-12 实施状态
 
@@ -98,7 +117,7 @@ git diff --check
 
 明确 deferred：
 
-- `GitWorkingTreeService`、`GitIndexCommitService`、`GitBranchRemoteService` 仍是后续候选 slice。不要为了完成清单一次性机械拆；它们涉及 path scope、inactive hunk、temporary index、active changelist commit plan 和 dirty-worktree protection，必须在对应行为增强或测试补强时逐个抽。
+- `GitWorkingTreeService`、`GitIndexCommitService` 仍是后续候选 slice。不要为了完成清单一次性机械拆；它们涉及 path scope、inactive hunk、temporary index、active changelist commit plan，必须在对应行为增强或测试补强时逐个抽。
 - `BasicTreeView` 仍保持原状，等待下一次具体 tree 行为改动时再抽 tested helper/hook。
 
 ## 设计原则
@@ -193,14 +212,16 @@ git diff --check
 
 ## P1: 按真实职责拆分 `GitService`
 
-状态：已完成首个 cohesive slice。`GitLogService` 已物理拆出并拥有真实 read-only history 行为；working-tree、index/commit、branch/remote 继续作为 deferred slice，等对应行为变更或测试补强时逐个抽。
+状态：已完成两个 cohesive slice。`GitLogService` 已物理拆出并拥有真实 read-only history 行为；`GitBranchRemoteService` 已物理拆出并拥有 branch、remote、push、pull、rebase/merge 和 log history mutation 行为。working-tree、index/commit 继续作为 deferred slice，等对应行为变更或测试补强时逐个抽。
 
 证据：
 
 - `apps/extension/src/services/GitLogService.ts` 负责 log loading、commit details、commit files、multi-commit files、authors、current user、graph cache、filtered ancestor stitching 和 ref parsing。
-- `apps/extension/src/services/GitService.ts` 保留 Git mutation、working tree、branch/remote、stash、commit plan 等后续候选 slice；不再直接持有 git-log implementation。
+- `apps/extension/src/services/GitBranchRemoteService.ts` 负责 branch、remote、push、pull、rebase/merge、branch-list data、remote provider detection、push commit pagination，以及 reset/cherry-pick/revert/checkout commit 这类 log history mutation workflow。
+- `apps/extension/src/services/GitService.ts` 保留 working tree、staging、stash、commit plan、file content 和 shared mutation notification primitive；不再直接持有 git-log 或 branch/remote implementation。
 - `GitService.fireChange()` 会调用 `GitLogService.invalidateGraphCache()`，避免 mutation 后复用 stale graph。
 - `apps/extension/src/services/GitLogService.test.ts` 覆盖 hash search、path scope、commit details、stats、refs、authors 和 filtered ancestor。
+- `apps/extension/src/services/GitService.test.ts` 覆盖 branch switch temporary stash restore 和 remote branch tracking checkout。
 
 为什么值得做：
 
@@ -211,14 +232,14 @@ git diff --check
 
 - `GitWorkingTreeService`: status、hunk parsing、diagnostics decoration inputs、path conversion。
 - `GitIndexCommitService`: staging support、temporary index、active changelist commit plan application。
-- `GitBranchRemoteService`: branch、checkout、push、pull、fetch、rebase、merge。
 - `GitLogService`: log loading、commit details、graph cache、ref parsing、authors。
+- `GitBranchRemoteService`: 已完成，继续作为 branch/remote workflow ownership 边界维护。
 
-已经落地的 `GitLogService` 没有在 `GitService` 上保留一组 one-method pass-through；RPC 和内部 push/last-commit 路径直接使用 `gitService.log`。
+已经落地的 `GitLogService` 和 `GitBranchRemoteService` 没有在 `GitService` 上保留一组 one-method pass-through；RPC、commands、status bar、branch picker 和 log actions 直接使用 `gitService.log` 或 `gitService.branchRemote`。
 
 更新建议：
 
-- 下一个优先候选可以是 `GitBranchRemoteService`，因为输入输出边界相对清楚，且对 commit precision 的风险小于 staging/temporary index。
+- 下一个优先候选不应继续机械拆 service。更适合先围绕 status/hunk 或 commit-plan 的真实行为风险补测试，再决定是 `GitWorkingTreeService` 还是 `GitIndexCommitService`。
 - `GitWorkingTreeService` 和 `GitIndexCommitService` 要更谨慎：它们涉及 path scope、inactive hunk、temporary index、active changelist commit plan，拆分前先增加更强的 status/commit-plan tests。
 - 不要先创建只改名转发的 facade。每个新 service 必须拥有 cohesive behavior 和对应测试。
 
@@ -429,6 +450,7 @@ npm run package:extension:dev
 - Commit/changelist webview model extraction。
 - Git mutation event contract。
 - Git log behavior slice。
+- Branch/remote behavior slice。
 - RPC read/changelist ownership split。
 - Changelist operation layer shared by native commands and RPC。
 - Native menu context typed contract。
@@ -437,9 +459,9 @@ npm run package:extension:dev
 
 下一步建议：
 
-1. Remaining GitService behavior slices。
-   - 一次只抽一个 cohesive area。
-   - 下一个候选是 branch/remote；working-tree 和 index/commit 需要先补更强测试。
+1. Working-tree 或 index/commit behavior slice 的前置测试。
+   - 先围绕 status/hunk parsing、inactive hunk、temporary index、active changelist commit plan 补充精确 regression tests。
+   - 有明确行为增强或 bug fix 时再抽 service，不要为了完成清单机械拆文件。
    - 保持 public behavior 稳定。
 
 2. Tree behavior focused extraction。
