@@ -68,94 +68,9 @@ Intelli Git 已经有一个清晰的产品切入点：把 JetBrains-style Git wo
 - webview 显示 actionable empty state：`Open a Git repository`、`Initialize repository`、`Open folder`。
 - repository-bound commands 在无 active repo 时给明确提示，而不是静默 return。
 
-#### 3. 给 `CommitView` 做真实 clean / loading / error state
-
-证据：
-
-- `CommitView.tsx` 用 `changelists.length === 0` 判断空态，但 `buildChangelists` 基本总会生成 root groups。
-- clean worktree 可能显示空 root group 和 disabled commit button，而不是明确状态。
-
-为什么值得做：
-
-clean worktree 是高频正常状态。它应该告诉用户当前状态可靠，并提供下一步动作，而不是像没加载出来。
-
-ASCII UI:
-
-```text
-Commit View
-+---------------------------------------------------------+
-| [Staged Mode v] [Refresh] [Tree/List]          main     |
-+---------------------------------------------------------+
-|                                                         |
-|                 Working tree clean                      |
-|          [Fetch] [Open Git Log] [Switch Repository]     |
-|                                                         |
-+---------------------------------------------------------+
-```
-
-建议：
-
-- 区分 `loading`、`empty`、`no repository`、`error`。
-- clean state 提供 `Fetch`、`Open Git Log`、`Switch Repository`。
-- changes mode 下也要显示当前 active changelist，但不要误导为存在可提交文件。
-- 新增 user-facing strings 走 shared l10n bundle。
-
 ### P1. Core Workflow Differentiation
 
-#### 4. 把 `changelist.mode` 保持为轻量 view 内 workflow 入口
-
-证据：
-
-- `intelli-git.changelist.mode` 已是配置项。
-- `CommitToolbar` 只有 changes mode 下才显示 create changelist。
-- view title menu 已有 staged / changes mode command。
-- 早期 toolbar button / dropdown 入口体验不好，已移除，不应再恢复到 toolbar。
-
-为什么值得做：
-
-`changes` mode 是 Intelli Git 的核心差异化，但 mode 切换不应抢占高频 toolbar 空间。更适合保留 view title command，并在 tree/list 显示区域右键菜单提供轻量入口。
-
-ASCII UI:
-
-```text
-Commit View
-+---------------------------------------------------------+
-| [Refresh] [Stage tracked] [Tree/List]                   |
-+---------------------------------------------------------+
-
-Tree/List background context menu:
-  Change Workflow Mode >
-    * Staged Mode
-    * Changelist Mode
-```
-
-建议：
-
-- 不恢复 `CommitToolbar` 的 mode button / dropdown。
-- 保留 view title commands 作为主入口。
-- 在 tree/list 显示区域空白处右键菜单提供 `Change Workflow Mode` submenu，submenu 内提供 staged / changes 切换。
-- changes mode 下 active list 仍只用更强文字权重表达，不加 `Active` badge，遵守现有 interaction contract。
-
-#### 5. 让 partial hunk assignment 可感知，但不渲染 hunk children
-
-证据：
-
-- shared contract 已支持 `ChangelistAssignment.hunkListIds`。
-- `CommitView.tsx` 会按 hunk assignment 把同一文件拆到不同 changelist group。
-- `ChangelistTree` 仍保持 file-oriented tree，不展示 hunk child nodes。
-
-为什么值得做：
-
-同一文件的 hunks 分属多个 changelists 是强能力，但当前 UI 容易让用户误以为“整文件都在这个 changelist”。这会影响提交前信任。
-
-建议：
-
-- 对跨 changelist 文件显示 compact indicator，例如 `3 blocks`、`split`、或 tooltip。
-- 文件详情 tooltip 显示 hunk assignment summary。
-- 双击仍打开 diff/editor，具体 hunk 操作继续通过 editor decorations / code actions / context menu 完成。
-- 不新增 hunk child nodes，避免破坏 file-oriented tree contract。
-
-#### 6. 把 dirty worktree protection 做成统一产品能力
+#### 3. 把 dirty worktree protection 做成统一产品能力
 
 证据：
 
@@ -174,7 +89,7 @@ IntelliJ-style Git 产品的最大价值之一，是在 update / checkout / reba
 - 出现 conflict 或 restore failure 时，明确展示 temporary stash name、当前 Git state、recovery action。
 - 保持 implementation local，不为了“统一”新造大框架；围绕危险操作补 preflight 和 recovery result 即可。
 
-#### 7. 破坏性操作加影响预览和 recovery clue
+#### 4. 破坏性操作加影响预览和 recovery clue
 
 证据：
 
@@ -195,7 +110,7 @@ Git 产品的危险操作必须让用户知道会影响哪些 commits / files，
 
 ### P1. Command And Repository UX
 
-#### 8. 清理 Command Palette 里的 context-only commands
+#### 5. 清理 Command Palette 里的 context-only commands
 
 证据：
 
@@ -213,7 +128,7 @@ Command Palette 是用户探索扩展的入口。大量 context-only 命令会�
 - 对可以 argumentless 的命令补 QuickPick，例如选择 stash / commit / branch 后执行。
 - 保留真正 global commands：focus commit view、focus git log、configure AI provider、open feedback、switch repository。
 
-#### 9. 补齐 multi-repo / submodule 产品闭环
+#### 6. 补齐 multi-repo / submodule 产品闭环
 
 证据：
 
@@ -243,70 +158,7 @@ Header
 
 ### P2. Git Log And History Workflows
 
-#### 10. Git Log filters 增加 active summary、clear all 和 empty result
-
-证据：
-
-- `FilterToolbar` 已持久化 branch、search、regex、case、authors、paths、since、until。
-- `LogListPanel` virtual list 没有明确 no-results state。
-- branch double click 会设置 filter，但用户不一定知道当前 log 已被 filter。
-
-为什么值得做：
-
-Git Log 的搜索和过滤是核心使用场景。空白结果如果没有解释，会被误判为加载失败。
-
-ASCII UI:
-
-```text
-Git Log
-+---------------------------------------------------------+
-| Search: "auth"  Branch: feature/login  Author: Alice x  |
-| [Clear All] [Fetch] [Show All Branches]                 |
-+---------------------------------------------------------+
-| No commits match these filters.                         |
-+---------------------------------------------------------+
-```
-
-建议：
-
-- filter toolbar 下方显示 active chips。
-- 增加 `Clear All`。
-- empty result 显示当前 filters summary 和可行动按钮。
-- reveal commit / file history flow 应显式显示它设置了哪些 filters。
-
-#### 11. Git Log narrow mode 不依赖 hover-only details panel
-
-证据：
-
-- `GitLogView` 在宽度小于 800px 时隐藏 details split。
-- `LogListPanel` narrow mode 需要 hover selected row 1 秒才显示 side panel。
-- side panel CSS 宽度较窄，发现性和可操作性不足。
-
-为什么值得做：
-
-VS Code side panel 经常很窄。hover-only details 在触控板、键盘和窄布局里都不稳定。
-
-建议：
-
-- 选中 commit 后显式显示 details/files panel。
-- 可用 bottom split 或 inline expandable details，而不是 hover-only。
-- 保留 pin / close，但让入口可见。
-
-ASCII UI:
-
-```text
-Narrow Git Log
-+------------------------------+
-| commit row                   |
-| commit row selected          |
-+------------------------------+
-| Files | Details | Actions    |
-| src/foo.ts                   |
-| README.md                    |
-+------------------------------+
-```
-
-#### 12. 让 branch panel 的 “Filter Log by Branch” 显式化
+#### 7. 让 branch panel 的 “Filter Log by Branch” 显式化
 
 证据：
 
@@ -324,7 +176,36 @@ Narrow Git Log
 - filter toolbar 显示 branch chip，并可一键清除。
 - 保留 double click 作为快捷操作。
 
-#### 13. Git Log 大仓库性能继续产品化
+#### 8. Git Log narrow expanded item 视觉重设计
+
+证据：
+
+- narrow mode 已去掉 hover-only side panel，并支持单击 commit row 展开 / 收起。
+- 当前 inline details 仍偏像 list row 下方插入一个子面板，和 Git graph / commit row 的视觉关系不够自然。
+- 文件树 toolbar、details shell、graph continuation 在窄布局里容易显得拥挤。
+
+为什么值得做：
+
+Git Log 是 daily driver 入口。窄屏展开态如果看起来像“面板塞进列表”，会破坏浏览历史的连续性，也会让 graph 成为噪音。
+
+建议：
+
+- 把展开态改为 variable-height commit item，而不是 child panel。
+- details 内容从 subject 起点继续排版，只保留 body、meta、compact file summary。
+- 文件少时 inline 展示文件路径；文件多时显示前几项和 `+N more`，完整文件树交给右侧详情或后续 action。
+- graph gutter 只负责 graph，不放背景、accent border 或额外 guide line。
+- 保留单击 row 展开 / 收起和多 commit 同时展开。
+
+```text
+graph   commit subject...                  author  date
+  │     body first line...
+  │     author · hash · time · +12 -3
+  │     3 files: src/a.ts, src/b.ts, README.md
+  │
+graph   next commit...
+```
+
+#### 9. Git Log 大仓库性能继续产品化
 
 证据：
 
@@ -345,7 +226,7 @@ Git Log 是核心卖点。大仓库里一次明显卡顿，就会让用户回到
 
 ### P2. Push, Remote Providers, And Sync
 
-#### 14. 修正 `Commit & Push` 的 remote / upstream 语义
+#### 10. 修正 `Commit & Push` 的 remote / upstream 语义
 
 证据：
 
@@ -375,7 +256,7 @@ Commit footer
 +---------------------------------------------------------+
 ```
 
-#### 15. Push tab 补 empty、target validation 和 danger guard
+#### 11. Push tab 补 empty、target validation 和 danger guard
 
 证据：
 
@@ -394,7 +275,7 @@ zero outgoing commits 是正常状态；force push 是危险状态。两者都�
 - force push 开启后需要二次确认，并解释 `force-with-lease`。
 - push rejection behind 不再靠 string sentinel 驱动 UI，见 structured result。
 
-#### 16. 把 GitHub-only 外链升级成 provider-aware remote link contract
+#### 12. 把 GitHub-only 外链升级成 provider-aware remote link contract
 
 证据：
 
@@ -414,7 +295,7 @@ zero outgoing commits 是正常状态；force push 是危险状态。两者都�
 
 ### P3. AI Workflow
 
-#### 17. AI generate 增加 provider visibility、test connection 和 no-diff feedback
+#### 13. AI generate 增加 provider visibility、test connection 和 no-diff feedback
 
 证据：
 
@@ -449,7 +330,7 @@ AI generate
 +-------------------------------+
 ```
 
-#### 18. Commit message AI 应支持 scoped generation 和 revision
+#### 14. Commit message AI 应支持 scoped generation 和 revision
 
 证据：
 
@@ -469,7 +350,7 @@ AI generate
 
 ### P3. Quality Bar
 
-#### 19. 加 webview l10n audit
+#### 15. 加 webview l10n audit
 
 证据：
 
@@ -486,7 +367,7 @@ AI generate
 - 扫描明显 JSX text literal，并允许少量 ignore list。
 - 接入 `npm run lint` 或 release audit。
 
-#### 20. 给 custom tree / menu 补 keyboard 和 ARIA 语义
+#### 16. 给 custom tree / menu 补 keyboard 和 ARIA 语义
 
 证据：
 
@@ -504,7 +385,7 @@ VS Code 用户大量依赖键盘。tree / menu 的 keyboard UX 是专业工具�
 - context menu key 支持 native webview context menu。
 - filter menu 使用 `role=menu` / `role=menuitemcheckbox`。
 
-#### 21. 收敛重复 control styles，但不要做薄 wrapper
+#### 17. 收敛重复 control styles，但不要做薄 wrapper
 
 证据：
 
@@ -522,7 +403,7 @@ VS Code 用户大量依赖键盘。tree / menu 的 keyboard UX 是专业工具�
 
 ### P4. Release And Support Trust
 
-#### 22. 明确 dev build expiration / release channel 语义
+#### 18. 明确 dev build expiration / release channel 语义
 
 证据：
 
@@ -539,7 +420,7 @@ VS Code 用户大量依赖键盘。tree / menu 的 keyboard UX 是专业工具�
 - expired panel 提供 `Install latest release` / `Open feedback` / `Rebuild dev VSIX` 的明确路径。
 - release checklist 中检查 `__IS_EXPIRED__`、`__BUILD_TIME__`、VSIX content。
 
-#### 23. structured operation result 替代 string sentinel
+#### 19. structured operation result 替代 string sentinel
 
 证据：
 
@@ -562,23 +443,19 @@ push / pull / checkout / rebase / stash recovery 都需要 UI 分支。用字符
 
 - README / Marketplace content。
 - non-git / empty workspace flow。
-- commit clean state。
 - command palette hygiene。
 - webview l10n audit。
 - push empty state 和 force push confirmation。
 
 ### Milestone 2: Changelist Workflow Maturity
 
-- commit view mode switch。
-- partial hunk assignment indicators。
 - unified dirty worktree preflight for merge / pull / checkout / cherry-pick / revert。
 - destructive operation impact preview。
 
 ### Milestone 3: Git Log As A Daily Driver
 
-- filter chips / clear all / empty result。
-- narrow mode explicit details panel。
 - branch panel explicit filter action。
+- narrow expanded item 视觉重设计。
 - Git Log cache and large-repo performance pass。
 
 ### Milestone 4: AI And Remote Ecosystem
