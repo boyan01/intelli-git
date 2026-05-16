@@ -1,9 +1,16 @@
 .container {
     display: flex;
-    align-items: center;
-    height: 30px;
+    flex-direction: column;
+    align-items: stretch;
+    flex-shrink: 0;
     padding: 0 0px;
     background-color: var(--vscode-titleBar-activeBackground);
+}
+
+.controls {
+    display: flex;
+    align-items: center;
+    height: 30px;
     gap: 4px;
 }
 
@@ -202,4 +209,74 @@
     gap: 8px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
     min-width: 200px;
+}
+
+.activeFilters {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-height: 26px;
+    padding: 0 6px 4px 6px;
+    box-sizing: border-box;
+    overflow-x: auto;
+}
+
+.filterChip {
+    display: inline-flex;
+    align-items: center;
+    flex: 0 0 auto;
+    max-width: 220px;
+    height: 20px;
+    padding: 0 5px 0 7px;
+    gap: 4px;
+    border: 1px solid color-mix(in srgb, var(--vscode-badge-background) 44%, var(--vscode-widget-border));
+    border-radius: 3px;
+    background: color-mix(in srgb, var(--vscode-badge-background) 12%, transparent);
+    color: var(--vscode-foreground);
+    cursor: pointer;
+    font: inherit;
+    font-size: 11px;
+}
+
+.filterChip:hover {
+    background: var(--vscode-toolbar-hoverBackground);
+}
+
+.filterChip:focus-visible,
+.clearAllButton:focus-visible {
+    outline: 1px solid var(--vscode-focusBorder);
+    outline-offset: 1px;
+}
+
+.chipLabel {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.chipClose {
+    flex-shrink: 0;
+    color: var(--vscode-descriptionForeground);
+    font-size: 12px;
+}
+
+.chipClose:global(.codicon[class*='codicon-']) {
+    font: normal normal normal 12px/1 codicon;
+}
+
+.clearAllButton {
+    flex: 0 0 auto;
+    height: 20px;
+    padding: 0 6px;
+    border: none;
+    border-radius: 3px;
+    background: transparent;
+    color: var(--vscode-textLink-foreground);
+    cursor: pointer;
+    font: inherit;
+    font-size: 11px;
+}
+
+.clearAllButton:hover {
+    background: var(--vscode-toolbar-hoverBackground);
 }

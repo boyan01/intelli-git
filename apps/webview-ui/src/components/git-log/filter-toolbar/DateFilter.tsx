@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import styles from './DateFilter.module.css';
 import { FilterMenu } from './FilterMenu';
 import { useTranslation } from 'react-i18next';
@@ -7,9 +7,10 @@ interface DateFilterProps {
     onChange: (dates: { since?: string; until?: string }) => void;
     initialSince?: string;
     initialUntil?: string;
+    resetToken?: number;
 }
 
-export const DateFilter: React.FC<DateFilterProps> = ({ onChange, initialSince, initialUntil }) => {
+export const DateFilter: React.FC<DateFilterProps> = ({ onChange, initialSince, initialUntil, resetToken = 0 }) => {
     const { t } = useTranslation();
     const [filterType, setFilterType] = useState<'all' | '24h' | '7d' | 'custom'>(() => {
         if (initialSince || initialUntil) return 'custom';
@@ -23,6 +24,22 @@ export const DateFilter: React.FC<DateFilterProps> = ({ onChange, initialSince, 
     // Validation state
     const [sinceError, setSinceError] = useState(false);
     const [untilError, setUntilError] = useState(false);
+    const didMountRef = useRef(false);
+
+    useEffect(() => {
+        if (!didMountRef.current) {
+            didMountRef.current = true;
+            return;
+        }
+
+        setFilterType('all');
+        setCustomSince('');
+        setCustomUntil('');
+        setSinceError(false);
+        setUntilError(false);
+        setShowMenu(false);
+        setShowPopup(false);
+    }, [resetToken]);
 
     useEffect(() => {
         if (filterType === 'all') {

@@ -10,9 +10,10 @@ import { useCommitSelection } from './hooks/useCommitSelection';
 import { formatRelativeDate } from '../../utils/dateUtils';
 import { CommitDetailsView } from '../common/CommitDetailsView';
 import { usePersistedState } from '../../hooks/usePersistedState';
-import type { CommitDetails } from '@shared/messages';
+import type { CommitDetails, LogOptions } from '@shared/messages';
 import { rpc, rpcEvents } from '../../lib/rpc_client';
 import type { GitLogCommitContext } from '@shared/webviewContext';
+import { useTranslation } from 'react-i18next';
 
 interface LogListPanelProps {
     onSelectionChange?: (commits: string[]) => void;
@@ -25,6 +26,19 @@ interface LogListPanelProps {
 const ROW_HEIGHT = 24;
 const BUFFER = 10;
 
+function hasActiveFilters(filters: Partial<LogOptions>): boolean {
+    return Boolean(
+        filters.branch ||
+        filters.search ||
+        filters.regexMode ||
+        filters.caseSensitive ||
+        (filters.authors && filters.authors.length > 0) ||
+        (filters.paths && filters.paths.length > 0) ||
+        filters.since ||
+        filters.until
+    );
+}
+
 export const LogListPanel: React.FC<LogListPanelProps> = ({
     onSelectionChange,
     externalBranchFilter,
@@ -32,6 +46,7 @@ export const LogListPanel: React.FC<LogListPanelProps> = ({
     selectedHashes: externalSelectedHashes = [],
     commitDetails
 }) => {
+    const { t } = useTranslation();
     const containerRef = useRef<HTMLDivElement>(null);
     const [cachedScrollTop, setCachedScrollTop] = usePersistedState('gitLog.scrollTop');
     const hasRestoredScroll = useRef(false);
@@ -308,6 +323,8 @@ export const LogListPanel: React.FC<LogListPanelProps> = ({
 
     const visibleCommits = commits.slice(startIndex, endIndex);
     const offsetY = startIndex * ROW_HEIGHT;
+    const hasFilters = hasActiveFilters(filters);
+    const showEmptyResult = commits.length === 0 && !loading;
 
     return (
         <div className={styles.container}>
@@ -324,74 +341,111 @@ export const LogListPanel: React.FC<LogListPanelProps> = ({
                     onBlur={() => setListHasFocus(false)}
                     style={{ outline: 'none' }}
                 >
-                    <div style={{ height: totalHeight, position: 'relative' }}>
-                        <div style={{
-                            position: 'absolute',
-                            top: offsetY,
-                            left: 0,
-                            right: 0,
-                        }}>
-                            {visibleCommits.map((commit, i) => {
-                                const globalIndex = startIndex + i;
-                                const graphNode = graph.get(commit.hash);
-                                const selected = isSelected(commit.hash);
-                                const isBlink = commit.hash === blinkHash;
-                                const rowGraphWidth = graphNode ? (graphNode.maxX + 1) * CELL_WIDTH : CELL_WIDTH;
-                                return (
-                                    <div
-                                        key={commit.hash}
-                                        className={`${styles.row} ${!isBlink && selected ? styles.selected : ''} ${isBlink ? styles.blink : ''} ${focusedHash === commit.hash ? styles.focused : ''}`}
-                                        onClick={(e) => {
-                                            setFocusedHash(commit.hash);
-                                            handleRowClickWithHover(e, commit);
-                                        }}
-                                        onMouseEnter={() => {
-                                            setRowHoveredHash(commit.hash);
-                                            handleRowMouseEnter(commit.hash, selected);
-                                        }}
-                                        onMouseLeave={() => {
-                                            setRowHoveredHash(null);
-                                            handleRowMouseLeave();
-                                        }}
-                                        onContextMenu={() => setFocusedHash(commit.hash)}
-                                        data-vscode-context={JSON.stringify({
-                                            webviewSection: 'gitLogCommit',
-                                            hash: commit.hash,
-                                            shortHash: commit.shortHash,
-                                            subject: commit.subject,
-                                            isUnpushed: unpushedCommits.has(commit.hash),
-                                            isLatestUnpushed: commit.hash === latestUnpushedHash
-                                        } satisfies GitLogCommitContext)}
+                    {showEmptyResult ? (
+                        <div className={styles.emptyState}>
+                            <i
+                                className={`codicon ${hasFilters ? 'codicon-filter' : 'codicon-git-commit'} ${styles.emptyIcon}`}
+                                aria-hidden="true"
+                            />
+                            <div className={styles.emptyTitle}>
+                                {hasFilters ? t('No commits match these filters.') : t('No commits found.')}
+                            </div>
+                            <div className={styles.emptyDescription}>
+                                {hasFilters
+                                    ? t('Adjust or clear filters to show more history.')
+                                    : t('Fetch or create commits to populate the Git Log.')}
+                            </div>
+                            <div className={styles.emptyActions}>
+                                {hasFilters && (
+                                    <button
+                                        className={styles.emptyButton}
+                                        type="button"
+                                        onClick={() => rpcEvents.clearGitLogFilters.emit('all')}
                                     >
-                                        <div className={styles.graphCol} style={{ width: rowGraphWidth }}>
-                                            {graphNode && (
-                                                <GraphColumn
-                                                    node={graphNode}
-                                                    rowHeight={ROW_HEIGHT}
-                                                    graphWidth={rowGraphWidth}
-                                                    rowIndex={globalIndex}
-                                                    onJumpToCommit={handleJumpToCommit}
-                                                    isSelected={selected && !isBlink}
-                                                    isHovered={rowHoveredHash === commit.hash}
-                                                    hasFocus={listHasFocus}
-                                                />
-                                            )}
-                                        </div>
-                                        <div className={styles.subject}>
-                                            <span>{commit.subject}</span>
-                                            {commit.refs && commit.refs.length > 0 && (
-                                                <RefLabels refs={commit.refs} />
-                                            )}
-                                        </div>
-                                        <span className={styles.author}>{commit.authorName}</span>
-                                        <span className={styles.date}>
-                                            {formatRelativeDate(commit.date)}
-                                        </span>
-                                    </div>
-                                );
-                            })}
+                                        {t('Clear All')}
+                                    </button>
+                                )}
+                                {filters.branch && (
+                                    <button
+                                        className={styles.emptyButton}
+                                        type="button"
+                                        onClick={() => rpcEvents.clearGitLogFilters.emit('branch')}
+                                    >
+                                        {t('Show All Branches')}
+                                    </button>
+                                )}
+                            </div>
                         </div>
-                    </div>
+                    ) : (
+                        <div style={{ height: totalHeight, position: 'relative' }}>
+                            <div style={{
+                                position: 'absolute',
+                                top: offsetY,
+                                left: 0,
+                                right: 0,
+                            }}>
+                                {visibleCommits.map((commit, i) => {
+                                    const globalIndex = startIndex + i;
+                                    const graphNode = graph.get(commit.hash);
+                                    const selected = isSelected(commit.hash);
+                                    const isBlink = commit.hash === blinkHash;
+                                    const rowGraphWidth = graphNode ? (graphNode.maxX + 1) * CELL_WIDTH : CELL_WIDTH;
+                                    return (
+                                        <div
+                                            key={commit.hash}
+                                            className={`${styles.row} ${!isBlink && selected ? styles.selected : ''} ${isBlink ? styles.blink : ''} ${focusedHash === commit.hash ? styles.focused : ''}`}
+                                            onClick={(e) => {
+                                                setFocusedHash(commit.hash);
+                                                handleRowClickWithHover(e, commit);
+                                            }}
+                                            onMouseEnter={() => {
+                                                setRowHoveredHash(commit.hash);
+                                                handleRowMouseEnter(commit.hash, selected);
+                                            }}
+                                            onMouseLeave={() => {
+                                                setRowHoveredHash(null);
+                                                handleRowMouseLeave();
+                                            }}
+                                            onContextMenu={() => setFocusedHash(commit.hash)}
+                                            data-vscode-context={JSON.stringify({
+                                                webviewSection: 'gitLogCommit',
+                                                hash: commit.hash,
+                                                shortHash: commit.shortHash,
+                                                subject: commit.subject,
+                                                isUnpushed: unpushedCommits.has(commit.hash),
+                                                isLatestUnpushed: commit.hash === latestUnpushedHash
+                                            } satisfies GitLogCommitContext)}
+                                        >
+                                            <div className={styles.graphCol} style={{ width: rowGraphWidth }}>
+                                                {graphNode && (
+                                                    <GraphColumn
+                                                        node={graphNode}
+                                                        rowHeight={ROW_HEIGHT}
+                                                        graphWidth={rowGraphWidth}
+                                                        rowIndex={globalIndex}
+                                                        onJumpToCommit={handleJumpToCommit}
+                                                        isSelected={selected && !isBlink}
+                                                        isHovered={rowHoveredHash === commit.hash}
+                                                        hasFocus={listHasFocus}
+                                                    />
+                                                )}
+                                            </div>
+                                            <div className={styles.subject}>
+                                                <span>{commit.subject}</span>
+                                                {commit.refs && commit.refs.length > 0 && (
+                                                    <RefLabels refs={commit.refs} />
+                                                )}
+                                            </div>
+                                            <span className={styles.author}>{commit.authorName}</span>
+                                            <span className={styles.date}>
+                                                {formatRelativeDate(commit.date)}
+                                            </span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
 

@@ -21,6 +21,7 @@ export const rpcEvents = {
     activeFileChange: new EventStream<{ path: string; commitHash?: string }>(),
     revealLog: new EventStream<GitLogRevealRequest>(),
     refresh: new EventStream<void>(),
+    clearGitLogFilters: new EventStream<'all' | 'branch'>(),
     switchTab: new EventStream<'commit' | 'stash' | 'push'>(),
 };
 
