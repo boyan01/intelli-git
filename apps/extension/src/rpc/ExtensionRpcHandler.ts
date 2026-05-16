@@ -162,6 +162,10 @@ export class ExtensionRpcHandler {
                 switchBranch: this.switchBranch,
                 pull: this.pull,
                 fetch: this.fetch,
+                focusGitLog: this.focusGitLog,
+                switchRepository: this.switchRepository,
+                openFolder: this.openFolder,
+                initializeRepository: this.initializeRepository,
                 pickBranch: this.pickBranch,
                 continueRebase: this.continueRebase,
                 abortRebase: this.abortRebase,
@@ -702,6 +706,22 @@ export class ExtensionRpcHandler {
             logger.error('Fetch failed:', e);
             throw e;
         }
+    };
+
+    focusGitLog = async (): Promise<void> => {
+        await vscode.commands.executeCommand('intelli-git.focusGitLog');
+    };
+
+    switchRepository = async (): Promise<void> => {
+        await vscode.commands.executeCommand('intelli-git.repository.switch');
+    };
+
+    openFolder = async (): Promise<void> => {
+        await vscode.commands.executeCommand('workbench.action.files.openFolder');
+    };
+
+    initializeRepository = async (): Promise<void> => {
+        await vscode.commands.executeCommand('git.init');
     };
 
     showErrorMessage = async (message: string): Promise<void> => {

@@ -195,6 +195,10 @@ export interface ExtensionMethods {
     switchBranch: (branch: string) => Promise<void>;
     pull: () => Promise<void>;
     fetch: () => Promise<void>;
+    focusGitLog: () => Promise<void>;
+    switchRepository: () => Promise<void>;
+    openFolder: () => Promise<void>;
+    initializeRepository: () => Promise<void>;
     pickBranch: () => Promise<void>;
     continueRebase: (params: { message?: string; files?: string[] }) => Promise<void>;
     abortRebase: () => Promise<void>;
