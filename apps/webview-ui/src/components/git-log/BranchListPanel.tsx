@@ -70,7 +70,7 @@ export const BranchListPanel: React.FC<BranchListPanelProps> = ({ onBranchFilter
         setSelectedId(node.id);
     }, [setSelectedId]);
 
-    const handleDoubleClick = useCallback((node: TreeNode<BranchNodeData>) => {
+    const handleBranchAction = useCallback((node: TreeNode<BranchNodeData>) => {
         if (node.data?.type !== 'folder') {
             onBranchFilter?.(node.data?.fullPath || node.id);
         }
@@ -376,11 +376,13 @@ export const BranchListPanel: React.FC<BranchListPanelProps> = ({ onBranchFilter
                 selectedId={selectedId ?? undefined}
                 onToggle={handleToggle}
                 onSelect={handleSelect}
-                onDoubleClick={handleDoubleClick}
+                onAction={handleBranchAction}
+                onDoubleClick={handleBranchAction}
                 renderLabel={renderLabel}
                 renderTrailing={renderTrailing}
                 getContextData={getContextData}
                 baseIndent={8}
+                ariaLabel={t('Branches')}
                 stickyHeaders={true}
             />
         );

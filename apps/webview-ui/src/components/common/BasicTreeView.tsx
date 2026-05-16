@@ -28,6 +28,7 @@ export interface BasicTreeViewProps<T = unknown> {
     isStickyHeader?: (node: TreeNode<T>) => boolean;
     onToggle?: (id: string, expanded: boolean) => void;
     onSelect?: (node: TreeNode<T>) => void;
+    onAction?: (node: TreeNode<T>) => void;
     onDoubleClick?: (node: TreeNode<T>) => void;
     onContextMenu?: (e: React.MouseEvent, node: TreeNode<T>) => void;
     onFocusNodeChange?: (node: TreeNode<T>) => void;
@@ -48,6 +49,7 @@ export interface BasicTreeViewProps<T = unknown> {
     getDragLabel?: (node: TreeNode<T>) => { label: string; count?: number };
     onDrop?: (draggedNode: TreeNode<T>, targetNode: TreeNode<T>) => void;
     rootContextData?: Record<string, unknown>;
+    ariaLabel?: string;
 }
 
 export interface BasicTreeViewRef {
@@ -79,6 +81,7 @@ interface TreeNodeItemProps<T> {
     dragOverId: string | null;
     toggleNode: (id: string) => void;
     onSelect?: (node: TreeNode<T>) => void;
+    onAction?: (node: TreeNode<T>) => void;
     onDoubleClick?: (node: TreeNode<T>) => void;
     onContextMenu?: (e: React.MouseEvent, node: TreeNode<T>) => void;
     onFocusNodeChange?: (node: TreeNode<T>) => void;
@@ -105,6 +108,10 @@ interface TreeNodeItemProps<T> {
     scheduleDragAutoScroll: (clientY: number) => void;
     startDragAutoScrollTracking: () => void;
     stopDragAutoScrollTracking: () => void;
+    nodeElementId?: string;
+    ariaSetSize?: number;
+    ariaPosInSet?: number;
+    setNodeElement: (nodeId: string, element: HTMLDivElement | null) => void;
 }
 
 interface FlatTreeNode<T> {
@@ -289,16 +296,29 @@ function scrollTargetBy(scrollTarget: HTMLElement | Window, delta: number) {
     scrollTarget.scrollTop += delta;
 }
 
+function getTreeNodeElementId(nodeId: string): string {
+    return `basic-tree-node-${encodeURIComponent(nodeId)}`;
+}
+
+function isInteractiveKeyboardTarget(target: EventTarget | null): boolean {
+    if (!(target instanceof HTMLElement)) {
+        return false;
+    }
+
+    return !!target.closest('button, input, textarea, select, [contenteditable="true"], [role="button"]');
+}
+
 const TreeNodeItem = <T,>(props: TreeNodeItemProps<T>) => {
     const {
         node, depth, isStickyClone = false, expandedIds, selectedId, focusedId, dragOverId,
-        toggleNode, onSelect, onDoubleClick, onContextMenu, onFocusNodeChange,
+        toggleNode, onSelect, onAction, onDoubleClick, onContextMenu, onFocusNodeChange,
         renderLabel, renderTrailing, getNodeClassName, getContextData, renderLeading,
         baseIndent, indent, isDraggable, isDropTarget,
         getDropTargetRootId, onDrop, getDragData, getDragLabel,
         setFocusedId, setDragOverId, focusTree, dragGhostRef,
         draggedNodeRef, clearDragTimeoutRef, scheduleDragAutoScroll,
-        startDragAutoScrollTracking, stopDragAutoScrollTracking
+        startDragAutoScrollTracking, stopDragAutoScrollTracking,
+        nodeElementId, ariaSetSize, ariaPosInSet, setNodeElement
     } = props;
 
     const hasChildren = node.children && node.children.length > 0;
@@ -409,7 +429,21 @@ const TreeNodeItem = <T,>(props: TreeNodeItemProps<T>) => {
 
     return (
         <div
+            ref={(element) => {
+                if (!isStickyClone) {
+                    setNodeElement(node.id, element);
+                }
+            }}
             className={`${styles.node} ${nodeClassName || ''} ${isSelected ? styles.selected : ''} ${focusedId === node.id ? styles.focused : ''} ${isDragOver ? styles.dragOver : ''} ${isStickyClone ? styles.stickyNode : ''}`}
+            id={isStickyClone ? undefined : nodeElementId}
+            role={isStickyClone ? 'presentation' : 'treeitem'}
+            aria-hidden={isStickyClone ? true : undefined}
+            aria-level={isStickyClone ? undefined : depth + 1}
+            aria-expanded={isStickyClone || !hasChildren ? undefined : isExpanded}
+            aria-selected={isStickyClone ? undefined : isSelected}
+            aria-setsize={isStickyClone ? undefined : ariaSetSize}
+            aria-posinset={isStickyClone ? undefined : ariaPosInSet}
+            tabIndex={isStickyClone ? undefined : focusedId === node.id ? 0 : -1}
             style={{ paddingLeft: `${baseIndent + depth * indent}px` }}
             draggable={canDrag}
             onDragStart={handleDragStartWrapped}
@@ -437,7 +471,11 @@ const TreeNodeItem = <T,>(props: TreeNodeItemProps<T>) => {
             onDoubleClick={(e) => {
                 e.stopPropagation();
                 focusTree();
-                onDoubleClick?.(node);
+                if (isLeaf) {
+                    (onAction ?? onDoubleClick)?.(node);
+                } else {
+                    toggleNode(node.id);
+                }
             }}
             onContextMenu={(e) => {
                 focusTree();
@@ -483,15 +521,17 @@ function BasicTreeViewInner<T>(
     const {
         nodes, expandedIds: controlledExpandedIds, selectedId, defaultExpandAll = false,
         stickyHeaders = false, isStickyHeader,
-        onToggle, onSelect, onDoubleClick, onContextMenu, onFocusNodeChange, onFocusChange, renderLabel, renderTrailing,
+        onToggle, onSelect, onAction, onDoubleClick, onContextMenu, onFocusNodeChange, onFocusChange, renderLabel, renderTrailing,
         getNodeClassName, getContextData, indent = 8, baseIndent = 0, renderLeading, isDraggable, isDropTarget,
-        getDropTargetRootId, onDrop, getDragData, getDragLabel, rootContextData
+        getDropTargetRootId, onDrop, getDragData, getDragLabel, rootContextData, ariaLabel
     } = props;
 
     const rootRef = useRef<HTMLDivElement>(null);
     const stickyHeaderRefs = useRef(new Map<string, HTMLDivElement>());
+    const nodeElementRefs = useRef(new Map<string, HTMLDivElement>());
     const dragGhostRef = useRef<HTMLDivElement>(null);
     const [focusedId, setFocusedId] = useState<string | null>(null);
+    const [isTreeFocused, setIsTreeFocused] = useState(false);
     const [dragOverId, setDragOverId] = useState<string | null>(null);
     const draggedNodeRef = useRef<TreeNode<T> | null>(null);
     const clearDragTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -533,6 +573,14 @@ function BasicTreeViewInner<T>(
         rootRef.current?.focus();
     }, []);
 
+    const setNodeElement = useCallback((nodeId: string, element: HTMLDivElement | null) => {
+        if (element) {
+            nodeElementRefs.current.set(nodeId, element);
+        } else {
+            nodeElementRefs.current.delete(nodeId);
+        }
+    }, []);
+
     const toggleNode = useCallback((id: string) => {
         const isExpanded = expandedIds.has(id);
         onToggle?.(id, !isExpanded);
@@ -548,6 +596,147 @@ function BasicTreeViewInner<T>(
             });
         }
     }, [expandedIds, onToggle, controlledExpandedIds]);
+
+    const scrollIndexIntoView = useCallback((index: number) => {
+        const root = rootRef.current;
+        if (!root) return;
+
+        const scrollParent = getScrollParent(root);
+        const rootRect = root.getBoundingClientRect();
+        const viewportTop = scrollParent instanceof Window ? 0 : scrollParent.getBoundingClientRect().top;
+        const viewportBottom = scrollParent instanceof Window ? window.innerHeight : scrollParent.getBoundingClientRect().bottom;
+        const itemTop = rootRect.top + index * ROW_HEIGHT;
+        const itemBottom = itemTop + ROW_HEIGHT;
+
+        if (itemTop < viewportTop) {
+            scrollTargetBy(scrollParent, itemTop - viewportTop);
+        } else if (itemBottom > viewportBottom) {
+            scrollTargetBy(scrollParent, itemBottom - viewportBottom);
+        }
+    }, []);
+
+    const focusItemAtIndex = useCallback((index: number) => {
+        if (flatNodes.length === 0) return;
+
+        const boundedIndex = Math.max(0, Math.min(flatNodes.length - 1, index));
+        const item = flatNodes[boundedIndex];
+        setFocusedId(item.node.id);
+        onFocusNodeChange?.(item.node);
+        scrollIndexIntoView(boundedIndex);
+    }, [flatNodes, onFocusNodeChange, scrollIndexIntoView]);
+
+    const activateItem = useCallback((item: FlatTreeNode<T>) => {
+        const hasChildren = !!item.node.children?.length;
+        if (hasChildren) {
+            toggleNode(item.node.id);
+            return;
+        }
+
+        (onAction ?? onDoubleClick ?? onSelect)?.(item.node);
+    }, [onAction, onDoubleClick, onSelect, toggleNode]);
+
+    const handleKeyDown = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
+        if (isInteractiveKeyboardTarget(event.target)) {
+            return;
+        }
+
+        const currentIndex = focusedId ? flatNodeIndexById.get(focusedId) : undefined;
+        const fallbackIndex = selectedId ? flatNodeIndexById.get(selectedId) : undefined;
+        const activeIndex = currentIndex ?? fallbackIndex ?? 0;
+        const activeItem = flatNodes[activeIndex];
+
+        if (!activeItem) {
+            return;
+        }
+
+        switch (event.key) {
+            case 'ArrowDown':
+                event.preventDefault();
+                focusItemAtIndex(activeIndex + 1);
+                break;
+            case 'ArrowUp':
+                event.preventDefault();
+                focusItemAtIndex(activeIndex - 1);
+                break;
+            case 'Home':
+                event.preventDefault();
+                focusItemAtIndex(0);
+                break;
+            case 'End':
+                event.preventDefault();
+                focusItemAtIndex(flatNodes.length - 1);
+                break;
+            case 'ArrowRight': {
+                const hasChildren = !!activeItem.node.children?.length;
+                if (!hasChildren) return;
+
+                event.preventDefault();
+                if (!expandedIds.has(activeItem.node.id)) {
+                    toggleNode(activeItem.node.id);
+                    return;
+                }
+                focusItemAtIndex(activeIndex + 1);
+                break;
+            }
+            case 'ArrowLeft': {
+                const hasChildren = !!activeItem.node.children?.length;
+                event.preventDefault();
+
+                if (hasChildren && expandedIds.has(activeItem.node.id)) {
+                    toggleNode(activeItem.node.id);
+                    return;
+                }
+
+                const parentId = activeItem.ancestorIds[activeItem.ancestorIds.length - 1];
+                const parentIndex = parentId ? flatNodeIndexById.get(parentId) : undefined;
+                if (parentIndex !== undefined) {
+                    focusItemAtIndex(parentIndex);
+                }
+                break;
+            }
+            case 'Enter':
+            case ' ':
+                event.preventDefault();
+                activateItem(activeItem);
+                break;
+            case 'ContextMenu': {
+                event.preventDefault();
+                const element = nodeElementRefs.current.get(activeItem.node.id);
+                const rect = element?.getBoundingClientRect();
+                element?.dispatchEvent(new MouseEvent('contextmenu', {
+                    bubbles: true,
+                    cancelable: true,
+                    clientX: rect?.left ?? 0,
+                    clientY: rect?.bottom ?? 0
+                }));
+                break;
+            }
+            case 'F10': {
+                if (!event.shiftKey) return;
+                event.preventDefault();
+                const element = nodeElementRefs.current.get(activeItem.node.id);
+                const rect = element?.getBoundingClientRect();
+                element?.dispatchEvent(new MouseEvent('contextmenu', {
+                    bubbles: true,
+                    cancelable: true,
+                    clientX: rect?.left ?? 0,
+                    clientY: rect?.bottom ?? 0
+                }));
+                break;
+            }
+            default:
+                break;
+        }
+    }, [
+        activateItem,
+        expandedIds,
+        flatNodeIndexById,
+        flatNodes,
+        focusItemAtIndex,
+        focusedId,
+        selectedId,
+        toggleNode
+    ]);
 
     const updateVisibleRange = useCallback(() => {
         const root = rootRef.current;
@@ -579,6 +768,47 @@ function BasicTreeViewInner<T>(
                 : { start: nextStart, end, visibleTop }
         ));
     }, [flatNodeIndexById, flatNodes, isStickyHeader, stickyHeaders, totalHeight]);
+
+    useEffect(() => {
+        if (focusedId && flatNodeIndexById.has(focusedId)) {
+            return;
+        }
+
+        const selectedIndex = selectedId ? flatNodeIndexById.get(selectedId) : undefined;
+        const fallbackItem = flatNodes[selectedIndex ?? 0];
+        setFocusedId(fallbackItem?.node.id ?? null);
+    }, [flatNodeIndexById, flatNodes, focusedId, selectedId]);
+
+    useLayoutEffect(() => {
+        if (!isTreeFocused || !focusedId) {
+            return;
+        }
+
+        nodeElementRefs.current.get(focusedId)?.focus({ preventScroll: true });
+    }, [focusedId, isTreeFocused, visibleItems]);
+
+    const handleRootFocus = useCallback((event: React.FocusEvent<HTMLDivElement>) => {
+        if (event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget)) {
+            return;
+        }
+
+        setIsTreeFocused(true);
+        onFocusChange?.(true);
+
+        if (!focusedId) {
+            const selectedIndex = selectedId ? flatNodeIndexById.get(selectedId) : undefined;
+            focusItemAtIndex(selectedIndex ?? 0);
+        }
+    }, [flatNodeIndexById, focusItemAtIndex, focusedId, onFocusChange, selectedId]);
+
+    const handleRootBlur = useCallback((event: React.FocusEvent<HTMLDivElement>) => {
+        if (event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget)) {
+            return;
+        }
+
+        setIsTreeFocused(false);
+        onFocusChange?.(false);
+    }, [onFocusChange]);
 
     const stopDragAutoScroll = useCallback(() => {
         dragAutoScrollVelocityRef.current = 0;
@@ -725,13 +955,21 @@ function BasicTreeViewInner<T>(
         }
     }), [nodes, controlledExpandedIds, onToggle, expandedIds]);
 
+    const activeDescendantId = focusedId && flatNodeIndexById.has(focusedId)
+        ? getTreeNodeElementId(focusedId)
+        : undefined;
+
     return (
         <div
             ref={rootRef}
             className={styles.root}
+            role="tree"
+            aria-label={ariaLabel}
+            aria-activedescendant={activeDescendantId}
             tabIndex={0}
-            onFocus={() => onFocusChange?.(true)}
-            onBlur={() => onFocusChange?.(false)}
+            onFocus={handleRootFocus}
+            onBlur={handleRootBlur}
+            onKeyDown={handleKeyDown}
             {...(rootContextData ? { 'data-vscode-context': JSON.stringify(rootContextData) } : {})}
             data-basic-tree-root="true"
         >
@@ -758,6 +996,7 @@ function BasicTreeViewInner<T>(
                         dragOverId={dragOverId}
                         toggleNode={toggleNode}
                         onSelect={onSelect}
+                        onAction={onAction}
                         onDoubleClick={onDoubleClick}
                         onContextMenu={onContextMenu}
                         onFocusNodeChange={onFocusNodeChange}
@@ -783,6 +1022,8 @@ function BasicTreeViewInner<T>(
                         scheduleDragAutoScroll={scheduleDragAutoScroll}
                         startDragAutoScrollTracking={startDragAutoScrollTracking}
                         stopDragAutoScrollTracking={stopDragAutoScrollTracking}
+                        nodeElementId={getTreeNodeElementId(stickyHeaderState.item.node.id)}
+                        setNodeElement={setNodeElement}
                     />
                 </div>
             ))}
@@ -798,6 +1039,7 @@ function BasicTreeViewInner<T>(
                     dragOverId={dragOverId}
                     toggleNode={toggleNode}
                     onSelect={onSelect}
+                    onAction={onAction}
                     onDoubleClick={onDoubleClick}
                     onContextMenu={onContextMenu}
                     onFocusNodeChange={onFocusNodeChange}
@@ -823,6 +1065,8 @@ function BasicTreeViewInner<T>(
                     scheduleDragAutoScroll={scheduleDragAutoScroll}
                     startDragAutoScrollTracking={startDragAutoScrollTracking}
                     stopDragAutoScrollTracking={stopDragAutoScrollTracking}
+                    nodeElementId={getTreeNodeElementId(node.id)}
+                    setNodeElement={setNodeElement}
                 />
             ))}
             <div className={styles.virtualSpacer} style={{ height: `${bottomSpacerHeight}px` }} />

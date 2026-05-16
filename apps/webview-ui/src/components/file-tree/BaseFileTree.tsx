@@ -357,6 +357,7 @@ export const BaseFileTree = React.forwardRef<BaseFileTreeRef, BaseFileTreeProps>
             baseIndent={8}
             stickyHeaders={stickyHeaders}
             isStickyHeader={isStickyHeader}
+            ariaLabel={rootLabel}
         />
     );
 });

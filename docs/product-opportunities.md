@@ -349,24 +349,21 @@ AI generate
 - 扫描明显 JSX text literal，并允许少量 ignore list。
 - 接入 `npm run lint` 或 release audit。
 
-#### 15. 给 custom tree / menu 补 keyboard 和 ARIA 语义
+#### 15. 给 custom filter menu 补 keyboard 和 ARIA 语义
 
 证据：
 
-- `BasicTreeView` root 有 `tabIndex`。
-- row 和 menu item 多为 `div` + click handler。
+- filter menu item 多为 `div` + click handler。
 
 为什么值得做：
 
-VS Code 用户大量依赖键盘。tree / menu 的 keyboard UX 是专业工具的基础质量。
+VS Code 用户大量依赖键盘。menu 的 keyboard UX 是专业工具的基础质量。
 
 建议：
 
-- `role=tree`、`role=treeitem`、`aria-expanded`、`aria-selected`。
-- `Enter` / `Space` 触发 open/select。
-- branch tree row 支持 `Enter` 触发 `Filter Log by Branch`。
-- context menu key 支持 native webview context menu。
 - filter menu 使用 `role=menu` / `role=menuitemcheckbox`。
+- `ArrowUp` / `ArrowDown` 移动菜单焦点。
+- `Enter` / `Space` 切换当前菜单项。
 
 #### 16. 收敛重复 control styles，但不要做薄 wrapper
 

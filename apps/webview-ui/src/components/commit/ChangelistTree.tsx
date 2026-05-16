@@ -650,6 +650,7 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
             onDrop={handleDrop}
             getDragData={getDragData}
             getDragLabel={getDragLabel}
+            ariaLabel={t('Changes')}
             rootContextData={{
                 webviewSection: 'changelistBackground',
                 changelistMode: changelistState.mode,
