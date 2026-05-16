@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ChangelistState, FileStatus, GitHunk } from '@shared/messages';
-import { buildChangelists, getSelectedFiles, hasTrackedChanges } from './changelistModel';
+import { buildChangelists, buildSplitInfoByPath, getSelectedFiles, hasTrackedChanges } from './changelistModel';
 
 const t = (key: string) => key;
 
@@ -111,6 +111,31 @@ describe('changelistModel', () => {
         expect(groups.find(group => group.id === 'inactive-changes')?.items).toMatchObject([
             { path: 'src/split.ts', hunks: [inactive], inactive: true }
         ]);
+    });
+
+    it('marks files shown in multiple groups as split', () => {
+        const splitInfo = buildSplitInfoByPath([
+            {
+                id: 'changes',
+                name: 'Changes',
+                isDefault: true,
+                isActive: true,
+                items: [file('src/split.ts'), file('src/only-active.ts')]
+            },
+            {
+                id: 'review',
+                name: 'Review',
+                isDefault: false,
+                isActive: false,
+                items: [file('src/split.ts')]
+            }
+        ]);
+
+        expect(splitInfo.get('src/split.ts')).toEqual({
+            groupCount: 2,
+            groupNames: ['Changes', 'Review']
+        });
+        expect(splitInfo.has('src/only-active.ts')).toBe(false);
     });
 
     it('does not treat inactive, conflict, or untracked entries as tracked changes', () => {

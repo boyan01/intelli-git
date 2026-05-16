@@ -59,6 +59,8 @@
     "Show Diff": "显示差异",
     "Delete from Disk": "从磁盘删除",
     "Move to Changelist...": "移动到变更列表...",
+    "Split": "拆分",
+    "This file has changes in {{groups}}.": "这个文件的更改分布在 {{groups}} 中。",
     "Mark as Inactive Changes": "标记为 Inactive 更改",
     "Move to Active Changes": "移回 Active 更改",
     "Reveal in Commit Panel": "在提交面板中显示",

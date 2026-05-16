@@ -16,6 +16,11 @@ type LogicalFile = {
     hasStagedInactive?: boolean;
 };
 
+export interface SplitFileInfo {
+    groupCount: number;
+    groupNames: string[];
+}
+
 export function getEquivalentHunkIds(hunkId: string): string[] {
     return [
         hunkId,
@@ -326,4 +331,30 @@ export function getFileStats(changelists: ChangelistGroup[], selectedFiles: Set<
 
 export function hasTrackedChanges(files: FileStatus[]): boolean {
     return files.some(file => !hasOnlyInactiveHunks(file) && file.status !== '?' && file.status !== 'C' && file.status !== 'U' && !file.staged);
+}
+
+export function buildSplitInfoByPath(groups: ChangelistGroup[]): Map<string, SplitFileInfo> {
+    const groupNamesByPath = new Map<string, Set<string>>();
+
+    groups.forEach(group => {
+        group.items.forEach(file => {
+            const groupNames = groupNamesByPath.get(file.path) || new Set<string>();
+            groupNames.add(group.name);
+            groupNamesByPath.set(file.path, groupNames);
+        });
+    });
+
+    const result = new Map<string, SplitFileInfo>();
+    groupNamesByPath.forEach((groupNames, path) => {
+        if (groupNames.size < 2) {
+            return;
+        }
+
+        result.set(path, {
+            groupCount: groupNames.size,
+            groupNames: Array.from(groupNames)
+        });
+    });
+
+    return result;
 }

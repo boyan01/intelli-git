@@ -59,6 +59,8 @@
     "Show Diff": "Show Diff",
     "Delete from Disk": "Delete from Disk",
     "Move to Changelist...": "Move to Changelist...",
+    "Split": "Split",
+    "This file has changes in {{groups}}.": "This file has changes in {{groups}}.",
     "Mark as Inactive Changes": "Mark as Inactive Changes",
     "Move to Active Changes": "Move to Active Changes",
     "Reveal in Commit Panel": "Reveal in Commit Panel",

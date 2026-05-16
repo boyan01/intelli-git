@@ -9,6 +9,7 @@ import { rpc, rpcEvents } from '@/lib/rpc_client';
 import { logger } from '@/utils/logger';
 import styles from '../file-tree/BaseFileTree.module.css';
 import { compactSingleChildFolders } from '../file-tree/treeUtils';
+import { buildSplitInfoByPath, type SplitFileInfo } from './changelistModel';
 
 export interface ChangelistTreeProps {
     groups: ChangelistGroup[];
@@ -47,6 +48,7 @@ interface FileNodeData {
     isActiveChangelist?: boolean;
     isChangelistGroup?: boolean;
     showInDragMode?: boolean;
+    splitInfo?: SplitFileInfo;
 }
 
 const getDirPath = (fullPath: string): string => {
@@ -69,7 +71,7 @@ const countFiles = (node: TreeNode<FileNodeData>): number => {
     return node.children.reduce((sum, child) => sum + countFiles(child), 0);
 };
 
-const buildTree = (files: FileStatus[]): TreeNode<FileNodeData>[] => {
+const buildTree = (files: FileStatus[], splitInfoByPath: Map<string, SplitFileInfo>): TreeNode<FileNodeData>[] => {
     const root: TreeNode<FileNodeData>[] = [];
     const map = new Map<string, TreeNode<FileNodeData>>();
 
@@ -94,6 +96,7 @@ const buildTree = (files: FileStatus[]): TreeNode<FileNodeData>[] => {
                         inactive: isLast ? file.inactive : undefined,
                         hunkIds: isLast && file.status !== '?' ? file.hunks?.map(hunk => hunk.id) : undefined,
                         resolvedCandidate: isLast ? file.resolvedCandidate : undefined,
+                        splitInfo: isLast ? splitInfoByPath.get(file.path) : undefined,
                         fileCount: 0
                     },
                     children: isLast ? [] : []
@@ -201,6 +204,8 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
         collapseAll: () => treeRef.current?.collapseAll()
     }));
 
+    const splitInfoByPath = useMemo(() => buildSplitInfoByPath(groups), [groups]);
+
     const nodes = useMemo(() => {
         const result: TreeNode<FileNodeData>[] = [];
 
@@ -219,11 +224,12 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
                         hunkIds: file.status !== '?' ? file.hunks?.map(hunk => hunk.id) : undefined,
                         resolvedCandidate: file.resolvedCandidate,
                         fileCount: 1,
-                        changelistId: group.id
+                        changelistId: group.id,
+                        splitInfo: splitInfoByPath.get(file.path)
                     },
                     children: undefined
                 }))
-                : prefixNodes(buildTree(group.items), group.id, group.id);
+                : prefixNodes(buildTree(group.items, splitInfoByPath), group.id, group.id);
 
             result.push({
                 id: `__root__${group.id}`,
@@ -275,7 +281,7 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
         }
 
         return result;
-    }, [groups, changelistState.lists, viewMode, amendCommit]);
+    }, [groups, changelistState.lists, viewMode, amendCommit, splitInfoByPath]);
 
     const handleNodeClick = useCallback((node: TreeNode<FileNodeData>) => {
         if (node.data?.isFile) {
@@ -399,6 +405,7 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
 
         if (node.data?.isFile) {
             const fileIcon = getFileIcon(node.label);
+            const splitInfo = node.data.splitInfo;
             const statusClass = status === 'M' ? styles.statusM :
                 status === 'A' ? styles.statusA :
                     status === 'D' ? styles.statusD :
@@ -416,6 +423,14 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
                     <span className={`${styles.name} ${statusClass}`} style={isDeleted ? undefined : { color: statusColor }}>
                         {node.label}
                     </span>
+                    {splitInfo && (
+                        <span
+                            className={styles.splitBadge}
+                            title={t('This file has changes in {{groups}}.', { groups: splitInfo.groupNames.join(', ') })}
+                        >
+                            {t('Split')}
+                        </span>
+                    )}
                     {showPath && <span className={styles.fileDirPath}>{getDirPath(node.data.path)}</span>}
                 </div>
             );

@@ -204,6 +204,18 @@
     max-width: 50%;
 }
 
+.splitBadge {
+    flex-shrink: 0;
+    padding: 1px 5px;
+    border: 1px solid color-mix(in srgb, var(--vscode-badge-background) 55%, transparent);
+    border-radius: 3px;
+    background: color-mix(in srgb, var(--vscode-badge-background) 16%, transparent);
+    color: var(--vscode-descriptionForeground);
+    font-size: 10px;
+    line-height: 14px;
+    text-transform: uppercase;
+}
+
 .fileItemContent {
     display: flex;
     align-items: center;
