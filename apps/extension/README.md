@@ -4,6 +4,10 @@ Intelli Git brings an IntelliJ IDEA inspired Git workflow to Visual Studio Code.
 
 It provides a focused commit panel, changelist-style organization, stash tools, branch actions, Git log browsing, and AI-assisted commit message generation without replacing VS Code's built-in Git support.
 
+## Early Access
+
+Intelli Git is currently free during Early Access.
+
 ## Features
 
 - Commit panel for staged and unstaged changes

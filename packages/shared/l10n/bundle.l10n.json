@@ -317,7 +317,7 @@
     "Amend": "Amend",
     "Amend & Push": "Amend & Push",
     "Commit & Push": "Commit & Push",
-    "version.expires.warning": "This beta version will expire in {{days}} days. Please update the extension to continue using it.",
-    "version.expired.title": "Version Expired",
-    "version.expired.description": "Version Expired. Please update to the latest version to ensure the best experience."
+    "version.expires.warning": "This Early Access build will expire in {{days}} days. Please update Intelli Git to continue using it.",
+    "version.expired.title": "Early Access Build Expired",
+    "version.expired.description": "This Early Access build has expired. Please update Intelli Git to continue using it."
 }

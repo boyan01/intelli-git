@@ -2,6 +2,10 @@
 
 A VS Code extension that provides an enhanced Git experience with a webview-based UI, inspired by IntelliJ IDEA's Git integration.
 
+## Early Access
+
+Intelli Git is currently free during Early Access.
+
 ## Development
 
 ### Prerequisites

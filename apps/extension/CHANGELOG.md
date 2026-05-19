@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.0.5
+
+- Added Early Access messaging that clarifies Intelli Git is currently free.
+- Updated expiration warnings to use Early Access wording.
+- Added repository switching support for multi-root workspaces.
+- Added keyboard navigation for webview trees and Git Log filter menus.
+- Added branch log filtering, visible Git Log filter summaries, and inline Git Log details for narrow layouts.
+- Improved commit view empty states, background mode switching, and split indicators for files spread across changelists.
+- Improved branch and push workflow reliability around remotes and subdirectory merge states.
+- Simplified commit empty states by removing redundant quick actions.
+
 ## 0.0.4
 
 - Added a native commit mode menu in the commit view title bar with clear staged and changelist mode switching.
