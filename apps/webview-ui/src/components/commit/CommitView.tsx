@@ -102,7 +102,6 @@ export function CommitView({ rebaseStatus }: CommitViewProps) {
     const [expandedIds, setExpandedIds] = usePersistedState('commit.expandedIds');
     const [commitMessage, setCommitMessage] = usePersistedState('commit.message');
     const [amend, setAmend] = usePersistedState('commit.amend');
-    const [fetching, setFetching] = useState(false);
     const currentCommitMessageRef = useRef(commitMessage);
     const savedMessageRef = useRef<string | null>(null);
     const lastCommitInfoRequestRef = useRef(0);
@@ -167,22 +166,6 @@ export function CommitView({ rebaseStatus }: CommitViewProps) {
         setAmend(false);
     }, [setAmend]);
 
-    const handleFetch = useCallback(async () => {
-        if (fetching) {
-            return;
-        }
-
-        setFetching(true);
-        try {
-            await rpc.fetch();
-            rpcEvents.refresh.emit();
-        } catch (fetchError) {
-            await rpc.showErrorMessage(String(fetchError));
-        } finally {
-            setFetching(false);
-        }
-    }, [fetching]);
-
     const renderStatePanel = () => {
         if (loading && files.length === 0 && !workspaceRoot && !error) {
             return (
@@ -243,24 +226,6 @@ export function CommitView({ rebaseStatus }: CommitViewProps) {
                     detail={changelistState.mode === 'changes' && activeChangelistName
                         ? t('Active changelist: {{name}}', { name: activeChangelistName })
                         : undefined}
-                    actions={[
-                        {
-                            label: fetching ? t('Fetching...') : t('Fetch'),
-                            icon: fetching ? 'codicon-loading codicon-modifier-spin' : 'codicon-refresh',
-                            onClick: handleFetch,
-                            disabled: fetching
-                        },
-                        {
-                            label: t('Open Git Log'),
-                            icon: 'codicon-git-commit',
-                            onClick: () => void rpc.focusGitLog()
-                        },
-                        {
-                            label: t('Switch Repository...'),
-                            icon: 'codicon-repo',
-                            onClick: () => void rpc.switchRepository()
-                        }
-                    ]}
                 />
             );
         }
