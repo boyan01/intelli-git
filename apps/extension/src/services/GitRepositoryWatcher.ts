@@ -91,6 +91,28 @@ export class VSCodeGitWatcher implements vscode.Disposable {
     }
 }
 
+class CompositeGitWatcher implements vscode.Disposable {
+    private disposables: vscode.Disposable[] = [];
+    private onChangeEmitter = new vscode.EventEmitter<void>();
+
+    public readonly onChange = this.onChangeEmitter.event;
+
+    constructor(watchers: Array<vscode.Disposable & { onChange: vscode.Event<void> }>) {
+        this.disposables.push(this.onChangeEmitter);
+        for (const watcher of watchers) {
+            this.disposables.push(
+                watcher.onChange(() => this.onChangeEmitter.fire()),
+                watcher
+            );
+        }
+    }
+
+    dispose() {
+        this.disposables.forEach(d => d.dispose());
+        this.disposables = [];
+    }
+}
+
 /**
  * Fallback watcher using FileSystemWatcher.
  * Used when VS Code Git extension is not available.
@@ -102,13 +124,18 @@ export class FileSystemGitWatcher implements vscode.Disposable {
 
     public readonly onChange = this.onChangeEmitter.event;
 
-    constructor(_workspaceRoots: string[]) {
-        // Watch all files including .git directory
-        const watcher = vscode.workspace.createFileSystemWatcher('**/*');
-        watcher.onDidChange(this.handleChange);
-        watcher.onDidCreate(this.handleChange);
-        watcher.onDidDelete(this.handleChange);
-        this.disposables.push(watcher);
+    constructor(workspaceRoots: string[]) {
+        const patterns = workspaceRoots.length > 0
+            ? workspaceRoots.map(root => new vscode.RelativePattern(root, '**/*'))
+            : ['**/*'];
+
+        for (const pattern of patterns) {
+            const watcher = vscode.workspace.createFileSystemWatcher(pattern);
+            watcher.onDidChange(this.handleChange);
+            watcher.onDidCreate(this.handleChange);
+            watcher.onDidDelete(this.handleChange);
+            this.disposables.push(watcher);
+        }
 
         this.disposables.push(this.onChangeEmitter);
         logger.info('FileSystemGitWatcher initialized as fallback');
@@ -150,7 +177,8 @@ export class FileSystemGitWatcher implements vscode.Disposable {
  */
 export async function createGitWatcher(
     _context: vscode.ExtensionContext,
-    workspaceRoots: string[]
+    workspaceRoots: string[],
+    additionalRoots: string[] = []
 ): Promise<vscode.Disposable & { onChange: vscode.Event<void> }> {
     const vsCodeWatcher = new VSCodeGitWatcher();
 
@@ -158,10 +186,16 @@ export async function createGitWatcher(
     await new Promise(resolve => setTimeout(resolve, 100));
 
     if (vsCodeWatcher.isActive) {
+        if (additionalRoots.length > 0) {
+            return new CompositeGitWatcher([
+                vsCodeWatcher,
+                new FileSystemGitWatcher(additionalRoots)
+            ]);
+        }
         return vsCodeWatcher;
     }
 
     // Fallback to FileSystemWatcher
     vsCodeWatcher.dispose();
-    return new FileSystemGitWatcher(workspaceRoots);
+    return new FileSystemGitWatcher(Array.from(new Set([...workspaceRoots, ...additionalRoots])));
 }

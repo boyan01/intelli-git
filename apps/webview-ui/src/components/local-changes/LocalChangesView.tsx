@@ -191,21 +191,24 @@ export function LocalChangesView() {
                     </button>
                 </div>
                 <div className={styles.tabsRight}>
-                    {branches?.current && (
-                        isRebasing ? (
-                            <div
-                                className={`${styles.branchIndicator} ${styles.rebaseActive}`}
-                                onClick={() => rpc.pickBranch()}
-                                title={`Rebase in progress (${branches.rebaseStatus})`}
-                            >
-                                <RebaseIndicator status={branches.rebaseStatus as 'interactive' | 'merging'} />
-                            </div>
-                        ) : (
+                    {isRebasing ? (
+                        <div
+                            className={`${styles.branchIndicator} ${styles.rebaseActive}`}
+                            onClick={() => rpc.pickBranch()}
+                            title={`Rebase in progress (${branches.rebaseStatus})`}
+                        >
+                            <RebaseIndicator status={branches.rebaseStatus as 'interactive' | 'merging'} />
+                        </div>
+                    ) : (
+                        branches?.current && (
                             <div style={{ marginRight: '4px' }}>
                                 <BranchStatus
                                     current={branches.current}
                                     ahead={branches.ahead}
                                     behind={branches.behind}
+                                    repositoryKind={branches.repositoryKind}
+                                    repositoryDetached={branches.repositoryDetached}
+                                    repositoryPath={branches.repositoryPath}
                                     onPush={() => setActiveTab('push')}
                                 />
                             </div>

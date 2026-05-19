@@ -409,7 +409,7 @@
         {
           "command": "intelli-git.repository.switch",
           "when": "view == intelliGitView && intelli-git.hasMultipleRepositories",
-          "group": "1_repository@1"
+          "group": "navigation@1"
         },
         {
           "command": "intelli-git.changelistMode.staged.current",

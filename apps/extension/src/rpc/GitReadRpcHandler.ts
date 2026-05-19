@@ -45,10 +45,19 @@ export class GitReadRpcHandler {
     };
 
     getBranchInfo = async (): Promise<BranchInfo> => {
-        return await this.repositoryManager.getActiveService()?.branchRemote.getRpcBranchInfo() ?? {
+        const activeScope = this.repositoryManager.getActiveScope();
+        const branchInfo = await this.repositoryManager.getActiveService()?.branchRemote.getRpcBranchInfo() ?? {
             current: '',
             all: [],
             rebaseStatus: 'none'
+        };
+
+        return {
+            ...branchInfo,
+            current: branchInfo.current || (activeScope?.isDetached && activeScope.head ? activeScope.head.substring(0, 7) : branchInfo.current),
+            repositoryKind: activeScope?.kind,
+            repositoryDetached: activeScope?.isDetached,
+            repositoryPath: activeScope?.path
         };
     };
 

@@ -27,6 +27,7 @@
 
 .tabsRight {
     gap: 4px;
+    min-width: 0;
 }
 
 .tab {

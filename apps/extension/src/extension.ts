@@ -1,11 +1,139 @@
 import * as vscode from 'vscode';
+import * as path from 'path';
 import { CommitViewProvider, GitLogViewProvider, StashContentProvider, RevisionContentProvider } from './providers';
-import { RepositoryManager } from './services/RepositoryManager';
+import { RepositoryManager, type RepositoryScope } from './services/RepositoryManager';
 import { createGitWatcher } from './services/GitRepositoryWatcher';
 import { BranchStatusBar, GitLogStatusBar } from './ui';
 import { registerStashCommands, registerGlobalNavigationCommands, registerNavigationCommands, registerBranchCommands, registerLogCommands, registerLogFileCommands, registerChangelistCommands, registerAiCommands, registerEditorGitCommands } from './commands';
 import { logger } from './utils/logger';
 import { ChangeBlockEditorController } from './editor/ChangeBlockEditorController';
+
+interface RepositoryQuickPickItem extends vscode.QuickPickItem {
+    repo: RepositoryScope;
+}
+
+function getRepositoryKindLabel(repo: RepositoryScope): string {
+    if (repo.kind === 'worktree') {
+        return vscode.l10n.t('Worktree');
+    }
+
+    if (repo.kind === 'submodule' || repo.isSubmodule) {
+        return vscode.l10n.t('Submodule');
+    }
+
+    return vscode.l10n.t('Workspace');
+}
+
+function getRepositoryRefLabel(repo: RepositoryScope): string | undefined {
+    if (repo.branch) {
+        return repo.branch;
+    }
+
+    if (repo.isDetached && repo.head) {
+        return vscode.l10n.t('Detached at {0}', repo.head.substring(0, 7));
+    }
+
+    return undefined;
+}
+
+function createRepositoryQuickPickItem(
+    repo: RepositoryScope,
+    activeRepoPath: string | undefined,
+    openInNewWindowButton: vscode.QuickInputButton
+): RepositoryQuickPickItem {
+    const descriptionParts = [];
+    if (repo.path === activeRepoPath) {
+        descriptionParts.push(vscode.l10n.t('Current'));
+    }
+    descriptionParts.push(getRepositoryKindLabel(repo));
+    const refLabel = getRepositoryRefLabel(repo);
+    if (refLabel) {
+        descriptionParts.push(refLabel);
+    }
+
+    return {
+        label: repo.name,
+        description: descriptionParts.join(' · '),
+        detail: repo.path,
+        buttons: [openInNewWindowButton],
+        repo
+    };
+}
+
+function showRepositoryQuickPick(repositoryManager: RepositoryManager, onRepositoryChanged: () => void): void {
+    const repositories = repositoryManager.getRepositories();
+    if (repositories.length === 0) {
+        void vscode.window.showInformationMessage(vscode.l10n.t('No repositories available'));
+        return;
+    }
+
+    const activeRepoPath = repositoryManager.getActiveRepoPath();
+    const openInNewWindowButton: vscode.QuickInputButton = {
+        iconPath: new vscode.ThemeIcon('multiple-windows'),
+        tooltip: vscode.l10n.t('Open in New Window')
+    };
+    const items = repositories.map(repo => createRepositoryQuickPickItem(repo, activeRepoPath, openInNewWindowButton));
+    const activeItem = items.find(item => item.repo.path === activeRepoPath);
+    const quickPick = vscode.window.createQuickPick<RepositoryQuickPickItem>();
+    const disposables: vscode.Disposable[] = [];
+
+    quickPick.placeholder = vscode.l10n.t('Switch Repository...');
+    quickPick.matchOnDescription = true;
+    quickPick.matchOnDetail = true;
+    quickPick.items = items;
+    if (activeItem) {
+        quickPick.activeItems = [activeItem];
+    }
+
+    disposables.push(
+        quickPick.onDidAccept(() => {
+            const selected = quickPick.selectedItems[0] || quickPick.activeItems[0];
+            if (selected && selected.repo.path !== activeRepoPath && repositoryManager.setActiveRepository(selected.repo.path)) {
+                onRepositoryChanged();
+            }
+            quickPick.hide();
+        }),
+        quickPick.onDidTriggerItemButton(event => {
+            void vscode.commands.executeCommand(
+                'vscode.openFolder',
+                vscode.Uri.file(event.item.repo.path),
+                { forceNewWindow: true }
+            );
+            quickPick.hide();
+        }),
+        quickPick.onDidHide(() => {
+            for (const disposable of disposables) {
+                disposable.dispose();
+            }
+            quickPick.dispose();
+        })
+    );
+
+    quickPick.show();
+}
+
+function isSameOrDescendantPath(parentPath: string, candidatePath: string): boolean {
+    const relativePath = path.relative(parentPath, candidatePath);
+    return relativePath === '' || (!relativePath.startsWith('..') && !path.isAbsolute(relativePath));
+}
+
+function getAdditionalGitWatcherRoots(repositories: RepositoryScope[], workspaceRoots: string[]): string[] {
+    const roots = new Set<string>();
+
+    for (const repo of repositories) {
+        const isWorkspaceBacked = workspaceRoots.some(root => isSameOrDescendantPath(root, repo.workspaceRoot));
+        if (repo.kind !== 'worktree' && isWorkspaceBacked) {
+            continue;
+        }
+
+        roots.add(repo.workspaceRoot);
+        if (repo.gitDir) {
+            roots.add(repo.gitDir);
+        }
+    }
+
+    return Array.from(roots);
+}
 
 export async function activate(context: vscode.ExtensionContext) {
     logger.initLogger(context);
@@ -70,7 +198,9 @@ export async function activate(context: vscode.ExtensionContext) {
             return;
         }
 
-        const watcher = await createGitWatcher(context, folders.map(folder => folder.uri.fsPath));
+        const workspaceRoots = folders.map(folder => folder.uri.fsPath);
+        const additionalRoots = getAdditionalGitWatcherRoots(repositoryManager.getRepositories(), workspaceRoots);
+        const watcher = await createGitWatcher(context, workspaceRoots, additionalRoots);
         if (generation !== gitWatcherGeneration) {
             watcher.dispose();
             return;
@@ -189,43 +319,8 @@ export async function activate(context: vscode.ExtensionContext) {
     );
 
     context.subscriptions.push(
-        vscode.commands.registerCommand('intelli-git.repository.switch', async () => {
-            const repositories = repositoryManager.getRepositories();
-            if (repositories.length === 0) {
-                void vscode.window.showInformationMessage(vscode.l10n.t('No repositories available'));
-                return;
-            }
-
-            const activeRepoPath = repositoryManager.getActiveRepoPath();
-            const selected = await vscode.window.showQuickPick(
-                repositories.map(repo => {
-                    const descriptionParts = [];
-                    if (repo.path === activeRepoPath) {
-                        descriptionParts.push(vscode.l10n.t('Current'));
-                    }
-                    if (repo.isSubmodule) {
-                        descriptionParts.push(vscode.l10n.t('Submodule'));
-                    }
-
-                    return {
-                        label: repo.name,
-                        description: descriptionParts.join(' · '),
-                        detail: repo.path,
-                        repoPath: repo.path
-                    };
-                }),
-                {
-                    placeHolder: vscode.l10n.t('Switch Repository...')
-                }
-            );
-
-            if (!selected || selected.repoPath === activeRepoPath) {
-                return;
-            }
-
-            if (repositoryManager.setActiveRepository(selected.repoPath)) {
-                updateRepositoryContext();
-            }
+        vscode.commands.registerCommand('intelli-git.repository.switch', () => {
+            showRepositoryQuickPick(repositoryManager, updateRepositoryContext);
         })
     );
 
@@ -239,6 +334,7 @@ export async function activate(context: vscode.ExtensionContext) {
         }),
         repositoryManager.onDidChangeRepositories(() => {
             updateRepositoryContext();
+            void resetGitWatcher();
             triggerRefresh();
         })
     );

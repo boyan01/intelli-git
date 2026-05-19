@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import simpleGit from 'simple-git';
+import simpleGit, { type SimpleGit } from 'simple-git';
 import { GitService } from './GitService';
 import { InactiveChangesService } from './InactiveChangesService';
 import { ChangelistStateService } from './ChangelistStateService';
@@ -13,12 +13,34 @@ export interface RepositoryScope {
     path: string;
     workspaceRoot: string;
     gitRoot: string;
+    gitDir?: string;
     isSubmodule: boolean;
+    kind: 'workspace' | 'submodule' | 'worktree';
+    mainWorktreePath?: string;
+    branch?: string;
+    head?: string;
+    isDetached?: boolean;
 }
 
 interface RepositoryEntry {
     service: GitService;
     info: RepositoryScope;
+}
+
+interface RepositoryGitState {
+    head?: string;
+    branch?: string;
+    isDetached?: boolean;
+    gitDir?: string;
+}
+
+interface WorktreeRecord {
+    path: string;
+    head?: string;
+    branch?: string;
+    isDetached?: boolean;
+    isBare?: boolean;
+    isPrunable?: boolean;
 }
 
 function normalizeExistingPath(filePath: string): string {
@@ -64,10 +86,22 @@ export class RepositoryManager implements vscode.Disposable {
                 if (isRepo) {
                     const topLevel = await git.revparse(['--show-toplevel']);
                     const rootPath = normalizeExistingPath(topLevel.trim());
+                    const gitState = await this.readRepositoryGitState(git, rootPath);
+                    const worktreeList = await this.readWorktreeList(git, rootPath);
+                    const currentWorktreeRecord = worktreeList?.records.find(record => (
+                        record.path && normalizeExistingPath(record.path) === rootPath
+                    ));
+                    const isLinkedWorktreeRoot = Boolean(worktreeList && currentWorktreeRecord && rootPath !== worktreeList.mainWorktreePath);
                     const scope = this.createRepositoryScope({
                         workspaceRoot: folderPath,
                         gitRoot: rootPath,
-                        isSubmodule: false
+                        isSubmodule: false,
+                        kind: isLinkedWorktreeRoot ? 'worktree' : 'workspace',
+                        mainWorktreePath: isLinkedWorktreeRoot ? worktreeList?.mainWorktreePath : undefined,
+                        head: currentWorktreeRecord?.head || gitState.head,
+                        branch: currentWorktreeRecord?.branch || gitState.branch,
+                        isDetached: currentWorktreeRecord?.isDetached ?? gitState.isDetached,
+                        gitDir: gitState.gitDir
                     });
                     newRepos.set(scope.repoPath, scope);
                     if (index === 0) {
@@ -87,16 +121,27 @@ export class RepositoryManager implements vscode.Disposable {
                                 if (parts.length >= 2) {
                                     const subPath = parts[1];
                                     const absoluteSubPath = normalizeExistingPath(path.join(rootPath, subPath));
-                                    newRepos.set(absoluteSubPath, this.createRepositoryScope({
+                                    const submoduleGit = simpleGit(absoluteSubPath);
+                                    const submoduleGitState = await this.readRepositoryGitState(submoduleGit, absoluteSubPath);
+                                    const submoduleScope = this.createRepositoryScope({
                                         workspaceRoot: absoluteSubPath,
                                         gitRoot: absoluteSubPath,
-                                        isSubmodule: true
-                                    }));
+                                        isSubmodule: true,
+                                        kind: 'submodule',
+                                        ...submoduleGitState
+                                    });
+                                    newRepos.set(absoluteSubPath, submoduleScope);
                                 }
                             }
                         }
                     } catch (e) {
                         logger.error(`Failed to get submodules for ${rootPath}`, e);
+                    }
+
+                    for (const worktreeScope of await this.discoverLinkedWorktrees(git, rootPath, worktreeList)) {
+                        if (!newRepos.has(worktreeScope.repoPath)) {
+                            newRepos.set(worktreeScope.repoPath, worktreeScope);
+                        }
                     }
                 }
             } catch (e) {
@@ -150,7 +195,165 @@ export class RepositoryManager implements vscode.Disposable {
         }
     }
 
-    private createRepositoryScope(input: { workspaceRoot: string; gitRoot: string; isSubmodule: boolean }): RepositoryScope {
+    private async readRepositoryGitState(git: SimpleGit, baseDir: string): Promise<RepositoryGitState> {
+        const state: RepositoryGitState = {};
+
+        try {
+            const head = (await git.revparse(['HEAD'])).trim();
+            if (head) {
+                state.head = head;
+            }
+        } catch {
+            // An unborn repository has no HEAD commit yet.
+        }
+
+        try {
+            const branch = (await git.raw(['symbolic-ref', '--short', '-q', 'HEAD'])).trim();
+            if (branch) {
+                state.branch = branch;
+            }
+        } catch {
+            // Detached HEAD or no commits yet.
+        }
+
+        try {
+            const gitDir = (await git.revparse(['--git-dir'])).trim();
+            if (gitDir) {
+                state.gitDir = normalizeExistingPath(path.isAbsolute(gitDir) ? gitDir : path.join(baseDir, gitDir));
+            }
+        } catch {
+            // Ignore git-dir lookup failures; the repository itself was already validated.
+        }
+
+        state.isDetached = Boolean(state.head && !state.branch);
+        return state;
+    }
+
+    private parseWorktreeList(output: string): WorktreeRecord[] {
+        const records: WorktreeRecord[] = [];
+        let current: WorktreeRecord | undefined;
+
+        const finishRecord = () => {
+            if (current) {
+                records.push(current);
+                current = undefined;
+            }
+        };
+
+        for (const rawLine of output.split(/\r?\n/)) {
+            const line = rawLine.trimEnd();
+            if (!line) {
+                finishRecord();
+                continue;
+            }
+
+            if (line.startsWith('worktree ')) {
+                finishRecord();
+                current = { path: line.substring('worktree '.length) };
+                continue;
+            }
+
+            if (!current) {
+                continue;
+            }
+
+            if (line.startsWith('HEAD ')) {
+                current.head = line.substring('HEAD '.length);
+            } else if (line.startsWith('branch ')) {
+                current.branch = line.substring('branch '.length).replace(/^refs\/heads\//, '');
+            } else if (line === 'detached') {
+                current.isDetached = true;
+            } else if (line === 'bare') {
+                current.isBare = true;
+            } else if (line.startsWith('prunable')) {
+                current.isPrunable = true;
+            }
+        }
+
+        finishRecord();
+        return records;
+    }
+
+    private async readWorktreeList(git: SimpleGit, rootPath: string): Promise<{ records: WorktreeRecord[]; mainWorktreePath: string } | undefined> {
+        let output: string;
+        try {
+            output = await git.raw(['worktree', 'list', '--porcelain']);
+        } catch (e) {
+            logger.debug(`Failed to list worktrees for ${rootPath}`, e);
+            return undefined;
+        }
+
+        const records = this.parseWorktreeList(output);
+        const mainWorktreePath = records[0]?.path ? normalizeExistingPath(records[0].path) : rootPath;
+        return { records, mainWorktreePath };
+    }
+
+    private async discoverLinkedWorktrees(
+        git: SimpleGit,
+        rootPath: string,
+        worktreeList?: { records: WorktreeRecord[]; mainWorktreePath: string }
+    ): Promise<RepositoryScope[]> {
+        const list = worktreeList ?? await this.readWorktreeList(git, rootPath);
+        if (!list) {
+            return [];
+        }
+
+        const { records, mainWorktreePath } = list;
+        const scopes: RepositoryScope[] = [];
+
+        for (const record of records) {
+            if (!record.path || record.isBare || record.isPrunable) {
+                continue;
+            }
+
+            const worktreePath = normalizeExistingPath(record.path);
+            if (worktreePath === rootPath || !fs.existsSync(worktreePath)) {
+                continue;
+            }
+
+            try {
+                const worktreeGit = simpleGit(worktreePath);
+                if (!await worktreeGit.checkIsRepo()) {
+                    continue;
+                }
+
+                const topLevel = normalizeExistingPath((await worktreeGit.revparse(['--show-toplevel'])).trim());
+                if (topLevel !== worktreePath) {
+                    continue;
+                }
+
+                const gitState = await this.readRepositoryGitState(worktreeGit, worktreePath);
+                const kind: RepositoryScope['kind'] = worktreePath === mainWorktreePath ? 'workspace' : 'worktree';
+                scopes.push(this.createRepositoryScope({
+                    workspaceRoot: worktreePath,
+                    gitRoot: worktreePath,
+                    isSubmodule: false,
+                    kind,
+                    mainWorktreePath: kind === 'worktree' ? mainWorktreePath : undefined,
+                    head: record.head || gitState.head,
+                    branch: record.branch || gitState.branch,
+                    isDetached: record.isDetached ?? gitState.isDetached,
+                    gitDir: gitState.gitDir
+                }));
+            } catch (e) {
+                logger.debug(`Ignoring unavailable worktree ${worktreePath}`, e);
+            }
+        }
+
+        return scopes;
+    }
+
+    private createRepositoryScope(input: {
+        workspaceRoot: string;
+        gitRoot: string;
+        gitDir?: string;
+        isSubmodule: boolean;
+        kind: RepositoryScope['kind'];
+        mainWorktreePath?: string;
+        branch?: string;
+        head?: string;
+        isDetached?: boolean;
+    }): RepositoryScope {
         const repoPath = normalizeExistingPath(input.workspaceRoot);
         const gitRoot = normalizeExistingPath(input.gitRoot);
         return {
@@ -159,7 +362,13 @@ export class RepositoryManager implements vscode.Disposable {
             path: repoPath,
             workspaceRoot: repoPath,
             gitRoot,
-            isSubmodule: input.isSubmodule
+            gitDir: input.gitDir,
+            isSubmodule: input.isSubmodule,
+            kind: input.kind,
+            mainWorktreePath: input.mainWorktreePath,
+            branch: input.branch,
+            head: input.head,
+            isDetached: input.isDetached
         };
     }
 
@@ -169,7 +378,13 @@ export class RepositoryManager implements vscode.Disposable {
             && a.path === b.path
             && a.workspaceRoot === b.workspaceRoot
             && a.gitRoot === b.gitRoot
-            && a.isSubmodule === b.isSubmodule;
+            && a.gitDir === b.gitDir
+            && a.isSubmodule === b.isSubmodule
+            && a.kind === b.kind
+            && a.mainWorktreePath === b.mainWorktreePath
+            && a.branch === b.branch
+            && a.head === b.head
+            && a.isDetached === b.isDetached;
     }
 
     public getActiveService(): GitService | undefined {
@@ -199,10 +414,15 @@ export class RepositoryManager implements vscode.Disposable {
 
     public getRepositories(): RepositoryScope[] {
         const repos = Array.from(this.repositories.values()).map(entry => entry.info);
-        // Sort: main repos first, then submodules, then alphabetically
+        const kindOrder: Record<RepositoryScope['kind'], number> = {
+            workspace: 0,
+            worktree: 1,
+            submodule: 2
+        };
+
         return repos.sort((a, b) => {
-            if (a.isSubmodule !== b.isSubmodule) {
-                return a.isSubmodule ? 1 : -1;
+            if (a.kind !== b.kind) {
+                return kindOrder[a.kind] - kindOrder[b.kind];
             }
             return a.name.localeCompare(b.name);
         });

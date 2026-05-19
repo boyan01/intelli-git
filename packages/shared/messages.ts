@@ -80,6 +80,9 @@ export interface BranchInfo {
     ahead?: number;
     behind?: number;
     rebaseStatus?: 'none' | 'interactive' | 'merging';
+    repositoryKind?: RepositoryInfo['kind'];
+    repositoryDetached?: boolean;
+    repositoryPath?: string;
 }
 
 export interface StashItem {
@@ -157,7 +160,13 @@ export interface RepositoryInfo {
     repoPath: string;
     workspaceRoot: string;
     gitRoot: string;
+    gitDir?: string;
     isSubmodule: boolean;
+    kind?: 'workspace' | 'submodule' | 'worktree';
+    mainWorktreePath?: string;
+    branch?: string;
+    head?: string;
+    isDetached?: boolean;
 }
 
 export interface ExtensionMethods {

@@ -1,5 +1,6 @@
 let changelistMode = 'staged';
 const executedCommands: Array<{ command: string; args: unknown[] }> = [];
+let workspaceFoldersValue: Array<{ uri: MockUri; name: string; index: number }> | undefined;
 
 export class EventEmitter<T> {
     private listeners = new Set<(event: T) => unknown>();
@@ -29,6 +30,12 @@ export const ConfigurationTarget = {
 } as const;
 
 export const workspace = {
+    get workspaceFolders() {
+        return workspaceFoldersValue;
+    },
+    onDidChangeWorkspaceFolders(listener: () => unknown) {
+        return workspaceFolderEmitter.event(listener);
+    },
     getConfiguration(section?: string) {
         return {
             get<T>(key: string, defaultValue: T): T {
@@ -43,17 +50,35 @@ export const workspace = {
                 }
             }
         };
+    },
+    createFileSystemWatcher() {
+        return {
+            onDidChange() {
+                return { dispose() { } };
+            },
+            onDidCreate() {
+                return { dispose() { } };
+            },
+            onDidDelete() {
+                return { dispose() { } };
+            },
+            dispose() { }
+        };
     }
 };
+
+const workspaceFolderEmitter = new EventEmitter<void>();
 
 class MockUri {
     public readonly path: string;
     public readonly query: string;
+    public readonly fsPath: string;
 
-    constructor(public readonly value: string, parts?: { path?: string; query?: string }) {
+    constructor(public readonly value: string, parts?: { path?: string; query?: string; fsPath?: string }) {
         const [withoutQuery, query = ''] = value.split('?');
         this.path = parts?.path ?? withoutQuery.replace(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\/[^/]*/, '');
         this.query = parts?.query ?? query;
+        this.fsPath = parts?.fsPath ?? this.path;
     }
 
     public static parse(value: string): MockUri {
@@ -61,7 +86,10 @@ class MockUri {
     }
 
     public static file(value: string): MockUri {
-        return new MockUri(`file://${value}`);
+        return new MockUri(`file://${value}`, {
+            path: value,
+            fsPath: value
+        });
     }
 
     public with(parts: { query?: string }): MockUri {
@@ -79,6 +107,13 @@ class MockUri {
 }
 
 export const Uri = MockUri;
+
+export class RelativePattern {
+    constructor(
+        public readonly base: string,
+        public readonly pattern: string
+    ) { }
+}
 
 export const commands = {
     async executeCommand(command: string, ...args: unknown[]): Promise<void> {
@@ -110,4 +145,13 @@ export function __getExecutedCommands(): Array<{ command: string; args: unknown[
 
 export function __resetExecutedCommands(): void {
     executedCommands.length = 0;
+}
+
+export function __setWorkspaceFolders(paths: string[] | undefined): void {
+    workspaceFoldersValue = paths?.map((folderPath, index) => ({
+        uri: MockUri.file(folderPath),
+        name: folderPath.split(/[\\/]/).filter(Boolean).pop() || folderPath,
+        index
+    }));
+    workspaceFolderEmitter.fire();
 }
