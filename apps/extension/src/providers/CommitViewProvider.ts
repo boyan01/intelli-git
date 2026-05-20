@@ -25,6 +25,13 @@ export class CommitViewProvider extends BaseWebviewProvider implements vscode.We
         }
     }
 
+    public toggleWorktreesDrawer() {
+        if (this._view) {
+            this._view.show();
+            this._rpc?.proxy.toggleWorktreesDrawer();
+        }
+    }
+
     protected getInitialRoute(): string | undefined {
         return undefined;
     }

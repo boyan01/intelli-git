@@ -13,7 +13,15 @@ const originalPackageJson = baseVersion === packageData.version
 const baseContentUrl = process.env.VSCE_BASE_CONTENT_URL || 'https://raw.githubusercontent.com/boyan01/intelli-git/main/apps/extension';
 const baseImagesUrl = process.env.VSCE_BASE_IMAGES_URL || 'https://boyan01.github.io/intelli_git';
 const shouldInstall = process.argv.includes('--install');
-const vscodeCli = process.env.VSCODE_CLI || 'code';
+let vscodeCli = process.env.VSCODE_CLI;
+if (!vscodeCli) {
+    // Dynamically detect the CLI path when running inside Antigravity IDE's integrated terminal
+    if (process.env.ANTIGRAVITY_EDITOR_APP_ROOT) {
+        vscodeCli = path.join(process.env.ANTIGRAVITY_EDITOR_APP_ROOT, 'bin/antigravity-ide');
+    } else {
+        vscodeCli = 'code';
+    }
+}
 
 function formatDatePart(value) {
     return String(value).padStart(2, '0');

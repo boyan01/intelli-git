@@ -7,10 +7,11 @@ import { usePersistedState } from '../../hooks/usePersistedState';
 import { useRpcData } from '../../hooks/useRpcData';
 import { rpc, rpcEvents } from '../../lib/rpc_client';
 import { useVersionCheck } from '../../hooks/useVersionCheck';
-import type { BranchInfo } from '@shared/messages';
+import type { BranchInfo, WorktreeInfo } from '@shared/messages';
 import { BranchStatus } from '../common/BranchStatus';
 import { VersionCheckBanner } from '../common/VersionCheckBanner';
 import { VersionExpiredPanel } from '../common/VersionExpiredPanel';
+import { WorktreeDrawer } from './WorktreeDrawer';
 import styles from './LocalChangesView.module.css';
 
 const defaultBranchInfo: BranchInfo = {
@@ -61,10 +62,15 @@ export function LocalChangesView() {
     const [persistedTab, setPersistedTab] = usePersistedState('commit.activeTab');
     const [tabTimestamp, setTabTimestamp] = usePersistedState('commit.activeTabTimestamp');
     const loadBranchInfo = useCallback(() => rpc.getBranchInfo(), []);
+    const loadWorktrees = useCallback(() => rpc.getWorktrees(), []);
     const { data: branches } = useRpcData(loadBranchInfo, {
         initialValue: defaultBranchInfo,
         cacheKey: 'commit.branchInfo'
     });
+    const { data: worktrees, loading: worktreesLoading } = useRpcData(loadWorktrees, {
+        initialValue: [] as WorktreeInfo[]
+    });
+    const [worktreeDrawerOpen, setWorktreeDrawerOpen] = useState(false);
 
     // Determine initial tab: use persisted value only if set within 10 seconds
     const [activeTab, setActiveTabState] = useState<'commit' | 'stash' | 'push'>(() => {
@@ -136,6 +142,12 @@ export function LocalChangesView() {
         });
     }, [setActiveTab]);
 
+    useEffect(() => {
+        return rpcEvents.toggleWorktreesDrawer.subscribe(() => {
+            setWorktreeDrawerOpen(open => !open);
+        });
+    }, []);
+
     const isRebasing = branches.rebaseStatus && branches.rebaseStatus !== 'none';
     const { isExpired } = useVersionCheck();
 
@@ -150,6 +162,12 @@ export function LocalChangesView() {
     return (
         <div className={styles.container}>
             <VersionCheckBanner />
+            <WorktreeDrawer
+                open={worktreeDrawerOpen}
+                worktrees={worktrees}
+                loading={worktreesLoading}
+                onClose={() => setWorktreeDrawerOpen(false)}
+            />
             <div className={styles.headerTabs}>
                 <div className={styles.tabsLeft}>
                     <div

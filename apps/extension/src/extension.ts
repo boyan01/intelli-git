@@ -4,7 +4,7 @@ import { CommitViewProvider, GitLogViewProvider, StashContentProvider, RevisionC
 import { RepositoryManager, type RepositoryScope } from './services/RepositoryManager';
 import { createGitWatcher } from './services/GitRepositoryWatcher';
 import { BranchStatusBar, GitLogStatusBar } from './ui';
-import { registerStashCommands, registerGlobalNavigationCommands, registerNavigationCommands, registerBranchCommands, registerLogCommands, registerLogFileCommands, registerChangelistCommands, registerAiCommands, registerEditorGitCommands } from './commands';
+import { registerStashCommands, registerGlobalNavigationCommands, registerNavigationCommands, registerWorktreeCommands, registerBranchCommands, registerLogCommands, registerLogFileCommands, registerChangelistCommands, registerAiCommands, registerEditorGitCommands } from './commands';
 import { logger } from './utils/logger';
 import { ChangeBlockEditorController } from './editor/ChangeBlockEditorController';
 
@@ -61,7 +61,7 @@ function createRepositoryQuickPickItem(
 }
 
 function showRepositoryQuickPick(repositoryManager: RepositoryManager, onRepositoryChanged: () => void): void {
-    const repositories = repositoryManager.getRepositories();
+    const repositories = repositoryManager.getRepositories().filter(repo => repo.kind !== 'worktree');
     if (repositories.length === 0) {
         void vscode.window.showInformationMessage(vscode.l10n.t('No repositories available'));
         return;
@@ -216,7 +216,7 @@ export async function activate(context: vscode.ExtensionContext) {
     };
 
     const updateRepositoryContext = () => {
-        const repositories = repositoryManager.getRepositories();
+        const repositories = repositoryManager.getRepositories().filter(repo => repo.kind !== 'worktree');
         void vscode.commands.executeCommand('setContext', 'intelli-git.hasMultipleRepositories', repositories.length > 1);
     };
 
@@ -231,6 +231,20 @@ export async function activate(context: vscode.ExtensionContext) {
         void vscode.commands.executeCommand('setContext', 'intelli-git.changelistMode', mode);
     };
 
+    const updateWorktreesContext = async () => {
+        const gitService = repositoryManager.getActiveService();
+        if (!gitService) {
+            void vscode.commands.executeCommand('setContext', 'intelli-git.hasMultipleWorktrees', false);
+            return;
+        }
+        try {
+            const worktrees = await gitService.branchRemote.getWorktrees(repositoryManager.getActiveRepoPath());
+            void vscode.commands.executeCommand('setContext', 'intelli-git.hasMultipleWorktrees', worktrees.length > 1);
+        } catch {
+            void vscode.commands.executeCommand('setContext', 'intelli-git.hasMultipleWorktrees', false);
+        }
+    };
+
     const triggerRefresh = () => {
         provider.rpc?.refresh();
         gitLogProvider.rpc?.refresh();
@@ -238,6 +252,7 @@ export async function activate(context: vscode.ExtensionContext) {
         gitLogStatusBar?.update();
         changeBlockEditorController?.refresh();
         void updateRemoteProviderContext();
+        void updateWorktreesContext();
     };
 
     const bindActiveRepository = () => {
@@ -250,6 +265,7 @@ export async function activate(context: vscode.ExtensionContext) {
             updateRepositoryContext();
             void updateRemoteProviderContext();
             updateChangelistModeContext();
+            void updateWorktreesContext();
             return;
         }
 
@@ -263,6 +279,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
         registerStashCommands(repoContext, gitService, provider);
         registerNavigationCommands(repoContext, branchStatusBar, provider);
+        registerWorktreeCommands(repoContext, gitService, repositoryManager, provider);
         registerBranchCommands(repoContext, gitService, gitLogProvider);
         registerLogCommands(repoContext, gitService);
         registerLogFileCommands(repoContext, gitService);
@@ -279,6 +296,7 @@ export async function activate(context: vscode.ExtensionContext) {
         updateRepositoryContext();
         void updateRemoteProviderContext();
         updateChangelistModeContext();
+        void updateWorktreesContext();
     };
 
     // Register content providers

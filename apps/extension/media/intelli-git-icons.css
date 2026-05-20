@@ -1,0 +1,33 @@
+@font-face {
+    font-family: "IntelliGitIcons";
+    src: url("../resources/intelli-git-icons.woff") format("woff");
+    font-weight: normal;
+    font-style: normal;
+}
+
+.intelli-git-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-family: "IntelliGitIcons";
+    font-size: 16px;
+    font-style: normal;
+    font-weight: normal;
+    line-height: 1;
+    speak: never;
+    text-rendering: auto;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+.intelli-git-icon-worktree::before {
+    content: "\E001";
+}
+
+.intelli-git-icon-broom::before {
+    content: "\E002";
+}
+
+.intelli-git-icon-logo::before {
+    content: "\E003";
+}

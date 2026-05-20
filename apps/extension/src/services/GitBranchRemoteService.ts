@@ -1,7 +1,7 @@
-import type { SimpleGit } from 'simple-git';
+import simpleGit, { type SimpleGit } from 'simple-git';
 import * as fs from 'fs';
 import * as path from 'path';
-import type { BranchInfo, BranchListData, CommitDetails, CommitFile, PushCommitsData, PushInitState } from '@shared/messages';
+import type { BranchInfo, BranchListData, CommitDetails, CommitFile, PushCommitsData, PushInitState, WorktreeInfo } from '@shared/messages';
 import { logger } from '../utils/logger';
 
 const GIT_LOG_RECORD_SEPARATOR = '\x1e';
@@ -15,6 +15,22 @@ export interface GitBranchRemoteServiceOptions {
     withTemporaryStash: (operationName: string, operation: () => Promise<void>) => Promise<void>;
     createEditorGit: (envOverrides: NodeJS.ProcessEnv) => SimpleGit;
     getCommitFiles: (hash: string) => Promise<CommitFile[]>;
+}
+
+export interface WorktreeBranchUsage {
+    branch: string;
+    path: string;
+    pathExists: boolean;
+    isPrunable: boolean;
+}
+
+interface WorktreeRecord {
+    path: string;
+    head?: string;
+    branch?: string;
+    isDetached?: boolean;
+    isBare?: boolean;
+    isPrunable?: boolean;
 }
 
 function getGitHubRepositoryUrl(remoteUrl: string): string | undefined {
@@ -45,8 +61,159 @@ function getGitHubRepositoryUrl(remoteUrl: string): string | undefined {
     }
 }
 
+function normalizePath(filePath: string): string {
+    try {
+        return path.normalize(fs.realpathSync(filePath));
+    } catch {
+        return path.normalize(filePath);
+    }
+}
+
+function parseWorktreeList(output: string): WorktreeRecord[] {
+    const records: WorktreeRecord[] = [];
+    let current: WorktreeRecord | undefined;
+
+    const finishRecord = () => {
+        if (current?.path) {
+            records.push(current);
+        }
+        current = undefined;
+    };
+
+    for (const line of output.split(/\r?\n/)) {
+        if (line.startsWith('worktree ')) {
+            finishRecord();
+            current = { path: line.substring('worktree '.length) };
+            continue;
+        }
+
+        if (!current) {
+            continue;
+        }
+
+        if (line.startsWith('branch ')) {
+            current.branch = line.substring('branch '.length).replace(/^refs\/heads\//, '');
+        } else if (line.startsWith('HEAD ')) {
+            current.head = line.substring('HEAD '.length);
+        } else if (line === 'detached') {
+            current.isDetached = true;
+        } else if (line === 'bare') {
+            current.isBare = true;
+        } else if (line.startsWith('prunable')) {
+            current.isPrunable = true;
+        }
+    }
+
+    finishRecord();
+    return records;
+}
+
+function parseWorktreeCheckoutError(error: unknown): { branch: string; path: string } | undefined {
+    const match = String(error).match(/fatal:\s+'([^']+)'\s+is already used by worktree at '([^']+)'/);
+    if (!match) {
+        return undefined;
+    }
+
+    return {
+        branch: match[1],
+        path: match[2]
+    };
+}
+
 export class GitBranchRemoteService {
     constructor(private readonly options: GitBranchRemoteServiceOptions) { }
+
+    public async getWorktreeBranchUsage(branchName: string): Promise<WorktreeBranchUsage | undefined> {
+        const records = await this.readWorktreeRecords();
+        const currentGitRoot = normalizePath(this.options.gitRoot);
+        const record = records.find(item => (
+            !item.isBare &&
+            item.branch === branchName &&
+            normalizePath(item.path) !== currentGitRoot
+        ));
+
+        if (!record) {
+            return undefined;
+        }
+
+        return this.toWorktreeBranchUsage(branchName, record.path, Boolean(record.isPrunable));
+    }
+
+    public async resolveWorktreeBranchUsage(branchName: string, error: unknown): Promise<WorktreeBranchUsage | undefined> {
+        try {
+            const usage = await this.getWorktreeBranchUsage(branchName);
+            if (usage) {
+                return usage;
+            }
+        } catch (e) {
+            logger.debug(`Failed to inspect worktree usage for branch ${branchName}`, e);
+        }
+
+        const parsed = parseWorktreeCheckoutError(error);
+        if (!parsed || parsed.branch !== branchName) {
+            return undefined;
+        }
+
+        return this.toWorktreeBranchUsage(parsed.branch, parsed.path, false);
+    }
+
+    public async pruneWorktrees(): Promise<void> {
+        await this.options.git.raw(['worktree', 'prune']);
+        this.options.notifyChanged();
+    }
+
+    public async getWorktrees(activeRepositoryPath?: string): Promise<WorktreeInfo[]> {
+        const records = await this.readWorktreeRecords();
+        const currentGitRoot = normalizePath(this.options.gitRoot);
+        const activePath = activeRepositoryPath ? normalizePath(activeRepositoryPath) : currentGitRoot;
+        const worktrees: WorktreeInfo[] = [];
+
+        for (const record of records) {
+            if (record.isBare) {
+                continue;
+            }
+
+            const worktreePath = normalizePath(record.path);
+            const pathExists = fs.existsSync(worktreePath);
+            worktrees.push({
+                path: worktreePath,
+                branch: record.branch,
+                head: record.head,
+                isDetached: Boolean(record.isDetached),
+                isCurrent: worktreePath === currentGitRoot,
+                isActiveRepository: worktreePath === activePath,
+                pathExists,
+                isPrunable: Boolean(record.isPrunable),
+                isDirty: pathExists ? await this.isWorktreeDirty(worktreePath) : false
+            });
+        }
+
+        return worktrees;
+    }
+
+    public async removeWorktree(worktreePath: string, force: boolean = false): Promise<void> {
+        const normalizedPath = normalizePath(worktreePath);
+        if (normalizedPath === normalizePath(this.options.gitRoot)) {
+            throw new Error('Cannot remove the current worktree.');
+        }
+
+        if (!fs.existsSync(normalizedPath)) {
+            throw new Error('Cannot remove a missing worktree. Prune stale worktrees instead.');
+        }
+
+        if (!force && await this.isWorktreeDirty(normalizedPath)) {
+            throw new Error('Cannot remove a worktree with local changes.');
+        }
+
+        const args = ['worktree', 'remove'];
+        if (force) {
+            args.push('--force');
+        }
+        args.push(normalizedPath);
+
+        await this.options.git.raw(args);
+        this.options.notifyChanged();
+    }
 
     public async getBranches(): Promise<BranchInfo> {
         try {
@@ -71,6 +238,34 @@ export class GitBranchRemoteService {
         await this.options.withTemporaryStash(`switch branch ${branchName}`, async () => {
             await this.options.git.checkout(branchName);
         });
+    }
+
+    private toWorktreeBranchUsage(branch: string, worktreePath: string, isPrunable: boolean): WorktreeBranchUsage {
+        return {
+            branch,
+            path: normalizePath(worktreePath),
+            pathExists: fs.existsSync(worktreePath),
+            isPrunable
+        };
+    }
+
+    private async readWorktreeRecords(): Promise<WorktreeRecord[]> {
+        const output = await this.options.git.raw(['worktree', 'list', '--porcelain']);
+        return parseWorktreeList(output);
+    }
+
+    private async isWorktreeDirty(worktreePath: string): Promise<boolean> {
+        try {
+            const git = simpleGit(worktreePath);
+            if (!await git.checkIsRepo()) {
+                return false;
+            }
+            const status = await git.status();
+            return status.files.length > 0;
+        } catch (e) {
+            logger.debug(`Failed to inspect worktree status for ${worktreePath}`, e);
+            return false;
+        }
     }
 
     public async push(remote: string, branch: string, options?: { noVerify?: boolean }): Promise<void> {

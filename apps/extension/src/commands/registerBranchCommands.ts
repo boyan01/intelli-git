@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { GitService } from '../services/GitService';
 import { GitLogViewProvider } from '../providers/GitLogViewProvider';
+import { handleCheckoutWorktreeConflict } from '../ui/checkoutWorktreeConflict';
 
 export function registerBranchCommands(
     context: vscode.ExtensionContext,
@@ -43,9 +44,10 @@ export function registerBranchCommands(
         vscode.commands.registerCommand('intelli-git.branch.checkout', async (arg) => {
             const branch = getBranchName(arg);
             if (!branch) return;
+            const isRemote = arg && arg.webviewSection === 'remoteBranch';
 
-            try {
-                if (arg && arg.webviewSection === 'remoteBranch') {
+            const checkout = async () => {
+                if (isRemote) {
                     // For remote branches, use logic to create tracking branch or checkout detached
                     await gitService.branchRemote.checkoutRemoteBranch(branch); // branch here is full e.g. origin/main
                 } else {
@@ -53,7 +55,20 @@ export function registerBranchCommands(
                     await gitService.branchRemote.switchBranch(branch);
                 }
                 vscode.window.showInformationMessage(vscode.l10n.t('Checked out {0}', branch));
+            };
+
+            try {
+                await checkout();
             } catch (error: any) {
+                if (await handleCheckoutWorktreeConflict({
+                    gitService,
+                    branch,
+                    isRemote,
+                    error,
+                    retry: checkout
+                })) {
+                    return;
+                }
                 vscode.window.showErrorMessage(vscode.l10n.t('Failed to checkout {0}: {1}', branch, error.message));
             }
         })

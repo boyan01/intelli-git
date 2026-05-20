@@ -1,0 +1,20 @@
+[
+  {
+    "name": "worktree",
+    "id": "intelli-git-worktree",
+    "codepoint": "E001",
+    "description": "Intelli Git worktree icon"
+  },
+  {
+    "name": "broom",
+    "id": "intelli-git-broom",
+    "codepoint": "E002",
+    "description": "Intelli Git prune stale worktrees icon"
+  },
+  {
+    "name": "logo",
+    "id": "intelli-git-logo",
+    "codepoint": "E003",
+    "description": "Intelli Git logo icon"
+  }
+]

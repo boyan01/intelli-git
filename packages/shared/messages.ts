@@ -169,10 +169,28 @@ export interface RepositoryInfo {
     isDetached?: boolean;
 }
 
+export interface WorktreeInfo {
+    path: string;
+    branch?: string;
+    head?: string;
+    isDetached?: boolean;
+    isCurrent: boolean;
+    isActiveRepository: boolean;
+    pathExists: boolean;
+    isPrunable: boolean;
+    isDirty: boolean;
+}
+
 export interface ExtensionMethods {
     getRepositories: () => Promise<RepositoryInfo[]>;
     getActiveRepository: () => Promise<string | undefined>;
     setActiveRepository: (repoPath: string) => Promise<boolean>;
+    getWorktrees: () => Promise<WorktreeInfo[]>;
+    setActiveWorktree: (path: string) => Promise<boolean>;
+    openWorktree: (path: string) => Promise<void>;
+    revealWorktree: (path: string) => Promise<void>;
+    pruneWorktrees: () => Promise<void>;
+    removeWorktree: (path: string, force?: boolean) => Promise<void>;
     log(params: { message: string; type?: 'info' | 'error' | 'warn' | 'debug' }): Promise<void>;
     getPushInitState: () => Promise<PushInitState>;
     getRemoteBranches: (remote: string) => Promise<string[]>;
@@ -261,6 +279,7 @@ export interface WebviewMethods {
     filterLogByBranch: (params: { branch: string }) => void;
     refresh: () => void;
     switchTab: (tab: 'commit' | 'stash' | 'push') => void;
+    toggleWorktreesDrawer: () => void;
 }
 
 export interface LocalBranchInfo {

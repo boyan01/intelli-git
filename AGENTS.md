@@ -103,6 +103,12 @@ Technical terms, code identifiers, file paths, commands, and source-level string
 - 与现有 UI 语言集成时，颜色和主题优先使用 VS Code theme variables。
 - 保持当前 React + Vite 结构，不要随意引入新的 frontend stack。
 
+### Webview Selectable Lists
+- Webview 中任何 tree-like / list-like selectable rows，例如 worktree drawer、branch list、changelist tree、repository/workspace list，优先使用 `BasicTreeView` 承载 hover、selected、focused、keyboard focus、context menu focus 行为。
+- 不要为这类 row 另写 ad hoc button-row selection styles；内容组件只负责 label、icon、trailing metadata 的排版。
+- Hover / selected / focused 必须沿用 VS Code list token：`--vscode-list-hoverBackground`、`--vscode-list-inactiveSelectionBackground`、`--vscode-list-activeSelectionBackground`、`--vscode-list-focusOutline`。
+- `selected` 表示当前持久选中的业务项，例如 active worktree 或 active file；`focused` 表示键盘/鼠标刚聚焦的 node。点击 row 应移动 focus，右键 row 应先 focus 该 node 再打开原生 VS Code webview context menu。
+
 ### Backend (Extension)
 - 功能逻辑在合适的情况下放入 service classes。
 - 使用 `async/await`。

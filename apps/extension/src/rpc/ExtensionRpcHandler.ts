@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
+import * as fs from 'fs';
 import { RpcPeer } from '@shared/rpc';
 import type { WebviewMethods, ExtensionMethods, FileStatus, ChangelistFileSelection, ChangelistState, GitLogRevealRequest } from '@shared/messages';
 import { GitService } from '../services/GitService';
@@ -17,6 +18,15 @@ import { createRevisionContentUri, createStashContentUri } from '../utils/reposi
 import { ChangelistOperations, createDefaultRefreshDecorations } from '../operations/ChangelistOperations';
 import { GitReadRpcHandler } from './GitReadRpcHandler';
 import { ChangelistRpcHandler } from './ChangelistRpcHandler';
+import { handleCheckoutWorktreeConflict } from '../ui/checkoutWorktreeConflict';
+
+function normalizeExistingPath(filePath: string): string {
+    try {
+        return path.normalize(fs.realpathSync(filePath));
+    } catch {
+        return path.normalize(filePath);
+    }
+}
 
 export interface ExtensionRpcHandlerOptions {
     context: vscode.ExtensionContext;
@@ -125,12 +135,51 @@ export class ExtensionRpcHandler {
         return this.repositoryManager.setActiveRepository(repoPath);
     };
 
+    getWorktrees = async () => {
+        const service = this.repositoryManager.getActiveService();
+        if (!service) {
+            return [];
+        }
+        return service.branchRemote.getWorktrees(this.repositoryManager.getActiveRepoPath());
+    };
+
+    setActiveWorktree = async (worktreePath: string) => {
+        const normalizedPath = normalizeExistingPath(worktreePath);
+        const repo = this.repositoryManager.getRepositories().find(item => normalizeExistingPath(item.repoPath) === normalizedPath);
+        if (!repo) {
+            return false;
+        }
+        return this.repositoryManager.setActiveRepository(repo.repoPath);
+    };
+
+    openWorktree = async (worktreePath: string) => {
+        await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(worktreePath), { forceNewWindow: true });
+    };
+
+    revealWorktree = async (worktreePath: string) => {
+        await vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(worktreePath));
+    };
+
+    pruneWorktrees = async () => {
+        await this.gitService.branchRemote.pruneWorktrees();
+    };
+
+    removeWorktree = async (worktreePath: string, force?: boolean) => {
+        await this.gitService.branchRemote.removeWorktree(worktreePath, force);
+    };
+
     registerAll(rpc: RpcPeer<WebviewMethods, ExtensionMethods>) {
         rpc.registerAll(
             {
                 getRepositories: this.getRepositories,
                 getActiveRepository: this.getActiveRepository,
                 setActiveRepository: this.setActiveRepository,
+                getWorktrees: this.getWorktrees,
+                setActiveWorktree: this.setActiveWorktree,
+                openWorktree: this.openWorktree,
+                revealWorktree: this.revealWorktree,
+                pruneWorktrees: this.pruneWorktrees,
+                removeWorktree: this.removeWorktree,
                 log: this.log,
                 getPushInitState: this.gitReadRpcHandler.getPushInitState,
                 getRemoteBranches: this.gitReadRpcHandler.getRemoteBranches,
@@ -685,6 +734,17 @@ export class ExtensionRpcHandler {
             await this.gitService.branchRemote.switchBranch(branch);
 
         } catch (e) {
+            if (await handleCheckoutWorktreeConflict({
+                gitService: this.gitService,
+                branch,
+                error: e,
+                retry: async () => {
+                    await this.gitService.branchRemote.switchBranch(branch);
+                    vscode.commands.executeCommand('intelli-git.refresh');
+                }
+            })) {
+                return;
+            }
             vscode.window.showErrorMessage(i18n.t('extension.switchBranchFailed', `${e}`));
         }
     };

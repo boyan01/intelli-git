@@ -26,6 +26,9 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
     const styleUri = webview.asWebviewUri(
         vscode.Uri.joinPath(extensionUri, 'out', 'webview', 'index.css')
     );
+    const iconStyleUri = webview.asWebviewUri(
+        vscode.Uri.joinPath(extensionUri, 'media', 'intelli-git-icons.css')
+    );
 
     const language = vscode.env.language;
     const routeScript = `
@@ -40,6 +43,7 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource}; font-src ${webview.cspSource}; script-src 'nonce-${nonce}';">
+    <link href="${iconStyleUri}" rel="stylesheet">
     <link href="${styleUri}" rel="stylesheet">
     <title>${title}</title>
 </head>

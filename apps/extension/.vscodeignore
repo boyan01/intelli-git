@@ -23,6 +23,7 @@ tsconfig.json
 eslint.config.mjs
 eslint.config.cjs
 scripts/**
+resources/icons/**
 
 # Webview node_modules (build artifacts are in out/webview)
 webview-ui/node_modules/**

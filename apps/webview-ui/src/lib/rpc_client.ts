@@ -24,6 +24,7 @@ export const rpcEvents = {
     refresh: new EventStream<void>(),
     clearGitLogFilters: new EventStream<'all' | 'branch'>(),
     switchTab: new EventStream<'commit' | 'stash' | 'push'>(),
+    toggleWorktreesDrawer: new EventStream<void>(),
 };
 
 const _rpc = new RpcPeer<ExtensionMethods, WebviewMethods>(
@@ -50,6 +51,7 @@ _rpc.registerAll({
     filterLogByBranch: (params) => rpcEvents.filterLogByBranch.emit(params),
     refresh: () => rpcEvents.refresh.emit(),
     switchTab: (tab) => rpcEvents.switchTab.emit(tab),
+    toggleWorktreesDrawer: () => rpcEvents.toggleWorktreesDrawer.emit(),
 });
 
 window.addEventListener('message', (event) => {

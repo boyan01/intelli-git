@@ -13,7 +13,8 @@ export const WEBVIEW_CONTEXT_SECTIONS = [
     'changelistFolder',
     'changelistFile',
     'changelistHunk',
-    'changelistBackground'
+    'changelistBackground',
+    'worktreeItem'
 ] as const;
 
 export type WebviewContextSection = typeof WEBVIEW_CONTEXT_SECTIONS[number];
@@ -118,6 +119,18 @@ export interface ChangelistBackgroundContext extends BaseWebviewContext {
     preventDefaultContextMenuItems: true;
 }
 
+export interface WorktreeItemContext extends BaseWebviewContext {
+    webviewSection: 'worktreeItem';
+    path: string;
+    branch?: string;
+    pathExists: boolean;
+    isCurrent: boolean;
+    isActiveRepository: boolean;
+    isDirty: boolean;
+    isPrunable: boolean;
+    preventDefaultContextMenuItems: true;
+}
+
 export type WebviewContextPayload =
     | StashItemContext
     | BranchContext
@@ -128,4 +141,5 @@ export type WebviewContextPayload =
     | ChangelistFolderContext
     | ChangelistFileContext
     | ChangelistBackgroundContext
+    | WorktreeItemContext
     | BaseWebviewContext;

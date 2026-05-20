@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { GitService } from '../services/GitService';
+import { handleCheckoutWorktreeConflict } from './checkoutWorktreeConflict';
 
 interface BranchQuickPickItem extends vscode.QuickPickItem {
     action?: 'fetch' | 'update' | 'commit' | 'push' | 'newBranch' | 'checkout';
@@ -325,6 +326,16 @@ export class BranchPicker {
             );
             vscode.commands.executeCommand('intelli-git.refresh');
         } catch (e: any) {
+            if (await handleCheckoutWorktreeConflict({
+                gitService: this.gitService,
+                branch,
+                isRemote,
+                error: e,
+                retry: () => this._handleCheckout(branch, isRemote)
+            })) {
+                return;
+            }
+
             if (this._isLocalChangesError(e)) {
                 await this._handleSmartCheckout(branch, isRemote);
             } else {

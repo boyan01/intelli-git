@@ -1,0 +1,154 @@
+.drawer {
+    flex-shrink: 0;
+    border-bottom: 0 solid var(--vscode-panel-border);
+    background: var(--vscode-sideBar-background, var(--vscode-editor-background));
+    overflow: hidden;
+    max-height: 0;
+    opacity: 0;
+    transition: max-height 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+                opacity 0.2s ease,
+                border-bottom-width 0.25s ease;
+    pointer-events: none;
+}
+
+.drawer.open {
+    max-height: 200px;
+    opacity: 1;
+    border-bottom: 1px solid var(--vscode-panel-border);
+    pointer-events: auto;
+}
+
+.header {
+    display: flex;
+    height: 24px;
+    padding: 0 6px 0 8px;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.title {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 6px;
+    color: var(--vscode-sideBarSectionHeader-foreground, var(--vscode-descriptionForeground));
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0;
+    text-transform: uppercase;
+}
+
+.titleIcon {
+    width: 14px;
+    height: 14px;
+    font-size: 14px;
+    color: inherit;
+}
+
+.actions {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.iconBtn {
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 3px;
+    background: transparent;
+    color: var(--vscode-foreground);
+    cursor: pointer;
+}
+
+.iconBtn:hover {
+    background: var(--vscode-toolbar-hoverBackground);
+}
+
+.iconBtn:disabled {
+    color: var(--vscode-disabledForeground, var(--vscode-descriptionForeground));
+    cursor: default;
+    opacity: 0.45;
+}
+
+.iconBtn:disabled:hover {
+    background: transparent;
+}
+
+.list {
+    max-height: 156px;
+    overflow-y: auto;
+    padding-bottom: 4px;
+}
+
+.worktreeLabel {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 4px;
+}
+
+.stateIcon {
+    display: flex;
+    width: 16px;
+    height: 22px;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    color: var(--vscode-descriptionForeground);
+}
+
+.stateIcon :global(.codicon) {
+    font-size: 14px;
+}
+
+.ref,
+.path {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ref {
+    /* Allow branch name to expand wider since the trailing status text is removed */
+    max-width: 65%;
+    flex: 0 1 auto;
+    font-weight: 500;
+    line-height: 22px;
+}
+
+.path {
+    flex: 1 1 auto;
+    color: var(--vscode-descriptionForeground);
+    font-size: 11px;
+    line-height: 22px;
+}
+
+
+
+.dirtyState {
+    color: var(--vscode-gitDecoration-modifiedResourceForeground);
+}
+
+.missingState {
+    color: var(--vscode-errorForeground);
+}
+
+.normalState {
+    color: var(--vscode-descriptionForeground);
+}
+
+.empty {
+    display: flex;
+    height: 28px;
+    align-items: center;
+    gap: 6px;
+    padding: 0 8px;
+    color: var(--vscode-descriptionForeground);
+    font-size: 11px;
+}

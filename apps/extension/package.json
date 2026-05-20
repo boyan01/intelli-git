@@ -41,12 +41,35 @@
   "l10n": "./l10n",
   "main": "./out/extension.js",
   "contributes": {
+    "icons": {
+      "intelli-git-worktree": {
+        "description": "Intelli Git worktree icon",
+        "default": {
+          "fontPath": "resources/intelli-git-icons.woff",
+          "fontCharacter": "\\E001"
+        }
+      },
+      "intelli-git-broom": {
+        "description": "Intelli Git prune stale worktrees icon",
+        "default": {
+          "fontPath": "resources/intelli-git-icons.woff",
+          "fontCharacter": "\\E002"
+        }
+      },
+      "intelli-git-logo": {
+        "description": "Intelli Git logo icon",
+        "default": {
+          "fontPath": "resources/intelli-git-icons.woff",
+          "fontCharacter": "\\E003"
+        }
+      }
+    },
     "viewsContainers": {
       "activitybar": [
         {
           "id": "intelli-git-container",
           "title": "%intelli-git.viewsContainers.activitybar.title%",
-          "icon": "resources/git-icon.svg"
+          "icon": "$(intelli-git-logo)"
         }
       ],
       "panel": [
@@ -103,6 +126,31 @@
         "command": "intelli-git.repository.switch",
         "title": "%intelli-git.commands.repository.switch.title%",
         "icon": "$(repo)"
+      },
+      {
+        "command": "intelli-git.worktrees.toggleDrawer",
+        "title": "%intelli-git.commands.worktrees.toggleDrawer.title%",
+        "icon": "$(intelli-git-worktree)"
+      },
+      {
+        "command": "intelli-git.worktree.switch",
+        "title": "%intelli-git.commands.worktree.switch.title%"
+      },
+      {
+        "command": "intelli-git.worktree.open",
+        "title": "%intelli-git.commands.worktree.open.title%"
+      },
+      {
+        "command": "intelli-git.worktree.reveal",
+        "title": "%intelli-git.commands.worktree.reveal.title%"
+      },
+      {
+        "command": "intelli-git.worktree.prune",
+        "title": "%intelli-git.commands.worktree.prune.title%"
+      },
+      {
+        "command": "intelli-git.worktree.remove",
+        "title": "%intelli-git.commands.worktree.remove.title%"
       },
       {
         "command": "intelli-git.changelistMode.staged",
@@ -403,6 +451,26 @@
         {
           "command": "intelli-git.changelistMode.changes.current",
           "when": "false"
+        },
+        {
+          "command": "intelli-git.worktree.switch",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.worktree.open",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.worktree.reveal",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.worktree.prune",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.worktree.remove",
+          "when": "false"
         }
       ],
       "view/title": [
@@ -410,6 +478,11 @@
           "command": "intelli-git.repository.switch",
           "when": "view == intelliGitView && intelli-git.hasMultipleRepositories",
           "group": "navigation@1"
+        },
+        {
+          "command": "intelli-git.worktrees.toggleDrawer",
+          "when": "view == intelliGitView && intelli-git.hasMultipleWorktrees",
+          "group": "navigation@2"
         },
         {
           "command": "intelli-git.changelistMode.staged.current",
@@ -440,6 +513,31 @@
         }
       ],
       "webview/context": [
+        {
+          "command": "intelli-git.worktree.switch",
+          "when": "webviewSection == 'worktreeItem' && pathExists == true && isActiveRepository != true",
+          "group": "0_navigation@1"
+        },
+        {
+          "command": "intelli-git.worktree.open",
+          "when": "webviewSection == 'worktreeItem' && pathExists == true",
+          "group": "0_navigation@2"
+        },
+        {
+          "command": "intelli-git.worktree.reveal",
+          "when": "webviewSection == 'worktreeItem' && pathExists == true",
+          "group": "0_navigation@3"
+        },
+        {
+          "command": "intelli-git.worktree.prune",
+          "when": "webviewSection == 'worktreeItem' && pathExists != true",
+          "group": "1_manage@1"
+        },
+        {
+          "command": "intelli-git.worktree.remove",
+          "when": "webviewSection == 'worktreeItem' && pathExists == true && isCurrent != true",
+          "group": "2_danger"
+        },
         {
           "command": "intelli-git.copyCommitHash",
           "when": "webviewSection == 'commitItem'",
@@ -901,11 +999,12 @@
     "package:dev": "node scripts/package-dev.js",
     "publish:marketplace": "vsce publish --allow-missing-repository --baseContentUrl ${VSCE_BASE_CONTENT_URL:-https://raw.githubusercontent.com/boyan01/intelli-git/main/apps/extension} --baseImagesUrl ${VSCE_BASE_IMAGES_URL:-https://boyan01.github.io/intelli_git}",
     "vscode:prepublish": "npm run compile",
+    "generate:icons": "node scripts/generate-icons.js",
     "sync:l10n": "node scripts/sync-l10n.js",
     "build:webview": "cd ../webview-ui && npm run build",
     "bundle:extension": "node scripts/build-extension.js",
-    "compile": "npm run sync:l10n && npm run build:webview && tsc -p tsconfig.json --noEmit && npm run bundle:extension",
-    "watch": "npm run sync:l10n && concurrently --raw \"tsc -watch -p tsconfig.json --noEmit\" \"node scripts/build-extension.js --watch\"",
+    "compile": "npm run generate:icons && npm run sync:l10n && npm run build:webview && tsc -p tsconfig.json --noEmit && npm run bundle:extension",
+    "watch": "npm run generate:icons && npm run sync:l10n && concurrently --raw \"tsc -watch -p tsconfig.json --noEmit\" \"node scripts/build-extension.js --watch\"",
     "watch:webview": "cd ../webview-ui && npm run watch",
     "lint": "eslint src",
     "test:regression": "node scripts/run-regression-tests.js",
@@ -924,6 +1023,7 @@
     "concurrently": "^9.2.1",
     "esbuild": "^0.28.0",
     "eslint": "^10.1.0",
+    "fantasticon": "^4.1.0",
     "typescript": "^6.0.2",
     "vite": "^8.0.3",
     "vitest": "^4.0.15"

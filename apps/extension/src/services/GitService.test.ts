@@ -655,6 +655,146 @@ describe('GitService branch remote workflows', () => {
         expect(fs.readFileSync(path.join(tempDir, 'notes.txt'), 'utf8')).toBe('local only\n');
     });
 
+    it('detects branches that are checked out in another linked worktree', async () => {
+        fs.writeFileSync(path.join(tempDir, 'tracked.txt'), 'base\n');
+        await git.add('tracked.txt');
+        await git.commit('Initial commit');
+        await git.branch(['-M', 'main']);
+        await git.checkoutLocalBranch('feature');
+        await git.checkout('main');
+
+        const linkedWorktreePath = path.join(remoteDir, 'feature-worktree');
+        await git.raw(['worktree', 'add', linkedWorktreePath, 'feature']);
+
+        const service = new GitService(tempDir, tempDir, git);
+        const usage = await service.branchRemote.getWorktreeBranchUsage('feature');
+
+        expect(usage).toMatchObject({
+            branch: 'feature',
+            path: fs.realpathSync(linkedWorktreePath),
+            pathExists: true,
+            isPrunable: false
+        });
+        await expect(service.branchRemote.switchBranch('feature')).rejects.toThrow(/already used by worktree/);
+    });
+
+    it('prunes missing linked worktrees before retrying checkout', async () => {
+        fs.writeFileSync(path.join(tempDir, 'tracked.txt'), 'base\n');
+        await git.add('tracked.txt');
+        await git.commit('Initial commit');
+        await git.branch(['-M', 'main']);
+        await git.checkoutLocalBranch('feature');
+        await git.checkout('main');
+
+        const linkedWorktreePath = path.join(remoteDir, 'stale-feature-worktree');
+        await git.raw(['worktree', 'add', linkedWorktreePath, 'feature']);
+        fs.rmSync(linkedWorktreePath, { recursive: true, force: true });
+
+        const service = new GitService(tempDir, tempDir, git);
+        await expect(service.branchRemote.getWorktreeBranchUsage('feature')).resolves.toMatchObject({
+            branch: 'feature',
+            path: path.join(fs.realpathSync(remoteDir), 'stale-feature-worktree'),
+            pathExists: false
+        });
+
+        await service.branchRemote.pruneWorktrees();
+        await expect(service.branchRemote.getWorktreeBranchUsage('feature')).resolves.toBeUndefined();
+
+        await service.branchRemote.switchBranch('feature');
+        expect((await git.branch()).current).toBe('feature');
+    });
+
+    it('lists linked worktrees with active, dirty, and missing state', async () => {
+        fs.writeFileSync(path.join(tempDir, 'tracked.txt'), 'base\n');
+        await git.add('tracked.txt');
+        await git.commit('Initial commit');
+        await git.branch(['-M', 'main']);
+        await git.checkoutLocalBranch('feature');
+        await git.checkout('main');
+
+        const linkedWorktreePath = path.join(remoteDir, 'feature-worktree');
+        await git.raw(['worktree', 'add', linkedWorktreePath, 'feature']);
+        fs.writeFileSync(path.join(linkedWorktreePath, 'tracked.txt'), 'dirty\n');
+
+        const staleWorktreePath = path.join(remoteDir, 'stale-worktree');
+        await git.checkoutLocalBranch('stale-feature');
+        await git.checkout('main');
+        await git.raw(['worktree', 'add', staleWorktreePath, 'stale-feature']);
+        fs.rmSync(staleWorktreePath, { recursive: true, force: true });
+
+        const service = new GitService(tempDir, tempDir, git);
+        const worktrees = await service.branchRemote.getWorktrees(tempDir);
+
+        expect(worktrees).toEqual(expect.arrayContaining([
+            expect.objectContaining({
+                branch: 'main',
+                path: fs.realpathSync(tempDir),
+                isCurrent: true,
+                isActiveRepository: true,
+                pathExists: true,
+                isDirty: false
+            }),
+            expect.objectContaining({
+                branch: 'feature',
+                path: fs.realpathSync(linkedWorktreePath),
+                isCurrent: false,
+                pathExists: true,
+                isDirty: true
+            }),
+            expect.objectContaining({
+                branch: 'stale-feature',
+                path: path.join(fs.realpathSync(remoteDir), 'stale-worktree'),
+                pathExists: false,
+                isDirty: false
+            })
+        ]));
+    });
+
+    it('removes clean linked worktrees but blocks dirty worktrees', async () => {
+        fs.writeFileSync(path.join(tempDir, 'tracked.txt'), 'base\n');
+        await git.add('tracked.txt');
+        await git.commit('Initial commit');
+        await git.branch(['-M', 'main']);
+
+        await git.checkoutLocalBranch('dirty-feature');
+        await git.checkout('main');
+        const dirtyWorktreePath = path.join(remoteDir, 'dirty-worktree');
+        await git.raw(['worktree', 'add', dirtyWorktreePath, 'dirty-feature']);
+        fs.writeFileSync(path.join(dirtyWorktreePath, 'tracked.txt'), 'dirty\n');
+
+        const service = new GitService(tempDir, tempDir, git);
+        await expect(service.branchRemote.removeWorktree(dirtyWorktreePath)).rejects.toThrow(/local changes/);
+
+        await git.checkoutLocalBranch('clean-feature');
+        await git.checkout('main');
+        const cleanWorktreePath = path.join(remoteDir, 'clean-worktree');
+        await git.raw(['worktree', 'add', cleanWorktreePath, 'clean-feature']);
+
+        await service.branchRemote.removeWorktree(cleanWorktreePath);
+
+        expect(fs.existsSync(cleanWorktreePath)).toBe(false);
+        await expect(service.branchRemote.getWorktreeBranchUsage('clean-feature')).resolves.toBeUndefined();
+    });
+
+    it('forces removing dirty linked worktrees when force parameter is true', async () => {
+        fs.writeFileSync(path.join(tempDir, 'tracked.txt'), 'base\n');
+        await git.add('tracked.txt');
+        await git.commit('Initial commit');
+        await git.branch(['-M', 'main']);
+
+        await git.checkoutLocalBranch('dirty-feature');
+        await git.checkout('main');
+        const dirtyWorktreePath = path.join(remoteDir, 'dirty-worktree');
+        await git.raw(['worktree', 'add', dirtyWorktreePath, 'dirty-feature']);
+        fs.writeFileSync(path.join(dirtyWorktreePath, 'tracked.txt'), 'dirty\n');
+
+        const service = new GitService(tempDir, tempDir, git);
+        await service.branchRemote.removeWorktree(dirtyWorktreePath, true);
+
+        expect(fs.existsSync(dirtyWorktreePath)).toBe(false);
+        await expect(service.branchRemote.getWorktreeBranchUsage('dirty-feature')).resolves.toBeUndefined();
+    });
+
     it('checks out remote branches as tracking local branches', async () => {
         await simpleGit(remoteDir).init(true);
         fs.writeFileSync(path.join(tempDir, 'tracked.txt'), 'base\n');

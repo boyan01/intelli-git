@@ -51,15 +51,10 @@
 }
 
 .svgIcon {
-    display: block;
+    display: inline-flex;
     width: 13px;
     height: 13px;
-}
-
-.svgIcon svg {
-    display: block;
-    width: 100%;
-    height: 100%;
+    font-size: 13px;
 }
 
 .name {

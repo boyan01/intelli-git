@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { rpc } from '../../lib/rpc_client';
 import type { BranchInfo } from '@shared/messages';
-import worktreeIconSvg from '../../assets/worktree.svg?raw';
 import styles from './BranchStatus.module.css';
 
 interface BranchStatusProps {
@@ -60,8 +59,7 @@ export const BranchStatus: React.FC<BranchStatusProps> = ({
                 >
                     {isWorktreeRepository && !repositoryDetached ? (
                         <span
-                            className={`${styles.icon} ${styles.svgIcon}`}
-                            dangerouslySetInnerHTML={{ __html: worktreeIconSvg }}
+                            className={`${styles.icon} ${styles.svgIcon} intelli-git-icon intelli-git-icon-worktree`}
                             aria-hidden="true"
                         />
                     ) : (
