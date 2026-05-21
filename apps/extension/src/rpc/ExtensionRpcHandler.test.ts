@@ -80,6 +80,54 @@ describe('ExtensionRpcHandler commit', () => {
 
         expect(commitAmend).toHaveBeenCalledWith('Amend partial staging', undefined);
     });
+
+    it('commits each selected repository in a workspace commit', async () => {
+        const commitA = vi.fn().mockResolvedValue(undefined);
+        const commitB = vi.fn().mockResolvedValue(undefined);
+        const serviceA = {
+            commit: commitA,
+            getWorkspaceRoot: () => '/workspace/a'
+        } as Partial<GitService>;
+        const serviceB = {
+            commit: commitB,
+            getWorkspaceRoot: () => '/workspace/b'
+        } as Partial<GitService>;
+
+        for (const service of [serviceA, serviceB]) {
+            Object.defineProperty(service, 'inactiveChangesService', {
+                get: () => ({} as InactiveChangesService)
+            });
+            Object.defineProperty(service, 'changelistStateService', {
+                get: () => ({
+                    getState: () => createStagedChangelistState()
+                } as ChangelistStateService)
+            });
+        }
+
+        const handler = new ExtensionRpcHandler({
+            context: {} as vscode.ExtensionContext,
+            repositoryManager: {
+                getActiveService: () => serviceA as GitService,
+                getService: (repoPath: string) => repoPath === '/workspace/b' ? serviceB as GitService : serviceA as GitService,
+                getRepositories: () => [
+                    { name: 'a', repoPath: '/workspace/a', path: '/workspace/a', workspaceRoot: '/workspace/a', gitRoot: '/workspace/a', isSubmodule: false },
+                    { name: 'b', repoPath: '/workspace/b', path: '/workspace/b', workspaceRoot: '/workspace/b', gitRoot: '/workspace/b', isSubmodule: false }
+                ]
+            } as any
+        });
+
+        await handler.commit({
+            message: 'Commit workspace changes',
+            amend: false,
+            files: [
+                { repoPath: '/workspace/a', path: 'a.txt' },
+                { repoPath: '/workspace/b', path: 'b.txt' }
+            ]
+        });
+
+        expect(commitA).toHaveBeenCalledWith('Commit workspace changes', undefined);
+        expect(commitB).toHaveBeenCalledWith('Commit workspace changes', undefined);
+    });
 });
 
 describe('ExtensionRpcHandler push', () => {

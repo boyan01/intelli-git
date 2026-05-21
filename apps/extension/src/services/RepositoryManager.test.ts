@@ -141,4 +141,32 @@ describe('RepositoryManager worktree discovery', () => {
 
         expect(manager.getRepositories().map(repo => repo.repoPath)).not.toContain(path.normalize(staleWorktreePath));
     });
+
+    it('discovers nested workspace repositories only when the user scans or adds them', async () => {
+        const workspaceRoot = path.join(tempDir, 'mixin');
+        const routeRepoPath = path.join(workspaceRoot, 'mixin-route');
+        const appRepoPath = path.join(workspaceRoot, 'flutter-app');
+        fs.mkdirSync(workspaceRoot, { recursive: true });
+        await createCommittedRepository(routeRepoPath);
+        await createCommittedRepository(appRepoPath);
+
+        const context = createExtensionContext();
+        __setWorkspaceFolders([workspaceRoot]);
+        manager = new RepositoryManager(context as never);
+        await manager.initialize();
+
+        expect(manager.getRepositories()).toEqual([]);
+
+        const candidates = await manager.discoverWorkspaceRepositories();
+        expect(candidates.map(repo => repo.name).sort()).toEqual(['flutter-app', 'mixin-route']);
+
+        await manager.addRepository(routeRepoPath);
+        expect(manager.getRepositories().map(repo => repo.repoPath)).toContain(fs.realpathSync(routeRepoPath));
+
+        manager.dispose();
+        manager = new RepositoryManager(context as never);
+        await manager.initialize();
+        expect(manager.getRepositories().map(repo => repo.repoPath)).toContain(fs.realpathSync(routeRepoPath));
+        expect(manager.getRepositories().map(repo => repo.repoPath)).not.toContain(fs.realpathSync(appRepoPath));
+    });
 });

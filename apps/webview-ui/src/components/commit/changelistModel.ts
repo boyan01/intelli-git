@@ -1,4 +1,13 @@
-import type { ChangelistAssignment, ChangelistGroup, ChangelistState, FileStatus, GitHunk } from '@shared/messages';
+import type {
+    ChangelistAssignment,
+    ChangelistGroup,
+    ChangelistState,
+    FileStatus,
+    GitHunk,
+    RepositoryCommitViewState,
+    RepositoryFileReference,
+    RepositoryInfo
+} from '@shared/messages';
 
 export const INACTIVE_CHANGELIST_ID = 'inactive-changes';
 
@@ -19,6 +28,27 @@ type LogicalFile = {
 export interface SplitFileInfo {
     groupCount: number;
     groupNames: string[];
+}
+
+export interface RepositoryChangelistGroup {
+    repository: RepositoryInfo;
+    workspaceRoot: string;
+    changelistState: ChangelistState;
+    group: ChangelistGroup;
+}
+
+export interface WorkspaceChangelistGroup extends ChangelistGroup {
+    repositories: RepositoryChangelistGroup[];
+}
+
+export interface RepositoryFileSelection extends RepositoryFileReference {
+    status?: FileStatus['status'];
+    staged?: boolean;
+    inactive?: boolean;
+}
+
+export function getSelectionKey(repoPath: string | undefined, filePath: string): string {
+    return `${repoPath || ''}\u0000${filePath}`;
 }
 
 export function getEquivalentHunkIds(hunkId: string): string[] {
@@ -357,4 +387,129 @@ export function buildSplitInfoByPath(groups: ChangelistGroup[]): Map<string, Spl
     });
 
     return result;
+}
+
+function getWorkspaceGroupKey(group: ChangelistGroup): string {
+    if (
+        group.id === 'staged-changes' ||
+        group.id === 'changes' ||
+        group.id === 'untracked-changes' ||
+        group.id === INACTIVE_CHANGELIST_ID
+    ) {
+        return group.id;
+    }
+
+    return `custom:${group.name}`;
+}
+
+export function buildWorkspaceChangelists(
+    repositories: RepositoryCommitViewState[],
+    t: Translate
+): WorkspaceChangelistGroup[] {
+    const groups = new Map<string, WorkspaceChangelistGroup>();
+
+    repositories.forEach(repositoryState => {
+        const repoGroups = buildChangelists(repositoryState.files, repositoryState.changelistState, t);
+        repoGroups.forEach(group => {
+            const key = getWorkspaceGroupKey(group);
+            const existing = groups.get(key);
+            const repositoryGroup: RepositoryChangelistGroup = {
+                repository: repositoryState.repository,
+                workspaceRoot: repositoryState.workspaceRoot,
+                changelistState: repositoryState.changelistState,
+                group
+            };
+
+            if (existing) {
+                existing.items.push(...group.items);
+                existing.repositories.push(repositoryGroup);
+                existing.hasWarning = existing.hasWarning || group.hasWarning;
+                existing.isActive = existing.isActive || group.isActive;
+                return;
+            }
+
+            groups.set(key, {
+                ...group,
+                id: key,
+                items: [...group.items],
+                repositories: [repositoryGroup]
+            });
+        });
+    });
+
+    return Array.from(groups.values()).filter(group => (
+        group.repositories.some(repoGroup => repoGroup.group.items.length > 0) ||
+        group.id === 'staged-changes' ||
+        group.id === 'changes' ||
+        group.id === INACTIVE_CHANGELIST_ID
+    ));
+}
+
+export function getWorkspaceSelectedFiles(
+    groups: WorkspaceChangelistGroup[],
+    changelistState: ChangelistState
+): Map<string, RepositoryFileSelection> {
+    const selected = new Map<string, RepositoryFileSelection>();
+
+    groups.forEach(group => {
+        group.repositories.forEach(repoGroup => {
+            const shouldSelect = changelistState.mode === 'staged'
+                ? repoGroup.group.id === 'staged-changes'
+                : repoGroup.group.isActive || repoGroup.group.id === 'untracked-changes';
+
+            if (!shouldSelect) {
+                return;
+            }
+
+            repoGroup.group.items.forEach(file => {
+                if (hasOnlyInactiveHunks(file)) {
+                    return;
+                }
+
+                selected.set(getSelectionKey(repoGroup.repository.repoPath, file.path), {
+                    repoPath: repoGroup.repository.repoPath,
+                    path: file.path,
+                    status: file.status,
+                    staged: file.staged,
+                    inactive: file.inactive
+                });
+            });
+        });
+    });
+
+    return selected;
+}
+
+export function getWorkspaceFileStats(
+    groups: WorkspaceChangelistGroup[],
+    selectedFiles: Map<string, RepositoryFileSelection>
+): { added: number; modified: number; deleted: number } {
+    let added = 0;
+    let modified = 0;
+    let deleted = 0;
+
+    groups.forEach(group => {
+        group.repositories.forEach(repoGroup => {
+            repoGroup.group.items.forEach(file => {
+                if (!selectedFiles.has(getSelectionKey(repoGroup.repository.repoPath, file.path))) {
+                    return;
+                }
+
+                const status = file.status.trim().toUpperCase();
+                if (status.startsWith('A') || status === '?' || status === 'U') {
+                    added++;
+                } else if (status.startsWith('D')) {
+                    deleted++;
+                } else {
+                    modified++;
+                }
+            });
+        });
+    });
+
+    return { added, modified, deleted };
+}
+
+export function hasWorkspaceTrackedChanges(repositories: RepositoryCommitViewState[]): boolean {
+    return repositories.some(repository => hasTrackedChanges(repository.files));
 }

@@ -128,6 +128,21 @@
         "icon": "$(repo)"
       },
       {
+        "command": "intelli-git.repository.scanWorkspace",
+        "title": "%intelli-git.commands.repository.scanWorkspace.title%",
+        "icon": "$(search)"
+      },
+      {
+        "command": "intelli-git.repository.add",
+        "title": "%intelli-git.commands.repository.add.title%",
+        "icon": "$(repo-create)"
+      },
+      {
+        "command": "intelli-git.repository.removeFromWorkspace",
+        "title": "%intelli-git.commands.repository.removeFromWorkspace.title%",
+        "icon": "$(trash)"
+      },
+      {
         "command": "intelli-git.worktrees.toggleDrawer",
         "title": "%intelli-git.commands.worktrees.toggleDrawer.title%",
         "icon": "$(intelli-git-worktree)"
@@ -485,6 +500,16 @@
           "group": "navigation@2"
         },
         {
+          "command": "intelli-git.repository.scanWorkspace",
+          "when": "view == intelliGitView",
+          "group": "3_repository@1"
+        },
+        {
+          "command": "intelli-git.repository.add",
+          "when": "view == intelliGitView",
+          "group": "3_repository@2"
+        },
+        {
           "command": "intelli-git.changelistMode.staged.current",
           "when": "view == intelliGitView && intelli-git.changelistMode == 'staged'",
           "group": "2_mode@1"
@@ -682,6 +707,11 @@
           "command": "intelli-git.copyCommitHash",
           "when": "webviewSection == 'gitLogCommit'",
           "group": "1_cutcopypaste"
+        },
+        {
+          "command": "intelli-git.repository.removeFromWorkspace",
+          "when": "webviewSection == 'changelistRepository'",
+          "group": "2_danger"
         },
         {
           "command": "intelli-git.changelist.openFile",

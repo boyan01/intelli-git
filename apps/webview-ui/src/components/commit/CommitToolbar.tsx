@@ -1,13 +1,13 @@
 import { rpc, rpcEvents } from '../../lib/rpc_client';
 import { useTranslation } from 'react-i18next';
 import { ViewModeToggle } from '../common/ViewModeToggle';
-import type { ChangelistState } from '@shared/messages';
+import type { ChangelistState, RepositoryFileReference } from '@shared/messages';
 import styles from './CommitToolbar.module.css';
 
 interface CommitToolbarProps {
     viewMode: 'tree' | 'list';
     changelistState: ChangelistState;
-    selectedFiles: Set<string>;
+    selectedFiles: RepositoryFileReference[];
     hasTrackedChanges: boolean;
     onViewModeChange: (mode: 'tree' | 'list') => void;
     onExpandAll: () => void;
@@ -64,8 +64,8 @@ export function CommitToolbar({
                             title={t('Stash')}
                             aria-label={t('Stash')}
                             data-tooltip={t('Stash')}
-                            onClick={() => rpc.stash({ files: Array.from(selectedFiles), stagedOnly: true })}
-                            disabled={selectedFiles.size === 0}
+                            onClick={() => rpc.stash({ files: selectedFiles, stagedOnly: true })}
+                            disabled={selectedFiles.length === 0}
                         >
                             <i className="codicon codicon-archive"></i>
                         </button>

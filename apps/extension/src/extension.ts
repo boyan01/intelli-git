@@ -112,6 +112,60 @@ function showRepositoryQuickPick(repositoryManager: RepositoryManager, onReposit
     quickPick.show();
 }
 
+async function addRepositoryFromDialog(repositoryManager: RepositoryManager, onRepositoryChanged: () => void): Promise<void> {
+    const selected = await vscode.window.showOpenDialog({
+        canSelectFiles: false,
+        canSelectFolders: true,
+        canSelectMany: false,
+        openLabel: vscode.l10n.t('Add Repository')
+    });
+
+    const folder = selected?.[0]?.fsPath;
+    if (!folder) {
+        return;
+    }
+
+    const repository = await repositoryManager.addRepository(folder);
+    if (!repository) {
+        void vscode.window.showWarningMessage(vscode.l10n.t('Selected folder is not a Git repository.'));
+        return;
+    }
+
+    onRepositoryChanged();
+}
+
+async function scanWorkspaceRepositories(repositoryManager: RepositoryManager, onRepositoryChanged: () => void): Promise<void> {
+    const candidates = await repositoryManager.discoverWorkspaceRepositories();
+    if (candidates.length === 0) {
+        void vscode.window.showInformationMessage(vscode.l10n.t('No Git repositories found in this workspace.'));
+        return;
+    }
+
+    const selected = await vscode.window.showQuickPick(
+        candidates.map(repo => ({
+            label: repo.name,
+            description: getRepositoryRefLabel(repo),
+            detail: repo.path,
+            repo
+        })),
+        {
+            canPickMany: true,
+            matchOnDescription: true,
+            matchOnDetail: true,
+            placeHolder: vscode.l10n.t('Select repositories to add')
+        }
+    );
+
+    if (!selected || selected.length === 0) {
+        return;
+    }
+
+    for (const item of selected) {
+        await repositoryManager.addRepository(item.repo.path);
+    }
+    onRepositoryChanged();
+}
+
 function isSameOrDescendantPath(parentPath: string, candidatePath: string): boolean {
     const relativePath = path.relative(parentPath, candidatePath);
     return relativePath === '' || (!relativePath.startsWith('..') && !path.isAbsolute(relativePath));
@@ -339,6 +393,31 @@ export async function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(
         vscode.commands.registerCommand('intelli-git.repository.switch', () => {
             showRepositoryQuickPick(repositoryManager, updateRepositoryContext);
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand('intelli-git.repository.add', async () => {
+            await addRepositoryFromDialog(repositoryManager, updateRepositoryContext);
+            triggerRefresh();
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand('intelli-git.repository.scanWorkspace', async () => {
+            await scanWorkspaceRepositories(repositoryManager, updateRepositoryContext);
+            triggerRefresh();
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand('intelli-git.repository.removeFromWorkspace', async (args?: { repoPath?: string }) => {
+            if (!args?.repoPath) {
+                return;
+            }
+            await repositoryManager.removeRepository(args.repoPath);
+            updateRepositoryContext();
+            triggerRefresh();
         })
     );
 

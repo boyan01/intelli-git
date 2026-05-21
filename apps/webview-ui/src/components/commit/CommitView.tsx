@@ -8,9 +8,16 @@ import { usePersistedState } from '../../hooks/usePersistedState';
 import { useRpcData } from '../../hooks/useRpcData';
 import styles from './CommitView.module.css';
 import { rpc, rpcEvents } from '../../lib/rpc_client';
-import type { BranchInfo, ChangelistGroup, ChangelistState, FileStatus, LastCommitInfo } from '@shared/messages';
+import type { BranchInfo, ChangelistState, FileStatus, LastCommitInfo, RepositoryCommitViewState, RepositoryFileReference } from '@shared/messages';
 import type { ChangelistBackgroundContext } from '@shared/webviewContext';
-import { buildChangelists, getFileStats, getSelectedFiles, hasTrackedChanges, INACTIVE_CHANGELIST_ID } from './changelistModel';
+import {
+    buildWorkspaceChangelists,
+    getWorkspaceFileStats,
+    getWorkspaceSelectedFiles,
+    hasWorkspaceTrackedChanges,
+    INACTIVE_CHANGELIST_ID,
+    type WorkspaceChangelistGroup
+} from './changelistModel';
 
 interface CommitViewProps {
     rebaseStatus?: BranchInfo['rebaseStatus'];
@@ -20,8 +27,8 @@ function getActiveChangelistName(changelistState: ChangelistState): string | und
     return changelistState.lists.find(list => list.id === changelistState.activeListId)?.name;
 }
 
-function hasDisplayableChanges(changelists: ChangelistGroup[]): boolean {
-    return changelists.some(group => group.items.length > 0);
+function hasDisplayableChanges(changelists: WorkspaceChangelistGroup[]): boolean {
+    return changelists.some(group => group.repositories.some(repoGroup => repoGroup.group.items.length > 0));
 }
 
 interface EmptyAction {
@@ -84,7 +91,8 @@ export function CommitView({ rebaseStatus }: CommitViewProps) {
             files: [] as FileStatus[],
             changelistState: initialChangelistState,
             workspaceRoot: '',
-            hasRepository: true
+            hasRepository: true,
+            repositories: [] as RepositoryCommitViewState[]
         },
         cacheKey: 'commit.viewState'
     });
@@ -92,8 +100,32 @@ export function CommitView({ rebaseStatus }: CommitViewProps) {
     const changelistState = commitViewState.changelistState;
     const workspaceRoot = commitViewState.workspaceRoot;
     const hasRepository = commitViewState.hasRepository !== false;
+    const repositoryStates = useMemo(() => {
+        if (commitViewState.repositories && commitViewState.repositories.length > 0) {
+            return commitViewState.repositories;
+        }
 
-    const changelists = useMemo(() => buildChangelists(files, changelistState, t), [files, changelistState, t]);
+        if (!workspaceRoot) {
+            return [] as RepositoryCommitViewState[];
+        }
+
+        return [{
+            repository: commitViewState.activeRepository || {
+                name: workspaceRoot.split('/').pop() || workspaceRoot,
+                path: workspaceRoot,
+                repoPath: workspaceRoot,
+                workspaceRoot,
+                gitRoot: workspaceRoot,
+                isSubmodule: false,
+                kind: 'workspace'
+            },
+            files,
+            changelistState,
+            workspaceRoot
+        }] as RepositoryCommitViewState[];
+    }, [commitViewState.repositories, commitViewState.activeRepository, files, changelistState, workspaceRoot]);
+
+    const changelists = useMemo(() => buildWorkspaceChangelists(repositoryStates, t), [repositoryStates, t]);
     const [activeFile, setActiveFile] = useState<string | null>(null);
 
     const [lastCommitInfo, setLastCommitInfo] = useState<LastCommitInfo | null>(null);
@@ -102,6 +134,7 @@ export function CommitView({ rebaseStatus }: CommitViewProps) {
     const [expandedIds, setExpandedIds] = usePersistedState('commit.expandedIds');
     const [commitMessage, setCommitMessage] = usePersistedState('commit.message');
     const [amend, setAmend] = usePersistedState('commit.amend');
+    const [isScanningRepositories, setIsScanningRepositories] = useState(false);
     const currentCommitMessageRef = useRef(commitMessage);
     const savedMessageRef = useRef<string | null>(null);
     const lastCommitInfoRequestRef = useRef(0);
@@ -117,7 +150,12 @@ export function CommitView({ rebaseStatus }: CommitViewProps) {
         return rpcEvents.activeFileChange.subscribe(handleActiveFile);
     }, []);
 
-    const selectedFiles = useMemo(() => getSelectedFiles(files, changelists, changelistState), [files, changelists, changelistState]);
+    const selectedFileMap = useMemo(() => getWorkspaceSelectedFiles(changelists, changelistState), [changelists, changelistState]);
+    const selectedFiles = useMemo(() => new Set(selectedFileMap.keys()), [selectedFileMap]);
+    const selectedFileRefs = useMemo(() => Array.from(selectedFileMap.values()).map(file => ({
+        repoPath: file.repoPath,
+        path: file.path
+    } satisfies RepositoryFileReference)), [selectedFileMap]);
 
     useEffect(() => {
         const requestId = ++lastCommitInfoRequestRef.current;
@@ -155,16 +193,41 @@ export function CommitView({ rebaseStatus }: CommitViewProps) {
         });
     }, [setExpandedIds]);
 
-    const fileStats = useMemo(() => getFileStats(changelists, selectedFiles), [changelists, selectedFiles]);
+    const fileStats = useMemo(() => getWorkspaceFileStats(changelists, selectedFileMap), [changelists, selectedFileMap]);
 
-    const hasTracked = useMemo(() => hasTrackedChanges(files), [files]);
+    const hasTracked = useMemo(() => hasWorkspaceTrackedChanges(repositoryStates), [repositoryStates]);
     const hasChanges = useMemo(() => hasDisplayableChanges(changelists), [changelists]);
+    const changedRepositoryCount = useMemo(() => {
+        const repoPaths = new Set<string>();
+        changelists.forEach(group => {
+            group.repositories.forEach(repoGroup => {
+                if (repoGroup.group.items.length > 0) {
+                    repoPaths.add(repoGroup.repository.repoPath);
+                }
+            });
+        });
+        return repoPaths.size;
+    }, [changelists]);
     const activeChangelistName = useMemo(() => getActiveChangelistName(changelistState), [changelistState]);
 
     const handleCommitSuccess = useCallback(() => {
         savedMessageRef.current = null;
         setAmend(false);
     }, [setAmend]);
+
+    const handleScanRepositories = useCallback(async () => {
+        if (isScanningRepositories) {
+            return;
+        }
+
+        setIsScanningRepositories(true);
+        try {
+            await rpc.scanWorkspaceRepositories();
+            reload();
+        } finally {
+            setIsScanningRepositories(false);
+        }
+    }, [isScanningRepositories, reload]);
 
     const renderStatePanel = () => {
         if (loading && files.length === 0 && !workspaceRoot && !error) {
@@ -198,17 +261,22 @@ export function CommitView({ rebaseStatus }: CommitViewProps) {
                 <CommitViewStatePanel
                     icon="codicon-source-control"
                     title={t('No Git repository found')}
-                    description={t('Open a folder or initialize a repository to start using Intelli Git.')}
+                    description={t('Scan this workspace or add a repository to start using Intelli Git.')}
                     actions={[
                         {
-                            label: t('Open Folder'),
-                            icon: 'codicon-folder-opened',
-                            onClick: () => void rpc.openFolder()
+                            label: isScanningRepositories ? t('Scanning Workspace') : t('Scan Workspace'),
+                            icon: isScanningRepositories ? 'codicon-loading codicon-modifier-spin' : 'codicon-search',
+                            onClick: handleScanRepositories,
+                            disabled: isScanningRepositories
                         },
                         {
-                            label: t('Initialize Repository'),
+                            label: t('Add Repository'),
                             icon: 'codicon-repo-create',
-                            onClick: () => void rpc.initializeRepository()
+                            onClick: async () => {
+                                await rpc.addRepository();
+                                reload();
+                            },
+                            disabled: isScanningRepositories
                         }
                     ]}
                 />
@@ -247,7 +315,7 @@ export function CommitView({ rebaseStatus }: CommitViewProps) {
             <CommitToolbar
                 viewMode={viewMode}
                 changelistState={changelistState}
-                selectedFiles={selectedFiles}
+                selectedFiles={selectedFileRefs}
                 hasTrackedChanges={hasTracked}
                 onViewModeChange={setViewMode}
                 onExpandAll={() => {
@@ -276,6 +344,7 @@ export function CommitView({ rebaseStatus }: CommitViewProps) {
                         activeFile={activeFile}
                         onToggle={handleToggle}
                         workspaceRoot={workspaceRoot}
+                        showRepositoryRoots={changedRepositoryCount > 1}
                         amendCommit={lastCommitInfo}
                     />
                 )}
@@ -292,14 +361,15 @@ export function CommitView({ rebaseStatus }: CommitViewProps) {
                     onMessageChange={setCommitMessage}
                     onContinue={() => rpc.continueRebase({
                         message: commitMessage,
-                        files: Array.from(selectedFiles)
+                        files: selectedFileRefs.map(file => file.path)
                     })}
                 />
             ) : (
                 <CommitForm
                     message={commitMessage}
                     amend={amend}
-                    selectedFiles={selectedFiles}
+                    selectedFiles={selectedFileRefs}
+                    repositories={repositoryStates.map(state => state.repository)}
                     addedCount={fileStats.added}
                     modifiedCount={fileStats.modified}
                     deletedCount={fileStats.deleted}

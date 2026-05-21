@@ -1,6 +1,6 @@
 import React, { useMemo, useCallback, useRef } from 'react';
-import type { ChangelistGroup, ChangelistState, FileStatus, LastCommitInfo } from '@shared/messages';
-import type { ChangelistBackgroundContext, ChangelistFileContext, ChangelistFolderContext, ChangelistRootContext } from '@shared/webviewContext';
+import type { ChangelistGroup, ChangelistState, FileStatus, LastCommitInfo, RepositoryInfo } from '@shared/messages';
+import type { ChangelistBackgroundContext, ChangelistFileContext, ChangelistFolderContext, ChangelistRepositoryContext, ChangelistRootContext } from '@shared/webviewContext';
 import { useTranslation } from 'react-i18next';
 import { BasicTreeView } from '../common/BasicTreeView';
 import type { TreeNode, BasicTreeViewRef } from '../common/BasicTreeView';
@@ -9,10 +9,10 @@ import { rpc, rpcEvents } from '@/lib/rpc_client';
 import { logger } from '@/utils/logger';
 import styles from '../file-tree/BaseFileTree.module.css';
 import { compactSingleChildFolders } from '../file-tree/treeUtils';
-import { buildSplitInfoByPath, type SplitFileInfo } from './changelistModel';
+import { buildSplitInfoByPath, getSelectionKey, type SplitFileInfo, type WorkspaceChangelistGroup } from './changelistModel';
 
 export interface ChangelistTreeProps {
-    groups: ChangelistGroup[];
+    groups: WorkspaceChangelistGroup[];
     changelistState: ChangelistState;
     viewMode: 'tree' | 'list';
     selectedFiles: Set<string>;
@@ -21,6 +21,7 @@ export interface ChangelistTreeProps {
     onToggle?: (id: string, expanded: boolean) => void;
     readonly?: boolean;
     workspaceRoot?: string;
+    showRepositoryRoots?: boolean;
     amendCommit?: LastCommitInfo | null;
 }
 
@@ -30,8 +31,12 @@ export interface ChangelistTreeRef {
 }
 
 interface FileNodeData {
+    repoPath?: string;
+    repository?: RepositoryInfo;
+    workspaceRoot?: string;
     path: string;
     isFile: boolean;
+    isRepositoryRoot?: boolean;
     hunkIds?: string[];
     isRoot?: boolean;
     isInactiveGroup?: boolean;
@@ -71,7 +76,12 @@ const countFiles = (node: TreeNode<FileNodeData>): number => {
     return node.children.reduce((sum, child) => sum + countFiles(child), 0);
 };
 
-const buildTree = (files: FileStatus[], splitInfoByPath: Map<string, SplitFileInfo>): TreeNode<FileNodeData>[] => {
+const buildTree = (
+    files: FileStatus[],
+    splitInfoByPath: Map<string, SplitFileInfo>,
+    repository: RepositoryInfo,
+    workspaceRoot: string
+): TreeNode<FileNodeData>[] => {
     const root: TreeNode<FileNodeData>[] = [];
     const map = new Map<string, TreeNode<FileNodeData>>();
 
@@ -89,6 +99,9 @@ const buildTree = (files: FileStatus[], splitInfoByPath: Map<string, SplitFileIn
                     id: currentPath,
                     label: part,
                     data: {
+                        repoPath: repository.repoPath,
+                        repository,
+                        workspaceRoot,
                         path: file.path,
                         isFile: isLast,
                         status: isLast ? file.status : undefined,
@@ -96,7 +109,7 @@ const buildTree = (files: FileStatus[], splitInfoByPath: Map<string, SplitFileIn
                         inactive: isLast ? file.inactive : undefined,
                         hunkIds: isLast && file.status !== '?' ? file.hunks?.map(hunk => hunk.id) : undefined,
                         resolvedCandidate: isLast ? file.resolvedCandidate : undefined,
-                        splitInfo: isLast ? splitInfoByPath.get(file.path) : undefined,
+                        splitInfo: isLast ? splitInfoByPath.get(getSelectionKey(repository.repoPath, file.path)) : undefined,
                         fileCount: 0
                     },
                     children: isLast ? [] : []
@@ -186,6 +199,16 @@ function getDescendantFiles(node: TreeNode<FileNodeData>): FileNodeData[] {
     return (node.children || []).flatMap(child => getDescendantFiles(child));
 }
 
+function getCommonRepoPath(files: FileNodeData[]): string | undefined {
+    const repoPaths = Array.from(new Set(files.map(file => file.repoPath).filter(Boolean)));
+    return repoPaths.length === 1 ? repoPaths[0] : undefined;
+}
+
+function getCommonChangelistId(group: WorkspaceChangelistGroup): string | undefined {
+    const ids = Array.from(new Set(group.repositories.map(repoGroup => repoGroup.group.id)));
+    return ids.length === 1 ? ids[0] : undefined;
+}
+
 export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTreeProps>(({
     groups,
     changelistState,
@@ -194,6 +217,7 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
     activeFile,
     onToggle,
     workspaceRoot,
+    showRepositoryRoots = true,
     amendCommit
 }, ref) => {
     const { t } = useTranslation();
@@ -204,32 +228,80 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
         collapseAll: () => treeRef.current?.collapseAll()
     }));
 
-    const splitInfoByPath = useMemo(() => buildSplitInfoByPath(groups), [groups]);
+    const splitInfoByPath = useMemo(() => {
+        const result = new Map<string, SplitFileInfo>();
+        const groupsByRepo = new Map<string, ChangelistGroup[]>();
+        groups.forEach(group => {
+            group.repositories.forEach(repoGroup => {
+                const repoGroups = groupsByRepo.get(repoGroup.repository.repoPath) || [];
+                repoGroups.push(repoGroup.group);
+                groupsByRepo.set(repoGroup.repository.repoPath, repoGroups);
+            });
+        });
+        groupsByRepo.forEach((repoGroups, repoPath) => {
+            buildSplitInfoByPath(repoGroups).forEach((value, path) => {
+                result.set(getSelectionKey(repoPath, path), value);
+            });
+        });
+        return result;
+    }, [groups]);
 
     const nodes = useMemo(() => {
         const result: TreeNode<FileNodeData>[] = [];
 
         groups.forEach(group => {
-            const listInfo = changelistState.lists.find(list => list.id === group.id);
-            const children = viewMode === 'list'
-                ? group.items.map(file => ({
-                    id: `${group.id}/${file.path}`,
-                    label: file.path.split('/').pop() || file.path,
+            const repoGroups = group.repositories.filter(repoGroup => repoGroup.group.items.length > 0);
+            const changelistId = getCommonChangelistId(group);
+            const children = repoGroups.flatMap(repoGroup => {
+                const repoNodeId = `${group.id}::repo::${repoGroup.repository.repoPath}`;
+                const repoChildren = viewMode === 'list'
+                    ? repoGroup.group.items.map(file => ({
+                        id: `${repoNodeId}/${file.path}`,
+                        label: file.path.split('/').pop() || file.path,
+                        data: {
+                            repoPath: repoGroup.repository.repoPath,
+                            repository: repoGroup.repository,
+                            workspaceRoot: repoGroup.workspaceRoot,
+                            path: file.path,
+                            isFile: true,
+                            status: file.status,
+                            staged: file.staged,
+                            inactive: file.inactive,
+                            hunkIds: file.status !== '?' ? file.hunks?.map(hunk => hunk.id) : undefined,
+                            resolvedCandidate: file.resolvedCandidate,
+                            fileCount: 1,
+                            changelistId: repoGroup.group.id,
+                            splitInfo: splitInfoByPath.get(getSelectionKey(repoGroup.repository.repoPath, file.path))
+                        },
+                        children: undefined
+                    }))
+                    : prefixNodes(
+                        buildTree(repoGroup.group.items, splitInfoByPath, repoGroup.repository, repoGroup.workspaceRoot),
+                        `${repoNodeId}/files`,
+                        repoGroup.group.id
+                    );
+
+                if (!showRepositoryRoots) {
+                    return repoChildren;
+                }
+
+                return [{
+                    id: repoNodeId,
+                    label: repoGroup.repository.name,
                     data: {
-                        path: file.path,
-                        isFile: true,
-                        status: file.status,
-                        staged: file.staged,
-                        inactive: file.inactive,
-                        hunkIds: file.status !== '?' ? file.hunks?.map(hunk => hunk.id) : undefined,
-                        resolvedCandidate: file.resolvedCandidate,
-                        fileCount: 1,
-                        changelistId: group.id,
-                        splitInfo: splitInfoByPath.get(file.path)
+                        repoPath: repoGroup.repository.repoPath,
+                        repository: repoGroup.repository,
+                        workspaceRoot: repoGroup.workspaceRoot,
+                        path: '',
+                        isFile: false,
+                        isRepositoryRoot: true,
+                        fileCount: repoGroup.group.items.length,
+                        changelistId: repoGroup.group.id,
+                        isActiveChangelist: repoGroup.group.isActive
                     },
-                    children: undefined
-                }))
-                : prefixNodes(buildTree(group.items, splitInfoByPath), group.id, group.id);
+                    children: repoChildren
+                } satisfies TreeNode<FileNodeData>];
+            });
 
             result.push({
                 id: `__root__${group.id}`,
@@ -240,11 +312,11 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
                     isRoot: true,
                     isInactiveGroup: group.id === 'inactive-changes',
                     isStagedGroup: group.id === 'staged-changes',
-                    fileCount: group.items.length,
+                    fileCount: group.repositories.reduce((sum, repoGroup) => sum + repoGroup.group.items.length, 0),
                     hasWarning: group.hasWarning,
-                    changelistId: group.id,
+                    changelistId,
                     isActiveChangelist: group.isActive,
-                    isChangelistGroup: Boolean(listInfo),
+                    isChangelistGroup: group.id !== 'staged-changes' && group.id !== 'untracked-changes',
                     showInDragMode: group.items.length === 0 && (
                         group.id === 'staged-changes' ||
                         group.id === 'changes' ||
@@ -281,14 +353,14 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
         }
 
         return result;
-    }, [groups, changelistState.lists, viewMode, amendCommit, splitInfoByPath]);
+    }, [groups, changelistState.lists, viewMode, amendCommit, splitInfoByPath, showRepositoryRoots]);
 
     const handleNodeClick = useCallback((node: TreeNode<FileNodeData>) => {
         if (node.data?.isFile) {
             if (node.data.status === 'D') {
-                rpc.openDiff(node.data.path, node.data.staged);
+                rpc.openDiff({ path: node.data.path, repoPath: node.data.repoPath, staged: node.data.staged });
             } else {
-                rpc.openFile({ path: node.data.path, preserveFocus: true });
+                rpc.openFile({ path: node.data.path, repoPath: node.data.repoPath, preserveFocus: true });
             }
         }
     }, []);
@@ -296,9 +368,9 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
     const handleNodeDoubleClick = useCallback((node: TreeNode<FileNodeData>) => {
         if (node.data?.isFile) {
             if (node.data.status === 'D') {
-                rpc.openDiff(node.data.path, node.data.staged);
+                rpc.openDiff({ path: node.data.path, repoPath: node.data.repoPath, staged: node.data.staged });
             } else {
-                rpc.openFile({ path: node.data.path, preserveFocus: false });
+                rpc.openFile({ path: node.data.path, repoPath: node.data.repoPath, preserveFocus: false });
             }
         }
     }, []);
@@ -310,6 +382,7 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
         }
 
         void rpc.setActiveChangelistFile({
+            repoPath: node.data.repoPath,
             path: node.data.path,
             status: node.data.status,
             staged: node.data.staged,
@@ -345,7 +418,10 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
             kind: 'stage' as const,
             title: t('Stage')
         };
-        const paths = Array.from(new Set(actionableFileNodes.map(file => file.path)));
+        const refs = Array.from(new Map(actionableFileNodes.map(file => [
+            getSelectionKey(file.repoPath, file.path),
+            { repoPath: file.repoPath, path: file.path }
+        ])).values());
 
         return (
             <div className={styles.groupTrailing}>
@@ -356,9 +432,9 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
                     onClick={async (event) => {
                         event.stopPropagation();
                         if (action.kind === 'stage') {
-                            await rpc.stageFiles(paths);
+                            await rpc.stageFiles(refs);
                         } else {
-                            await rpc.unstageFiles(paths);
+                            await rpc.unstageFiles(refs);
                         }
                         rpcEvents.refresh.emit();
                     }}
@@ -399,6 +475,18 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
                             title={t('Some inactive changes in this group are staged externally. They will be automatically excluded by the plugin during commit.')}
                         ></span>
                     )}
+                </div>
+            );
+        }
+
+        if (node.data?.isRepositoryRoot) {
+            const branchLabel = node.data.repository?.branch || (node.data.repository?.isDetached && node.data.repository.head ? node.data.repository.head.substring(0, 7) : undefined);
+            return (
+                <div className={styles.fileItemContent}>
+                    <span className={`codicon codicon-repo ${styles.icon}`}></span>
+                    <span className={styles.name} style={node.data.isActiveChangelist ? { fontWeight: 600 } : undefined}>{node.label}</span>
+                    {branchLabel && <span className={styles.fileDirPath}>{branchLabel}</span>}
+                    <span className={styles.fileCount}>{node.data.fileCount}</span>
                 </div>
             );
         }
@@ -453,12 +541,31 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
         const hasStaged = descendantFiles.some(file => Boolean(file.staged));
         const allStaged = descendantFiles.length > 0 && descendantFiles.every(file => Boolean(file.staged));
         const hasUntracked = descendantFiles.some(file => file.status === '?');
+        const repoPath = getCommonRepoPath(descendantFiles);
 
         if (!node.data?.isFile) {
+            if (node.data?.isRepositoryRoot && node.data.repoPath) {
+                return {
+                    webviewSection: 'changelistRepository',
+                    repoPath: node.data.repoPath,
+                    paths,
+                    hasConflict,
+                    hasInactive,
+                    allInactive,
+                    hasStaged,
+                    allStaged,
+                    hasUntracked,
+                    changelistId: node.data.changelistId,
+                    changelistMode: changelistState.mode,
+                    preventDefaultContextMenuItems: true
+                } satisfies ChangelistRepositoryContext;
+            }
+
             if (node.data?.isRoot) {
                 const changelist = changelistState.lists.find(list => list.id === node.data?.changelistId);
                 return {
                     webviewSection: 'changelistRoot',
+                    repoPath,
                     changelistId: node.data.changelistId,
                     paths,
                     isActiveChangelist: Boolean(node.data.isActiveChangelist),
@@ -477,6 +584,7 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
 
             return {
                 webviewSection: 'changelistFolder',
+                repoPath,
                 path: node.id,
                 paths,
                 hasConflict,
@@ -492,6 +600,7 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
         }
         return {
             webviewSection: 'changelistFile',
+            repoPath: node.data.repoPath,
             path: node.data.path,
             paths: [node.data.path],
             hunkIds: node.data.hunkIds,
@@ -564,6 +673,11 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
         if (!targetListId) {
             return;
         }
+        const sourceRepoPath = getCommonRepoPath(getDescendantFiles(draggedNode));
+        const targetRepoPath = targetNode.data?.repoPath || getCommonRepoPath(getDescendantFiles(targetNode));
+        if (sourceRepoPath && targetRepoPath && sourceRepoPath !== targetRepoPath) {
+            return;
+        }
 
         const moveData = getAllMoveData(draggedNode);
         const paths = moveData.paths;
@@ -571,6 +685,7 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
         if (changelistState.mode === 'changes') {
             const sourceChangelistId = draggedNode.data?.changelistId;
             await rpc.moveChangesToChangelist({
+                repoPath: sourceRepoPath,
                 targetListId,
                 paths,
                 hunksByPath: moveData.hunkMap,
@@ -583,17 +698,17 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
 
             if (targetListId === 'staged-changes') {
                 if (sourceChangelistId === 'inactive-changes') {
-                    await rpc.markFilesActive(paths);
+                    await rpc.markFilesActive(paths.map(path => ({ repoPath: sourceRepoPath, path })));
                 }
-                await rpc.stageFiles(paths);
+                await rpc.stageFiles(paths.map(path => ({ repoPath: sourceRepoPath, path })));
             } else if (targetListId === 'changes') {
                 if (sourceChangelistId === 'staged-changes') {
-                    await rpc.unstageFiles(paths);
+                    await rpc.unstageFiles(paths.map(path => ({ repoPath: sourceRepoPath, path })));
                 } else if (sourceChangelistId === 'inactive-changes') {
-                    await rpc.markFilesActive(paths);
+                    await rpc.markFilesActive(paths.map(path => ({ repoPath: sourceRepoPath, path })));
                 }
             } else if (targetListId === 'inactive-changes') {
-                await rpc.markFilesInactive(paths);
+                await rpc.markFilesInactive(paths.map(path => ({ repoPath: sourceRepoPath, path })));
             }
         }
 
@@ -608,8 +723,12 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
         ]));
         if (paths.length === 0) return {};
 
-        const root = workspaceRoot || '';
-        const absPaths = paths.map(path => root ? `${root}/${path}` : path);
+        const descendantFiles = getDescendantFiles(node);
+        const rootByPath = new Map(descendantFiles.map(file => [file.path, file.workspaceRoot || workspaceRoot || '']));
+        const absPaths = paths.map(path => {
+            const root = rootByPath.get(path) || workspaceRoot || '';
+            return root ? `${root}/${path}` : path;
+        });
         const fileUris = absPaths.map(path => `file://${encodeURI(path)}`);
         const uriList = fileUris.join('\r\n');
 

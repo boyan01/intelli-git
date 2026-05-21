@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import styles from './CommitForm.module.css';
 import { rpc } from '../../lib/rpc_client';
+import type { RepositoryFileReference, RepositoryInfo } from '@shared/messages';
 
 interface CommitOptions {
     push: boolean;
@@ -11,7 +12,8 @@ interface CommitOptions {
 interface CommitFormProps {
     message: string;
     amend: boolean;
-    selectedFiles: Set<string>;
+    selectedFiles: RepositoryFileReference[];
+    repositories?: RepositoryInfo[];
     addedCount?: number;
     modifiedCount?: number;
     deletedCount?: number;
@@ -24,6 +26,7 @@ export const CommitForm: React.FC<CommitFormProps> = ({
     message,
     amend,
     selectedFiles,
+    repositories = [],
     addedCount = 0,
     modifiedCount = 0,
     deletedCount = 0,
@@ -49,7 +52,7 @@ export const CommitForm: React.FC<CommitFormProps> = ({
         setError(null);
         setIsGenerating(true);
         try {
-            const msg = await rpc.generateCommitMessage(Array.from(selectedFiles));
+            const msg = await rpc.generateCommitMessage(selectedFiles);
             onMessageChange(msg);
         } catch (e) {
             const errMsg = e instanceof Error ? e.message : String(e);
@@ -61,7 +64,7 @@ export const CommitForm: React.FC<CommitFormProps> = ({
 
     const handleCommit = async () => {
         setError(null);
-        const files = Array.from(selectedFiles);
+        const files = selectedFiles;
         if (files.length === 0 && !amend) {
             return;
         }
@@ -81,6 +84,7 @@ export const CommitForm: React.FC<CommitFormProps> = ({
     };
 
     const getButtonState = () => {
+        const repoCount = new Set(selectedFiles.map(file => file.repoPath || '')).size;
         if (amend && options.push) {
             return {
                 text: t('Amend & Push'),
@@ -97,20 +101,33 @@ export const CommitForm: React.FC<CommitFormProps> = ({
         }
         if (options.push) {
             return {
-                text: t('Commit & Push'),
+                text: repoCount > 1
+                    ? t('Commit {{count}} Repositories & Push', { count: repoCount })
+                    : t('Commit & Push'),
                 variant: 'primary' as const,
                 icon: 'codicon-repo-push'
             };
         }
         return {
-            text: t('Commit'),
+            text: repoCount > 1
+                ? t('Commit {{count}} Repositories', { count: repoCount })
+                : t('Commit'),
             variant: 'primary' as const,
             icon: 'codicon-check'
         };
     };
 
     const btnState = getButtonState();
-    const isDisabled = (selectedFiles.size === 0 && !amend) || !message.trim();
+    const isDisabled = (selectedFiles.length === 0 && !amend) || !message.trim();
+    const planItems = Array.from(selectedFiles.reduce((map, file) => {
+        const key = file.repoPath || '';
+        map.set(key, (map.get(key) || 0) + 1);
+        return map;
+    }, new Map<string, number>()).entries()).map(([repoPath, count]) => ({
+        repo: repositories.find(repo => repo.repoPath === repoPath),
+        repoPath,
+        count
+    }));
 
     return (
         <div className={styles.commitSection}>
@@ -135,7 +152,7 @@ export const CommitForm: React.FC<CommitFormProps> = ({
                         <button
                             className={`${styles.iconBtn} ${styles.generateBtn} ${isGenerating ? styles.generateBtnLoading : ''}`}
                             onClick={handleGenerateMessage}
-                            disabled={isGenerating || selectedFiles.size === 0}
+                            disabled={isGenerating || selectedFiles.length === 0}
                             title={t('Generate')}
                         >
                             <i className={`codicon ${isGenerating ? 'codicon-loading codicon-modifier-spin' : 'codicon-sparkle'}`}></i>
@@ -159,6 +176,21 @@ export const CommitForm: React.FC<CommitFormProps> = ({
                 rows={4}
                 className={styles.textarea}
             />
+
+            {planItems.length > 1 && (
+                <div className={styles.commitPlan}>
+                    <div className={styles.commitPlanTitle}>{t('Commit Plan')}</div>
+                    {planItems.map(item => (
+                        <div className={styles.commitPlanItem} key={item.repoPath || 'active'}>
+                            <span>
+                                {item.repo?.name || item.repoPath || t('Current Repository')}
+                                {item.repo?.branch ? ` - ${item.repo.branch}` : ''}
+                            </span>
+                            <span>{t('{{count}} files', { count: item.count })}</span>
+                        </div>
+                    ))}
+                </div>
+            )}
 
             {error && (
                 <div className={styles.errorMessage}>

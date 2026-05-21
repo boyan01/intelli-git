@@ -52,6 +52,9 @@ function normalizeExistingPath(filePath: string): string {
 }
 
 export class RepositoryManager implements vscode.Disposable {
+    private static readonly USER_REPOSITORIES_KEY = 'ideaCommitPanel.userRepositories.v1';
+    private static readonly HIDDEN_REPOSITORIES_KEY = 'ideaCommitPanel.hiddenRepositories.v1';
+
     private repositories = new Map<string, RepositoryEntry>();
     private activeRepoPath: string | undefined;
     private _onDidChangeActiveRepo = new vscode.EventEmitter<string | undefined>();
@@ -73,40 +76,69 @@ export class RepositoryManager implements vscode.Disposable {
         await this.scanRepositories();
     }
 
+    private getUserRepositoryPaths(): string[] {
+        return this.context.workspaceState.get<string[]>(RepositoryManager.USER_REPOSITORIES_KEY, []) || [];
+    }
+
+    private async saveUserRepositoryPaths(paths: string[]): Promise<void> {
+        const normalized = Array.from(new Set(paths.map(normalizeExistingPath))).sort((a, b) => a.localeCompare(b));
+        await this.context.workspaceState.update(RepositoryManager.USER_REPOSITORIES_KEY, normalized);
+    }
+
+    private getHiddenRepositoryPaths(): string[] {
+        return this.context.workspaceState.get<string[]>(RepositoryManager.HIDDEN_REPOSITORIES_KEY, []) || [];
+    }
+
+    private async saveHiddenRepositoryPaths(paths: string[]): Promise<void> {
+        const normalized = Array.from(new Set(paths.map(normalizeExistingPath))).sort((a, b) => a.localeCompare(b));
+        await this.context.workspaceState.update(RepositoryManager.HIDDEN_REPOSITORIES_KEY, normalized);
+    }
+
     private async scanRepositories() {
         const workspaceFolders = vscode.workspace.workspaceFolders || [];
         const newRepos = new Map<string, RepositoryScope>();
         let globalStateMigrationRepoPath: string | undefined;
+        const hiddenRepoPaths = new Set(this.getHiddenRepositoryPaths());
+        const candidateFolders: Array<{ folderPath: string; workspaceIndex?: number }> = [];
 
         for (const [index, folder] of workspaceFolders.entries()) {
-            const folderPath = normalizeExistingPath(folder.uri.fsPath);
+            candidateFolders.push({
+                folderPath: normalizeExistingPath(folder.uri.fsPath),
+                workspaceIndex: index
+            });
+        }
+
+        for (const repoPath of this.getUserRepositoryPaths()) {
+            candidateFolders.push({
+                folderPath: normalizeExistingPath(repoPath)
+            });
+        }
+
+        const seenFolders = new Set<string>();
+        for (const candidate of candidateFolders) {
+            const folderPath = normalizeExistingPath(candidate.folderPath);
+            if (seenFolders.has(folderPath)) {
+                continue;
+            }
+            seenFolders.add(folderPath);
+
+            if (!fs.existsSync(folderPath)) {
+                continue;
+            }
+
             try {
-                const git = simpleGit(folderPath);
-                const isRepo = await git.checkIsRepo();
-                if (isRepo) {
-                    const topLevel = await git.revparse(['--show-toplevel']);
-                    const rootPath = normalizeExistingPath(topLevel.trim());
-                    const gitState = await this.readRepositoryGitState(git, rootPath);
-                    const worktreeList = await this.readWorktreeList(git, rootPath);
-                    const currentWorktreeRecord = worktreeList?.records.find(record => (
-                        record.path && normalizeExistingPath(record.path) === rootPath
-                    ));
-                    const isLinkedWorktreeRoot = Boolean(worktreeList && currentWorktreeRecord && rootPath !== worktreeList.mainWorktreePath);
-                    const scope = this.createRepositoryScope({
-                        workspaceRoot: folderPath,
-                        gitRoot: rootPath,
-                        isSubmodule: false,
-                        kind: isLinkedWorktreeRoot ? 'worktree' : 'workspace',
-                        mainWorktreePath: isLinkedWorktreeRoot ? worktreeList?.mainWorktreePath : undefined,
-                        head: currentWorktreeRecord?.head || gitState.head,
-                        branch: currentWorktreeRecord?.branch || gitState.branch,
-                        isDetached: currentWorktreeRecord?.isDetached ?? gitState.isDetached,
-                        gitDir: gitState.gitDir
-                    });
+                const scope = await this.resolveRepositoryScope(folderPath);
+                if (scope) {
+                    if (hiddenRepoPaths.has(scope.repoPath)) {
+                        continue;
+                    }
+
                     newRepos.set(scope.repoPath, scope);
-                    if (index === 0) {
+                    if (candidate.workspaceIndex === 0) {
                         globalStateMigrationRepoPath = scope.repoPath;
                     }
+
+                    const git = simpleGit(scope.gitRoot);
 
                     // Find submodules
                     try {
@@ -120,7 +152,7 @@ export class RepositoryManager implements vscode.Disposable {
                                 const parts = line.trim().split(/\s+/);
                                 if (parts.length >= 2) {
                                     const subPath = parts[1];
-                                    const absoluteSubPath = normalizeExistingPath(path.join(rootPath, subPath));
+                                    const absoluteSubPath = normalizeExistingPath(path.join(scope.gitRoot, subPath));
                                     const submoduleGit = simpleGit(absoluteSubPath);
                                     const submoduleGitState = await this.readRepositoryGitState(submoduleGit, absoluteSubPath);
                                     const submoduleScope = this.createRepositoryScope({
@@ -130,16 +162,19 @@ export class RepositoryManager implements vscode.Disposable {
                                         kind: 'submodule',
                                         ...submoduleGitState
                                     });
-                                    newRepos.set(absoluteSubPath, submoduleScope);
+                                    if (!hiddenRepoPaths.has(submoduleScope.repoPath)) {
+                                        newRepos.set(absoluteSubPath, submoduleScope);
+                                    }
                                 }
                             }
                         }
                     } catch (e) {
-                        logger.error(`Failed to get submodules for ${rootPath}`, e);
+                        logger.error(`Failed to get submodules for ${scope.gitRoot}`, e);
                     }
 
-                    for (const worktreeScope of await this.discoverLinkedWorktrees(git, rootPath, worktreeList)) {
-                        if (!newRepos.has(worktreeScope.repoPath)) {
+                    const worktreeList = await this.readWorktreeList(git, scope.gitRoot);
+                    for (const worktreeScope of await this.discoverLinkedWorktrees(git, scope.gitRoot, worktreeList)) {
+                        if (!newRepos.has(worktreeScope.repoPath) && !hiddenRepoPaths.has(worktreeScope.repoPath)) {
                             newRepos.set(worktreeScope.repoPath, worktreeScope);
                         }
                     }
@@ -227,6 +262,35 @@ export class RepositoryManager implements vscode.Disposable {
 
         state.isDetached = Boolean(state.head && !state.branch);
         return state;
+    }
+
+    private async resolveRepositoryScope(folderPath: string): Promise<RepositoryScope | undefined> {
+        const git = simpleGit(folderPath);
+        if (!await git.checkIsRepo()) {
+            return undefined;
+        }
+
+        const topLevel = await git.revparse(['--show-toplevel']);
+        const rootPath = normalizeExistingPath(topLevel.trim());
+        const rootGit = simpleGit(rootPath);
+        const gitState = await this.readRepositoryGitState(rootGit, rootPath);
+        const worktreeList = await this.readWorktreeList(rootGit, rootPath);
+        const currentWorktreeRecord = worktreeList?.records.find(record => (
+            record.path && normalizeExistingPath(record.path) === rootPath
+        ));
+        const isLinkedWorktreeRoot = Boolean(worktreeList && currentWorktreeRecord && rootPath !== worktreeList.mainWorktreePath);
+
+        return this.createRepositoryScope({
+            workspaceRoot: folderPath,
+            gitRoot: rootPath,
+            isSubmodule: false,
+            kind: isLinkedWorktreeRoot ? 'worktree' : 'workspace',
+            mainWorktreePath: isLinkedWorktreeRoot ? worktreeList?.mainWorktreePath : undefined,
+            head: currentWorktreeRecord?.head || gitState.head,
+            branch: currentWorktreeRecord?.branch || gitState.branch,
+            isDetached: currentWorktreeRecord?.isDetached ?? gitState.isDetached,
+            gitDir: gitState.gitDir
+        });
     }
 
     private parseWorktreeList(output: string): WorktreeRecord[] {
@@ -435,6 +499,111 @@ export class RepositoryManager implements vscode.Disposable {
             return true;
         }
         return false;
+    }
+
+    public async addRepository(folderPath: string): Promise<RepositoryScope | undefined> {
+        const scope = await this.resolveRepositoryScope(normalizeExistingPath(folderPath));
+        if (!scope) {
+            return undefined;
+        }
+
+        const hidden = this.getHiddenRepositoryPaths().filter(path => path !== scope.repoPath);
+        await this.saveHiddenRepositoryPaths(hidden);
+
+        const userRepositories = this.getUserRepositoryPaths();
+        if (!userRepositories.some(path => normalizeExistingPath(path) === scope.workspaceRoot)) {
+            userRepositories.push(scope.workspaceRoot);
+            await this.saveUserRepositoryPaths(userRepositories);
+        }
+
+        await this.scanRepositories();
+        return this.repositories.get(scope.repoPath)?.info || scope;
+    }
+
+    public async removeRepository(repoPath: string): Promise<boolean> {
+        const normalizedRepoPath = normalizeExistingPath(repoPath);
+        const existing = this.repositories.get(normalizedRepoPath);
+        const existed = Boolean(existing);
+        const workspaceRoot = existing?.info.workspaceRoot;
+        const userRepositories = this.getUserRepositoryPaths().filter(path => {
+            const normalizedPath = normalizeExistingPath(path);
+            return normalizedPath !== normalizedRepoPath && normalizedPath !== workspaceRoot;
+        });
+        await this.saveUserRepositoryPaths(userRepositories);
+
+        const hidden = this.getHiddenRepositoryPaths();
+        if (!hidden.some(path => normalizeExistingPath(path) === normalizedRepoPath)) {
+            hidden.push(normalizedRepoPath);
+            await this.saveHiddenRepositoryPaths(hidden);
+        }
+
+        await this.scanRepositories();
+        return existed;
+    }
+
+    public async discoverWorkspaceRepositories(maxDepth = 3): Promise<RepositoryScope[]> {
+        const workspaceFolders = vscode.workspace.workspaceFolders || [];
+        const existing = new Set(this.getRepositories().map(repo => repo.repoPath));
+        const hidden = new Set(this.getHiddenRepositoryPaths());
+        const candidates = new Set<string>();
+        const ignoredNames = new Set([
+            '.git',
+            '.hg',
+            '.svn',
+            'node_modules',
+            'Pods',
+            'build',
+            'dist',
+            'out',
+            '.dart_tool',
+            '.gradle',
+            '.idea',
+            '.vscode'
+        ]);
+
+        const walk = (dir: string, depth: number) => {
+            if (depth > maxDepth) {
+                return;
+            }
+
+            let entries: fs.Dirent[];
+            try {
+                entries = fs.readdirSync(dir, { withFileTypes: true });
+            } catch {
+                return;
+            }
+
+            if (entries.some(entry => entry.name === '.git')) {
+                candidates.add(dir);
+                return;
+            }
+
+            for (const entry of entries) {
+                if (!entry.isDirectory() || ignoredNames.has(entry.name)) {
+                    continue;
+                }
+                walk(path.join(dir, entry.name), depth + 1);
+            }
+        };
+
+        for (const folder of workspaceFolders) {
+            walk(normalizeExistingPath(folder.uri.fsPath), 0);
+        }
+
+        const scopes: RepositoryScope[] = [];
+        for (const candidate of candidates) {
+            try {
+                const scope = await this.resolveRepositoryScope(candidate);
+                if (!scope || existing.has(scope.repoPath) || hidden.has(scope.repoPath)) {
+                    continue;
+                }
+                scopes.push(scope);
+            } catch (e) {
+                logger.debug(`Ignoring unavailable repository candidate ${candidate}`, e);
+            }
+        }
+
+        return scopes.sort((a, b) => a.name.localeCompare(b.name) || a.path.localeCompare(b.path));
     }
 
     public getAllServices(): GitService[] {

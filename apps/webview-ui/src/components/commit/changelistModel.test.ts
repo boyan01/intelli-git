@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { ChangelistState, FileStatus, GitHunk } from '@shared/messages';
-import { buildChangelists, buildSplitInfoByPath, getSelectedFiles, hasTrackedChanges } from './changelistModel';
+import type { ChangelistState, FileStatus, GitHunk, RepositoryCommitViewState } from '@shared/messages';
+import { buildChangelists, buildSplitInfoByPath, buildWorkspaceChangelists, getSelectedFiles, getWorkspaceSelectedFiles, hasTrackedChanges } from './changelistModel';
 
 const t = (key: string) => key;
 
@@ -148,5 +148,52 @@ describe('changelistModel', () => {
         expect(hasTrackedChanges([
             file('src/modified.ts')
         ])).toBe(true);
+    });
+
+    it('groups workspace changes by changelist and repository', () => {
+        const state = changelistState('staged');
+        const repositories: RepositoryCommitViewState[] = [
+            {
+                repository: {
+                    name: 'mixin-route',
+                    repoPath: '/workspace/mixin-route',
+                    path: '/workspace/mixin-route',
+                    workspaceRoot: '/workspace/mixin-route',
+                    gitRoot: '/workspace/mixin-route',
+                    isSubmodule: false
+                },
+                workspaceRoot: '/workspace/mixin-route',
+                changelistState: state,
+                files: [file('route.go', { staged: true })]
+            },
+            {
+                repository: {
+                    name: 'flutter-app',
+                    repoPath: '/workspace/flutter-app',
+                    path: '/workspace/flutter-app',
+                    workspaceRoot: '/workspace/flutter-app',
+                    gitRoot: '/workspace/flutter-app',
+                    isSubmodule: false
+                },
+                workspaceRoot: '/workspace/flutter-app',
+                changelistState: state,
+                files: [file('lib/main.dart', { staged: true })]
+            }
+        ];
+
+        const groups = buildWorkspaceChangelists(repositories, t);
+        const staged = groups.find(group => group.id === 'staged-changes');
+
+        expect(staged?.repositories.map(repoGroup => [
+            repoGroup.repository.name,
+            repoGroup.group.items.map(item => item.path)
+        ])).toEqual([
+            ['mixin-route', ['route.go']],
+            ['flutter-app', ['lib/main.dart']]
+        ]);
+        expect(Array.from(getWorkspaceSelectedFiles(groups, state).values())).toEqual([
+            { repoPath: '/workspace/mixin-route', path: 'route.go', status: 'M', staged: true, inactive: undefined },
+            { repoPath: '/workspace/flutter-app', path: 'lib/main.dart', status: 'M', staged: true, inactive: undefined }
+        ]);
     });
 });

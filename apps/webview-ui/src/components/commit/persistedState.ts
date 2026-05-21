@@ -21,6 +21,7 @@ export const commitStateDefaults: CommitPersistedStateSchema = {
             lists: [{ id: 'changes', name: 'Changes', isDefault: true, isActive: true }],
             assignments: {}
         },
-        workspaceRoot: ''
+        workspaceRoot: '',
+        repositories: []
     }
 };

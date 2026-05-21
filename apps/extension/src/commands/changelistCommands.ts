@@ -13,6 +13,7 @@ import { ChangelistOperations, createDefaultRefreshDecorations } from '../operat
 
 interface ChangelistFileContext {
     webviewSection: 'changelistFile';
+    repoPath?: string;
     path: string;
     paths?: string[];
     hunkIds?: string[];
@@ -33,6 +34,7 @@ interface ChangelistFileContext {
 
 interface ChangelistRootContext {
     webviewSection: 'changelistRoot';
+    repoPath?: string;
     changelistId?: string;
     paths?: string[];
     isActiveChangelist?: boolean;
@@ -48,6 +50,7 @@ interface ChangelistRootContext {
 
 interface ChangelistFolderContext {
     webviewSection: 'changelistFolder';
+    repoPath?: string;
     path: string;
     paths: string[];
     hasStaged?: boolean;

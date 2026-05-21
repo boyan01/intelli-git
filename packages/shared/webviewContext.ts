@@ -10,6 +10,7 @@ export const WEBVIEW_CONTEXT_SECTIONS = [
     'gitLogCommit',
     'gitLogCommitFile',
     'changelistRoot',
+    'changelistRepository',
     'changelistFolder',
     'changelistFile',
     'changelistHunk',
@@ -62,6 +63,7 @@ export interface GitLogCommitFileContext extends BaseWebviewContext {
 
 export interface ChangelistRootContext extends BaseWebviewContext {
     webviewSection: 'changelistRoot';
+    repoPath?: string;
     changelistId?: string;
     paths: string[];
     isActiveChangelist: boolean;
@@ -77,8 +79,24 @@ export interface ChangelistRootContext extends BaseWebviewContext {
     preventDefaultContextMenuItems: true;
 }
 
+export interface ChangelistRepositoryContext extends BaseWebviewContext {
+    webviewSection: 'changelistRepository';
+    repoPath: string;
+    paths: string[];
+    hasConflict: boolean;
+    hasInactive: boolean;
+    allInactive: boolean;
+    hasStaged: boolean;
+    allStaged: boolean;
+    hasUntracked: boolean;
+    changelistId?: string;
+    changelistMode: 'staged' | 'changes';
+    preventDefaultContextMenuItems: true;
+}
+
 export interface ChangelistFolderContext extends BaseWebviewContext {
     webviewSection: 'changelistFolder';
+    repoPath?: string;
     path: string;
     paths: string[];
     hasConflict: boolean;
@@ -94,6 +112,7 @@ export interface ChangelistFolderContext extends BaseWebviewContext {
 
 export interface ChangelistFileContext extends BaseWebviewContext {
     webviewSection: 'changelistFile';
+    repoPath?: string;
     path: string;
     paths: string[];
     hunkIds?: string[];
@@ -138,6 +157,7 @@ export type WebviewContextPayload =
     | GitLogCommitContext
     | GitLogCommitFileContext
     | ChangelistRootContext
+    | ChangelistRepositoryContext
     | ChangelistFolderContext
     | ChangelistFileContext
     | ChangelistBackgroundContext

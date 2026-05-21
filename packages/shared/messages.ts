@@ -29,6 +29,13 @@ export interface FileStatus {
     hasStagedInactive?: boolean;
 }
 
+export interface RepositoryFileReference {
+    repoPath?: string;
+    path: string;
+}
+
+export type FileReferenceInput = string | RepositoryFileReference;
+
 export interface ChangelistGroup {
     id: string;
     name: string;
@@ -59,14 +66,39 @@ export interface ChangelistState {
     assignments: Record<string, ChangelistAssignment>;
 }
 
+export interface RepositoryInfo {
+    name: string;
+    path: string;
+    repoPath: string;
+    workspaceRoot: string;
+    gitRoot: string;
+    gitDir?: string;
+    isSubmodule: boolean;
+    kind?: 'workspace' | 'submodule' | 'worktree';
+    mainWorktreePath?: string;
+    branch?: string;
+    head?: string;
+    isDetached?: boolean;
+}
+
+export interface RepositoryCommitViewState {
+    repository: RepositoryInfo;
+    files: FileStatus[];
+    changelistState: ChangelistState;
+    workspaceRoot: string;
+}
+
 export interface CommitViewState {
     files: FileStatus[];
     changelistState: ChangelistState;
     workspaceRoot: string;
     hasRepository?: boolean;
+    repositories?: RepositoryCommitViewState[];
+    activeRepository?: RepositoryInfo;
 }
 
 export interface ChangelistFileSelection {
+    repoPath?: string;
     path: string;
     status?: string;
     staged?: boolean;
@@ -148,25 +180,11 @@ export interface GitLogRevealRequest {
 }
 
 export interface ChangelistMoveRequest {
+    repoPath?: string;
     targetListId: string;
     paths?: string[];
     hunksByPath?: Record<string, string[]>;
     activateInactive?: boolean;
-}
-
-export interface RepositoryInfo {
-    name: string;
-    path: string;
-    repoPath: string;
-    workspaceRoot: string;
-    gitRoot: string;
-    gitDir?: string;
-    isSubmodule: boolean;
-    kind?: 'workspace' | 'submodule' | 'worktree';
-    mainWorktreePath?: string;
-    branch?: string;
-    head?: string;
-    isDetached?: boolean;
 }
 
 export interface WorktreeInfo {
@@ -185,6 +203,9 @@ export interface ExtensionMethods {
     getRepositories: () => Promise<RepositoryInfo[]>;
     getActiveRepository: () => Promise<string | undefined>;
     setActiveRepository: (repoPath: string) => Promise<boolean>;
+    addRepository: () => Promise<RepositoryInfo | undefined>;
+    scanWorkspaceRepositories: () => Promise<RepositoryInfo[]>;
+    removeRepository: (repoPath: string) => Promise<boolean>;
     getWorktrees: () => Promise<WorktreeInfo[]>;
     setActiveWorktree: (path: string) => Promise<boolean>;
     openWorktree: (path: string) => Promise<void>;
@@ -198,7 +219,7 @@ export interface ExtensionMethods {
     getCommitFiles: (hash: string) => Promise<CommitFile[]>;
     getMultiCommitFiles: (hashes: string[]) => Promise<CommitFile[]>;
     push: (params: { force: boolean; pushTags: boolean; noVerify?: boolean; remote: string; branch: string }) => Promise<void>;
-    openDiff: (path: string, staged?: boolean) => Promise<void>;
+    openDiff: (path: string | { path: string; repoPath?: string; staged?: boolean }, staged?: boolean) => Promise<void>;
     closeWebView: () => Promise<void>;
     openCommitDiff: (params: { path: string; leftRef: string; rightRef: string; preserveFocus?: boolean }) => Promise<void>;
     getStatus: () => Promise<FileStatus[]>;
@@ -207,18 +228,18 @@ export interface ExtensionMethods {
     getBranchInfo: () => Promise<BranchInfo>;
     getStashList: () => Promise<StashItem[]>;
     getStashFiles: (index: number) => Promise<CommitFile[]>;
-    commit: (params: { message: string; amend: boolean; files: string[]; push?: boolean }) => Promise<void>;
-    stage: (path: string) => Promise<void>;
-    stageFiles: (paths: string[]) => Promise<void>;
-    unstage: (path: string) => Promise<void>;
-    unstageFiles: (paths: string[]) => Promise<void>;
+    commit: (params: { message: string; amend: boolean; files: FileReferenceInput[]; push?: boolean }) => Promise<void>;
+    stage: (path: FileReferenceInput) => Promise<void>;
+    stageFiles: (paths: FileReferenceInput[]) => Promise<void>;
+    unstage: (path: FileReferenceInput) => Promise<void>;
+    unstageFiles: (paths: FileReferenceInput[]) => Promise<void>;
     stageAll: () => Promise<void>;
     unstageAll: () => Promise<void>;
     stageTracked: () => Promise<void>;
-    generateCommitMessage: (files?: string[]) => Promise<string>;
-    stash: (params: { message?: string; files: string[]; stagedOnly?: boolean }) => Promise<void>;
-    deleteFiles: (files: string[]) => Promise<void>;
-    rollback: (files: string[]) => Promise<void>;
+    generateCommitMessage: (files?: FileReferenceInput[]) => Promise<string>;
+    stash: (params: { message?: string; files: FileReferenceInput[]; stagedOnly?: boolean }) => Promise<void>;
+    deleteFiles: (files: FileReferenceInput[]) => Promise<void>;
+    rollback: (files: FileReferenceInput[]) => Promise<void>;
     switchBranch: (branch: string) => Promise<void>;
     pull: () => Promise<void>;
     fetch: () => Promise<void>;
@@ -230,7 +251,7 @@ export interface ExtensionMethods {
     continueRebase: (params: { message?: string; files?: string[] }) => Promise<void>;
     abortRebase: () => Promise<void>;
     resolveConflict: (params: { path: string; side: 'ours' | 'theirs' }) => Promise<void>;
-    openFile: (params: { path: string; preserveFocus?: boolean }) => Promise<void>;
+    openFile: (params: { path: string; repoPath?: string; preserveFocus?: boolean }) => Promise<void>;
     openStashDiff: (params: { index: number; path: string }) => Promise<void>;
     getBranchListData: () => Promise<BranchListData>;
     getLog: (options: LogOptions) => Promise<LogCommit[]>;
@@ -244,10 +265,10 @@ export interface ExtensionMethods {
     getWorkspaceRoot: () => Promise<string>;
     getLastCommitInfo: () => Promise<LastCommitInfo | null>;
     showErrorMessage: (message: string) => Promise<void>;
-    markHunkInactive: (params: { path: string; hunkId: string }) => Promise<void>;
-    markHunkActive: (params: { path: string; hunkId: string }) => Promise<void>;
-    markFilesInactive: (paths: string[]) => Promise<void>;
-    markFilesActive: (paths: string[]) => Promise<void>;
+    markHunkInactive: (params: { path: string; repoPath?: string; hunkId: string }) => Promise<void>;
+    markHunkActive: (params: { path: string; repoPath?: string; hunkId: string }) => Promise<void>;
+    markFilesInactive: (paths: FileReferenceInput[]) => Promise<void>;
+    markFilesActive: (paths: FileReferenceInput[]) => Promise<void>;
     setChangelistMode: (mode: ChangelistMode) => Promise<void>;
     createChangelist: (name?: string) => Promise<ChangelistInfo | null>;
     renameChangelist: (params: { id: string; name?: string }) => Promise<ChangelistInfo | null>;

@@ -1,29 +1,51 @@
 import * as vscode from 'vscode';
-import type { ChangelistInfo, ChangelistMode, ChangelistMoveRequest } from '@shared/messages';
+import type { ChangelistInfo, ChangelistMode, ChangelistMoveRequest, FileReferenceInput, RepositoryFileReference } from '@shared/messages';
 import { i18n } from '../utils/i18n';
 import type { ChangelistStateService } from '../services/ChangelistStateService';
 import type { ChangelistOperations } from '../operations/ChangelistOperations';
 
 export class ChangelistRpcHandler {
     constructor(
-        private readonly getOperations: () => ChangelistOperations | undefined,
-        private readonly getChangelistStateService: () => ChangelistStateService | undefined
+        private readonly getOperations: (repoPath?: string) => ChangelistOperations | undefined,
+        private readonly getChangelistStateService: (repoPath?: string) => ChangelistStateService | undefined
     ) { }
 
-    markHunkInactive = async (params: { path: string; hunkId: string }): Promise<void> => {
-        await this.getOperations()?.markHunksInactive(params.path, [params.hunkId]);
+    private normalizeFileReference(input: FileReferenceInput): RepositoryFileReference {
+        return typeof input === 'object' && input !== null
+            ? { repoPath: input.repoPath, path: input.path }
+            : { path: input };
+    }
+
+    private groupFileReferences(inputs: FileReferenceInput[]): Map<string | undefined, string[]> {
+        const grouped = new Map<string | undefined, Set<string>>();
+        for (const input of inputs) {
+            const ref = this.normalizeFileReference(input);
+            const paths = grouped.get(ref.repoPath) || new Set<string>();
+            paths.add(ref.path);
+            grouped.set(ref.repoPath, paths);
+        }
+
+        return new Map(Array.from(grouped.entries()).map(([repoPath, paths]) => [repoPath, Array.from(paths)]));
+    }
+
+    markHunkInactive = async (params: { path: string; repoPath?: string; hunkId: string }): Promise<void> => {
+        await this.getOperations(params.repoPath)?.markHunksInactive(params.path, [params.hunkId]);
     };
 
-    markHunkActive = async (params: { path: string; hunkId: string }): Promise<void> => {
-        await this.getOperations()?.markHunksActive(params.path, [params.hunkId]);
+    markHunkActive = async (params: { path: string; repoPath?: string; hunkId: string }): Promise<void> => {
+        await this.getOperations(params.repoPath)?.markHunksActive(params.path, [params.hunkId]);
     };
 
-    markFilesInactive = async (paths: string[]): Promise<void> => {
-        await this.getOperations()?.markFilesInactive(paths);
+    markFilesInactive = async (paths: FileReferenceInput[]): Promise<void> => {
+        for (const [repoPath, repoPaths] of this.groupFileReferences(paths)) {
+            await this.getOperations(repoPath)?.markFilesInactive(repoPaths);
+        }
     };
 
-    markFilesActive = async (paths: string[]): Promise<void> => {
-        await this.getOperations()?.markFilesActive(paths);
+    markFilesActive = async (paths: FileReferenceInput[]): Promise<void> => {
+        for (const [repoPath, repoPaths] of this.groupFileReferences(paths)) {
+            await this.getOperations(repoPath)?.markFilesActive(repoPaths);
+        }
     };
 
     setChangelistMode = async (mode: ChangelistMode): Promise<void> => {
@@ -89,7 +111,7 @@ export class ChangelistRpcHandler {
     };
 
     moveChangesToChangelist = async (params: ChangelistMoveRequest): Promise<void> => {
-        await this.getOperations()?.moveChangesToChangelist(params);
+        await this.getOperations(params.repoPath)?.moveChangesToChangelist(params);
     };
 
     moveFilesToChangelist = async (params: { paths: string[]; targetListId: string }): Promise<void> => {

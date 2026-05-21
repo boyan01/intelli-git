@@ -135,6 +135,27 @@
     border-color: var(--vscode-focusBorder);
 }
 
+.commitPlan {
+    margin: 0 8px 8px;
+    padding: 6px 8px;
+    border: 1px solid var(--vscode-panel-border);
+    border-radius: 4px;
+    background: var(--vscode-sideBarSectionHeader-background);
+    font-size: 12px;
+}
+
+.commitPlanTitle {
+    color: var(--vscode-descriptionForeground);
+    margin-bottom: 4px;
+}
+
+.commitPlanItem {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    line-height: 18px;
+}
+
 .errorMessage {
     display: flex;
     align-items: center;

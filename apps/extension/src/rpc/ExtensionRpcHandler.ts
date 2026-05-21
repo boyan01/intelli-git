@@ -2,7 +2,17 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import { RpcPeer } from '@shared/rpc';
-import type { WebviewMethods, ExtensionMethods, FileStatus, ChangelistFileSelection, ChangelistState, GitLogRevealRequest } from '@shared/messages';
+import type {
+    WebviewMethods,
+    ExtensionMethods,
+    FileStatus,
+    ChangelistFileSelection,
+    ChangelistState,
+    GitLogRevealRequest,
+    FileReferenceInput,
+    RepositoryCommitViewState,
+    RepositoryFileReference
+} from '@shared/messages';
 import { GitService } from '../services/GitService';
 import { RepositoryManager } from '../services/RepositoryManager';
 import { ChangelistStateService } from '../services/ChangelistStateService';
@@ -26,6 +36,10 @@ function normalizeExistingPath(filePath: string): string {
     } catch {
         return path.normalize(filePath);
     }
+}
+
+function isRepositoryFileReference(value: FileReferenceInput): value is RepositoryFileReference {
+    return typeof value === 'object' && value !== null && typeof value.path === 'string';
 }
 
 export interface ExtensionRpcHandlerOptions {
@@ -59,8 +73,8 @@ export class ExtensionRpcHandler {
         this.onChangelistFocusChange = options.onChangelistFocusChange;
         this.gitReadRpcHandler = new GitReadRpcHandler(this.repositoryManager, options.consumePendingGitLogReveal);
         this.changelistRpcHandler = new ChangelistRpcHandler(
-            () => this.getChangelistOperations(),
-            () => this.changelistStateService
+            repoPath => this.getChangelistOperationsForRepo(repoPath),
+            repoPath => repoPath ? this.getChangelistStateServiceForRepo(repoPath) : this.changelistStateService
         );
     }
 
@@ -72,6 +86,45 @@ export class ExtensionRpcHandler {
         return service;
     }
 
+    private getServiceForRepo(repoPath?: string): GitService {
+        const service = repoPath
+            ? this.repositoryManager.getService(repoPath)
+            : this.repositoryManager.getActiveService();
+        if (!service) {
+            throw new Error(repoPath ? `No repository found for ${repoPath}` : 'No active repository');
+        }
+        return service;
+    }
+
+    private getChangelistStateServiceForRepo(repoPath?: string): ChangelistStateService | undefined {
+        return this.getServiceForRepo(repoPath).changelistStateService;
+    }
+
+    private normalizeFileReference(input: FileReferenceInput): RepositoryFileReference {
+        return isRepositoryFileReference(input)
+            ? { repoPath: input.repoPath, path: input.path }
+            : { path: input };
+    }
+
+    private groupFileReferences(inputs: FileReferenceInput[]): Map<string | undefined, string[]> {
+        const grouped = new Map<string | undefined, Set<string>>();
+        for (const input of inputs) {
+            const ref = this.normalizeFileReference(input);
+            const paths = grouped.get(ref.repoPath) || new Set<string>();
+            paths.add(ref.path);
+            grouped.set(ref.repoPath, paths);
+        }
+
+        return new Map(Array.from(grouped.entries()).map(([repoPath, paths]) => [repoPath, Array.from(paths)]));
+    }
+
+    private getRepositoryName(repoPath: string | undefined, gitService: GitService): string {
+        const repositories = typeof this.repositoryManager.getRepositories === 'function'
+            ? this.repositoryManager.getRepositories()
+            : [];
+        return repositories.find(repo => repo.repoPath === repoPath)?.name || path.basename(gitService.getWorkspaceRoot());
+    }
+
     private get inactiveChangesService(): InactiveChangesService | undefined {
         return this.repositoryManager.getActiveService()?.inactiveChangesService;
     }
@@ -80,8 +133,8 @@ export class ExtensionRpcHandler {
         return this.repositoryManager.getActiveService()?.changelistStateService;
     }
 
-    private getChangelistOperations(): ChangelistOperations | undefined {
-        const gitService = this.repositoryManager.getActiveService();
+    private getChangelistOperationsForRepo(repoPath?: string): ChangelistOperations | undefined {
+        const gitService = repoPath ? this.repositoryManager.getService(repoPath) : this.repositoryManager.getActiveService();
         const inactiveChangesService = gitService?.inactiveChangesService;
         const changelistStateService = gitService?.changelistStateService;
         if (!gitService || !inactiveChangesService || !changelistStateService) {
@@ -135,6 +188,66 @@ export class ExtensionRpcHandler {
         return this.repositoryManager.setActiveRepository(repoPath);
     };
 
+    addRepository = async () => {
+        const selected = await vscode.window.showOpenDialog({
+            canSelectFiles: false,
+            canSelectFolders: true,
+            canSelectMany: false,
+            openLabel: i18n.t('Add Repository')
+        });
+
+        const folder = selected?.[0]?.fsPath;
+        if (!folder) {
+            return undefined;
+        }
+
+        const repository = await this.repositoryManager.addRepository(folder);
+        if (!repository) {
+            vscode.window.showWarningMessage(i18n.t('Selected folder is not a Git repository.'));
+        }
+        return repository;
+    };
+
+    scanWorkspaceRepositories = async () => {
+        const candidates = await this.repositoryManager.discoverWorkspaceRepositories();
+        if (candidates.length === 0) {
+            vscode.window.showInformationMessage(i18n.t('No Git repositories found in this workspace.'));
+            return [];
+        }
+
+        const selected = await vscode.window.showQuickPick(
+            candidates.map(repo => ({
+                label: repo.name,
+                description: repo.branch,
+                detail: repo.path,
+                repo
+            })),
+            {
+                canPickMany: true,
+                matchOnDescription: true,
+                matchOnDetail: true,
+                placeHolder: i18n.t('Select repositories to add')
+            }
+        );
+
+        if (!selected || selected.length === 0) {
+            return [];
+        }
+
+        const added = [];
+        for (const item of selected) {
+            const repo = await this.repositoryManager.addRepository(item.repo.path);
+            if (repo) {
+                added.push(repo);
+            }
+        }
+        return added;
+    };
+
+    removeRepository = async (repoPath: string) => {
+        return this.repositoryManager.removeRepository(repoPath);
+    };
+
     getWorktrees = async () => {
         const service = this.repositoryManager.getActiveService();
         if (!service) {
@@ -174,6 +287,9 @@ export class ExtensionRpcHandler {
                 getRepositories: this.getRepositories,
                 getActiveRepository: this.getActiveRepository,
                 setActiveRepository: this.setActiveRepository,
+                addRepository: this.addRepository,
+                scanWorkspaceRepositories: this.scanWorkspaceRepositories,
+                removeRepository: this.removeRepository,
                 getWorktrees: this.getWorktrees,
                 setActiveWorktree: this.setActiveWorktree,
                 openWorktree: this.openWorktree,
@@ -298,16 +414,19 @@ export class ExtensionRpcHandler {
     };
 
     private async getStatusWithState(): Promise<FileStatus[]> {
-        const gitService = this.repositoryManager.getActiveService();
+        return this.getStatusWithStateForService(this.repositoryManager.getActiveService());
+    };
+
+    private async getStatusWithStateForService(gitService: GitService | undefined): Promise<FileStatus[]> {
         if (!gitService) {
             return [];
         }
 
         const status = await gitService.getStatus();
-        this.inactiveChangesService?.syncWithStatus(status);
-        this.changelistStateService?.syncWithStatus(status);
+        gitService.inactiveChangesService?.syncWithStatus(status);
+        gitService.changelistStateService?.syncWithStatus(status);
 
-        return this.decorateStatus(status);
+        return this.decorateStatus(status, gitService.inactiveChangesService);
     };
 
     getStatus = async (): Promise<FileStatus[]> => {
@@ -321,46 +440,67 @@ export class ExtensionRpcHandler {
         }
 
         const status = await gitService.getStatus();
-        this.changelistStateService?.syncWithStatus(status);
-        return this.getCurrentChangelistState();
+        gitService.changelistStateService?.syncWithStatus(status);
+        return this.getCurrentChangelistState(gitService);
     };
 
     getCommitViewState = async () => {
         const startedAt = Date.now();
-        const gitService = this.repositoryManager.getActiveService();
-        if (!gitService) {
+        const repositories = typeof this.repositoryManager.getRepositories === 'function'
+            ? this.repositoryManager.getRepositories()
+            : [];
+        if (repositories.length === 0) {
             return {
                 files: [],
                 changelistState: this.getCurrentChangelistState(),
                 workspaceRoot: '',
-                hasRepository: false
+                hasRepository: false,
+                repositories: []
             };
         }
 
-        const status = await gitService.getStatus();
-        this.inactiveChangesService?.syncWithStatus(status);
-        this.changelistStateService?.syncWithStatus(status);
-        const files = this.decorateStatus(status);
-        const changelistState = this.getCurrentChangelistState();
+        const repositoryStates: RepositoryCommitViewState[] = [];
+        for (const repository of repositories) {
+            const service = this.repositoryManager.getService(repository.repoPath);
+            if (!service) {
+                continue;
+            }
+
+            const files = await this.getStatusWithStateForService(service);
+            repositoryStates.push({
+                repository,
+                files,
+                changelistState: this.getCurrentChangelistState(service),
+                workspaceRoot: service.getWorkspaceRoot()
+            });
+        }
+
+        const activeRepoPath = this.repositoryManager.getActiveRepoPath();
+        const activeRepositoryState = repositoryStates.find(state => state.repository.repoPath === activeRepoPath) || repositoryStates[0];
+        const files = activeRepositoryState?.files || [];
+        const changelistState = activeRepositoryState?.changelistState || this.getCurrentChangelistState();
         const elapsedMs = Date.now() - startedAt;
 
         logger.info('[refresh] commit view state loaded', {
             elapsedMs,
-            files: files.length,
-            hunkFiles: files.filter(file => file.hunks && file.hunks.length > 0).length,
+            repositories: repositoryStates.length,
+            files: repositoryStates.reduce((sum, state) => sum + state.files.length, 0),
+            hunkFiles: repositoryStates.reduce((sum, state) => sum + state.files.filter(file => file.hunks && file.hunks.length > 0).length, 0),
             mode: changelistState.mode
         });
 
         return {
             files,
             changelistState,
-            workspaceRoot: gitService.getWorkspaceRoot(),
-            hasRepository: true
+            workspaceRoot: activeRepositoryState?.workspaceRoot || '',
+            hasRepository: true,
+            repositories: repositoryStates,
+            activeRepository: activeRepositoryState?.repository
         };
     };
 
-    private getCurrentChangelistState(): ChangelistState {
-        return this.changelistStateService?.getState() || {
+    private getCurrentChangelistState(gitService?: GitService): ChangelistState {
+        return (gitService?.changelistStateService || this.changelistStateService)?.getState() || {
             mode: 'staged',
             activeListId: 'changes',
             lists: [{ id: 'changes', name: 'Changes', isDefault: true, isActive: true }],
@@ -368,10 +508,10 @@ export class ExtensionRpcHandler {
         };
     }
 
-    private decorateStatus(status: FileStatus[]): FileStatus[] {
+    private decorateStatus(status: FileStatus[], inactiveChangesService = this.inactiveChangesService): FileStatus[] {
         return status.map(file => {
-            const isFileInactive = !!this.inactiveChangesService?.isInactive(file.path);
-            const inactiveHunkIds = this.inactiveChangesService?.getInactiveHunkIds(file.path) || [];
+            const isFileInactive = !!inactiveChangesService?.isInactive(file.path);
+            const inactiveHunkIds = inactiveChangesService?.getInactiveHunkIds(file.path) || [];
             const inactiveHunkIdSet = new Set(inactiveHunkIds);
             const hasStagedInactive = file.staged && (
                 isFileInactive ||
@@ -391,34 +531,40 @@ export class ExtensionRpcHandler {
         });
     }
 
-    openDiff = async (filePathOrArgs: string | [string, boolean?], staged?: boolean): Promise<void> => {
-        const [filePath, effectiveStaged] = Array.isArray(filePathOrArgs)
-            ? [filePathOrArgs[0], filePathOrArgs[1]]
-            : [filePathOrArgs, staged];
+    openDiff = async (filePathOrArgs: string | [string, boolean?] | { path: string; repoPath?: string; staged?: boolean }, staged?: boolean): Promise<void> => {
+        const [filePath, effectiveStaged, repoPath] = Array.isArray(filePathOrArgs)
+            ? [filePathOrArgs[0], filePathOrArgs[1], undefined]
+            : typeof filePathOrArgs === 'object'
+                ? [filePathOrArgs.path, filePathOrArgs.staged, filePathOrArgs.repoPath]
+                : [filePathOrArgs, staged, undefined];
+        const gitService = this.getServiceForRepo(repoPath);
 
         if (effectiveStaged) {
             // HEAD vs Index
-            const leftUri = createRevisionContentUri(this.gitService, filePath, { ref: 'HEAD', preferStaged: true });
-            const rightUri = createRevisionContentUri(this.gitService, filePath, { ref: '' });
+            const leftUri = createRevisionContentUri(gitService, filePath, { ref: 'HEAD', preferStaged: true });
+            const rightUri = createRevisionContentUri(gitService, filePath, { ref: '' });
             const title = `${path.basename(filePath)} ${i18n.t('(Staged)')}`;
             await vscode.commands.executeCommand('vscode.diff', leftUri, rightUri, title);
         } else {
-            const status = await this.gitService.getStatus();
+            const status = await gitService.getStatus();
             const target = status.find(file => file.path === filePath && !file.staged) || status.find(file => file.path === filePath);
             if (target?.status === 'D') {
-                const leftUri = createRevisionContentUri(this.gitService, filePath, { ref: 'HEAD', preferStaged: false });
-                const rightUri = createRevisionContentUri(this.gitService, filePath, { ref: 'WORKTREE', preferStaged: false });
+                const leftUri = createRevisionContentUri(gitService, filePath, { ref: 'HEAD', preferStaged: false });
+                const rightUri = createRevisionContentUri(gitService, filePath, { ref: 'WORKTREE', preferStaged: false });
                 await vscode.commands.executeCommand('vscode.diff', leftUri, rightUri, path.basename(filePath));
                 return;
             }
 
-            const workspaceRoot = this.gitService.getWorkspaceRoot();
+            const workspaceRoot = gitService.getWorkspaceRoot();
             const uri = vscode.Uri.file(`${workspaceRoot}/${filePath}`);
             await vscode.commands.executeCommand('git.openChange', uri);
         }
     };
 
     setActiveChangelistFile = async (selection: ChangelistFileSelection | null): Promise<void> => {
+        if (selection?.repoPath) {
+            this.repositoryManager.setActiveRepository(selection.repoPath);
+        }
         this.onChangelistSelectionChange?.(selection);
     };
 
@@ -582,69 +728,100 @@ export class ExtensionRpcHandler {
         return branches.length === 1 ? branches[0] : branches.join(',');
     };
 
-    commit = async (params: { message: string; amend: boolean; files: string[]; push?: boolean }): Promise<void> => {
-        try {
-            const changelistState = this.changelistStateService?.getState();
+    commit = async (params: { message: string; amend: boolean; files: FileReferenceInput[]; push?: boolean }): Promise<void> => {
+        const groups = this.groupFileReferences(params.files || []);
+        const entries = groups.size > 0 ? Array.from(groups.entries()) : [[undefined, []] as [string | undefined, string[]]];
+        if (params.amend && entries.length > 1) {
+            throw new Error('Amend supports one repository at a time');
+        }
 
-            if (changelistState?.mode === 'changes') {
-                const status = await this.getStatusWithState();
-                const plan = this.changelistStateService?.buildCommitPlan(status, params.files);
+        const failures: string[] = [];
 
-                if (!plan || (!params.amend && plan.files.length === 0)) {
-                    throw new Error('No active changelist changes to commit');
-                }
+        for (const [repoPath, files] of entries) {
+            const gitService = this.getServiceForRepo(repoPath);
+            const repoName = this.getRepositoryName(repoPath, gitService);
 
-                if (params.amend && plan.files.length === 0) {
-                    await this.gitService.commitAmend(params.message, []);
+            try {
+                const changelistState = gitService.changelistStateService?.getState();
+
+                if (changelistState?.mode === 'changes') {
+                    const status = await this.getStatusWithStateForService(gitService);
+                    const plan = gitService.changelistStateService?.buildCommitPlan(status, files);
+
+                    if (!plan || (!params.amend && plan.files.length === 0)) {
+                        throw new Error('No active changelist changes to commit');
+                    }
+
+                    if (params.amend && plan.files.length === 0) {
+                        await gitService.commitAmend(params.message, []);
+                    } else {
+                        await gitService.commitChangelistPlan(params.message, params.amend, plan, status);
+                    }
+                } else if (params.amend) {
+                    await gitService.commitAmend(params.message, undefined);
                 } else {
-                    await this.gitService.commitChangelistPlan(params.message, params.amend, plan, status);
+                    await gitService.commit(params.message, undefined);
                 }
-            } else if (params.amend) {
-                await this.gitService.commitAmend(params.message, undefined);
-            } else {
-                await this.gitService.commit(params.message, undefined);
-            }
 
-            if (params.push) {
-                const branches = await this.gitService.branchRemote.getBranches();
-                if (branches.current) {
-                    await this.gitService.branchRemote.push('origin', branches.current);
+                if (params.push) {
+                    const branches = await gitService.branchRemote.getBranches();
+                    if (branches.current) {
+                        await gitService.branchRemote.push('origin', branches.current);
+                    }
                 }
+            } catch (e) {
+                failures.push(`${repoName}: ${e instanceof Error ? e.message : String(e)}`);
             }
-        } catch (e) {
-            throw e;
+        }
+
+        if (failures.length > 0) {
+            throw new Error(failures.length === entries.length
+                ? failures.join('\n')
+                : `Workspace commit completed with failures:\n${failures.join('\n')}`);
         }
     };
 
-    stage = async (filePath: string): Promise<void> => {
-        await this.gitService.stageFile(filePath);
+    stage = async (filePath: FileReferenceInput): Promise<void> => {
+        const ref = this.normalizeFileReference(filePath);
+        await this.getServiceForRepo(ref.repoPath).stageFile(ref.path);
     };
 
-    stageFiles = async (filePaths: string[]): Promise<void> => {
-        await this.gitService.stageFiles(filePaths);
+    stageFiles = async (filePaths: FileReferenceInput[]): Promise<void> => {
+        for (const [repoPath, paths] of this.groupFileReferences(filePaths)) {
+            await this.getServiceForRepo(repoPath).stageFiles(paths);
+        }
     };
 
-    unstage = async (filePath: string): Promise<void> => {
-        await this.gitService.unstageFile(filePath);
+    unstage = async (filePath: FileReferenceInput): Promise<void> => {
+        const ref = this.normalizeFileReference(filePath);
+        await this.getServiceForRepo(ref.repoPath).unstageFile(ref.path);
     };
 
-    unstageFiles = async (filePaths: string[]): Promise<void> => {
-        await this.gitService.unstageFiles(filePaths);
+    unstageFiles = async (filePaths: FileReferenceInput[]): Promise<void> => {
+        for (const [repoPath, paths] of this.groupFileReferences(filePaths)) {
+            await this.getServiceForRepo(repoPath).unstageFiles(paths);
+        }
     };
 
     stageAll = async (): Promise<void> => {
-        await this.gitService.stageAll();
+        for (const service of this.repositoryManager.getAllServices()) {
+            await service.stageAll();
+        }
     };
 
     unstageAll = async (): Promise<void> => {
-        await this.gitService.unstageAll();
+        for (const service of this.repositoryManager.getAllServices()) {
+            await service.unstageAll();
+        }
     };
 
     stageTracked = async (): Promise<void> => {
-        await this.gitService.stageTracked();
+        for (const service of this.repositoryManager.getAllServices()) {
+            await service.stageTracked();
+        }
     };
 
-    stash = async (params: { message?: string; files: string[]; stagedOnly?: boolean }): Promise<void> => {
+    stash = async (params: { message?: string; files: FileReferenceInput[]; stagedOnly?: boolean }): Promise<void> => {
         try {
             let message = params.message;
             if (!message) {
@@ -652,26 +829,29 @@ export class ExtensionRpcHandler {
                     placeHolder: i18n.t('extension.stashPlaceholder')
                 });
             }
-            await this.gitService.stash(message, params.files, false, params.stagedOnly);
+            for (const [repoPath, files] of this.groupFileReferences(params.files)) {
+                await this.getServiceForRepo(repoPath).stash(message, files, false, params.stagedOnly);
+            }
             vscode.window.showInformationMessage(i18n.t('extension.stashSuccess'));
         } catch (e) {
             vscode.window.showErrorMessage(i18n.t('extension.stashFailed', `${e}`));
         }
     };
 
-    deleteFiles = async (files: string[]): Promise<void> => {
+    deleteFiles = async (files: FileReferenceInput[]): Promise<void> => {
         const answer = await vscode.window.showWarningMessage(
             i18n.t('extension.deleteFilesConfirm', files.length),
             { modal: true },
             i18n.t('Delete')
         );
         if (answer === i18n.t('Delete')) {
-            const workspaceRoot = this.gitService.getWorkspaceRoot();
-            if (!workspaceRoot) return;
             try {
-                for (const file of files) {
-                    const uri = vscode.Uri.file(`${workspaceRoot}/${file}`);
-                    await vscode.workspace.fs.delete(uri, { recursive: false, useTrash: true });
+                for (const [repoPath, repoFiles] of this.groupFileReferences(files)) {
+                    const workspaceRoot = this.getServiceForRepo(repoPath).getWorkspaceRoot();
+                    for (const file of repoFiles) {
+                        const uri = vscode.Uri.file(`${workspaceRoot}/${file}`);
+                        await vscode.workspace.fs.delete(uri, { recursive: false, useTrash: true });
+                    }
                 }
 
             } catch (e) {
@@ -680,7 +860,7 @@ export class ExtensionRpcHandler {
         }
     };
 
-    rollback = async (files: string[]): Promise<void> => {
+    rollback = async (files: FileReferenceInput[]): Promise<void> => {
         const answer = await vscode.window.showWarningMessage(
             i18n.t('extension.rollbackFilesConfirm', files.length),
             { modal: true },
@@ -688,7 +868,9 @@ export class ExtensionRpcHandler {
         );
         if (answer === i18n.t('Rollback')) {
             try {
-                await this.gitService.rollbackFiles(files);
+                for (const [repoPath, repoFiles] of this.groupFileReferences(files)) {
+                    await this.getServiceForRepo(repoPath).rollbackFiles(repoFiles);
+                }
 
             } catch (e) {
                 vscode.window.showErrorMessage(i18n.t('extension.rollbackFailed', `${e}`));
@@ -696,8 +878,9 @@ export class ExtensionRpcHandler {
         }
     };
 
-    openFile = async (params: { path: string; preserveFocus?: boolean }): Promise<void> => {
-        const workspaceRoot = this.gitService.getWorkspaceRoot();
+    openFile = async (params: { path: string; repoPath?: string; preserveFocus?: boolean }): Promise<void> => {
+        const gitService = this.getServiceForRepo(params.repoPath);
+        const workspaceRoot = gitService.getWorkspaceRoot();
         if (!workspaceRoot) return;
         const uri = vscode.Uri.file(`${workspaceRoot}/${params.path}`);
         try {
@@ -706,10 +889,14 @@ export class ExtensionRpcHandler {
                 preserveFocus: params.preserveFocus ?? false
             });
         } catch {
-            const status = await this.gitService.getStatus();
+            const status = await gitService.getStatus();
             const deleted = status.some(file => file.path === params.path && file.status === 'D');
             if (deleted) {
-                await this.openDiff(params.path, status.find(file => file.path === params.path && file.status === 'D')?.staged);
+                await this.openDiff({
+                    path: params.path,
+                    repoPath: params.repoPath,
+                    staged: status.find(file => file.path === params.path && file.status === 'D')?.staged
+                });
             }
         }
     };
@@ -852,19 +1039,41 @@ export class ExtensionRpcHandler {
         }
     };
 
-    generateCommitMessage = async (files?: string[]): Promise<string> => {
+    generateCommitMessage = async (files?: FileReferenceInput[]): Promise<string> => {
         try {
             let diff = '';
-            const changelistState = this.changelistStateService?.getState();
 
-            if (changelistState?.mode === 'changes') {
-                const status = await this.getStatusWithState();
-                const plan = this.changelistStateService?.buildCommitPlan(status, files);
-                diff = plan ? await this.gitService.getDiffForChangelistPlan(plan, status) : '';
-            } else if (files && files.length > 0) {
-                diff = await this.gitService.getDiffForFiles(files);
+            if (files && files.length > 0) {
+                const parts: string[] = [];
+                for (const [repoPath, repoFiles] of this.groupFileReferences(files)) {
+                    const gitService = this.getServiceForRepo(repoPath);
+                    const repoName = this.getRepositoryName(repoPath, gitService);
+                    const changelistState = gitService.changelistStateService?.getState();
+                    let repoDiff = '';
+
+                    if (changelistState?.mode === 'changes') {
+                        const status = await this.getStatusWithStateForService(gitService);
+                        const plan = gitService.changelistStateService?.buildCommitPlan(status, repoFiles);
+                        repoDiff = plan ? await gitService.getDiffForChangelistPlan(plan, status) : '';
+                    } else {
+                        repoDiff = await gitService.getDiffForFiles(repoFiles);
+                    }
+
+                    if (repoDiff) {
+                        parts.push(`# Repository: ${repoName}\n${repoDiff}`);
+                    }
+                }
+                diff = parts.join('\n\n');
             } else {
-                diff = await this.gitService.getStagedDiff();
+                const changelistState = this.changelistStateService?.getState();
+
+                if (changelistState?.mode === 'changes') {
+                    const status = await this.getStatusWithState();
+                    const plan = this.changelistStateService?.buildCommitPlan(status, undefined);
+                    diff = plan ? await this.gitService.getDiffForChangelistPlan(plan, status) : '';
+                } else {
+                    diff = await this.gitService.getStagedDiff();
+                }
             }
 
             if (!diff) {
