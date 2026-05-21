@@ -510,24 +510,9 @@
           "group": "3_repository@2"
         },
         {
-          "command": "intelli-git.changelistMode.staged.current",
-          "when": "view == intelliGitView && intelli-git.changelistMode == 'staged'",
+          "submenu": "intelli-git.changelistMode",
+          "when": "view == intelliGitView",
           "group": "2_mode@1"
-        },
-        {
-          "command": "intelli-git.changelistMode.staged",
-          "when": "view == intelliGitView && intelli-git.changelistMode != 'staged'",
-          "group": "2_mode@1"
-        },
-        {
-          "command": "intelli-git.changelistMode.changes.current",
-          "when": "view == intelliGitView && intelli-git.changelistMode == 'changes'",
-          "group": "2_mode@2"
-        },
-        {
-          "command": "intelli-git.changelistMode.changes",
-          "when": "view == intelliGitView && intelli-git.changelistMode != 'changes'",
-          "group": "2_mode@2"
         }
       ],
       "view/item/context": [
