@@ -6,6 +6,7 @@ const errorMessages: Array<{ message: string; args: unknown[] }> = [];
 const openedExternalUris: MockUri[] = [];
 const createdTerminals: Array<{ options: unknown; sentText: string[]; shown: boolean }> = [];
 let languageModels: unknown[] = [];
+let language = 'en';
 let workspaceFoldersValue: Array<{ uri: MockUri; name: string; index: number }> | undefined;
 let warningMessageResponse: unknown;
 
@@ -163,6 +164,9 @@ export const window = {
 };
 
 export const env = {
+    get language() {
+        return language;
+    },
     async openExternal(uri: MockUri): Promise<boolean> {
         openedExternalUris.push(uri);
         return true;
@@ -260,6 +264,10 @@ export function __setLanguageModels(models: unknown[]): void {
 
 export function __resetLanguageModels(): void {
     languageModels = [];
+}
+
+export function __setLanguage(value: string): void {
+    language = value;
 }
 
 export function __setWorkspaceFolders(paths: string[] | undefined): void {

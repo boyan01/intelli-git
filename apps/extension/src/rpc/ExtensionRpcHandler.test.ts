@@ -666,7 +666,7 @@ describe('ExtensionRpcHandler AI provider', () => {
 
         await expect(handler.testAIProvider()).resolves.toMatchObject({
             ok: false,
-            message: 'extension.noCopilotModelsAvailable'
+            message: 'No GitHub Copilot models are currently available.'
         });
     });
 

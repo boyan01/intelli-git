@@ -32,8 +32,9 @@ export function registerStashCommands(
     context.subscriptions.push(
         vscode.commands.registerCommand('intelli-git.stashDrop', async (args: any) => {
             if (args && typeof args.stashIndex === 'number') {
+                const stashRef = `stash@{${args.stashIndex}}`;
                 const confirm = await vscode.window.showWarningMessage(
-                    vscode.l10n.t('Drop stash@{{{0}}}?', args.stashIndex),
+                    vscode.l10n.t('Drop {0}?', stashRef),
                     { modal: true },
                     vscode.l10n.t('Drop')
                 );
