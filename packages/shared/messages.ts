@@ -247,6 +247,7 @@ export interface ExtensionMethods {
     switchRepository: () => Promise<void>;
     openFolder: () => Promise<void>;
     initializeRepository: () => Promise<void>;
+    configureAIProvider: () => Promise<void>;
     pickBranch: () => Promise<void>;
     continueRebase: (params: { message?: string; files?: string[] }) => Promise<void>;
     abortRebase: () => Promise<void>;
@@ -311,6 +312,7 @@ export interface LocalBranchInfo {
 }
 
 export interface BranchListData {
+    hasRepository?: boolean;
     currentBranch: string;
     localBranches: string[];
     localBranchesInfo: LocalBranchInfo[];

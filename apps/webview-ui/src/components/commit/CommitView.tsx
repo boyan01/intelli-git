@@ -134,7 +134,6 @@ export function CommitView({ rebaseStatus }: CommitViewProps) {
     const [expandedIds, setExpandedIds] = usePersistedState('commit.expandedIds');
     const [commitMessage, setCommitMessage] = usePersistedState('commit.message');
     const [amend, setAmend] = usePersistedState('commit.amend');
-    const [isScanningRepositories, setIsScanningRepositories] = useState(false);
     const currentCommitMessageRef = useRef(commitMessage);
     const savedMessageRef = useRef<string | null>(null);
     const lastCommitInfoRequestRef = useRef(0);
@@ -215,19 +214,18 @@ export function CommitView({ rebaseStatus }: CommitViewProps) {
         setAmend(false);
     }, [setAmend]);
 
-    const handleScanRepositories = useCallback(async () => {
-        if (isScanningRepositories) {
-            return;
-        }
+    const handleOpenFolder = useCallback(() => {
+        void rpc.openFolder();
+    }, []);
 
-        setIsScanningRepositories(true);
-        try {
-            await rpc.scanWorkspaceRepositories();
-            reload();
-        } finally {
-            setIsScanningRepositories(false);
-        }
-    }, [isScanningRepositories, reload]);
+    const handleInitializeRepository = useCallback(async () => {
+        await rpc.initializeRepository();
+        await reload();
+    }, [reload]);
+
+    const handleConfigureAIProvider = useCallback(() => {
+        void rpc.configureAIProvider();
+    }, []);
 
     const renderStatePanel = () => {
         if (loading && files.length === 0 && !workspaceRoot && !error) {
@@ -261,22 +259,22 @@ export function CommitView({ rebaseStatus }: CommitViewProps) {
                 <CommitViewStatePanel
                     icon="codicon-source-control"
                     title={t('No Git repository found')}
-                    description={t('Scan this workspace or add a repository to start using Intelli Git.')}
+                    description={t('Open a folder that contains a Git repository, or initialize one in the current workspace.')}
                     actions={[
                         {
-                            label: isScanningRepositories ? t('Scanning Workspace') : t('Scan Workspace'),
-                            icon: isScanningRepositories ? 'codicon-loading codicon-modifier-spin' : 'codicon-search',
-                            onClick: handleScanRepositories,
-                            disabled: isScanningRepositories
+                            label: t('Open Folder'),
+                            icon: 'codicon-folder-opened',
+                            onClick: handleOpenFolder
                         },
                         {
-                            label: t('Add Repository'),
+                            label: t('Initialize Repository'),
                             icon: 'codicon-repo-create',
-                            onClick: async () => {
-                                await rpc.addRepository();
-                                reload();
-                            },
-                            disabled: isScanningRepositories
+                            onClick: handleInitializeRepository
+                        },
+                        {
+                            label: t('Configure AI Provider'),
+                            icon: 'codicon-sparkle',
+                            onClick: handleConfigureAIProvider
                         }
                     ]}
                 />
@@ -302,6 +300,16 @@ export function CommitView({ rebaseStatus }: CommitViewProps) {
     };
 
     const statePanel = renderStatePanel();
+    if (!hasRepository) {
+        return (
+            <div className={styles.commitView}>
+                <div className={styles.fileListContainer}>
+                    {statePanel}
+                </div>
+            </div>
+        );
+    }
+
     const backgroundContext: ChangelistBackgroundContext | undefined = hasRepository
         ? {
             webviewSection: 'changelistBackground',

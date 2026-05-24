@@ -509,7 +509,7 @@
         },
         {
           "submenu": "intelli-git.changelistMode",
-          "when": "view == intelliGitView",
+          "when": "view == intelliGitView && intelli-git.hasActiveRepository",
           "group": "2_mode@1"
         }
       ],

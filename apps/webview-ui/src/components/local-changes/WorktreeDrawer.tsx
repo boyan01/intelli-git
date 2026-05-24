@@ -156,7 +156,7 @@ export function WorktreeDrawer({ open, worktrees, loading, onClose }: WorktreeDr
         );
     }, []);
 
-    const renderTrailing = useCallback((_node: TreeNode<WorktreeNodeData>) => {
+    const renderTrailing = useCallback(() => {
         // Do not render status label text in trailing position to prevent layout redundancy
         return null;
     }, []);

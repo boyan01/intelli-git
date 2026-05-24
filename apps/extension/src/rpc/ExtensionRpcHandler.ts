@@ -331,6 +331,7 @@ export class ExtensionRpcHandler {
                 switchRepository: this.switchRepository,
                 openFolder: this.openFolder,
                 initializeRepository: this.initializeRepository,
+                configureAIProvider: this.configureAIProvider,
                 pickBranch: this.pickBranch,
                 continueRebase: this.continueRebase,
                 abortRebase: this.abortRebase,
@@ -969,6 +970,11 @@ export class ExtensionRpcHandler {
 
     initializeRepository = async (): Promise<void> => {
         await vscode.commands.executeCommand('git.init');
+        await this.repositoryManager.initialize();
+    };
+
+    configureAIProvider = async (): Promise<void> => {
+        await vscode.commands.executeCommand('intelli-git.ai.configureProvider');
     };
 
     showErrorMessage = async (message: string): Promise<void> => {

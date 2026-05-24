@@ -168,6 +168,7 @@ describe('ExtensionRpcHandler no repository state', () => {
         });
         await expect(readHandler.getStashList()).resolves.toEqual([]);
         await expect(readHandler.getBranchListData()).resolves.toEqual({
+            hasRepository: false,
             currentBranch: '',
             localBranches: [],
             localBranchesInfo: [],
@@ -176,6 +177,60 @@ describe('ExtensionRpcHandler no repository state', () => {
         });
         await expect(readHandler.getLog({})).resolves.toEqual([]);
         await expect(readHandler.getWorkspaceRoot()).resolves.toBe('');
+    });
+
+    it('marks branch list data as repository-backed when a repository is active', async () => {
+        const branchData = {
+            currentBranch: 'main',
+            localBranches: ['main'],
+            localBranchesInfo: [],
+            remoteBranches: {},
+            tags: []
+        };
+        const readHandler = new GitReadRpcHandler({
+            getActiveService: () => ({
+                branchRemote: {
+                    getBranchListData: vi.fn().mockResolvedValue(branchData)
+                }
+            })
+        } as any);
+
+        await expect(readHandler.getBranchListData()).resolves.toEqual({
+            ...branchData,
+            hasRepository: true
+        });
+    });
+
+    it('rescans repositories after initializing a repository', async () => {
+        vscodeTestMock.__resetExecutedCommands();
+        const initialize = vi.fn().mockResolvedValue(undefined);
+        const handler = new ExtensionRpcHandler({
+            context: {} as vscode.ExtensionContext,
+            repositoryManager: {
+                getActiveService: () => undefined,
+                initialize
+            } as any
+        });
+
+        await handler.initializeRepository();
+
+        expect(vscodeTestMock.__getExecutedCommands()).toContainEqual({
+            command: 'git.init',
+            args: []
+        });
+        expect(initialize).toHaveBeenCalledOnce();
+    });
+
+    it('opens AI provider setup from webview empty states', async () => {
+        vscodeTestMock.__resetExecutedCommands();
+        const handler = createNoRepoHandler();
+
+        await handler.configureAIProvider();
+
+        expect(vscodeTestMock.__getExecutedCommands()).toContainEqual({
+            command: 'intelli-git.ai.configureProvider',
+            args: []
+        });
     });
 });
 

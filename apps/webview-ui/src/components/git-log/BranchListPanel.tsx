@@ -23,6 +23,7 @@ interface BranchListPanelProps {
 }
 
 const emptyBranchListData: BranchListData = {
+    hasRepository: true,
     currentBranch: '',
     localBranches: [],
     localBranchesInfo: [],

@@ -10,8 +10,19 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { rpc, rpcEvents } from '../../lib/rpc_client';
 import { usePersistedState } from '../../hooks/usePersistedState';
 import { useRpcData } from '../../hooks/useRpcData';
+import { useTranslation } from 'react-i18next';
+import type { BranchListData } from '@shared/messages';
 
 const NARROW_THRESHOLD = 800;
+
+const emptyBranchListData: BranchListData = {
+    hasRepository: true,
+    currentBranch: '',
+    localBranches: [],
+    localBranchesInfo: [],
+    remoteBranches: {},
+    tags: []
+};
 
 interface BranchFilterRequest {
     branch: string;
@@ -19,10 +30,16 @@ interface BranchFilterRequest {
 }
 
 export function GitLogView() {
+    const { t } = useTranslation();
     const containerRef = useRef<HTMLDivElement>(null);
     const [selectedHashes, setSelectedHashes] = useState<string[]>([]);
     const [branchFilter, setBranchFilter] = useState<BranchFilterRequest | undefined>(undefined);
     const [isNarrowMode, setIsNarrowMode] = useState(false);
+    const loadBranchListData = useCallback(() => rpc.getBranchListData(), []);
+    const { data: branchListData, loading: branchListLoading, reload: reloadBranchList } = useRpcData(
+        loadBranchListData,
+        { initialValue: emptyBranchListData }
+    );
 
     const [branchSplitRatio, setBranchSplitRatio] = usePersistedState('gitLog.branchSplitRatio');
     const [detailsSplitRatio, setDetailsSplitRatio] = usePersistedState('gitLog.detailsSplitRatio');
@@ -63,6 +80,64 @@ export function GitLogView() {
         return () => observer.disconnect();
     }, []);
 
+    const handleInitializeRepository = useCallback(async () => {
+        await rpc.initializeRepository();
+        await reloadBranchList();
+    }, [reloadBranchList]);
+
+    const { isExpired } = useVersionCheck();
+    const hasRepository = branchListData.hasRepository !== false;
+    if (branchListLoading) {
+        return (
+            <div ref={containerRef} className={styles.container}>
+                <div className={styles.statePanel}>
+                    <i className={`codicon codicon-loading codicon-modifier-spin ${styles.stateIcon}`} aria-hidden="true" />
+                    <div className={styles.stateTitle}>{t('Loading...')}</div>
+                </div>
+            </div>
+        );
+    }
+
+    if (!hasRepository) {
+        return (
+            <div ref={containerRef} className={styles.container}>
+                <div className={styles.statePanel}>
+                    <i className={`codicon codicon-source-control ${styles.stateIcon}`} aria-hidden="true" />
+                    <div className={styles.stateTitle}>{t('No Git repository found')}</div>
+                    <div className={styles.stateDescription}>
+                        {t('Open a folder that contains a Git repository, or initialize one in the current workspace.')}
+                    </div>
+                    <div className={styles.stateActions}>
+                        <button
+                            className={styles.stateButton}
+                            type="button"
+                            onClick={() => void rpc.openFolder()}
+                        >
+                            <i className="codicon codicon-folder-opened" aria-hidden="true" />
+                            <span>{t('Open Folder')}</span>
+                        </button>
+                        <button
+                            className={styles.stateButton}
+                            type="button"
+                            onClick={handleInitializeRepository}
+                        >
+                            <i className="codicon codicon-repo-create" aria-hidden="true" />
+                            <span>{t('Initialize Repository')}</span>
+                        </button>
+                        <button
+                            className={styles.stateButton}
+                            type="button"
+                            onClick={() => void rpc.configureAIProvider()}
+                        >
+                            <i className="codicon codicon-sparkle" aria-hidden="true" />
+                            <span>{t('Configure AI Provider')}</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     const logListPanel = (
         <LogListPanel
             onSelectionChange={setSelectedHashes}
@@ -72,7 +147,6 @@ export function GitLogView() {
         />
     );
 
-    const { isExpired } = useVersionCheck();
     const commitDetailsPanel = isExpired ? <VersionExpiredPanel /> : (
         <CommitDetailsView
             selectedHashes={selectedHashes}

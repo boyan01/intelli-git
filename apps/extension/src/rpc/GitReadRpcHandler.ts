@@ -70,12 +70,22 @@ export class GitReadRpcHandler {
     };
 
     getBranchListData = async (): Promise<BranchListData> => {
-        return await this.repositoryManager.getActiveService()?.branchRemote.getBranchListData() ?? {
-            currentBranch: '',
-            localBranches: [],
-            localBranchesInfo: [],
-            remoteBranches: {},
-            tags: []
+        const gitService = this.repositoryManager.getActiveService();
+        if (!gitService) {
+            return {
+                hasRepository: false,
+                currentBranch: '',
+                localBranches: [],
+                localBranchesInfo: [],
+                remoteBranches: {},
+                tags: []
+            };
+        }
+
+        const data = await gitService.branchRemote.getBranchListData();
+        return {
+            ...data,
+            hasRepository: true
         };
     };
 

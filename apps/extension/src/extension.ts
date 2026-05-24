@@ -4,7 +4,7 @@ import { CommitViewProvider, GitLogViewProvider, StashContentProvider, RevisionC
 import { RepositoryManager, type RepositoryScope } from './services/RepositoryManager';
 import { createGitWatcher } from './services/GitRepositoryWatcher';
 import { BranchStatusBar, GitLogStatusBar } from './ui';
-import { registerStashCommands, registerGlobalNavigationCommands, registerNavigationCommands, registerWorktreeCommands, registerBranchCommands, registerLogCommands, registerLogFileCommands, registerChangelistCommands, registerAiCommands, registerEditorGitCommands } from './commands';
+import { registerStashCommands, registerGlobalNavigationCommands, registerWorktreeCommands, registerBranchCommands, registerLogCommands, registerLogFileCommands, registerChangelistCommands, registerAiCommands, registerEditorGitCommands } from './commands';
 import { logger } from './utils/logger';
 import { ChangeBlockEditorController } from './editor/ChangeBlockEditorController';
 
@@ -271,6 +271,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
     const updateRepositoryContext = () => {
         const repositories = repositoryManager.getRepositories().filter(repo => repo.kind !== 'worktree');
+        void vscode.commands.executeCommand('setContext', 'intelli-git.hasActiveRepository', Boolean(repositoryManager.getActiveService()));
         void vscode.commands.executeCommand('setContext', 'intelli-git.hasMultipleRepositories', repositories.length > 1);
     };
 
@@ -332,7 +333,6 @@ export async function activate(context: vscode.ExtensionContext) {
         changeBlockEditorController = new ChangeBlockEditorController(gitService, inactiveChangesService, changelistStateService, provider);
 
         registerStashCommands(repoContext, gitService, provider);
-        registerNavigationCommands(repoContext, branchStatusBar, provider);
         registerWorktreeCommands(repoContext, gitService, repositoryManager, provider);
         registerBranchCommands(repoContext, gitService, gitLogProvider);
         registerLogCommands(repoContext, gitService);
@@ -370,7 +370,18 @@ export async function activate(context: vscode.ExtensionContext) {
     );
 
     registerAiCommands(context);
-    registerGlobalNavigationCommands(context, gitLogProvider);
+    registerGlobalNavigationCommands(context, {
+        gitLogProvider,
+        commitViewProvider: provider,
+        getBranchStatusBar: () => branchStatusBar,
+        hasActiveRepository: () => Boolean(repositoryManager.getActiveService()),
+        onRefresh: async () => {
+            await repositoryManager.initialize();
+            bindActiveRepository();
+            triggerRefresh();
+            void resetGitWatcher();
+        }
+    });
     bindActiveRepository();
 
     // Register Author Context Menu Commands
@@ -438,9 +449,13 @@ export async function activate(context: vscode.ExtensionContext) {
 
     context.subscriptions.push(
         vscode.workspace.onDidChangeWorkspaceFolders(() => {
-            branchStatusBar?.update();
-            gitLogStatusBar?.update();
-            void resetGitWatcher();
+            void repositoryManager.initialize()
+                .then(() => {
+                    bindActiveRepository();
+                    triggerRefresh();
+                    void resetGitWatcher();
+                })
+                .catch(e => logger.error('Failed to refresh repositories after workspace folder change', e));
         })
     );
 

@@ -63,6 +63,7 @@ export class VSCodeGitWatcher implements vscode.Disposable {
             this.disposables.push(
                 api.onDidOpenRepository(repo => {
                     this.disposables.push(repo.state.onDidChange(() => this.scheduleRefresh()));
+                    this.scheduleRefresh();
                 })
             );
 

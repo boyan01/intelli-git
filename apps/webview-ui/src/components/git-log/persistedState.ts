@@ -24,6 +24,7 @@ export interface GitLogPersistedStateSchema {
 
 export const gitLogStateDefaults: GitLogPersistedStateSchema = {
     'gitLog.branchListData': {
+        hasRepository: true,
         currentBranch: '',
         localBranches: [],
         localBranchesInfo: [],
