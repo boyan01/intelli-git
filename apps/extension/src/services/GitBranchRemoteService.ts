@@ -1,12 +1,41 @@
 import simpleGit, { type SimpleGit } from 'simple-git';
 import * as fs from 'fs';
 import * as path from 'path';
-import type { BranchInfo, BranchListData, CommitDetails, CommitFile, PushCommitsData, PushInitState, WorktreeInfo } from '@shared/messages';
+import type {
+    BranchInfo,
+    BranchListData,
+    CommitDetails,
+    CommitFile,
+    PushCommitsData,
+    PushInitState,
+    RemoteLinkCapabilities,
+    RemoteLinkInfo,
+    RemoteProvider,
+    WorktreeInfo
+} from '@shared/messages';
 import { logger } from '../utils/logger';
 
 const GIT_LOG_RECORD_SEPARATOR = '\x1e';
 const GIT_LOG_FIELD_SEPARATOR = '\x1f';
 const PUSH_COMMIT_LOG_FORMAT = '%x1e%H%x1f%h%x1f%s%x1f%an%x1f%aI%x1f%ae%x1f%P%x1f%b';
+const UNKNOWN_REMOTE_LINK_CAPABILITIES: RemoteLinkCapabilities = {
+    commit: false,
+    branch: false,
+    file: false,
+    compare: false
+};
+const COMMON_REMOTE_LINK_CAPABILITIES: RemoteLinkCapabilities = {
+    commit: true,
+    branch: true,
+    file: true,
+    compare: true
+};
+const PARTIAL_REMOTE_LINK_CAPABILITIES: RemoteLinkCapabilities = {
+    commit: true,
+    branch: true,
+    file: true,
+    compare: false
+};
 
 export interface GitBranchRemoteServiceOptions {
     git: SimpleGit;
@@ -33,32 +62,195 @@ interface WorktreeRecord {
     isPrunable?: boolean;
 }
 
-function getGitHubRepositoryUrl(remoteUrl: string): string | undefined {
-    const normalized = remoteUrl.trim().replace(/\.git\/?$/, '');
+interface ParsedRemoteUrl {
+    hostname: string;
+    pathParts: string[];
+}
+
+function stripGitSuffix(value: string): string {
+    return value.trim().replace(/\.git\/?$/, '').replace(/\/+$/, '');
+}
+
+function splitRemotePath(pathname: string): string[] {
+    return stripGitSuffix(pathname)
+        .replace(/^\/+|\/+$/g, '')
+        .split('/')
+        .filter(Boolean);
+}
+
+function decodeRemotePathPart(value: string): string {
+    try {
+        return decodeURIComponent(value);
+    } catch {
+        return value;
+    }
+}
+
+function parseRemoteUrl(remoteUrl: string): ParsedRemoteUrl | undefined {
+    const normalized = stripGitSuffix(remoteUrl);
     if (!normalized) {
         return undefined;
     }
 
     try {
         const url = new URL(normalized);
-        if (url.hostname.toLowerCase() !== 'github.com') {
-            return undefined;
-        }
-
-        const pathParts = url.pathname.replace(/^\/+|\/+$/g, '').split('/');
-        if (pathParts.length < 2) {
-            return undefined;
-        }
-
-        return `https://github.com/${pathParts[0]}/${pathParts[1]}`;
+        return {
+            hostname: url.hostname.toLowerCase(),
+            pathParts: splitRemotePath(url.pathname).map(decodeRemotePathPart)
+        };
     } catch {
-        const sshMatch = normalized.match(/^(?:[^@]+@)?github\.com[:/]([^/]+)\/(.+)$/i);
+        const sshMatch = normalized.match(/^(?:[^@/\s]+@)?([^:/\s]+):(.+)$/);
         if (!sshMatch) {
             return undefined;
         }
 
-        return `https://github.com/${sshMatch[1]}/${sshMatch[2]}`;
+        return {
+            hostname: sshMatch[1].toLowerCase(),
+            pathParts: splitRemotePath(sshMatch[2]).map(decodeRemotePathPart)
+        };
     }
+}
+
+function createRemoteLinkInfo(
+    provider: RemoteProvider,
+    repositoryUrl: string,
+    capabilities: RemoteLinkCapabilities
+): RemoteLinkInfo {
+    return { provider, repositoryUrl, capabilities };
+}
+
+function getUnknownRemoteLinkInfo(): RemoteLinkInfo {
+    return { provider: 'unknown', capabilities: UNKNOWN_REMOTE_LINK_CAPABILITIES };
+}
+
+function getRemoteLinkInfo(remoteUrl: string): RemoteLinkInfo {
+    const parsed = parseRemoteUrl(remoteUrl);
+    if (!parsed) {
+        return getUnknownRemoteLinkInfo();
+    }
+
+    const { hostname, pathParts } = parsed;
+
+    if (hostname === 'github.com' && pathParts.length >= 2) {
+        return createRemoteLinkInfo(
+            'github',
+            `https://github.com/${encodePath(pathParts[0])}/${encodePath(pathParts[1])}`,
+            COMMON_REMOTE_LINK_CAPABILITIES
+        );
+    }
+
+    if ((hostname === 'gitlab.com' || hostname.includes('gitlab')) && pathParts.length >= 2) {
+        return createRemoteLinkInfo(
+            'gitlab',
+            `https://${hostname}/${pathParts.map(encodePath).join('/')}`,
+            COMMON_REMOTE_LINK_CAPABILITIES
+        );
+    }
+
+    if (hostname === 'bitbucket.org' && pathParts.length >= 2) {
+        return createRemoteLinkInfo(
+            'bitbucket',
+            `https://bitbucket.org/${encodePath(pathParts[0])}/${encodePath(pathParts[1])}`,
+            PARTIAL_REMOTE_LINK_CAPABILITIES
+        );
+    }
+
+    if (hostname === 'dev.azure.com' && pathParts.length >= 4 && pathParts[2] === '_git') {
+        return createRemoteLinkInfo(
+            'azure',
+            `https://dev.azure.com/${encodePath(pathParts[0])}/${encodePath(pathParts[1])}/_git/${encodePath(pathParts[3])}`,
+            PARTIAL_REMOTE_LINK_CAPABILITIES
+        );
+    }
+
+    if (hostname.endsWith('.visualstudio.com') && pathParts.length >= 3 && pathParts[1] === '_git') {
+        return createRemoteLinkInfo(
+            'azure',
+            `https://${hostname}/${encodePath(pathParts[0])}/_git/${encodePath(pathParts[2])}`,
+            PARTIAL_REMOTE_LINK_CAPABILITIES
+        );
+    }
+
+    if (hostname === 'ssh.dev.azure.com' && pathParts.length >= 4 && pathParts[0] === 'v3') {
+        return createRemoteLinkInfo(
+            'azure',
+            `https://dev.azure.com/${encodePath(pathParts[1])}/${encodePath(pathParts[2])}/_git/${encodePath(pathParts[3])}`,
+            PARTIAL_REMOTE_LINK_CAPABILITIES
+        );
+    }
+
+    return getUnknownRemoteLinkInfo();
+}
+
+function encodePath(value: string): string {
+    return value.split('/').map(part => encodeURIComponent(part)).join('/');
+}
+
+function createQueryString(params: Record<string, string>): string {
+    return new URLSearchParams(params).toString();
+}
+
+function getAzureVersion(ref: string): string {
+    return /^[0-9a-f]{7,40}$/i.test(ref) ? `GC${ref}` : `GB${ref}`;
+}
+
+function getRemoteCommitUrl(remoteLink: RemoteLinkInfo, hash: string): string | undefined {
+    if (!remoteLink.repositoryUrl || !remoteLink.capabilities.commit) {
+        return undefined;
+    }
+
+    if (remoteLink.provider === 'bitbucket') {
+        return `${remoteLink.repositoryUrl}/commits/${encodePath(hash)}`;
+    }
+
+    if (remoteLink.provider === 'gitlab') {
+        return `${remoteLink.repositoryUrl}/-/commit/${encodePath(hash)}`;
+    }
+
+    return `${remoteLink.repositoryUrl}/commit/${encodePath(hash)}`;
+}
+
+function getRemoteBranchUrl(remoteLink: RemoteLinkInfo, branch: string): string | undefined {
+    if (!remoteLink.repositoryUrl || !remoteLink.capabilities.branch) {
+        return undefined;
+    }
+
+    if (remoteLink.provider === 'bitbucket') {
+        return `${remoteLink.repositoryUrl}/src/${encodePath(branch)}/`;
+    }
+
+    if (remoteLink.provider === 'azure') {
+        return `${remoteLink.repositoryUrl}?${createQueryString({ version: `GB${branch}` })}`;
+    }
+
+    const treeSegment = remoteLink.provider === 'gitlab' ? '-/tree' : 'tree';
+    return `${remoteLink.repositoryUrl}/${treeSegment}/${encodePath(branch)}`;
+}
+
+function getRemoteFileUrl(remoteLink: RemoteLinkInfo, ref: string, filePath: string): string | undefined {
+    if (!remoteLink.repositoryUrl || !remoteLink.capabilities.file) {
+        return undefined;
+    }
+
+    if (remoteLink.provider === 'bitbucket') {
+        return `${remoteLink.repositoryUrl}/src/${encodePath(ref)}/${encodePath(filePath)}`;
+    }
+
+    if (remoteLink.provider === 'azure') {
+        return `${remoteLink.repositoryUrl}?${createQueryString({ path: `/${filePath}`, version: getAzureVersion(ref) })}`;
+    }
+
+    const blobSegment = remoteLink.provider === 'gitlab' ? '-/blob' : 'blob';
+    return `${remoteLink.repositoryUrl}/${blobSegment}/${encodePath(ref)}/${encodePath(filePath)}`;
+}
+
+function getRemoteCompareUrl(remoteLink: RemoteLinkInfo, base: string, head: string): string | undefined {
+    if (!remoteLink.repositoryUrl || !remoteLink.capabilities.compare) {
+        return undefined;
+    }
+
+    const compareSegment = remoteLink.provider === 'gitlab' ? '-/compare' : 'compare';
+    return `${remoteLink.repositoryUrl}/${compareSegment}/${encodePath(base)}...${encodePath(head)}`;
 }
 
 function normalizePath(filePath: string): string {
@@ -328,7 +520,7 @@ export class GitBranchRemoteService {
         }
     }
 
-    public async getGitHubRepositoryUrl(): Promise<string | undefined> {
+    public async getRemoteLinkInfo(): Promise<RemoteLinkInfo> {
         const remotes = await this.options.git.getRemotes(true);
         for (const remote of remotes) {
             const refs = remote.refs as { fetch?: string; push?: string };
@@ -337,18 +529,39 @@ export class GitBranchRemoteService {
                 continue;
             }
 
-            const repositoryUrl = getGitHubRepositoryUrl(remoteUrl);
-            if (repositoryUrl) {
-                return repositoryUrl;
+            const remoteLink = getRemoteLinkInfo(remoteUrl);
+            if (remoteLink.provider !== 'unknown') {
+                return remoteLink;
             }
         }
 
-        return undefined;
+        return getUnknownRemoteLinkInfo();
     }
 
-    public async getRemoteProvider(): Promise<'github' | undefined> {
-        const repositoryUrl = await this.getGitHubRepositoryUrl();
-        return repositoryUrl ? 'github' : undefined;
+    public async getGitHubRepositoryUrl(): Promise<string | undefined> {
+        const remoteLink = await this.getRemoteLinkInfo();
+        return remoteLink.provider === 'github' ? remoteLink.repositoryUrl : undefined;
+    }
+
+    public async getRemoteProvider(): Promise<RemoteProvider> {
+        const remoteLink = await this.getRemoteLinkInfo();
+        return remoteLink.provider;
+    }
+
+    public async getRemoteCommitUrl(hash: string): Promise<string | undefined> {
+        return getRemoteCommitUrl(await this.getRemoteLinkInfo(), hash);
+    }
+
+    public async getRemoteBranchUrl(branch: string): Promise<string | undefined> {
+        return getRemoteBranchUrl(await this.getRemoteLinkInfo(), branch);
+    }
+
+    public async getRemoteFileUrl(ref: string, filePath: string): Promise<string | undefined> {
+        return getRemoteFileUrl(await this.getRemoteLinkInfo(), ref, filePath);
+    }
+
+    public async getRemoteCompareUrl(base: string, head: string): Promise<string | undefined> {
+        return getRemoteCompareUrl(await this.getRemoteLinkInfo(), base, head);
     }
 
     public async getRemoteBranches(): Promise<string[]> {

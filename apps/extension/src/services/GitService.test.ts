@@ -1001,6 +1001,102 @@ describe('GitService branch remote workflows', () => {
 
         await expect(service.branchRemote.getRemoteProvider()).resolves.toBe('github');
         await expect(service.branchRemote.getGitHubRepositoryUrl()).resolves.toBe('https://github.com/owner/repo');
+        await expect(service.branchRemote.getRemoteLinkInfo()).resolves.toMatchObject({
+            provider: 'github',
+            repositoryUrl: 'https://github.com/owner/repo',
+            capabilities: {
+                commit: true,
+                branch: true,
+                file: true,
+                compare: true
+            }
+        });
+        await expect(service.branchRemote.getRemoteCommitUrl('abc123')).resolves.toBe('https://github.com/owner/repo/commit/abc123');
+        await expect(service.branchRemote.getRemoteBranchUrl('feature/demo')).resolves.toBe('https://github.com/owner/repo/tree/feature/demo');
+        await expect(service.branchRemote.getRemoteFileUrl('main', 'src/index.ts')).resolves.toBe('https://github.com/owner/repo/blob/main/src/index.ts');
+        await expect(service.branchRemote.getRemoteCompareUrl('main', 'feature/demo')).resolves.toBe('https://github.com/owner/repo/compare/main...feature/demo');
+    });
+
+    it('builds commit links for self-hosted GitLab remotes', async () => {
+        await git.addRemote('origin', 'git@gitlab.example.com:group/subgroup/repo.git');
+
+        const service = new GitService(tempDir, tempDir, git);
+
+        await expect(service.branchRemote.getRemoteProvider()).resolves.toBe('gitlab');
+        await expect(service.branchRemote.getRemoteLinkInfo()).resolves.toMatchObject({
+            provider: 'gitlab',
+            repositoryUrl: 'https://gitlab.example.com/group/subgroup/repo',
+            capabilities: {
+                commit: true,
+                branch: true,
+                file: true,
+                compare: true
+            }
+        });
+        await expect(service.branchRemote.getRemoteCommitUrl('abc123')).resolves.toBe('https://gitlab.example.com/group/subgroup/repo/-/commit/abc123');
+        await expect(service.branchRemote.getRemoteBranchUrl('feature/demo')).resolves.toBe('https://gitlab.example.com/group/subgroup/repo/-/tree/feature/demo');
+        await expect(service.branchRemote.getRemoteFileUrl('main', 'src/index.ts')).resolves.toBe('https://gitlab.example.com/group/subgroup/repo/-/blob/main/src/index.ts');
+        await expect(service.branchRemote.getRemoteCompareUrl('main', 'feature/demo')).resolves.toBe('https://gitlab.example.com/group/subgroup/repo/-/compare/main...feature/demo');
+    });
+
+    it('builds provider-aware commit links for Bitbucket and Azure DevOps remotes', async () => {
+        await git.addRemote('origin', 'https://bitbucket.org/workspace/repo.git');
+
+        let service = new GitService(tempDir, tempDir, git);
+        await expect(service.branchRemote.getRemoteProvider()).resolves.toBe('bitbucket');
+        await expect(service.branchRemote.getRemoteLinkInfo()).resolves.toMatchObject({
+            provider: 'bitbucket',
+            repositoryUrl: 'https://bitbucket.org/workspace/repo',
+            capabilities: {
+                commit: true,
+                branch: true,
+                file: true,
+                compare: false
+            }
+        });
+        await expect(service.branchRemote.getRemoteCommitUrl('abc123')).resolves.toBe('https://bitbucket.org/workspace/repo/commits/abc123');
+        await expect(service.branchRemote.getRemoteBranchUrl('feature/demo')).resolves.toBe('https://bitbucket.org/workspace/repo/src/feature/demo/');
+        await expect(service.branchRemote.getRemoteFileUrl('main', 'src/index.ts')).resolves.toBe('https://bitbucket.org/workspace/repo/src/main/src/index.ts');
+        await expect(service.branchRemote.getRemoteCompareUrl('main', 'feature/demo')).resolves.toBeUndefined();
+
+        await git.removeRemote('origin');
+        await git.addRemote('origin', 'git@ssh.dev.azure.com:v3/org/project/repo');
+
+        service = new GitService(tempDir, tempDir, git);
+        await expect(service.branchRemote.getRemoteProvider()).resolves.toBe('azure');
+        await expect(service.branchRemote.getRemoteLinkInfo()).resolves.toMatchObject({
+            provider: 'azure',
+            repositoryUrl: 'https://dev.azure.com/org/project/_git/repo',
+            capabilities: {
+                commit: true,
+                branch: true,
+                file: true,
+                compare: false
+            }
+        });
+        await expect(service.branchRemote.getRemoteCommitUrl('abc123')).resolves.toBe('https://dev.azure.com/org/project/_git/repo/commit/abc123');
+        await expect(service.branchRemote.getRemoteBranchUrl('feature/demo')).resolves.toBe('https://dev.azure.com/org/project/_git/repo?version=GBfeature%2Fdemo');
+        await expect(service.branchRemote.getRemoteFileUrl('main', 'src/index.ts')).resolves.toBe('https://dev.azure.com/org/project/_git/repo?path=%2Fsrc%2Findex.ts&version=GBmain');
+        await expect(service.branchRemote.getRemoteFileUrl('abc1234', 'src/index.ts')).resolves.toBe('https://dev.azure.com/org/project/_git/repo?path=%2Fsrc%2Findex.ts&version=GCabc1234');
+        await expect(service.branchRemote.getRemoteCompareUrl('main', 'feature/demo')).resolves.toBeUndefined();
+    });
+
+    it('treats unrecognized remotes as unsupported remote links', async () => {
+        await git.addRemote('origin', 'git@example.com:owner/repo.git');
+
+        const service = new GitService(tempDir, tempDir, git);
+
+        await expect(service.branchRemote.getRemoteProvider()).resolves.toBe('unknown');
+        await expect(service.branchRemote.getRemoteLinkInfo()).resolves.toEqual({
+            provider: 'unknown',
+            capabilities: {
+                commit: false,
+                branch: false,
+                file: false,
+                compare: false
+            }
+        });
+        await expect(service.branchRemote.getRemoteCommitUrl('abc123')).resolves.toBeUndefined();
     });
 
     it('builds push preview data for a new remote branch', async () => {

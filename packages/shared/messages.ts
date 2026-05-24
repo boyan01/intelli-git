@@ -5,6 +5,21 @@
 
 export type GitStatusCode = 'A' | 'M' | 'D' | 'R' | 'C' | 'U' | '?';
 
+export type RemoteProvider = 'github' | 'gitlab' | 'bitbucket' | 'azure' | 'unknown';
+
+export interface RemoteLinkCapabilities {
+    commit: boolean;
+    branch: boolean;
+    file: boolean;
+    compare: boolean;
+}
+
+export interface RemoteLinkInfo {
+    provider: RemoteProvider;
+    repositoryUrl?: string;
+    capabilities: RemoteLinkCapabilities;
+}
+
 export interface GitHunk {
     id: string; // File path + change block signature (e.g., oldStart/newStart/content hash)
     lineRange: string; // e.g., "L10-20"

@@ -24,6 +24,9 @@ const CONTEXT_ONLY_COMMANDS = [
     'intelli-git.log.resetHard',
     'intelli-git.log.checkout',
     'intelli-git.log.openOnGitHub',
+    'intelli-git.log.openOnGitLab',
+    'intelli-git.log.openOnBitbucket',
+    'intelli-git.log.openOnAzureDevOps',
     'intelli-git.log.createBranch',
     'intelli-git.log.cherryPick',
     'intelli-git.log.revert',
@@ -118,5 +121,27 @@ test('context-only commands are hidden from the command palette', () => {
     for (const command of ACTIVE_REPOSITORY_COMMANDS) {
         assert.equal(hiddenCommands.has(command), false, `${command} should stay available for repositories`);
         assert.equal(activeRepositoryCommands.has(command), true, `${command} should require an active repository`);
+    }
+});
+
+test('remote commit link commands are scoped by detected provider', () => {
+    const packageJson = readPackageJson();
+    const webviewContext = packageJson.contributes.menus['webview/context'] ?? [];
+
+    const expectedProviders: Record<string, string> = {
+        'intelli-git.log.openOnGitHub': 'github',
+        'intelli-git.log.openOnGitLab': 'gitlab',
+        'intelli-git.log.openOnBitbucket': 'bitbucket',
+        'intelli-git.log.openOnAzureDevOps': 'azure'
+    };
+
+    for (const [command, provider] of Object.entries(expectedProviders)) {
+        const item = webviewContext.find((entry: { command?: string }) => entry.command === command);
+        assert.ok(item, `${command} should be registered in the Git Log context menu`);
+        assert.equal(
+            item.when,
+            `webviewSection == 'gitLogCommit' && intelli-git.remoteLink.commit == true && intelli-git.gitRemoteProvider == '${provider}'`
+        );
+        assert.equal(item.group, '9_external@1');
     }
 });

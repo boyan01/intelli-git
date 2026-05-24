@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { GitService } from '../services/GitService';
 import type { LocalChangePreview } from '../services/GitService';
+import type { RemoteProvider } from '@shared/messages';
 
 function formatSampleFiles(files: string[]): string[] {
     if (files.length === 0) {
@@ -27,6 +28,26 @@ function createResetHardPreviewMessage(hash: string, preview: LocalChangePreview
     ];
 
     return lines.filter(Boolean).join('\n');
+}
+
+function getRemoteProviderLabel(provider: RemoteProvider): string {
+    if (provider === 'github') {
+        return vscode.l10n.t('GitHub');
+    }
+
+    if (provider === 'gitlab') {
+        return vscode.l10n.t('GitLab');
+    }
+
+    if (provider === 'bitbucket') {
+        return vscode.l10n.t('Bitbucket');
+    }
+
+    if (provider === 'azure') {
+        return vscode.l10n.t('Azure DevOps');
+    }
+
+    return vscode.l10n.t('remote provider');
 }
 
 export function registerLogCommands(
@@ -124,23 +145,31 @@ export function registerLogCommands(
         })
     );
 
-    context.subscriptions.push(
-        vscode.commands.registerCommand('intelli-git.log.openOnGitHub', async (arg) => {
-            const hash = getCommitHash(arg);
-            if (!hash) return;
+    const openCommitOnRemote = async (arg: any) => {
+        const hash = getCommitHash(arg);
+        if (!hash) return;
 
-            try {
-                const repositoryUrl = await gitService.branchRemote.getGitHubRepositoryUrl();
-                if (!repositoryUrl) {
-                    vscode.window.showInformationMessage(vscode.l10n.t('No GitHub remote found for this repository.'));
-                    return;
-                }
-
-                await vscode.env.openExternal(vscode.Uri.parse(`${repositoryUrl}/commit/${hash}`));
-            } catch (e: any) {
-                vscode.window.showErrorMessage(vscode.l10n.t('Failed to open commit on GitHub: {0}', e.message));
+        let providerLabel = getRemoteProviderLabel('unknown');
+        try {
+            const remoteLink = await gitService.branchRemote.getRemoteLinkInfo();
+            providerLabel = getRemoteProviderLabel(remoteLink.provider);
+            const commitUrl = await gitService.branchRemote.getRemoteCommitUrl(hash);
+            if (!commitUrl) {
+                vscode.window.showInformationMessage(vscode.l10n.t('No supported remote commit link found for this repository.'));
+                return;
             }
-        })
+
+            await vscode.env.openExternal(vscode.Uri.parse(commitUrl));
+        } catch (e: any) {
+            vscode.window.showErrorMessage(vscode.l10n.t('Failed to open commit on {0}: {1}', providerLabel, e.message));
+        }
+    };
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand('intelli-git.log.openOnGitHub', openCommitOnRemote),
+        vscode.commands.registerCommand('intelli-git.log.openOnGitLab', openCommitOnRemote),
+        vscode.commands.registerCommand('intelli-git.log.openOnBitbucket', openCommitOnRemote),
+        vscode.commands.registerCommand('intelli-git.log.openOnAzureDevOps', openCommitOnRemote)
     );
 
     // Create Branch
