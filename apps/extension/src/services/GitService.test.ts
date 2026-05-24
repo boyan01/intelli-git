@@ -1,10 +1,11 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import simpleGit, { type SimpleGit } from 'simple-git';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import type { FileStatus } from '@shared/messages';
 import { GitService } from './GitService';
+import { GitBranchRemoteService } from './GitBranchRemoteService';
 import type { InactiveChangesService } from './InactiveChangesService';
 
 interface GitServiceInternals {
@@ -638,6 +639,28 @@ describe('GitService branch remote workflows', () => {
         fs.rmSync(remoteDir, { recursive: true, force: true });
     });
 
+    async function writeFileAndCommit(relativePath: string, content: string, message: string): Promise<string> {
+        fs.writeFileSync(path.join(tempDir, relativePath), content);
+        await git.add(relativePath);
+        await git.commit(message);
+        return (await git.revparse(['HEAD'])).trim();
+    }
+
+    async function prepareRestorableDirtyState(): Promise<void> {
+        fs.writeFileSync(path.join(tempDir, 'staged.txt'), 'staged local\n');
+        await git.add('staged.txt');
+        fs.writeFileSync(path.join(tempDir, 'notes.txt'), 'untracked local\n');
+    }
+
+    async function expectRestorableDirtyState(): Promise<void> {
+        const status = await git.status();
+        expect(status.staged).toContain('staged.txt');
+        expect(status.not_added).toContain('notes.txt');
+        expect(fs.readFileSync(path.join(tempDir, 'staged.txt'), 'utf8')).toBe('staged local\n');
+        expect(fs.readFileSync(path.join(tempDir, 'notes.txt'), 'utf8')).toBe('untracked local\n');
+        expect((await git.stashList()).all).toHaveLength(0);
+    }
+
     it('switches branches through temporary stash and restores dirty files', async () => {
         fs.writeFileSync(path.join(tempDir, 'tracked.txt'), 'base\n');
         await git.add('tracked.txt');
@@ -653,6 +676,123 @@ describe('GitService branch remote workflows', () => {
 
         expect((await git.branch()).current).toBe('feature');
         expect(fs.readFileSync(path.join(tempDir, 'notes.txt'), 'utf8')).toBe('local only\n');
+    });
+
+    it('merges through temporary stash and restores staged and untracked files', async () => {
+        await writeFileAndCommit('base.txt', 'base\n', 'Initial commit');
+        await git.branch(['-M', 'main']);
+        await git.checkoutLocalBranch('feature');
+        await writeFileAndCommit('feature.txt', 'feature\n', 'Feature commit');
+        await git.checkout('main');
+        await prepareRestorableDirtyState();
+
+        const service = new GitService(tempDir, tempDir, git);
+        await service.branchRemote.merge('feature');
+
+        expect(fs.readFileSync(path.join(tempDir, 'feature.txt'), 'utf8')).toBe('feature\n');
+        await expectRestorableDirtyState();
+    });
+
+    it('checks out commits through temporary stash and restores staged and untracked files', async () => {
+        const initialCommit = await writeFileAndCommit('base.txt', 'base\n', 'Initial commit');
+        await writeFileAndCommit('second.txt', 'second\n', 'Second commit');
+        await prepareRestorableDirtyState();
+
+        const service = new GitService(tempDir, tempDir, git);
+        await service.branchRemote.checkoutCommit(initialCommit);
+
+        expect((await git.revparse(['HEAD'])).trim()).toBe(initialCommit);
+        await expectRestorableDirtyState();
+    });
+
+    it('cherry-picks through temporary stash and restores staged and untracked files', async () => {
+        await writeFileAndCommit('base.txt', 'base\n', 'Initial commit');
+        await git.branch(['-M', 'main']);
+        await git.checkoutLocalBranch('feature');
+        const pickedCommit = await writeFileAndCommit('picked.txt', 'picked\n', 'Picked commit');
+        await git.checkout('main');
+        await prepareRestorableDirtyState();
+
+        const service = new GitService(tempDir, tempDir, git);
+        await service.branchRemote.cherryPick(pickedCommit);
+
+        expect(fs.readFileSync(path.join(tempDir, 'picked.txt'), 'utf8')).toBe('picked\n');
+        await expectRestorableDirtyState();
+    });
+
+    it('reverts through temporary stash and restores staged and untracked files', async () => {
+        await writeFileAndCommit('base.txt', 'base\n', 'Initial commit');
+        const revertedCommit = await writeFileAndCommit('revert-target.txt', 'remove me\n', 'Revert target');
+        await prepareRestorableDirtyState();
+
+        const service = new GitService(tempDir, tempDir, git);
+        await service.branchRemote.revert(revertedCommit);
+
+        expect(fs.existsSync(path.join(tempDir, 'revert-target.txt'))).toBe(false);
+        await expectRestorableDirtyState();
+    });
+
+    it('keeps the temporary stash discoverable when a protected operation fails', async () => {
+        await writeFileAndCommit('base.txt', 'base\n', 'Initial commit');
+        await prepareRestorableDirtyState();
+
+        const service = new GitService(tempDir, tempDir, git);
+        let thrownError: unknown;
+        try {
+            await service.branchRemote.merge('missing-branch');
+        } catch (e) {
+            thrownError = e;
+        }
+
+        const message = thrownError instanceof Error ? thrownError.message : String(thrownError);
+        expect(message).toMatch(/temporary stash "Intelli Git merge missing-branch:/);
+        expect(message).toMatch(/Current Git state:/);
+        expect(message).toMatch(/Git error:/);
+    });
+
+    it('uses force-with-lease for force push', async () => {
+        const push = vi.fn().mockResolvedValue(undefined);
+        const notifyChanged = vi.fn();
+        const service = new GitBranchRemoteService({
+            git: { push } as unknown as SimpleGit,
+            gitRoot: tempDir,
+            notifyChanged,
+            withTemporaryStash: async () => { },
+            createEditorGit: () => {
+                throw new Error('Not used');
+            },
+            getCommitFiles: async () => []
+        });
+
+        await service.forcePush('origin', 'main:main', { noVerify: true });
+
+        expect(push).toHaveBeenCalledWith('origin', 'main:main', ['--force-with-lease', '--no-verify']);
+        expect(notifyChanged).toHaveBeenCalledTimes(1);
+    });
+
+    it('pulls with merge through temporary stash protection', async () => {
+        const pull = vi.fn().mockResolvedValue(undefined);
+        const notifyChanged = vi.fn();
+        const withTemporaryStash = vi.fn(async (_operationName: string, operation: () => Promise<void>) => {
+            await operation();
+        });
+        const service = new GitBranchRemoteService({
+            git: { pull } as unknown as SimpleGit,
+            gitRoot: tempDir,
+            notifyChanged,
+            withTemporaryStash,
+            createEditorGit: () => {
+                throw new Error('Not used');
+            },
+            getCommitFiles: async () => []
+        });
+
+        await service.pullWithMerge('origin', 'main');
+
+        expect(withTemporaryStash).toHaveBeenCalledTimes(1);
+        expect(withTemporaryStash.mock.calls[0][0]).toBe('pull origin/main');
+        expect(pull).toHaveBeenCalledWith('origin', 'main');
+        expect(notifyChanged).not.toHaveBeenCalled();
     });
 
     it('detects branches that are checked out in another linked worktree', async () => {

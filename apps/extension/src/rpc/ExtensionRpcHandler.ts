@@ -303,6 +303,7 @@ export class ExtensionRpcHandler {
                 getCommitFiles: this.gitReadRpcHandler.getCommitFiles,
                 getMultiCommitFiles: this.gitReadRpcHandler.getMultiCommitFiles,
                 push: this.push,
+                confirmForcePush: this.confirmForcePush,
                 openDiff: this.openDiff,
                 closeWebView: this.closeWebView,
                 openCommitDiff: this.openCommitDiff,
@@ -412,6 +413,17 @@ export class ExtensionRpcHandler {
 
             throw error;
         }
+    };
+
+    confirmForcePush = async (params: { remote: string; branch: string }): Promise<boolean> => {
+        const action = i18n.t('Force Push');
+        const selected = await vscode.window.showWarningMessage(
+            i18n.t('Force push to {0}/{1}? This can overwrite remote commits. Intelli Git will use --force-with-lease to avoid overwriting newer remote updates.', params.remote, params.branch),
+            { modal: true },
+            action
+        );
+
+        return selected === action;
     };
 
     private async getStatusWithState(): Promise<FileStatus[]> {

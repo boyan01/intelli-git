@@ -278,7 +278,7 @@ export class GitBranchRemoteService {
     }
 
     public async forcePush(remote: string, branch: string, options?: { noVerify?: boolean }): Promise<void> {
-        const args: string[] = ['--force'];
+        const args: string[] = ['--force-with-lease'];
         if (options?.noVerify) {
             args.push('--no-verify');
         }
@@ -844,8 +844,9 @@ export class GitBranchRemoteService {
     }
 
     public async merge(branchName: string): Promise<void> {
-        await this.options.git.merge([branchName]);
-        this.options.notifyChanged();
+        await this.options.withTemporaryStash(`merge ${branchName}`, async () => {
+            await this.options.git.merge([branchName]);
+        });
     }
 
     public async checkoutAndRebase(branch: string, targetBranch: string): Promise<void> {
@@ -862,8 +863,9 @@ export class GitBranchRemoteService {
     }
 
     public async pullWithMerge(remote: string, branch: string): Promise<void> {
-        await this.options.git.pull(remote, branch);
-        this.options.notifyChanged();
+        await this.options.withTemporaryStash(`pull ${remote}/${branch}`, async () => {
+            await this.options.git.pull(remote, branch);
+        });
     }
 
     public async createBranchFrom(newBranch: string, fromBranch: string): Promise<void> {
@@ -877,13 +879,15 @@ export class GitBranchRemoteService {
     }
 
     public async cherryPick(commit: string): Promise<void> {
-        await this.options.git.raw(['cherry-pick', commit]);
-        this.options.notifyChanged();
+        await this.options.withTemporaryStash(`cherry-pick ${commit}`, async () => {
+            await this.options.git.raw(['cherry-pick', commit]);
+        });
     }
 
     public async revert(commit: string): Promise<void> {
-        await this.options.git.revert(commit, ['--no-edit']);
-        this.options.notifyChanged();
+        await this.options.withTemporaryStash(`revert ${commit}`, async () => {
+            await this.options.git.revert(commit, ['--no-edit']);
+        });
     }
 
     public async isCommitPushed(commit: string): Promise<boolean> {
@@ -896,7 +900,8 @@ export class GitBranchRemoteService {
     }
 
     public async checkoutCommit(commit: string): Promise<void> {
-        await this.options.git.checkout(commit);
-        this.options.notifyChanged();
+        await this.options.withTemporaryStash(`checkout commit ${commit}`, async () => {
+            await this.options.git.checkout(commit);
+        });
     }
 }

@@ -45,6 +45,11 @@ function normalizeExistingPath(filePath: string): string {
     }
 }
 
+function formatGitError(error: unknown): string {
+    const message = error instanceof Error ? error.message : String(error);
+    return message.replace(/\s+/g, ' ').trim() || 'Unknown git error';
+}
+
 export class GitService implements vscode.Disposable {
     private git: SimpleGit;
     private _workspaceRoot: string;
@@ -217,21 +222,56 @@ export class GitService implements vscode.Disposable {
         try {
             await operation();
         } catch (operationError) {
+            const gitState = await this.describeCurrentGitState();
             await this.restoreExtensionGitStateSnapshot(extensionStateSnapshot);
             this.fireChange();
-            throw new Error(`${operationName} failed after local changes were saved to the stash. Resolve the git state, then restore "${stashMessage}" from the stash list.`, { cause: operationError });
+            throw new Error(`${operationName} failed after local changes were saved to the temporary stash "${stashMessage}". Current Git state: ${gitState}. Resolve the Git state, then restore the stash from the stash list. Git error: ${formatGitError(operationError)}`, { cause: operationError });
         }
 
         try {
             await this.git.stash(['pop', '--index']);
         } catch (restoreError) {
+            const gitState = await this.describeCurrentGitState();
             await this.restoreExtensionGitStateSnapshot(extensionStateSnapshot);
             this.fireChange();
-            throw new Error(`${operationName} completed, but restoring local changes caused conflicts. The temporary stash was kept for recovery.`, { cause: restoreError });
+            throw new Error(`${operationName} completed, but restoring local changes caused conflicts. The temporary stash "${stashMessage}" was kept for recovery. Current Git state: ${gitState}. Resolve conflicts, then restore or drop the stash from the stash list. Git error: ${formatGitError(restoreError)}`, { cause: restoreError });
         }
 
         await this.restoreExtensionGitStateSnapshot(extensionStateSnapshot, true);
         this.fireChange();
+    }
+
+    private async describeCurrentGitState(): Promise<string> {
+        try {
+            const status = await this.git.status();
+            const branchName = status.current || 'detached HEAD';
+            const parts = [`branch ${branchName}`];
+
+            if (status.conflicted.length > 0) {
+                parts.push(`${status.conflicted.length} conflicted`);
+            }
+
+            if (status.staged.length > 0) {
+                parts.push(`${status.staged.length} staged`);
+            }
+
+            const unstagedCount = status.files.filter(file => file.index !== '?' && file.working_dir !== ' ').length;
+            if (unstagedCount > 0) {
+                parts.push(`${unstagedCount} unstaged`);
+            }
+
+            if (status.not_added.length > 0) {
+                parts.push(`${status.not_added.length} untracked`);
+            }
+
+            if (parts.length === 1 && status.files.length === 0) {
+                parts.push('clean');
+            }
+
+            return parts.join(', ');
+        } catch (stateError) {
+            return `unavailable (${formatGitError(stateError)})`;
+        }
     }
 
     private createExtensionGitStateSnapshot(): ExtensionGitStateSnapshot {

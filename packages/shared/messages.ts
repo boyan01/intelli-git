@@ -219,6 +219,7 @@ export interface ExtensionMethods {
     getCommitFiles: (hash: string) => Promise<CommitFile[]>;
     getMultiCommitFiles: (hashes: string[]) => Promise<CommitFile[]>;
     push: (params: { force: boolean; pushTags: boolean; noVerify?: boolean; remote: string; branch: string }) => Promise<void>;
+    confirmForcePush: (params: { remote: string; branch: string }) => Promise<boolean>;
     openDiff: (path: string | { path: string; repoPath?: string; staged?: boolean }, staged?: boolean) => Promise<void>;
     closeWebView: () => Promise<void>;
     openCommitDiff: (params: { path: string; leftRef: string; rightRef: string; preserveFocus?: boolean }) => Promise<void>;

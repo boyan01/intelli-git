@@ -66,8 +66,18 @@ export const PushFooter: React.FC<PushFooterProps> = ({
         if (!selectedRemote || !selectedRemoteBranch) return;
 
         setError(null);
-        setPushStatus('pushing');
         try {
+            if (options.force) {
+                const confirmed = await rpc.confirmForcePush({
+                    remote: selectedRemote,
+                    branch: selectedRemoteBranch
+                });
+                if (!confirmed) {
+                    return;
+                }
+            }
+
+            setPushStatus('pushing');
             await rpc.push({
                 force: options.force,
                 pushTags: options.tags,
