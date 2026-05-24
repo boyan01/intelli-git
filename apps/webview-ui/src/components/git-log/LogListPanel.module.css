@@ -97,6 +97,20 @@
     outline-offset: 2px;
 }
 
+.loadingState {
+    display: flex;
+    min-height: 100%;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    color: var(--vscode-descriptionForeground);
+    font-size: 12px;
+}
+
+.loadingState i {
+    animation: spin 1s linear infinite;
+}
+
 .row {
     display: flex;
     align-items: stretch;

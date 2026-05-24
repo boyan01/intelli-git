@@ -442,12 +442,17 @@ export const LogListPanel: React.FC<LogListPanelProps> = ({
 
     const visibleCommits = commits.slice(startIndex, endIndex);
     const hasFilters = hasActiveFilters(filters);
+    const showLoadingFirstPage = commits.length === 0 && loading;
     const showEmptyResult = commits.length === 0 && !loading;
 
     return (
         <div className={styles.container}>
             <div className={styles.mainContent}>
-                <FilterToolbar onFilterChange={setFilters} externalBranch={externalBranchFilter} />
+                <FilterToolbar
+                    onFilterChange={setFilters}
+                    externalBranch={externalBranchFilter}
+                    repositoryPath={repositoryPath}
+                />
 
                 <div
                     ref={containerRef}
@@ -459,7 +464,12 @@ export const LogListPanel: React.FC<LogListPanelProps> = ({
                     onBlur={() => setListHasFocus(false)}
                     style={{ outline: 'none' }}
                 >
-                    {showEmptyResult ? (
+                    {showLoadingFirstPage ? (
+                        <div className={styles.loadingState}>
+                            <i className="codicon codicon-loading" aria-hidden="true" />
+                            <span>{t('Loading...')}</span>
+                        </div>
+                    ) : showEmptyResult ? (
                         <div className={styles.emptyState}>
                             <i
                                 className={`codicon ${hasFilters ? 'codicon-filter' : 'codicon-git-commit'} ${styles.emptyIcon}`}

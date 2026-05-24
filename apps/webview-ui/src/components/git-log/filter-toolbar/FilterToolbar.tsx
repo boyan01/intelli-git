@@ -11,9 +11,10 @@ import { usePersistedState } from '../../../hooks/usePersistedState';
 interface FilterToolbarProps {
     onFilterChange: (options: Partial<LogOptions>) => void;
     externalBranch?: { branch: string; requestId: number };
+    repositoryPath?: string;
 }
 
-export const FilterToolbar: React.FC<FilterToolbarProps> = ({ onFilterChange, externalBranch }) => {
+export const FilterToolbar: React.FC<FilterToolbarProps> = ({ onFilterChange, externalBranch, repositoryPath }) => {
     const { t } = useTranslation();
     const [branch, setBranch] = usePersistedState('gitLog.filter.branch');
     const [search, setSearch] = usePersistedState('gitLog.filter.search');
@@ -255,7 +256,11 @@ export const FilterToolbar: React.FC<FilterToolbarProps> = ({ onFilterChange, ex
                 </button>
 
                 {/* User filter */}
-                <UserFilter key={authors.join('\n') || 'all'} onChange={authors => setAuthors(authors ?? [])} initialAuthors={authors} />
+                <UserFilter
+                    key={`${repositoryPath ?? 'default'}:${authors.join('\n') || 'all'}`}
+                    onChange={authors => setAuthors(authors ?? [])}
+                    initialAuthors={authors}
+                />
 
                 <DateFilter
                     onChange={handleDateChange}

@@ -103,3 +103,29 @@
     flex: 1;
     overflow-y: auto;
 }
+
+.loadingState,
+.noData {
+    display: flex;
+    height: 100%;
+    min-height: 96px;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    color: var(--vscode-descriptionForeground);
+    font-size: 12px;
+}
+
+.loadingState i {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import simpleGit, { type SimpleGit } from 'simple-git';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
@@ -146,5 +146,50 @@ describe('GitLogService', () => {
     it('returns sorted authors and the configured user', async () => {
         await expect(service.getAuthors()).resolves.toEqual(['Test User']);
         await expect(service.getCurrentUser()).resolves.toBe('Test User');
+    });
+
+    it('caches authors until the refs snapshot changes', async () => {
+        const rawSpy = vi.spyOn(git, 'raw');
+        const countAuthorScans = () => rawSpy.mock.calls.filter(([args]) =>
+            Array.isArray(args) && args[0] === 'log' && args[1] === '--format=%aN'
+        ).length;
+
+        await expect(service.getAuthors()).resolves.toEqual(['Test User']);
+        await expect(service.getAuthors()).resolves.toEqual(['Test User']);
+        expect(countAuthorScans()).toBe(1);
+
+        fs.writeFileSync(path.join(tempDir, 'app', 'other-author.txt'), 'other\n');
+        await git.add('app/other-author.txt');
+        await git.raw([
+            '-c',
+            'user.name=Other User',
+            '-c',
+            'user.email=other@example.com',
+            'commit',
+            '--author=Other User <other@example.com>',
+            '-m',
+            'other author'
+        ]);
+
+        await expect(service.getAuthors()).resolves.toEqual(['Other User', 'Test User']);
+        expect(countAuthorScans()).toBe(2);
+    });
+
+    it('reuses filtered graph data until the refs snapshot changes', async () => {
+        const rawSpy = vi.spyOn(git, 'raw');
+        const countGraphLoads = () => rawSpy.mock.calls.filter(([args]) =>
+            Array.isArray(args) && args.join(' ') === 'rev-list --exclude=refs/stash --all --parents'
+        ).length;
+
+        await service.getLog({ search: 'match', maxCount: 20 });
+        await service.getLog({ search: 'match', maxCount: 20 });
+        expect(countGraphLoads()).toBe(1);
+
+        fs.writeFileSync(path.join(tempDir, 'app', 'new-match.txt'), 'new\n');
+        await git.add('app/new-match.txt');
+        await git.commit('match new');
+
+        await service.getLog({ search: 'match', maxCount: 20 });
+        expect(countGraphLoads()).toBe(2);
     });
 });

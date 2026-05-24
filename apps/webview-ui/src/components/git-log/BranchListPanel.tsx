@@ -2,7 +2,6 @@ import React, { useMemo, useCallback, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { BranchListData, LocalBranchInfo } from '@shared/messages';
 import { rpc } from '../../lib/rpc_client';
-import { useRpcData } from '../../hooks/useRpcData';
 import { usePersistedState } from '../../hooks/usePersistedState';
 import { BasicTreeView, type TreeNode, type BasicTreeViewRef } from '../common/BasicTreeView';
 import { BranchStatus } from '../common/BranchStatus';
@@ -19,25 +18,13 @@ interface BranchNodeData {
 }
 
 interface BranchListPanelProps {
+    data: BranchListData;
+    isLoading?: boolean;
     onBranchFilter?: (branch: string) => void;
 }
 
-const emptyBranchListData: BranchListData = {
-    hasRepository: true,
-    currentBranch: '',
-    localBranches: [],
-    localBranchesInfo: [],
-    remoteBranches: {},
-    tags: []
-};
-
-export const BranchListPanel: React.FC<BranchListPanelProps> = ({ onBranchFilter }) => {
+export const BranchListPanel: React.FC<BranchListPanelProps> = ({ data, isLoading = false, onBranchFilter }) => {
     const { t } = useTranslation();
-    const loadBranchListData = useCallback(() => rpc.getBranchListData(), []);
-    const { data, loading: isLoading } = useRpcData(
-        loadBranchListData,
-        { initialValue: emptyBranchListData }
-    );
     const treeRef = useRef<BasicTreeViewRef>(null);
 
     const [expandedIds, setExpandedIds] = usePersistedState('branchList.expandedIds');
@@ -46,6 +33,12 @@ export const BranchListPanel: React.FC<BranchListPanelProps> = ({ onBranchFilter
     const [cachedScrollTop, setCachedScrollTop] = usePersistedState('branchList.scrollTop');
     const treeContainerRef = useRef<HTMLDivElement>(null);
     const hasRestoredScroll = useRef(false);
+    const hasBranchData = Boolean(
+        data.currentBranch ||
+        data.localBranches.length > 0 ||
+        Object.keys(data.remoteBranches).length > 0 ||
+        data.tags.length > 0
+    );
 
     // Restore scroll position after data loads
     useEffect(() => {
@@ -367,8 +360,15 @@ export const BranchListPanel: React.FC<BranchListPanelProps> = ({ onBranchFilter
         return undefined;
     }, [data]);
     const renderTreeContent = () => {
-        if (!data && isLoading) return null;
-        if (!data) return <div className={styles.noData}>{t('No data')}</div>;
+        if (isLoading && !hasBranchData) {
+            return (
+                <div className={styles.loadingState}>
+                    <i className="codicon codicon-loading" aria-hidden="true" />
+                    <span>{t('Loading...')}</span>
+                </div>
+            );
+        }
+        if (!hasBranchData) return <div className={styles.noData}>{t('No data')}</div>;
         return (
             <BasicTreeView
                 ref={treeRef}

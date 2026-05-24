@@ -8,12 +8,19 @@ interface GitLogServiceOptions {
     getWorkspaceRoot(): string;
 }
 
+interface CachedValue<T> {
+    key: string;
+    value?: T;
+    promise?: Promise<T>;
+}
+
 /**
  * Owns read-only Git history behavior: log loading, commit details, authors,
  * graph ancestry stitching, and ref parsing.
  */
 export class GitLogService {
-    private graphCache: Map<string, string[]> | null = null;
+    private graphCache: CachedValue<Map<string, string[]>> | null = null;
+    private authorsCache: CachedValue<string[]> | null = null;
 
     constructor(
         private readonly git: SimpleGit,
@@ -172,17 +179,17 @@ export class GitLogService {
             if (isFilteredMode && commits.length > 1) {
                 await this.ensureGraphLoaded();
 
-                const commitHashToIdx = new Map<string, number>();
-                commits.forEach((commit, index) => commitHashToIdx.set(commit.hash, index));
+                const remainingVisibleHashes = new Set(commits.map(commit => commit.hash));
 
                 for (let i = 0; i < commits.length; i++) {
                     const commit = commits[i];
-                    const hasVisibleParent = commit.parentHashes.some(parentHash => commitHashToIdx.has(parentHash));
+                    remainingVisibleHashes.delete(commit.hash);
+                    const hasVisibleParent = commit.parentHashes.some(parentHash => remainingVisibleHashes.has(parentHash));
 
                     if (!hasVisibleParent) {
                         const visibleAncestor = this.findNearestVisibleAncestor(
                             commit.hash,
-                            new Set(commits.slice(i + 1).map(candidate => candidate.hash))
+                            remainingVisibleHashes
                         );
 
                         if (visibleAncestor) {
@@ -203,11 +210,15 @@ export class GitLogService {
         if (!this.options.getWorkspaceRoot()) return [];
 
         try {
-            const logResult = await this.git.raw(['log', '--format=%aN']);
-            if (!logResult) return [];
+            const cacheKey = await this.getRefsSnapshotKey();
+            if (this.authorsCache?.key === cacheKey) {
+                if (this.authorsCache.value) return this.authorsCache.value;
+                if (this.authorsCache.promise) return this.authorsCache.promise;
+            }
 
-            const authors = new Set(logResult.split('\n').map(author => author.trim()).filter(author => !!author));
-            return Array.from(authors).sort();
+            const promise = this.loadAuthors(cacheKey);
+            this.authorsCache = { key: cacheKey, promise };
+            return await promise;
         } catch (e) {
             console.error('getAuthors error:', e);
             return [];
@@ -226,6 +237,7 @@ export class GitLogService {
 
     public invalidateGraphCache(): void {
         this.graphCache = null;
+        this.authorsCache = null;
     }
 
     public getCommitDetails = async (hash: string): Promise<CommitDetails> => {
@@ -278,30 +290,86 @@ export class GitLogService {
         }
     };
 
-    private async ensureGraphLoaded(): Promise<void> {
-        if (this.graphCache) return;
+    private async loadAuthors(cacheKey: string): Promise<string[]> {
+        let authors: string[] = [];
+        try {
+            const logResult = await this.git.raw(['log', '--format=%aN']);
+            authors = logResult
+                ? Array.from(new Set(logResult.split('\n').map(author => author.trim()).filter(author => !!author))).sort()
+                : [];
+        } catch (e) {
+            console.error('Failed to load authors:', e);
+        }
+
+        if (this.authorsCache?.key === cacheKey) {
+            this.authorsCache = { key: cacheKey, value: authors };
+        }
+
+        return authors;
+    }
+
+    private async ensureGraphLoaded(): Promise<Map<string, string[]>> {
+        const cacheKey = await this.getRefsSnapshotKey();
+        if (this.graphCache?.key === cacheKey) {
+            if (this.graphCache.value) return this.graphCache.value;
+            if (this.graphCache.promise) return this.graphCache.promise;
+        }
+
+        const promise = this.loadGraph(cacheKey);
+        this.graphCache = { key: cacheKey, promise };
+        return await promise;
+    }
+
+    private async loadGraph(cacheKey: string): Promise<Map<string, string[]>> {
+        const graph = new Map<string, string[]>();
 
         try {
-            const result = await this.git.raw(['rev-list', '--all', '--parents']);
-            this.graphCache = new Map();
+            const result = await this.git.raw(['rev-list', '--exclude=refs/stash', '--all', '--parents']);
 
             result.split('\n').forEach(line => {
                 if (!line) return;
                 const parts = line.split(' ');
                 const hash = parts[0];
                 const parents = parts.slice(1);
-                this.graphCache!.set(hash, parents);
+                graph.set(hash, parents);
             });
         } catch (e) {
             console.error('Failed to load commit graph:', e);
-            this.graphCache = new Map();
         }
+
+        if (this.graphCache?.key === cacheKey) {
+            this.graphCache = { key: cacheKey, value: graph };
+        }
+        return graph;
     }
 
-    private findNearestVisibleAncestor(startHash: string, visibleHashes: Set<string>): string | null {
-        if (!this.graphCache) return null;
+    private async getRefsSnapshotKey(): Promise<string> {
+        const [head, refs] = await Promise.all([
+            this.git.raw(['rev-parse', '--verify', 'HEAD']).catch(() => ''),
+            this.git.raw([
+                'for-each-ref',
+                '--format=%(refname)%00%(objectname)',
+                'refs/heads',
+                'refs/remotes',
+                'refs/tags'
+            ]).catch(() => '')
+        ]);
 
-        const queue: string[] = [...(this.graphCache.get(startHash) || [])];
+        return [
+            this.options.getWorkspaceRoot(),
+            head.trim(),
+            refs.trim()
+        ].join('\0');
+    }
+
+    private findNearestVisibleAncestor(
+        startHash: string,
+        visibleHashes: Set<string>
+    ): string | null {
+        const graph = this.graphCache?.value;
+        if (!graph) return null;
+
+        const queue: string[] = [...(graph.get(startHash) || [])];
         const visited = new Set<string>();
 
         let iterations = 0;
@@ -319,7 +387,7 @@ export class GitLogService {
                 return current;
             }
 
-            const parents = this.graphCache.get(current);
+            const parents = graph.get(current);
             if (parents) {
                 for (const parent of parents) {
                     if (!visited.has(parent)) {

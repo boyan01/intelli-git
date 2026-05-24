@@ -35,7 +35,16 @@ export function GitLogView() {
     const [selectedHashes, setSelectedHashes] = useState<string[]>([]);
     const [branchFilter, setBranchFilter] = useState<BranchFilterRequest | undefined>(undefined);
     const [isNarrowMode, setIsNarrowMode] = useState(false);
+    const loadActiveRepository = useCallback(() => rpc.getActiveRepository(), []);
     const loadBranchListData = useCallback(() => rpc.getBranchListData(), []);
+    const {
+        data: activeRepositoryPath,
+        loading: activeRepositoryLoading,
+        reload: reloadActiveRepository
+    } = useRpcData(
+        loadActiveRepository,
+        { initialValue: undefined }
+    );
     const { data: branchListData, loading: branchListLoading, reload: reloadBranchList } = useRpcData(
         loadBranchListData,
         { initialValue: emptyBranchListData }
@@ -82,28 +91,22 @@ export function GitLogView() {
 
     const handleInitializeRepository = useCallback(async () => {
         await rpc.initializeRepository();
-        await reloadBranchList();
-    }, [reloadBranchList]);
+        await Promise.all([
+            reloadActiveRepository(),
+            reloadBranchList()
+        ]);
+    }, [reloadActiveRepository, reloadBranchList]);
 
     const { isExpired } = useVersionCheck();
-    const hasRepository = branchListData.hasRepository !== false;
-    const activeRepositoryPath = branchListData.repository?.repoPath;
+    const hasRepository = activeRepositoryLoading
+        ? branchListData.hasRepository !== false
+        : Boolean(activeRepositoryPath) && branchListData.hasRepository !== false;
+    const repositoryPath = activeRepositoryPath ?? branchListData.repository?.repoPath;
 
     useEffect(() => {
         setSelectedHashes([]);
         setBranchFilter(undefined);
-    }, [activeRepositoryPath]);
-
-    if (branchListLoading) {
-        return (
-            <div ref={containerRef} className={styles.container}>
-                <div className={styles.statePanel}>
-                    <i className={`codicon codicon-loading codicon-modifier-spin ${styles.stateIcon}`} aria-hidden="true" />
-                    <div className={styles.stateTitle}>{t('Loading...')}</div>
-                </div>
-            </div>
-        );
-    }
+    }, [repositoryPath]);
 
     if (!hasRepository) {
         return (
@@ -145,13 +148,18 @@ export function GitLogView() {
         );
     }
 
-    const logListPanel = (
+    const logListPanel = activeRepositoryLoading && !repositoryPath ? (
+        <div className={styles.statePanel}>
+            <i className={`codicon codicon-loading codicon-modifier-spin ${styles.stateIcon}`} aria-hidden="true" />
+            <div className={styles.stateTitle}>{t('Loading...')}</div>
+        </div>
+    ) : (
         <LogListPanel
             onSelectionChange={setSelectedHashes}
             externalBranchFilter={branchFilter}
             isNarrowMode={isNarrowMode}
             commitDetails={commitDetails}
-            repositoryPath={activeRepositoryPath}
+            repositoryPath={repositoryPath}
         />
     );
 
@@ -173,7 +181,13 @@ export function GitLogView() {
                 minSize={0}
                 ratio={branchSplitRatio}
                 onRatioChange={setBranchSplitRatio}
-                first={<BranchListPanel onBranchFilter={handleBranchFilter} />}
+                first={(
+                    <BranchListPanel
+                        data={branchListData}
+                        isLoading={branchListLoading}
+                        onBranchFilter={handleBranchFilter}
+                    />
+                )}
                 second={
                     isNarrowMode ? (
                         logListPanel
