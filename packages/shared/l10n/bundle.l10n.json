@@ -113,6 +113,7 @@
     "No files in this stash": "No files in this stash",
     "Select a stash to view files": "Select a stash to view files",
     "{{count}} files": "{{count}} files",
+    "+{{count}} more": "+{{count}} more",
     "Push Tags": "Push Tags",
     "Push": "Push",
     "Push {{count}} Commits": "Push {{count}} Commits",

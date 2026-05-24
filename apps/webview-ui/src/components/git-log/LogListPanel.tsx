@@ -2,21 +2,18 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import styles from './LogListPanel.module.css';
 
 import { computeGraph, LONG_DISTANCE_THRESHOLD } from './graphUtils';
-import type { GraphLine } from './graphUtils';
 import { GraphColumn, CELL_WIDTH } from './GraphColumn';
 import { FilterToolbar } from './filter-toolbar/FilterToolbar';
 import { RefLabels } from '../common/RefLabels';
 import { useLogCommitLoader } from './hooks/useLogCommitLoader';
 import { useCommitSelection } from './hooks/useCommitSelection';
 import { formatRelativeDate } from '../../utils/dateUtils';
-import { BaseFileTree } from '../file-tree/BaseFileTree';
-import type { BaseFileTreeRef } from '../file-tree/BaseFileTree';
-import { ViewModeToggle } from '../common/ViewModeToggle';
 import { usePersistedState } from '../../hooks/usePersistedState';
-import type { CommitDetails, FileStatus, LogOptions } from '@shared/messages';
+import type { CommitDetails, LogOptions } from '@shared/messages';
 import { rpc, rpcEvents } from '../../lib/rpc_client';
 import type { GitLogCommitContext } from '@shared/webviewContext';
 import { useTranslation } from 'react-i18next';
+import { getInlineDetailsHeight, getInlineFileSummary } from './inlineCommitLayout';
 
 interface LogListPanelProps {
     onSelectionChange?: (commits: string[]) => void;
@@ -27,12 +24,6 @@ interface LogListPanelProps {
 }
 
 const ROW_HEIGHT = 24;
-const INLINE_LOADING_HEIGHT = 72;
-const INLINE_BODY_LINE_HEIGHT = 17;
-const INLINE_FILE_ROW_HEIGHT = 22;
-const INLINE_FILES_HEADER_HEIGHT = 30;
-const INLINE_MAX_FILE_ROWS = 8;
-const INLINE_MAX_DETAILS_HEIGHT = 320;
 const BUFFER = 10;
 
 function hasActiveFilters(filters: Partial<LogOptions>): boolean {
@@ -48,72 +39,6 @@ function hasActiveFilters(filters: Partial<LogOptions>): boolean {
     );
 }
 
-function estimateWrappedLineCount(text: string): number {
-    const trimmed = text.trim();
-    if (!trimmed) return 0;
-
-    return trimmed
-        .split(/\r?\n/)
-        .reduce((count, line) => count + Math.max(1, Math.ceil(line.length / 88)), 0);
-}
-
-function getInlineDetailsHeight(commit?: CommitDetails): number {
-    if (!commit) return INLINE_LOADING_HEIGHT;
-
-    const bodyLines = Math.min(4, estimateWrappedLineCount(commit.body));
-    const bodyHeight = bodyLines > 0 ? bodyLines * INLINE_BODY_LINE_HEIGHT + 7 : 0;
-    const summaryHeight = 8 + bodyHeight + 16 + 7 + 1;
-    const fileRows = Math.max(1, Math.min(INLINE_MAX_FILE_ROWS, commit.files.length));
-    const filesHeight = INLINE_FILES_HEADER_HEIGHT + fileRows * INLINE_FILE_ROW_HEIGHT;
-
-    return Math.min(INLINE_MAX_DETAILS_HEIGHT, summaryHeight + filesHeight);
-}
-
-interface InlineGraphLinesProps {
-    lines: GraphLine[];
-    graphWidth: number;
-    height: number;
-    nodeColumn: number;
-    rowIndex: number;
-}
-
-const InlineGraphLines: React.FC<InlineGraphLinesProps> = ({
-    lines,
-    graphWidth,
-    height,
-    nodeColumn,
-    rowIndex
-}) => {
-    const continuationLines = lines.filter(line => line.y2 === 1);
-    if (continuationLines.length === 0) return null;
-
-    return (
-        <svg
-            className={styles.inlineGraphSvg}
-            width={graphWidth}
-            height={height + 2}
-            aria-hidden="true"
-        >
-            {continuationLines.map((line, index) => {
-                const x = line.x2 * CELL_WIDTH + CELL_WIDTH / 2;
-                const isNodeLine = line.x1 === nodeColumn || line.x2 === nodeColumn;
-                return (
-                    <path
-                        key={`${line.x2}-${index}`}
-                        d={`M ${x} 0 L ${x} ${height + 2}`}
-                        stroke={line.color}
-                        strokeWidth={isNodeLine ? 3 : 2}
-                        fill="none"
-                        strokeLinecap={line.isDashed ? 'butt' : 'round'}
-                        strokeDasharray={line.isDashed ? '2 3' : undefined}
-                        strokeDashoffset={line.isDashed ? ((rowIndex + 1) * ROW_HEIGHT) % 5 : undefined}
-                    />
-                );
-            })}
-        </svg>
-    );
-};
-
 interface InlineCommitDetailsProps {
     selectedHash: string;
     commit?: CommitDetails;
@@ -121,37 +46,7 @@ interface InlineCommitDetailsProps {
 
 const InlineCommitDetails: React.FC<InlineCommitDetailsProps> = ({ selectedHash, commit }) => {
     const { t } = useTranslation();
-    const treeRef = useRef<BaseFileTreeRef>(null);
-    const [fileViewMode, setFileViewMode] = useState<'tree' | 'list'>('list');
     const isLoadedCommit = commit?.hash === selectedHash;
-
-    const fileItems: FileStatus[] = useMemo(() => {
-        if (!isLoadedCommit) return [];
-        return commit.files.map(file => ({
-            path: file.path,
-            displayPath: file.displayPath,
-            status: file.status,
-            staged: false
-        }));
-    }, [commit, isLoadedCommit]);
-
-    const openFile = useCallback((path: string, preserveFocus: boolean) => {
-        if (!isLoadedCommit) return;
-        const file = commit.files.find(item => item.path === path);
-        if (!file) return;
-
-        const parentHash = commit.parentHashes.length > 0 ? commit.parentHashes[0] : '';
-        let leftRef = parentHash;
-        let rightRef = commit.hash;
-
-        if (file.status.startsWith('A')) {
-            leftRef = '';
-        } else if (file.status.startsWith('D')) {
-            rightRef = '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
-        }
-
-        rpc.openCommitDiff({ path, leftRef, rightRef, preserveFocus });
-    }, [commit, isLoadedCommit]);
 
     if (!isLoadedCommit) {
         return (
@@ -164,74 +59,44 @@ const InlineCommitDetails: React.FC<InlineCommitDetailsProps> = ({ selectedHash,
 
     const bodyText = commit.body.trim();
     const statsLabel = `+${commit.stats.additions} -${commit.stats.deletions}`;
+    const fileSummary = getInlineFileSummary(commit.files);
 
     return (
         <div className={styles.inlineDetailsContent}>
-            <div className={styles.inlineSummary}>
-                {bodyText && (
-                    <div className={styles.inlineBody}>{bodyText}</div>
-                )}
-                <div className={styles.inlineMeta}>
-                    <span title={commit.authorEmail}>
-                        <i className="codicon codicon-person" aria-hidden="true" />
-                        {commit.authorName}
-                    </span>
-                    <span>
-                        <i className="codicon codicon-git-commit" aria-hidden="true" />
-                        {commit.shortHash}
-                    </span>
-                    <span title={new Date(commit.date).toLocaleString()}>
-                        <i className="codicon codicon-calendar" aria-hidden="true" />
-                        {formatRelativeDate(commit.date)}
-                    </span>
-                    <span className={styles.inlineStats}>{statsLabel}</span>
-                </div>
+            {bodyText && (
+                <div className={styles.inlineBody}>{bodyText}</div>
+            )}
+            <div className={styles.inlineMeta}>
+                <span title={commit.authorEmail}>
+                    <i className="codicon codicon-person" aria-hidden="true" />
+                    {commit.authorName}
+                </span>
+                <span>
+                    <i className="codicon codicon-git-commit" aria-hidden="true" />
+                    {commit.shortHash}
+                </span>
+                <span title={new Date(commit.date).toLocaleString()}>
+                    <i className="codicon codicon-calendar" aria-hidden="true" />
+                    {formatRelativeDate(commit.date)}
+                </span>
+                <span className={styles.inlineStats}>{statsLabel}</span>
             </div>
-            <div className={styles.inlineFiles}>
-                <div className={styles.inlineFilesHeader}>
+            {fileSummary.totalCount > 0 && (
+                <div className={styles.inlineFilesSummary}>
+                    <i className="codicon codicon-files" aria-hidden="true" />
                     <span className={styles.inlineFilesCount}>
-                        {t('{{count}} files', { count: commit.files.length })}
+                        {t('{{count}} files', { count: fileSummary.totalCount })}:
                     </span>
-                    <div className={styles.inlineFilesActions}>
-                        <ViewModeToggle viewMode={fileViewMode} onChange={setFileViewMode} />
-                        <button
-                            className={styles.inlineIconButton}
-                            type="button"
-                            onClick={() => treeRef.current?.expandAll()}
-                            title={t('Expand All')}
-                        >
-                            <i className="codicon codicon-expand-all" aria-hidden="true" />
-                        </button>
-                        <button
-                            className={styles.inlineIconButton}
-                            type="button"
-                            onClick={() => treeRef.current?.collapseAll()}
-                            title={t('Collapse All')}
-                        >
-                            <i className="codicon codicon-collapse-all" aria-hidden="true" />
-                        </button>
-                    </div>
+                    <span className={styles.inlineFilePaths}>
+                        {fileSummary.visibleFiles.join(', ')}
+                    </span>
+                    {fileSummary.moreCount > 0 && (
+                        <span className={styles.inlineMoreFiles}>
+                            {t('+{{count}} more', { count: fileSummary.moreCount })}
+                        </span>
+                    )}
                 </div>
-                <div className={styles.inlineFilesTree}>
-                    <BaseFileTree
-                        ref={treeRef}
-                        items={fileItems}
-                        viewMode={fileViewMode}
-                        readonly={true}
-                        onFileClick={(path) => openFile(path, true)}
-                        onFileDoubleClick={(path) => openFile(path, false)}
-                        selectedFiles={new Set()}
-                        activeFile={null}
-                        onToggleFile={() => { }}
-                        contextMenuSection="gitLogCommitFile"
-                        contextMenuData={{
-                            commitHash: commit.hash,
-                            parentHash: commit.parentHashes[0] || ''
-                        }}
-                        stickyHeaders={true}
-                    />
-                </div>
-            </div>
+            )}
         </div>
     );
 };
@@ -287,6 +152,19 @@ export const LogListPanel: React.FC<LogListPanelProps> = ({
     const getRowTop = useCallback((index: number) => {
         return index * ROW_HEIGHT + (expandedLayout.offsets[index] ?? 0);
     }, [expandedLayout]);
+
+    const getCommitBlockHeight = useCallback((commit: typeof commits[number]) => {
+        return ROW_HEIGHT + (expandedLayout.heightByHash.get(commit.hash) ?? 0);
+    }, [expandedLayout]);
+
+    const getFirstIndexAfterOffset = useCallback((offset: number) => {
+        for (let index = 0; index < commits.length; index += 1) {
+            if (getRowTop(index) > offset) {
+                return index;
+            }
+        }
+        return commits.length;
+    }, [commits.length, getRowTop]);
 
     const scrollToRow = useCallback((index: number) => {
         if (!containerRef.current) return;
@@ -439,7 +317,7 @@ export const LogListPanel: React.FC<LogListPanelProps> = ({
         const index = commits.findIndex(commit => commit.hash === hash);
         if (index === -1) return;
 
-        const inlineDetailsHeight = expandedLayout.heightByHash.get(hash) ?? INLINE_LOADING_HEIGHT;
+        const inlineDetailsHeight = expandedLayout.heightByHash.get(hash) ?? getInlineDetailsHeight();
         const rowTop = getRowTop(index);
         const detailsBottom = rowTop + ROW_HEIGHT + inlineDetailsHeight;
         const viewTop = containerRef.current.scrollTop;
@@ -466,8 +344,8 @@ export const LogListPanel: React.FC<LogListPanelProps> = ({
         setCachedScrollTop(target.scrollTop);
 
         // Preload when less than 30 rows remain (LONG_DISTANCE_THRESHOLD)
-        const visibleEndRow = Math.ceil((target.scrollTop + target.clientHeight) / ROW_HEIGHT);
-        const remainingRows = commits.length - visibleEndRow;
+        const visibleEndIndex = getFirstIndexAfterOffset(target.scrollTop + target.clientHeight);
+        const remainingRows = commits.length - visibleEndIndex;
         if (hasMore && !loading && remainingRows < LONG_DISTANCE_THRESHOLD + 10) {
             loadMore();
         }
@@ -527,7 +405,7 @@ export const LogListPanel: React.FC<LogListPanelProps> = ({
             // Ensure visible
             if (containerRef.current) {
                 const rowTop = getRowTop(newIndex);
-                const rowBottom = rowTop + ROW_HEIGHT;
+                const rowBottom = rowTop + getCommitBlockHeight(commits[newIndex]);
                 const viewTop = containerRef.current.scrollTop;
                 const viewBottom = viewTop + clientHeight;
 
@@ -546,13 +424,13 @@ export const LogListPanel: React.FC<LogListPanelProps> = ({
         const overscanTop = Math.max(0, scrollTop - BUFFER * ROW_HEIGHT);
         for (let index = 0; index < commits.length; index += 1) {
             const commit = commits[index];
-            const blockBottom = getRowTop(index) + ROW_HEIGHT + (expandedLayout.heightByHash.get(commit.hash) ?? 0);
+            const blockBottom = getRowTop(index) + getCommitBlockHeight(commit);
             if (blockBottom >= overscanTop) {
                 return Math.max(0, index - BUFFER);
             }
         }
         return Math.max(0, commits.length - BUFFER);
-    }, [commits, expandedLayout, getRowTop, scrollTop]);
+    }, [commits, getCommitBlockHeight, getRowTop, scrollTop]);
     const endIndex = useMemo(() => {
         const overscanBottom = scrollTop + clientHeight + BUFFER * ROW_HEIGHT;
         let index = startIndex;
@@ -627,92 +505,73 @@ export const LogListPanel: React.FC<LogListPanelProps> = ({
                                 const rowTop = getRowTop(globalIndex);
                                 const isExpanded = isNarrowMode && expandedHashes.has(commit.hash);
                                 const inlineDetailsHeight = expandedLayout.heightByHash.get(commit.hash) ?? 0;
-                                const detailsContentLeft = 8 + rowGraphWidth + 8;
-                                const detailsShellLeft = Math.max(0, detailsContentLeft - 12);
-                                const detailsId = `git-log-inline-details-${commit.hash}`;
+                                const blockHeight = ROW_HEIGHT + inlineDetailsHeight;
                                 return (
-                                    <React.Fragment key={commit.hash}>
-                                        <div
-                                            className={`${styles.row} ${isExpanded ? styles.expandedRow : ''} ${!isBlink && selected ? styles.selected : ''} ${isBlink ? styles.blink : ''} ${focusedHash === commit.hash ? styles.focused : ''}`}
-                                            style={{
-                                                position: 'absolute',
-                                                top: rowTop,
-                                                left: 0,
-                                                right: 0
-                                            }}
-                                            onClick={(e) => handleRowClickWithAccordion(e, commit)}
-                                            onMouseEnter={() => {
-                                                setRowHoveredHash(commit.hash);
-                                            }}
-                                            onMouseLeave={() => {
-                                                setRowHoveredHash(null);
-                                            }}
-                                            onContextMenu={() => setFocusedHash(commit.hash)}
-                                            data-vscode-context={JSON.stringify({
-                                                webviewSection: 'gitLogCommit',
-                                                hash: commit.hash,
-                                                shortHash: commit.shortHash,
-                                                subject: commit.subject,
-                                                isUnpushed: unpushedCommits.has(commit.hash),
-                                                isLatestUnpushed: commit.hash === latestUnpushedHash
-                                            } satisfies GitLogCommitContext)}
-                                        >
-                                            <div className={styles.graphCol} style={{ width: rowGraphWidth }}>
-                                                {graphNode && (
-                                                    <GraphColumn
-                                                        node={graphNode}
-                                                        rowHeight={ROW_HEIGHT}
-                                                        graphWidth={rowGraphWidth}
-                                                        rowIndex={globalIndex}
-                                                        onJumpToCommit={handleJumpToCommit}
-                                                        isSelected={selected && !isBlink}
-                                                        isHovered={rowHoveredHash === commit.hash}
-                                                        hasFocus={listHasFocus}
-                                                        isExpanded={isExpanded}
-                                                    />
-                                                )}
-                                            </div>
-                                            <div className={styles.subject}>
-                                                <span>{commit.subject}</span>
-                                                {commit.refs && commit.refs.length > 0 && (
-                                                    <RefLabels refs={commit.refs} />
-                                                )}
-                                            </div>
-                                            <span className={styles.author}>{commit.authorName}</span>
-                                            <span className={styles.date}>
-                                                {formatRelativeDate(commit.date)}
-                                            </span>
+                                    <div
+                                        key={commit.hash}
+                                        className={`${styles.row} ${isExpanded ? styles.expandedRow : ''} ${!isBlink && selected ? styles.selected : ''} ${isBlink ? styles.blink : ''} ${focusedHash === commit.hash ? styles.focused : ''}`}
+                                        style={{
+                                            position: 'absolute',
+                                            top: rowTop,
+                                            left: 0,
+                                            right: 0,
+                                            height: blockHeight
+                                        }}
+                                        onClick={(e) => handleRowClickWithAccordion(e, commit)}
+                                        onMouseEnter={() => {
+                                            setRowHoveredHash(commit.hash);
+                                        }}
+                                        onMouseLeave={() => {
+                                            setRowHoveredHash(null);
+                                        }}
+                                        onContextMenu={() => setFocusedHash(commit.hash)}
+                                        data-vscode-context={JSON.stringify({
+                                            webviewSection: 'gitLogCommit',
+                                            hash: commit.hash,
+                                            shortHash: commit.shortHash,
+                                            subject: commit.subject,
+                                            isUnpushed: unpushedCommits.has(commit.hash),
+                                            isLatestUnpushed: commit.hash === latestUnpushedHash
+                                        } satisfies GitLogCommitContext)}
+                                    >
+                                        <div className={styles.graphCol} style={{ width: rowGraphWidth, height: blockHeight }}>
+                                            {graphNode && (
+                                                <GraphColumn
+                                                    node={graphNode}
+                                                    rowHeight={ROW_HEIGHT}
+                                                    graphHeight={blockHeight}
+                                                    graphWidth={rowGraphWidth}
+                                                    rowIndex={globalIndex}
+                                                    rowTop={rowTop}
+                                                    onJumpToCommit={handleJumpToCommit}
+                                                    isSelected={selected && !isBlink}
+                                                    isHovered={rowHoveredHash === commit.hash}
+                                                    hasFocus={listHasFocus}
+                                                    isExpanded={isExpanded}
+                                                />
+                                            )}
                                         </div>
-                                        {isExpanded && (
-                                            <div
-                                                id={detailsId}
-                                                className={styles.inlineDetails}
-                                                style={{
-                                                    top: rowTop + ROW_HEIGHT,
-                                                    height: inlineDetailsHeight
-                                                }}
-                                            >
-                                                {graphNode && (
-                                                    <InlineGraphLines
-                                                        lines={graphNode.lines}
-                                                        graphWidth={rowGraphWidth}
-                                                        height={inlineDetailsHeight}
-                                                        nodeColumn={graphNode.column}
-                                                        rowIndex={globalIndex}
-                                                    />
-                                                )}
-                                                <div
-                                                    className={styles.inlineDetailsShell}
-                                                    style={{ marginLeft: detailsShellLeft }}
-                                                >
-                                                    <InlineCommitDetails
-                                                        selectedHash={commit.hash}
-                                                        commit={expandedCommitDetailsByHash[commit.hash]}
-                                                    />
+                                        <div className={styles.commitContent}>
+                                            <div className={styles.rowMain}>
+                                                <div className={styles.subject}>
+                                                    <span>{commit.subject}</span>
+                                                    {commit.refs && commit.refs.length > 0 && (
+                                                        <RefLabels refs={commit.refs} />
+                                                    )}
                                                 </div>
+                                                <span className={styles.author}>{commit.authorName}</span>
+                                                <span className={styles.date}>
+                                                    {formatRelativeDate(commit.date)}
+                                                </span>
                                             </div>
-                                        )}
-                                    </React.Fragment>
+                                            {isExpanded && (
+                                                <InlineCommitDetails
+                                                    selectedHash={commit.hash}
+                                                    commit={expandedCommitDetailsByHash[commit.hash]}
+                                                />
+                                            )}
+                                        </div>
+                                    </div>
                                 );
                             })}
                         </div>

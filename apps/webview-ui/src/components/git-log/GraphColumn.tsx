@@ -4,8 +4,10 @@ import type { GraphNode, GraphLine } from './graphUtils';
 interface GraphColumnProps {
     node: GraphNode;
     rowHeight: number;
+    graphHeight?: number;
     graphWidth: number;
     rowIndex: number;
+    rowTop?: number;
     onJumpToCommit?: (hash: string) => void;
     isSelected?: boolean;
     isHovered?: boolean;
@@ -31,14 +33,18 @@ const getStrokeColor = (isSelected: boolean, isHovered: boolean, hasFocus: boole
 export const GraphColumn: React.FC<GraphColumnProps> = ({
     node,
     rowHeight,
+    graphHeight,
     graphWidth,
     rowIndex,
+    rowTop,
     onJumpToCommit,
     isSelected = false,
     isHovered = false,
     hasFocus = false,
     isExpanded = false
 }) => {
+    const svgHeight = graphHeight ?? rowHeight;
+    const dotY = rowHeight / 2;
     const DOT_RADIUS = isExpanded ? 6 : 5;
     const STROKE_WIDTH = isExpanded ? 4 : 3;
     const [hoveredArrowIndex, setHoveredArrowIndex] = React.useState<number | null>(null);
@@ -47,11 +53,23 @@ export const GraphColumn: React.FC<GraphColumnProps> = ({
         return line.x1 === node.column || line.x2 === node.column ? 3 : 2;
     };
 
+    const getY = (value: number) => {
+        if (value <= 0.5) {
+            return value * rowHeight;
+        }
+
+        if (svgHeight === rowHeight) {
+            return value * rowHeight;
+        }
+
+        return dotY + ((value - 0.5) / 0.5) * (svgHeight - dotY);
+    };
+
     const getPath = (line: GraphLine) => {
         const x1 = line.x1 * CELL_WIDTH + CELL_WIDTH / 2;
-        const y1 = line.y1 * rowHeight;
+        const y1 = getY(line.y1);
         const x2 = line.x2 * CELL_WIDTH + CELL_WIDTH / 2;
-        const y2 = line.y2 * rowHeight;
+        const y2 = getY(line.y2);
 
         if (line.x1 === line.x2) {
             return `M ${x1} ${y1} L ${x2} ${y2}`;
@@ -68,7 +86,7 @@ export const GraphColumn: React.FC<GraphColumnProps> = ({
 
         // Arrow at the end of line
         const x = (isDown ? line.x2 : line.x1) * CELL_WIDTH + CELL_WIDTH / 2;
-        const arrowY = (isDown ? line.y2 : line.y1) * rowHeight;
+        const arrowY = getY(isDown ? line.y2 : line.y1);
 
         // Triangle arrow - filled for better visibility
         const arrowSize = 5;
@@ -124,7 +142,7 @@ export const GraphColumn: React.FC<GraphColumnProps> = ({
     };
 
     return (
-        <svg width={graphWidth} height={rowHeight} style={{ overflow: 'visible', pointerEvents: 'auto' }}>
+        <svg width={graphWidth} height={svgHeight} style={{ overflow: 'visible', pointerEvents: 'auto' }}>
             {node.lines.map((line, i) => (
                 <React.Fragment key={i}>
                     <path
@@ -134,14 +152,14 @@ export const GraphColumn: React.FC<GraphColumnProps> = ({
                         fill="none"
                         strokeLinecap={line.isDashed ? 'butt' : 'round'}
                         strokeDasharray={line.isDashed ? '2 3' : undefined}
-                        strokeDashoffset={line.isDashed ? ((rowIndex + line.y1) * rowHeight) % 5 : undefined}
+                        strokeDashoffset={line.isDashed ? ((rowTop ?? rowIndex * rowHeight) + getY(line.y1)) % 5 : undefined}
                     />
                     {renderArrow(line, i)}
                 </React.Fragment>
             ))}
             <circle
                 cx={node.column * CELL_WIDTH + CELL_WIDTH / 2}
-                cy={rowHeight / 2}
+                cy={dotY}
                 r={DOT_RADIUS}
                 fill={node.color}
                 stroke={getStrokeColor(isSelected, isHovered, hasFocus)}

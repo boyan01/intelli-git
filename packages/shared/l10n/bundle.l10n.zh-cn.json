@@ -113,6 +113,7 @@
     "No files in this stash": "此贮藏中没有文件",
     "Select a stash to view files": "选择一个贮藏以预览",
     "{{count}} files": "{{count}} 个文件",
+    "+{{count}} more": "还有 {{count}} 个",
     "Push Tags": "推送标签",
     "Push": "推送",
     "Push {{count}} Commits": "推送 {{count}} 个提交",
