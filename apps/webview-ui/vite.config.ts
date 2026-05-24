@@ -30,7 +30,7 @@ export default defineConfig(({ mode }) => {
       __BUILD_TIME__: JSON.stringify(String(finalBuildTime)),
       __BUILD_CHANNEL__: JSON.stringify(buildChannel),
       __IS_DEV_BUILD__: JSON.stringify(isDevBuild),
-      __IS_EXPIRED__: isDevBuild ? expirationExpression : 'false',
+      __IS_EXPIRED__: expirationExpression,
     },
     resolve: {
       alias: {

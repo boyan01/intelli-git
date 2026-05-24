@@ -454,6 +454,5 @@
     "version.expired.description": "当前 Early Access 版本已过期，请更新 Intelli Git 以继续使用。",
     "version.expired.installLatestRelease": "安装最新正式版",
     "version.expired.openFeedback": "打开反馈",
-    "version.expired.rebuildDevVsix": "重新构建 dev VSIX",
     "Intelli Git Dev Build": "Intelli Git Dev Build"
 }

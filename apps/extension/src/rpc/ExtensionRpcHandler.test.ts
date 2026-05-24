@@ -588,7 +588,7 @@ describe('ExtensionRpcHandler no repository state', () => {
         });
     });
 
-    it('opens expired dev build support actions from the webview', async () => {
+    it('opens expired build support actions from the webview', async () => {
         vscodeTestMock.__resetExecutedCommands();
         vscodeTestMock.__resetOpenedExternalUris();
         const handler = createNoRepoHandler();

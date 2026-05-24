@@ -18,12 +18,12 @@ export interface VersionCheckInput {
 export function getVersionCheckState(input: VersionCheckInput): VersionCheckState {
     const now = input.now ?? Date.now();
     const daysSinceBuild = (now - input.buildTime) / (1000 * 60 * 60 * 24);
-    const isExpired = input.isDevBuild && input.isExpired;
+    const isExpired = input.isExpired;
 
     return {
         isDevBuild: input.isDevBuild,
         isExpired,
-        needsWarning: input.isDevBuild && !isExpired && daysSinceBuild >= WARNING_DAYS,
+        needsWarning: !isExpired && daysSinceBuild >= WARNING_DAYS,
         daysRemaining: Math.max(0, Math.ceil(EXPIRATION_DAYS - daysSinceBuild))
     };
 }

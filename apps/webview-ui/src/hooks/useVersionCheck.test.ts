@@ -5,7 +5,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const NOW = Date.UTC(2026, 4, 24);
 
 describe('getVersionCheckState', () => {
-    it('keeps marketplace builds out of expiration even when the build is old', () => {
+    it('expires marketplace builds when the build macro is expired', () => {
         const state = getVersionCheckState({
             buildTime: NOW - (45 * DAY_MS),
             isDevBuild: false,
@@ -13,14 +13,14 @@ describe('getVersionCheckState', () => {
             now: NOW
         });
 
-        expect(state.isExpired).toBe(false);
+        expect(state.isExpired).toBe(true);
         expect(state.needsWarning).toBe(false);
     });
 
-    it('warns before a dev build expires', () => {
+    it('warns before an Early Access build expires', () => {
         const state = getVersionCheckState({
             buildTime: NOW - (24 * DAY_MS),
-            isDevBuild: true,
+            isDevBuild: false,
             isExpired: false,
             now: NOW
         });
@@ -30,7 +30,7 @@ describe('getVersionCheckState', () => {
         expect(state.daysRemaining).toBe(6);
     });
 
-    it('expires only dev builds', () => {
+    it('preserves dev build metadata while expiring dev builds', () => {
         const state = getVersionCheckState({
             buildTime: NOW - (31 * DAY_MS),
             isDevBuild: true,
@@ -38,6 +38,7 @@ describe('getVersionCheckState', () => {
             now: NOW
         });
 
+        expect(state.isDevBuild).toBe(true);
         expect(state.isExpired).toBe(true);
         expect(state.needsWarning).toBe(false);
     });

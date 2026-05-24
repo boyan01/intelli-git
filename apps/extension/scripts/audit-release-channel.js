@@ -12,7 +12,7 @@ const RAW_MACROS = [
     '__IS_EXPIRED__'
 ];
 const DEV_VERSION_PATTERN = /-dev\.\d+$/;
-const DEV_EXPIRATION_PATTERN = /Date\.now\(\)\s*-\s*\d+\s*>\s*(?:30\s*\*\s*24\s*\*\s*60\s*\*\s*60\s*\*\s*(?:1000|1e3)|720\s*\*\s*60\s*\*\s*60\s*\*\s*(?:1000|1e3)|2592e6|2592000000)/;
+const EARLY_ACCESS_EXPIRATION_PATTERN = /Date\.now\(\)\s*-\s*\d+\s*>\s*(?:30\s*\*\s*24\s*\*\s*60\s*\*\s*60\s*\*\s*(?:1000|1e3)|720\s*\*\s*60\s*\*\s*60\s*\*\s*(?:1000|1e3)|2592e6|2592000000)/;
 const BLOCKED_VSIX_ENTRIES = [
     { pattern: /^extension\/(?:\.agent|\.agents|\.codex|\.claude)\//, reason: 'agent-local notes must not ship' },
     { pattern: /^extension\/(?:src|apps|packages)\//, reason: 'source workspace files must not ship' },
@@ -150,12 +150,9 @@ function auditBundle(bundle, channel, issues) {
         }
     }
 
-    const hasDevExpiration = DEV_EXPIRATION_PATTERN.test(bundle.contents);
-    if (channel === 'marketplace' && hasDevExpiration) {
-        issues.push(`${bundle.name} contains a dev expiration expression in a Marketplace build`);
-    }
-    if (channel === 'dev' && !hasDevExpiration) {
-        issues.push(`${bundle.name} does not contain the dev expiration expression`);
+    const hasEarlyAccessExpiration = EARLY_ACCESS_EXPIRATION_PATTERN.test(bundle.contents);
+    if (!hasEarlyAccessExpiration) {
+        issues.push(`${bundle.name} does not contain the Early Access expiration expression`);
     }
 }
 

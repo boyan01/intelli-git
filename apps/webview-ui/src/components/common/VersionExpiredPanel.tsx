@@ -30,13 +30,6 @@ export const VersionExpiredPanel: React.FC = () => {
                 >
                     {t('version.expired.openFeedback')}
                 </button>
-                <button
-                    type="button"
-                    className={styles.secondaryAction}
-                    onClick={() => void rpc.rebuildDevVsix()}
-                >
-                    {t('version.expired.rebuildDevVsix')}
-                </button>
             </div>
         </div>
     );
