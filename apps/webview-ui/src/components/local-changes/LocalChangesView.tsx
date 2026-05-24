@@ -224,6 +224,7 @@ export function LocalChangesView() {
                                     current={branches.current}
                                     ahead={branches.ahead}
                                     behind={branches.behind}
+                                    repositoryName={branches.repositoryName}
                                     repositoryKind={branches.repositoryKind}
                                     repositoryDetached={branches.repositoryDetached}
                                     repositoryPath={branches.repositoryPath}

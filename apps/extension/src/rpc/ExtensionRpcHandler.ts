@@ -472,24 +472,18 @@ export class ExtensionRpcHandler {
             };
         }
 
-        const repositoryStates: RepositoryCommitViewState[] = [];
-        for (const repository of repositories) {
-            const service = this.repositoryManager.getService(repository.repoPath);
-            if (!service) {
-                continue;
-            }
-
-            const files = await this.getStatusWithStateForService(service);
-            repositoryStates.push({
-                repository,
-                files,
-                changelistState: this.getCurrentChangelistState(service),
-                workspaceRoot: service.getWorkspaceRoot()
-            });
-        }
-
         const activeRepoPath = this.repositoryManager.getActiveRepoPath();
-        const activeRepositoryState = repositoryStates.find(state => state.repository.repoPath === activeRepoPath) || repositoryStates[0];
+        const activeRepository = repositories.find(repository => repository.repoPath === activeRepoPath) || repositories[0];
+        const activeService = activeRepository ? this.repositoryManager.getService(activeRepository.repoPath) : undefined;
+        const activeRepositoryState: RepositoryCommitViewState | undefined = activeRepository && activeService
+            ? {
+                repository: activeRepository,
+                files: await this.getStatusWithStateForService(activeService),
+                changelistState: this.getCurrentChangelistState(activeService),
+                workspaceRoot: activeService.getWorkspaceRoot()
+            }
+            : undefined;
+        const repositoryStates = activeRepositoryState ? [activeRepositoryState] : [];
         const files = activeRepositoryState?.files || [];
         const changelistState = activeRepositoryState?.changelistState || this.getCurrentChangelistState();
         const elapsedMs = Date.now() - startedAt;

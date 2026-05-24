@@ -1,14 +1,17 @@
 import * as vscode from 'vscode';
 import { GitService } from '../services/GitService';
 import { BranchPicker } from './BranchPicker';
+import type { RepositoryScope } from '../services/RepositoryManager';
 
 export class BranchStatusBar {
     private statusBarItem: vscode.StatusBarItem;
     private gitService: GitService;
+    private repository?: RepositoryScope;
     private currentBranch: string = '';
 
-    constructor(gitService: GitService) {
+    constructor(gitService: GitService, repository?: RepositoryScope) {
         this.gitService = gitService;
+        this.repository = repository;
         this.statusBarItem = vscode.window.createStatusBarItem(
             vscode.StatusBarAlignment.Left,
             9999
@@ -23,10 +26,14 @@ export class BranchStatusBar {
         try {
             const branches = await this.gitService.branchRemote.getBranches();
             this.currentBranch = branches.current;
-            this.statusBarItem.text = `$(git-branch) ${this.currentBranch}`;
+            this.statusBarItem.text = this.repository?.name
+                ? `$(repo) ${this.repository.name} $(git-branch) ${this.currentBranch}`
+                : `$(git-branch) ${this.currentBranch}`;
             this.statusBarItem.show();
         } catch {
-            this.statusBarItem.text = `$(git-branch) ${vscode.l10n.t('No Branch')}`;
+            this.statusBarItem.text = this.repository?.name
+                ? `$(repo) ${this.repository.name} $(git-branch) ${vscode.l10n.t('No Branch')}`
+                : `$(git-branch) ${vscode.l10n.t('No Branch')}`;
             this.statusBarItem.show();
         }
     }

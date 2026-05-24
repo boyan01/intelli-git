@@ -8,6 +8,7 @@ interface BranchStatusProps {
     current?: string;
     ahead?: number;
     behind?: number;
+    repositoryName?: string;
     repositoryKind?: BranchInfo['repositoryKind'];
     repositoryDetached?: boolean;
     repositoryPath?: string;
@@ -18,6 +19,7 @@ export const BranchStatus: React.FC<BranchStatusProps> = ({
     current,
     ahead,
     behind,
+    repositoryName,
     repositoryKind,
     repositoryDetached,
     repositoryPath,
@@ -45,9 +47,28 @@ export const BranchStatus: React.FC<BranchStatusProps> = ({
         branchContext,
         repositoryPath
     ].filter(Boolean).join('\n');
+    const repositoryTitle = [
+        t('Switch Repository...'),
+        repositoryPath
+    ].filter(Boolean).join('\n');
 
     return (
         <div className={styles.container}>
+            {repositoryName && (
+                <div
+                    className={`${styles.section} ${styles.repository}`}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        void rpc.switchRepository();
+                    }}
+                    title={repositoryTitle}
+                >
+                    <i className={`codicon codicon-repo ${styles.icon}`} aria-hidden="true" />
+                    <span className={styles.repositoryName}>{repositoryName}</span>
+                    <i className={`codicon codicon-chevron-down ${styles.chevron}`} aria-hidden="true" />
+                </div>
+            )}
+
             {current && (
                 <div
                     className={branchSectionClassName}

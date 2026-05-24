@@ -112,6 +112,7 @@ export interface BranchInfo {
     ahead?: number;
     behind?: number;
     rebaseStatus?: 'none' | 'interactive' | 'merging';
+    repositoryName?: string;
     repositoryKind?: RepositoryInfo['kind'];
     repositoryDetached?: boolean;
     repositoryPath?: string;
@@ -314,6 +315,7 @@ export interface LocalBranchInfo {
 
 export interface BranchListData {
     hasRepository?: boolean;
+    repository?: RepositoryInfo;
     currentBranch: string;
     localBranches: string[];
     localBranchesInfo: LocalBranchInfo[];

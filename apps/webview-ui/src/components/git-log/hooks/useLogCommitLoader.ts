@@ -60,7 +60,7 @@ function getInitialFilters(): Partial<LogOptions> {
     };
 }
 
-export const useLogCommitLoader = (): UseLogCommitLoaderResult => {
+export const useLogCommitLoader = (repositoryPath?: string): UseLogCommitLoaderResult => {
     const [commits, setCommits] = useState<LogCommit[]>(() =>
         deserializePersistedValue('gitLog.commits', getStoredState()['gitLog.commits'])
     );
@@ -73,6 +73,7 @@ export const useLogCommitLoader = (): UseLogCommitLoaderResult => {
     const commitsLengthRef = useRef(commits.length);
     const filtersRef = useRef(filters);
     const pendingResetRef = useRef(false);
+    const repositoryPathRef = useRef(repositoryPath);
 
     const unpushedCommits = useMemo(() => new Set(unpushedList), [unpushedList]);
     const latestUnpushedHash = unpushedList[0] ?? null;
@@ -141,8 +142,19 @@ export const useLogCommitLoader = (): UseLogCommitLoaderResult => {
     }, []);
 
     useEffect(() => {
+        if (repositoryPathRef.current !== repositoryPath) {
+            repositoryPathRef.current = repositoryPath;
+            setCommits([]);
+            setUnpushedList([]);
+            setHasMore(true);
+            commitsLengthRef.current = 0;
+            updateStoredState('gitLog.commits', serializePersistedValue('gitLog.commits', []));
+        }
+    }, [repositoryPath]);
+
+    useEffect(() => {
         loadMore(true);
-    }, [filters, loadMore]);
+    }, [filters, repositoryPath, loadMore]);
 
     // Subscribe to refresh events to reload commits when Git state changes
     useEffect(() => {

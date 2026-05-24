@@ -36,7 +36,7 @@ export const BranchListPanel: React.FC<BranchListPanelProps> = ({ onBranchFilter
     const loadBranchListData = useCallback(() => rpc.getBranchListData(), []);
     const { data, loading: isLoading } = useRpcData(
         loadBranchListData,
-        { initialValue: emptyBranchListData, cacheKey: 'gitLog.branchListData' }
+        { initialValue: emptyBranchListData }
     );
     const treeRef = useRef<BasicTreeViewRef>(null);
 
@@ -391,6 +391,21 @@ export const BranchListPanel: React.FC<BranchListPanelProps> = ({ onBranchFilter
 
     return (
         <div className={styles.container}>
+            {data.repository && (
+                <div className={styles.repositoryContainer}>
+                    <button
+                        className={styles.repositoryButton}
+                        type="button"
+                        onClick={() => void rpc.switchRepository()}
+                        title={[t('Switch Repository...'), data.repository.path].filter(Boolean).join('\n')}
+                    >
+                        <i className="codicon codicon-repo" aria-hidden="true" />
+                        <span className={styles.repositoryName}>{data.repository.name}</span>
+                        <i className="codicon codicon-chevron-down" aria-hidden="true" />
+                    </button>
+                </div>
+            )}
+
             <div className={styles.searchContainer}>
                 <div className={styles.searchBox}>
                     <span className={`${styles.searchIcon} codicon codicon-search`} />

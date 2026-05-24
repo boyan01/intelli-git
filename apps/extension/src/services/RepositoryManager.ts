@@ -54,15 +54,18 @@ function normalizeExistingPath(filePath: string): string {
 export class RepositoryManager implements vscode.Disposable {
     private static readonly USER_REPOSITORIES_KEY = 'ideaCommitPanel.userRepositories.v1';
     private static readonly HIDDEN_REPOSITORIES_KEY = 'ideaCommitPanel.hiddenRepositories.v1';
+    private static readonly ACTIVE_REPOSITORY_KEY = 'ideaCommitPanel.activeRepository.v1';
 
     private repositories = new Map<string, RepositoryEntry>();
     private activeRepoPath: string | undefined;
     private _onDidChangeActiveRepo = new vscode.EventEmitter<string | undefined>();
     private _onDidChangeRepositories = new vscode.EventEmitter<void>();
+    private _onDidFallbackActiveRepo = new vscode.EventEmitter<{ previousRepoPath: string; nextRepoPath?: string }>();
     private disposables: vscode.Disposable[] = [];
 
     public readonly onDidChangeActiveRepo = this._onDidChangeActiveRepo.event;
     public readonly onDidChangeRepositories = this._onDidChangeRepositories.event;
+    public readonly onDidFallbackActiveRepo = this._onDidFallbackActiveRepo.event;
 
     constructor(private context: vscode.ExtensionContext) {
         this.disposables.push(
@@ -92,6 +95,18 @@ export class RepositoryManager implements vscode.Disposable {
     private async saveHiddenRepositoryPaths(paths: string[]): Promise<void> {
         const normalized = Array.from(new Set(paths.map(normalizeExistingPath))).sort((a, b) => a.localeCompare(b));
         await this.context.workspaceState.update(RepositoryManager.HIDDEN_REPOSITORIES_KEY, normalized);
+    }
+
+    private getSavedActiveRepositoryPath(): string | undefined {
+        const savedRepoPath = this.context.workspaceState.get<string>(RepositoryManager.ACTIVE_REPOSITORY_KEY);
+        return savedRepoPath ? normalizeExistingPath(savedRepoPath) : undefined;
+    }
+
+    private saveActiveRepositoryPath(repoPath: string | undefined): void {
+        this.context.workspaceState.update(
+            RepositoryManager.ACTIVE_REPOSITORY_KEY,
+            repoPath ? normalizeExistingPath(repoPath) : undefined
+        ).then(undefined, e => logger.error('Failed to save active repository', e));
     }
 
     private async scanRepositories() {
@@ -220,14 +235,50 @@ export class RepositoryManager implements vscode.Disposable {
             }
         }
 
-        if (changed) {
-            if (!this.activeRepoPath || !this.repositories.has(this.activeRepoPath)) {
-                const nextRepoPath = this.repositories.keys().next().value;
-                this.activeRepoPath = nextRepoPath;
-                this._onDidChangeActiveRepo.fire(this.activeRepoPath);
-            }
+        const activeChanged = this.reconcileActiveRepository();
+
+        if (changed || activeChanged) {
             this._onDidChangeRepositories.fire();
         }
+    }
+
+    private reconcileActiveRepository(): boolean {
+        const previousActiveRepoPath = this.activeRepoPath;
+        const savedActiveRepoPath = this.getSavedActiveRepositoryPath();
+        const requestedActiveRepoPath = previousActiveRepoPath || savedActiveRepoPath;
+        const activeRepoStillAvailable = requestedActiveRepoPath && this.repositories.has(requestedActiveRepoPath);
+        const nextRepoPath = activeRepoStillAvailable
+            ? requestedActiveRepoPath
+            : this.repositories.keys().next().value;
+        const fallbackRepoPath = requestedActiveRepoPath && requestedActiveRepoPath !== nextRepoPath
+            ? requestedActiveRepoPath
+            : undefined;
+
+        if (previousActiveRepoPath === nextRepoPath) {
+            if (savedActiveRepoPath !== nextRepoPath) {
+                this.saveActiveRepositoryPath(nextRepoPath);
+            }
+            if (fallbackRepoPath) {
+                this._onDidFallbackActiveRepo.fire({
+                    previousRepoPath: fallbackRepoPath,
+                    nextRepoPath
+                });
+            }
+            return Boolean(fallbackRepoPath);
+        }
+
+        this.activeRepoPath = nextRepoPath;
+        this.saveActiveRepositoryPath(nextRepoPath);
+        this._onDidChangeActiveRepo.fire(this.activeRepoPath);
+
+        if (fallbackRepoPath) {
+            this._onDidFallbackActiveRepo.fire({
+                previousRepoPath: fallbackRepoPath,
+                nextRepoPath
+            });
+        }
+
+        return true;
     }
 
     private async readRepositoryGitState(git: SimpleGit, baseDir: string): Promise<RepositoryGitState> {
@@ -493,9 +544,11 @@ export class RepositoryManager implements vscode.Disposable {
     }
 
     public setActiveRepository(repoPath: string): boolean {
-        if (this.repositories.has(repoPath) && this.activeRepoPath !== repoPath) {
-            this.activeRepoPath = repoPath;
-            this._onDidChangeActiveRepo.fire(repoPath);
+        const normalizedRepoPath = normalizeExistingPath(repoPath);
+        if (this.repositories.has(normalizedRepoPath) && this.activeRepoPath !== normalizedRepoPath) {
+            this.activeRepoPath = normalizedRepoPath;
+            this.saveActiveRepositoryPath(normalizedRepoPath);
+            this._onDidChangeActiveRepo.fire(normalizedRepoPath);
             return true;
         }
         return false;
@@ -618,5 +671,8 @@ export class RepositoryManager implements vscode.Disposable {
         for (const disposable of this.disposables) {
             disposable.dispose();
         }
+        this._onDidChangeActiveRepo.dispose();
+        this._onDidChangeRepositories.dispose();
+        this._onDidFallbackActiveRepo.dispose();
     }
 }

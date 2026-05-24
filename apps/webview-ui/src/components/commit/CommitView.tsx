@@ -93,8 +93,7 @@ export function CommitView({ rebaseStatus }: CommitViewProps) {
             workspaceRoot: '',
             hasRepository: true,
             repositories: [] as RepositoryCommitViewState[]
-        },
-        cacheKey: 'commit.viewState'
+        }
     });
     const files = commitViewState.files;
     const changelistState = commitViewState.changelistState;

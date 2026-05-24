@@ -187,7 +187,16 @@ describe('ExtensionRpcHandler no repository state', () => {
             remoteBranches: {},
             tags: []
         };
+        const repository = {
+            name: 'repo',
+            repoPath: '/workspace/repo',
+            path: '/workspace/repo',
+            workspaceRoot: '/workspace/repo',
+            gitRoot: '/workspace/repo',
+            isSubmodule: false as const
+        };
         const readHandler = new GitReadRpcHandler({
+            getActiveScope: () => repository,
             getActiveService: () => ({
                 branchRemote: {
                     getBranchListData: vi.fn().mockResolvedValue(branchData)
@@ -197,8 +206,77 @@ describe('ExtensionRpcHandler no repository state', () => {
 
         await expect(readHandler.getBranchListData()).resolves.toEqual({
             ...branchData,
+            repository,
             hasRepository: true
         });
+    });
+
+    it('loads commit view files only for the active repository', async () => {
+        const repositoryA = {
+            name: 'repo-a',
+            repoPath: '/workspace/repo-a',
+            path: '/workspace/repo-a',
+            workspaceRoot: '/workspace/repo-a',
+            gitRoot: '/workspace/repo-a',
+            isSubmodule: false as const
+        };
+        const repositoryB = {
+            name: 'repo-b',
+            repoPath: '/workspace/repo-b',
+            path: '/workspace/repo-b',
+            workspaceRoot: '/workspace/repo-b',
+            gitRoot: '/workspace/repo-b',
+            isSubmodule: false as const
+        };
+        const serviceA = {
+            getStatus: vi.fn().mockResolvedValue([{ path: 'a.txt', status: 'M', staged: false }]),
+            getWorkspaceRoot: () => '/workspace/repo-a'
+        } as Partial<GitService>;
+        const serviceB = {
+            getStatus: vi.fn().mockResolvedValue([{ path: 'b.txt', status: 'M', staged: false }]),
+            getWorkspaceRoot: () => '/workspace/repo-b'
+        } as Partial<GitService>;
+
+        for (const service of [serviceA, serviceB]) {
+            Object.defineProperty(service, 'inactiveChangesService', {
+                get: () => ({
+                    syncWithStatus: vi.fn(),
+                    isInactive: vi.fn().mockReturnValue(false),
+                    getInactiveHunkIds: vi.fn().mockReturnValue([])
+                } as Partial<InactiveChangesService>)
+            });
+            Object.defineProperty(service, 'changelistStateService', {
+                get: () => ({
+                    syncWithStatus: vi.fn(),
+                    getState: () => createStagedChangelistState()
+                } as Partial<ChangelistStateService>)
+            });
+        }
+
+        const handler = new ExtensionRpcHandler({
+            context: {} as vscode.ExtensionContext,
+            repositoryManager: {
+                getActiveRepoPath: () => repositoryB.repoPath,
+                getActiveService: () => serviceB as GitService,
+                getService: (repoPath: string) => repoPath === repositoryB.repoPath ? serviceB as GitService : serviceA as GitService,
+                getRepositories: () => [repositoryA, repositoryB]
+            } as any
+        });
+
+        const state = await handler.getCommitViewState();
+
+        expect(state.activeRepository).toEqual(repositoryB);
+        expect(state.repositories?.map(item => item.repository.repoPath)).toEqual([repositoryB.repoPath]);
+        expect(state.files).toEqual([{
+            path: 'b.txt',
+            status: 'M',
+            staged: false,
+            inactive: false,
+            inactiveHunkIds: [],
+            hasStagedInactive: false
+        }]);
+        expect(serviceA.getStatus).not.toHaveBeenCalled();
+        expect(serviceB.getStatus).toHaveBeenCalledOnce();
     });
 
     it('rescans repositories after initializing a repository', async () => {

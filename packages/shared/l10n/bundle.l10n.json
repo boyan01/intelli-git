@@ -175,6 +175,8 @@
     "Branches": "Branches",
     "extension.pushSuccess": "Successfully pushed to {0}/{1}",
     "Force push to {0}/{1}? This can overwrite remote commits. Intelli Git will use --force-with-lease to avoid overwriting newer remote updates.": "Force push to {0}/{1}? This can overwrite remote commits. Intelli Git will use --force-with-lease to avoid overwriting newer remote updates.",
+    "The previously active repository is no longer available. Intelli Git switched to {0}.": "The previously active repository is no longer available. Intelli Git switched to {0}.",
+    "The previously active repository is no longer available. Select a repository to continue.": "The previously active repository is no longer available. Select a repository to continue.",
     "extension.commitSuccess": "Commit successful",
     "extension.paramMissing": "Parameter missing: {0}",
     "extension.noWorkspace": "Intelli Git: No workspace opened.",

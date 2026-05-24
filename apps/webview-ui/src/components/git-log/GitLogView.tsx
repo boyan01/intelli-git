@@ -87,6 +87,13 @@ export function GitLogView() {
 
     const { isExpired } = useVersionCheck();
     const hasRepository = branchListData.hasRepository !== false;
+    const activeRepositoryPath = branchListData.repository?.repoPath;
+
+    useEffect(() => {
+        setSelectedHashes([]);
+        setBranchFilter(undefined);
+    }, [activeRepositoryPath]);
+
     if (branchListLoading) {
         return (
             <div ref={containerRef} className={styles.container}>
@@ -144,6 +151,7 @@ export function GitLogView() {
             externalBranchFilter={branchFilter}
             isNarrowMode={isNarrowMode}
             commitDetails={commitDetails}
+            repositoryPath={activeRepositoryPath}
         />
     );
 

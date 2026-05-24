@@ -199,7 +199,22 @@ export async function activate(context: vscode.ExtensionContext) {
 
     // Initialize RepositoryManager
     const repositoryManager = new RepositoryManager(context);
-    context.subscriptions.push(repositoryManager);
+    context.subscriptions.push(
+        repositoryManager,
+        repositoryManager.onDidFallbackActiveRepo(event => {
+            if (event.nextRepoPath) {
+                void vscode.window.showWarningMessage(vscode.l10n.t(
+                    'The previously active repository is no longer available. Intelli Git switched to {0}.',
+                    path.basename(event.nextRepoPath)
+                ));
+                return;
+            }
+
+            void vscode.window.showWarningMessage(vscode.l10n.t(
+                'The previously active repository is no longer available. Select a repository to continue.'
+            ));
+        })
+    );
     await repositoryManager.initialize();
 
     if (!repositoryManager.getActiveService()) {
@@ -328,8 +343,9 @@ export async function activate(context: vscode.ExtensionContext) {
             subscriptions: repoBoundDisposables
         } as Pick<vscode.ExtensionContext, 'subscriptions'> as vscode.ExtensionContext;
 
-        branchStatusBar = new BranchStatusBar(gitService);
-        gitLogStatusBar = new GitLogStatusBar(gitService);
+        const activeScope = repositoryManager.getActiveScope();
+        branchStatusBar = new BranchStatusBar(gitService, activeScope);
+        gitLogStatusBar = new GitLogStatusBar(gitService, activeScope);
         changeBlockEditorController = new ChangeBlockEditorController(gitService, inactiveChangesService, changelistStateService, provider);
 
         registerStashCommands(repoContext, gitService, provider);

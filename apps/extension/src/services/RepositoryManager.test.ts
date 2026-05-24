@@ -169,4 +169,54 @@ describe('RepositoryManager worktree discovery', () => {
         expect(manager.getRepositories().map(repo => repo.repoPath)).toContain(fs.realpathSync(routeRepoPath));
         expect(manager.getRepositories().map(repo => repo.repoPath)).not.toContain(fs.realpathSync(appRepoPath));
     });
+
+    it('restores the selected active repository from workspace state', async () => {
+        const repoAPath = path.join(tempDir, 'repo-a');
+        const repoBPath = path.join(tempDir, 'repo-b');
+        await createCommittedRepository(repoAPath);
+        await createCommittedRepository(repoBPath);
+        const context = createExtensionContext();
+
+        __setWorkspaceFolders([repoAPath, repoBPath]);
+        manager = new RepositoryManager(context as never);
+        await manager.initialize();
+
+        const repoBRealPath = fs.realpathSync(repoBPath);
+        expect(manager.setActiveRepository(repoBRealPath)).toBe(true);
+
+        manager.dispose();
+        manager = new RepositoryManager(context as never);
+        await manager.initialize();
+
+        expect(manager.getActiveRepoPath()).toBe(repoBRealPath);
+    });
+
+    it('falls back when the saved active repository is no longer available', async () => {
+        const repoAPath = path.join(tempDir, 'repo-a');
+        const repoBPath = path.join(tempDir, 'repo-b');
+        await createCommittedRepository(repoAPath);
+        await createCommittedRepository(repoBPath);
+        const context = createExtensionContext();
+
+        __setWorkspaceFolders([repoAPath, repoBPath]);
+        manager = new RepositoryManager(context as never);
+        await manager.initialize();
+
+        const repoARealPath = fs.realpathSync(repoAPath);
+        const repoBRealPath = fs.realpathSync(repoBPath);
+        expect(manager.setActiveRepository(repoBRealPath)).toBe(true);
+
+        manager.dispose();
+        __setWorkspaceFolders([repoAPath]);
+        manager = new RepositoryManager(context as never);
+        const fallbacks: Array<{ previousRepoPath: string; nextRepoPath?: string }> = [];
+        manager.onDidFallbackActiveRepo(event => fallbacks.push(event));
+        await manager.initialize();
+
+        expect(manager.getActiveRepoPath()).toBe(repoARealPath);
+        expect(fallbacks).toEqual([{
+            previousRepoPath: repoBRealPath,
+            nextRepoPath: repoARealPath
+        }]);
+    });
 });

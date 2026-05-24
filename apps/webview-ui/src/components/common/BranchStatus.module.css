@@ -18,6 +18,19 @@
     background-color: var(--vscode-toolbar-hoverBackground);
 }
 
+.repository {
+    max-width: 150px;
+}
+
+.repositoryName {
+    min-width: 0;
+    max-width: 104px;
+    overflow: hidden;
+    font-size: 11px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .worktree {
     background-color: color-mix(in srgb, var(--vscode-focusBorder) 14%, transparent);
     border-color: color-mix(in srgb, var(--vscode-focusBorder) 44%, transparent);

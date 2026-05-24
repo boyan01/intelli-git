@@ -23,6 +23,7 @@ interface LogListPanelProps {
     externalBranchFilter?: { branch: string; requestId: number };
     isNarrowMode?: boolean;
     commitDetails?: CommitDetails;
+    repositoryPath?: string;
 }
 
 const ROW_HEIGHT = 24;
@@ -239,7 +240,8 @@ export const LogListPanel: React.FC<LogListPanelProps> = ({
     onSelectionChange,
     externalBranchFilter,
     isNarrowMode = false,
-    commitDetails
+    commitDetails,
+    repositoryPath
 }) => {
     const { t } = useTranslation();
     const containerRef = useRef<HTMLDivElement>(null);
@@ -263,7 +265,7 @@ export const LogListPanel: React.FC<LogListPanelProps> = ({
         latestUnpushedHash,
         loadMore,
         setFilters
-    } = useLogCommitLoader();
+    } = useLogCommitLoader(repositoryPath);
 
     const expandedLayout = useMemo(() => {
         const offsets: number[] = [];
@@ -310,6 +312,16 @@ export const LogListPanel: React.FC<LogListPanelProps> = ({
         onSelectionPersist: setCachedSelectedHashes
     });
     const pendingRevealHashRef = useRef<string | null>(null);
+
+    useEffect(() => {
+        setSelectedCommits([]);
+        onSelectionChange?.([]);
+        setCachedSelectedHashes([]);
+        lastSelectedRef.current = null;
+        setFocusedHash(null);
+        setExpandedHashes(new Set());
+        setExpandedCommitDetailsByHash({});
+    }, [repositoryPath, setCachedSelectedHashes, setSelectedCommits, onSelectionChange, lastSelectedRef]);
 
     useEffect(() => {
         if (!isNarrowMode || expandedHashes.size === 0) return;
