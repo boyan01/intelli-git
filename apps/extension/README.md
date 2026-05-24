@@ -1,26 +1,43 @@
 # Intelli Git
 
-Intelli Git brings an IntelliJ IDEA inspired Git workflow to Visual Studio Code.
+Intelli Git brings JetBrains-style Git workflows to Visual Studio Code.
 
-It provides a focused commit panel, changelist-style organization, stash tools, branch actions, Git log browsing, and AI-assisted commit message generation without replacing VS Code's built-in Git support.
+It provides a focused commit panel, changelist-style organization, stash tools, push workflows, Git Log browsing, and AI-assisted commit message generation without replacing VS Code's built-in Git support.
 
 ## Early Access
 
 Intelli Git is currently free during Early Access.
 
+## Screenshots
+
+### Commit View In Staged Mode
+
+![Intelli Git commit view in staged mode](https://raw.githubusercontent.com/boyan01/intelli-git/main/docs/assets/intelli-git-commit-staged.png)
+
+### Commit View In Changes Mode
+
+![Intelli Git commit view in changes mode](https://raw.githubusercontent.com/boyan01/intelli-git/main/docs/assets/intelli-git-commit-changes.png)
+
+### Git Log
+
+![Intelli Git Git Log panel](https://raw.githubusercontent.com/boyan01/intelli-git/main/docs/assets/intelli-git-log.png)
+
 ## Features
 
-- Commit panel for staged and unstaged changes
-- IntelliJ-style changelist mode with one active changelist
-- Inactive changes support for keeping work out of the current commit
-- File, folder, and changelist context menus using native VS Code menus
-- Stash, branch, and push actions from the extension UI
-- Git log panel with commit actions and file-level history actions
-- AI commit message generation with GitHub Copilot, Anthropic, Google AI, or a custom OpenAI-compatible endpoint
+- Commit panel with `staged` mode for the normal staged / unstaged Git model.
+- `changes` mode with IntelliJ-style changelists and one active changelist.
+- Inactive changes for keeping local work out of the current commit flow.
+- Native VS Code context menus for files, folders, changelists, stash entries, branches, and commits.
+- Git Log with branch filtering, commit graph, file history actions, cherry-pick, revert, reset, and commit message editing.
+- Stash and push workflows from the Intelli Git UI.
+- AI commit message generation with GitHub Copilot, Anthropic, Google AI, or a custom OpenAI-compatible endpoint.
 
-## Screenshot
+## Commit Panel Modes
 
-![Intelli Git overview](https://boyan01.github.io/intelli_git/images/image.png)
+The extension supports two commit panel modes through `intelli-git.changelist.mode`:
+
+- `staged`: follows the normal Git staged and unstaged model.
+- `changes`: uses IntelliJ-style changelists and commits only the active changelist.
 
 ## Requirements
 
@@ -32,26 +49,19 @@ AI features are optional. GitHub Copilot mode requires the GitHub Copilot extens
 
 ## Usage
 
-Open the Intelli Git activity bar view to review local changes, organize files, create commits, and push changes.
+Open the Intelli Git activity bar view to review local changes, organize files, create commits, stash changes, and push to remotes.
 
-The extension supports two commit panel modes:
+Open the Git Log panel to browse commit history, filter by branch or path, inspect commit files, and run commit-level actions.
 
-- `staged`: follows the normal Git staged and unstaged model
-- `changes`: uses IntelliJ-style changelists and commits only the active changelist
-
-You can switch the mode from VS Code Settings with `intelli-git.changelist.mode`.
-
-## AI Provider Setup
-
-Run `Intelli: Configure AI Provider` from the Command Palette to choose a provider and configure credentials.
-
-API keys are stored with VS Code SecretStorage. Legacy settings-based API keys are migrated and cleared automatically when possible.
+Run `Intelli: Configure AI Provider` from the Command Palette to choose an AI provider and configure credentials.
 
 ## Privacy
 
 Intelli Git runs locally inside VS Code and reads Git repository state from the workspace you open.
 
 When AI commit message generation is used, selected diff context may be sent to the configured AI provider. No AI request is made unless you invoke an AI action.
+
+API keys are stored with VS Code SecretStorage. Legacy settings-based API keys are migrated and cleared automatically when possible.
 
 ## Known Limitations
 
