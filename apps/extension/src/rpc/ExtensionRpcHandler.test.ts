@@ -257,8 +257,14 @@ describe('ExtensionRpcHandler push', () => {
             force: true,
             pushTags: false,
             remote: 'origin',
-            branch: 'main'
-        })).resolves.toEqual({ pushed: true });
+            branch: 'main',
+            commitCount: 3
+        })).resolves.toEqual({
+            ok: true,
+            remote: 'origin',
+            branch: 'main',
+            commitCount: 3
+        });
 
         expect(vscodeTestMock.__getWarningMessages()[0].message).toBe('Force push to origin/main? This can overwrite remote commits. Intelli Git will use --force-with-lease to avoid overwriting newer remote updates.');
         expect(branchRemote.forcePush).toHaveBeenCalledWith('origin', 'main:main', {
@@ -281,7 +287,13 @@ describe('ExtensionRpcHandler push', () => {
             pushTags: false,
             remote: 'origin',
             branch: 'main'
-        })).resolves.toEqual({ pushed: false });
+        })).resolves.toEqual({
+            ok: false,
+            code: 'cancelled',
+            remote: 'origin',
+            branch: 'main',
+            message: 'Force push cancelled.'
+        });
 
         expect(branchRemote.forcePush).not.toHaveBeenCalled();
     });
@@ -303,10 +315,13 @@ describe('ExtensionRpcHandler push', () => {
             pushTags: false,
             remote: 'origin',
             branch: 'main'
-        })).rejects.toMatchObject({
+        })).resolves.toEqual({
+            ok: false,
+            code: 'behind',
+            remote: 'origin',
+            branch: 'main',
             message: 'Push rejected because the remote branch has new commits.',
-            code: 'PUSH_REJECTED_BEHIND',
-            data: { behind: 2 }
+            behindCount: 2
         });
 
         expect(branchRemote.push).toHaveBeenCalledWith('origin', 'main:main', {
@@ -315,6 +330,106 @@ describe('ExtensionRpcHandler push', () => {
         });
         expect(branchRemote.fetch).toHaveBeenCalledOnce();
         expect(branchRemote.getBranchStatus).toHaveBeenCalledOnce();
+    });
+
+    it('returns structured auth failures instead of throwing raw push errors', async () => {
+        const branchRemote = {
+            getBranches: vi.fn().mockResolvedValue({ current: 'main', all: ['main'] }),
+            getUpstreamBranch: vi.fn().mockResolvedValue('origin/main'),
+            push: vi.fn().mockRejectedValue(new Error('Authentication failed for origin'))
+        };
+        const handler = createHandler({
+            branchRemote
+        } as unknown as Partial<GitService>);
+
+        await expect(handler.push({
+            force: false,
+            pushTags: false,
+            remote: 'origin',
+            branch: 'main'
+        })).resolves.toEqual({
+            ok: false,
+            code: 'auth-failed',
+            remote: 'origin',
+            branch: 'main',
+            message: 'Authentication failed for origin'
+        });
+    });
+
+    it('does not classify remote hook rejections as behind results', async () => {
+        const branchRemote = {
+            getBranches: vi.fn().mockResolvedValue({ current: 'main', all: ['main'] }),
+            getUpstreamBranch: vi.fn().mockResolvedValue('origin/main'),
+            push: vi.fn().mockRejectedValue(new Error('! [remote rejected] main -> main (pre-receive hook declined)')),
+            fetch: vi.fn().mockResolvedValue(undefined),
+            getBranchStatus: vi.fn().mockResolvedValue({ ahead: 0, behind: 2 })
+        };
+        const handler = createHandler({
+            branchRemote
+        } as unknown as Partial<GitService>);
+
+        await expect(handler.push({
+            force: false,
+            pushTags: false,
+            remote: 'origin',
+            branch: 'main'
+        })).resolves.toEqual({
+            ok: false,
+            code: 'rejected',
+            remote: 'origin',
+            branch: 'main',
+            message: '! [remote rejected] main -> main (pre-receive hook declined)'
+        });
+        expect(branchRemote.fetch).not.toHaveBeenCalled();
+        expect(branchRemote.getBranchStatus).not.toHaveBeenCalled();
+    });
+
+    it('returns structured network failures', async () => {
+        const branchRemote = {
+            getBranches: vi.fn().mockResolvedValue({ current: 'main', all: ['main'] }),
+            getUpstreamBranch: vi.fn().mockResolvedValue('origin/main'),
+            push: vi.fn().mockRejectedValue(new Error('Could not resolve host: github.com'))
+        };
+        const handler = createHandler({
+            branchRemote
+        } as unknown as Partial<GitService>);
+
+        await expect(handler.push({
+            force: false,
+            pushTags: false,
+            remote: 'origin',
+            branch: 'main'
+        })).resolves.toEqual({
+            ok: false,
+            code: 'network',
+            remote: 'origin',
+            branch: 'main',
+            message: 'Could not resolve host: github.com'
+        });
+    });
+
+    it('returns unknown for unclassified push errors', async () => {
+        const branchRemote = {
+            getBranches: vi.fn().mockResolvedValue({ current: 'main', all: ['main'] }),
+            getUpstreamBranch: vi.fn().mockResolvedValue('origin/main'),
+            push: vi.fn().mockRejectedValue(new Error('unexpected push failure'))
+        };
+        const handler = createHandler({
+            branchRemote
+        } as unknown as Partial<GitService>);
+
+        await expect(handler.push({
+            force: false,
+            pushTags: false,
+            remote: 'origin',
+            branch: 'main'
+        })).resolves.toEqual({
+            ok: false,
+            code: 'unknown',
+            remote: 'origin',
+            branch: 'main',
+            message: 'unexpected push failure'
+        });
     });
 });
 

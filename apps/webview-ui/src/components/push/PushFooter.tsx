@@ -2,7 +2,9 @@ import React, { useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import styles from './PushFooter.module.css';
 import { rpc } from '@/lib/rpc_client';
-import { describePushError } from './pushError';
+import { describePushFailure, describeUnknownPushError } from './pushError';
+import type { PushErrorDescriptor } from './pushError';
+import type { PushFailedResult } from '@shared/messages';
 
 export interface PushOptions {
     force: boolean;
@@ -14,6 +16,7 @@ export type PushStatus = 'idle' | 'pushing' | 'success' | 'error';
 
 interface PushErrorState {
     message: string;
+    details?: string;
     canPull: boolean;
 }
 
@@ -42,8 +45,7 @@ export const PushFooter: React.FC<PushFooterProps> = ({
     });
     const dropdownRef = useRef<HTMLDivElement>(null);
 
-    const getPushErrorState = (rawError: unknown): PushErrorState => {
-        const descriptor = describePushError(rawError);
+    const getPushErrorState = (descriptor: PushErrorDescriptor): PushErrorState => {
         if (descriptor.kind === 'behind') {
             return {
                 message: descriptor.behindCount && descriptor.behindCount > 0
@@ -52,11 +54,42 @@ export const PushFooter: React.FC<PushFooterProps> = ({
                 canPull: true
             };
         }
+        if (descriptor.kind === 'auth-failed') {
+            return {
+                message: t('Push failed: authentication failed. Check your remote credentials and try again.'),
+                details: descriptor.message,
+                canPull: false
+            };
+        }
+        if (descriptor.kind === 'network') {
+            return {
+                message: t('Push failed: network error. Check your connection and try again.'),
+                details: descriptor.message,
+                canPull: false
+            };
+        }
+        if (descriptor.kind === 'rejected') {
+            return {
+                message: t('Push rejected by remote. Review the remote response and try again.'),
+                details: descriptor.message,
+                canPull: false
+            };
+        }
 
         return {
-            message: descriptor.message,
+            message: t('Push failed: {{message}}', { message: descriptor.message }),
             canPull: false
         };
+    };
+
+    const showPushFailure = (result: PushFailedResult) => {
+        if (result.code === 'cancelled') {
+            setPushStatus('idle');
+            return;
+        }
+
+        setError(getPushErrorState(describePushFailure(result)));
+        setPushStatus('error');
     };
 
     const toggleOption = (key: keyof PushOptions) => {
@@ -74,10 +107,11 @@ export const PushFooter: React.FC<PushFooterProps> = ({
                 pushTags: options.tags,
                 noVerify: options.noVerify,
                 remote: selectedRemote,
-                branch: selectedRemoteBranch
+                branch: selectedRemoteBranch,
+                commitCount
             });
-            if (!result.pushed) {
-                setPushStatus('idle');
+            if (!result.ok) {
+                showPushFailure(result);
                 return;
             }
             setPushStatus('success');
@@ -86,7 +120,7 @@ export const PushFooter: React.FC<PushFooterProps> = ({
             // Reset to idle after 2 seconds
             setTimeout(() => setPushStatus('idle'), 2000);
         } catch (e) {
-            setError(getPushErrorState(e));
+            setError(getPushErrorState(describeUnknownPushError(e)));
             setPushStatus('error');
         }
     };
@@ -149,7 +183,10 @@ export const PushFooter: React.FC<PushFooterProps> = ({
             {error && (
                 <div className={styles.errorMessage}>
                     <i className="codicon codicon-warning" />
-                    <span>{error.message}</span>
+                    <span className={styles.errorContent}>
+                        <span>{error.message}</span>
+                        {error.details && <span className={styles.errorDetails}>{error.details}</span>}
+                    </span>
                     {error.canPull && (
                         <button
                             className={styles.actionBtn}

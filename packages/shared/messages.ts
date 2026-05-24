@@ -153,6 +153,17 @@ export interface PushTarget {
     branch: string;
 }
 
+export type PushFailureCode = 'behind' | 'auth-failed' | 'network' | 'rejected' | 'cancelled' | 'unknown';
+
+export interface PushRequest {
+    force: boolean;
+    pushTags: boolean;
+    noVerify?: boolean;
+    remote: string;
+    branch: string;
+    commitCount?: number;
+}
+
 export interface ChangelistFileSelection {
     repoPath?: string;
     path: string;
@@ -275,7 +286,7 @@ export interface ExtensionMethods {
     getPushCommits: (params: { remote: string; branch: string; limit?: number; skip?: number }) => Promise<PushCommitsData>;
     getCommitFiles: (hash: string) => Promise<CommitFile[]>;
     getMultiCommitFiles: (hashes: string[]) => Promise<CommitFile[]>;
-    push: (params: { force: boolean; pushTags: boolean; noVerify?: boolean; remote: string; branch: string }) => Promise<PushResult>;
+    push: (params: PushRequest) => Promise<PushResult>;
     confirmForcePush: (params: { remote: string; branch: string }) => Promise<boolean>;
     openDiff: (path: string | { path: string; repoPath?: string; staged?: boolean }, staged?: boolean) => Promise<void>;
     closeWebView: () => Promise<void>;
@@ -361,8 +372,22 @@ export interface PushCommitsData {
     totalCount: number;
 }
 
-export interface PushResult {
-    pushed: boolean;
+export type PushResult = PushSuccessResult | PushFailedResult;
+
+export interface PushSuccessResult {
+    ok: true;
+    remote: string;
+    branch: string;
+    commitCount: number;
+}
+
+export interface PushFailedResult {
+    ok: false;
+    code: PushFailureCode;
+    remote: string;
+    branch: string;
+    message: string;
+    behindCount?: number;
 }
 
 export interface WebviewMethods {

@@ -130,9 +130,22 @@
     flex-shrink: 0;
 }
 
-.errorMessage span {
+.errorMessage > span {
     flex: 1;
     word-break: break-word;
+}
+
+.errorContent {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.errorDetails {
+    color: var(--vscode-descriptionForeground);
+    font-size: 11px;
+    line-height: 1.35;
 }
 
 .actionBtn {

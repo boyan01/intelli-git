@@ -23,7 +23,10 @@ import type {
     AiProviderId,
     CommitMessageGenerationMode,
     CommitMessageGenerationRequest,
-    CommitMessageGenerationResult
+    CommitMessageGenerationResult,
+    PushFailedResult,
+    PushFailureCode,
+    PushRequest
 } from '@shared/messages';
 import { GitService } from '../services/GitService';
 import { RepositoryManager } from '../services/RepositoryManager';
@@ -242,19 +245,111 @@ export class ExtensionRpcHandler {
 
         return (
             normalizedMessage.includes('non-fast-forward') ||
-            normalizedMessage.includes('[rejected]') ||
             normalizedMessage.includes('fetch first') ||
-            normalizedMessage.includes('failed to push some refs') ||
+            normalizedMessage.includes('remote contains work that you do not have locally') ||
             normalizedMessage.includes('tip of your current branch is behind')
         );
     }
 
-    private createPushRejectedBehindError(behind: number): Error & { code: string; data: { behind: number } } {
+    private createPushRejectedBehindError(behind: number): Error & { code: PushFailureCode; data: { behind: number } } {
         const error = new Error(i18n.t('Push rejected because the remote branch has new commits.'));
         return Object.assign(error, {
-            code: 'PUSH_REJECTED_BEHIND',
+            code: 'behind' as const,
             data: { behind }
         });
+    }
+
+    private getPushErrorCode(error: unknown): PushFailureCode | undefined {
+        if (typeof error !== 'object' || error === null || !('code' in error)) {
+            return undefined;
+        }
+
+        const code = (error as { code?: unknown }).code;
+        if (code === 'PUSH_REJECTED_BEHIND') {
+            return 'behind';
+        }
+        if (
+            code === 'behind' ||
+            code === 'auth-failed' ||
+            code === 'network' ||
+            code === 'rejected' ||
+            code === 'cancelled' ||
+            code === 'unknown'
+        ) {
+            return code;
+        }
+        return undefined;
+    }
+
+    private getPushBehindCount(error: unknown): number | undefined {
+        const data = typeof error === 'object' && error !== null && 'data' in error
+            ? (error as { data?: unknown }).data
+            : undefined;
+        if (typeof data !== 'object' || data === null || !('behind' in data)) {
+            return undefined;
+        }
+
+        const behind = Number((data as { behind?: unknown }).behind);
+        return Number.isFinite(behind) && behind > 0 ? behind : undefined;
+    }
+
+    private classifyPushError(error: unknown): PushFailureCode {
+        const structuredCode = this.getPushErrorCode(error);
+        if (structuredCode) {
+            return structuredCode;
+        }
+
+        const message = error instanceof Error ? error.message : String(error);
+        const normalized = message.toLowerCase();
+        if (
+            normalized.includes('authentication failed') ||
+            normalized.includes('permission denied') ||
+            normalized.includes('could not read from remote repository') ||
+            normalized.includes('repository not found') ||
+            normalized.includes('access denied')
+        ) {
+            return 'auth-failed';
+        }
+        if (
+            normalized.includes('could not resolve host') ||
+            normalized.includes('failed to connect') ||
+            normalized.includes('network is unreachable') ||
+            normalized.includes('connection timed out') ||
+            normalized.includes('connection reset') ||
+            normalized.includes('early eof')
+        ) {
+            return 'network';
+        }
+        if (
+            normalized.includes('remote rejected') ||
+            normalized.includes('pre-receive hook declined') ||
+            normalized.includes('protected branch hook declined') ||
+            normalized.includes('hook declined')
+        ) {
+            return 'rejected';
+        }
+        if (this.isBehindPushError(error)) {
+            return 'behind';
+        }
+
+        return 'unknown';
+    }
+
+    private createPushFailureResult(error: unknown, params: PushRequest): PushFailedResult {
+        const code = this.classifyPushError(error);
+        const message = error instanceof Error ? error.message : String(error);
+        const result: PushFailedResult = {
+            ok: false,
+            code,
+            remote: params.remote,
+            branch: params.branch,
+            message
+        };
+        const behindCount = code === 'behind' ? this.getPushBehindCount(error) : undefined;
+        if (behindCount !== undefined) {
+            result.behindCount = behindCount;
+        }
+        return result;
     }
 
     private async pushCurrentBranchToTarget(
@@ -513,23 +608,38 @@ export class ExtensionRpcHandler {
         )
     }
 
-    push = async (params: { force: boolean; pushTags: boolean; noVerify?: boolean; remote: string; branch: string }): Promise<PushResult> => {
+    push = async (params: PushRequest): Promise<PushResult> => {
         if (params.force) {
             const confirmed = await this.confirmForcePush({
                 remote: params.remote,
                 branch: params.branch
             });
             if (!confirmed) {
-                return { pushed: false };
+                return {
+                    ok: false,
+                    code: 'cancelled',
+                    remote: params.remote,
+                    branch: params.branch,
+                    message: i18n.t('Force push cancelled.')
+                };
             }
         }
 
-        await this.pushCurrentBranchToTarget(
-            this.gitService,
-            { remote: params.remote, branch: params.branch },
-            { force: params.force, pushTags: params.pushTags, noVerify: params.noVerify }
-        );
-        return { pushed: true };
+        try {
+            await this.pushCurrentBranchToTarget(
+                this.gitService,
+                { remote: params.remote, branch: params.branch },
+                { force: params.force, pushTags: params.pushTags, noVerify: params.noVerify }
+            );
+            return {
+                ok: true,
+                remote: params.remote,
+                branch: params.branch,
+                commitCount: params.commitCount ?? 0
+            };
+        } catch (error) {
+            return this.createPushFailureResult(error, params);
+        }
     };
 
     confirmForcePush = async (params: { remote: string; branch: string }): Promise<boolean> => {
