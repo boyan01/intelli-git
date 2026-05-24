@@ -1,0 +1,47 @@
+.panel {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    padding: 40px 20px;
+    text-align: center;
+    box-sizing: border-box;
+}
+
+.icon {
+    margin-bottom: 24px;
+    font-size: 48px;
+}
+
+.title {
+    margin: 0 0 12px;
+    color: var(--vscode-editorError-foreground);
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.description {
+    max-width: 420px;
+    margin: 0 0 24px;
+    color: var(--vscode-descriptionForeground);
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.actions {
+    composes: emptyActions from './ControlStyles.module.css';
+}
+
+.primaryAction {
+    composes: secondaryActionButton from './ControlStyles.module.css';
+    composes: buttonPrimary from './ControlStyles.module.css';
+    min-height: 28px;
+    padding: 4px 12px;
+}
+
+.secondaryAction {
+    composes: secondaryActionButton from './ControlStyles.module.css';
+    min-height: 28px;
+    padding: 4px 10px;
+}

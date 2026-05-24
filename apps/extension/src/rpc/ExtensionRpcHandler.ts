@@ -77,6 +77,25 @@ function countDiffHunks(diff: string): number {
     return diff.match(/^@@ /gm)?.length || 0;
 }
 
+const MARKETPLACE_EXTENSION_URL = 'https://marketplace.visualstudio.com/items?itemName=boyan01.intelli-git';
+const DEV_BUILD_INSTRUCTIONS_URL = 'https://github.com/boyan01/intelli-git#package';
+
+function isExtensionSourceRoot(candidate: string | undefined): candidate is string {
+    if (!candidate) {
+        return false;
+    }
+
+    try {
+        const rootPackageJson = JSON.parse(fs.readFileSync(path.join(candidate, 'package.json'), 'utf8')) as { name?: string };
+        const extensionPackageJson = JSON.parse(fs.readFileSync(path.join(candidate, 'apps/extension/package.json'), 'utf8')) as { name?: string };
+
+        return rootPackageJson.name === 'idea-commit-pannel-monorepo'
+            && extensionPackageJson.name === 'intelli-git';
+    } catch {
+        return false;
+    }
+}
+
 function createCommitMessageGenerationPrompt(
     basePrompt: string,
     mode: CommitMessageGenerationMode,
@@ -453,6 +472,9 @@ export class ExtensionRpcHandler {
                 focusGitLog: this.focusGitLog,
                 switchRepository: this.switchRepository,
                 openFolder: this.openFolder,
+                openFeedback: this.openFeedback,
+                openLatestRelease: this.openLatestRelease,
+                rebuildDevVsix: this.rebuildDevVsix,
                 initializeRepository: this.initializeRepository,
                 configureAIProvider: this.configureAIProvider,
                 pickBranch: this.pickBranch,
@@ -1084,6 +1106,38 @@ export class ExtensionRpcHandler {
 
     openFolder = async (): Promise<void> => {
         await vscode.commands.executeCommand('workbench.action.files.openFolder');
+    };
+
+    openFeedback = async (): Promise<void> => {
+        await vscode.commands.executeCommand('intelli-git.openFeedback');
+    };
+
+    openLatestRelease = async (): Promise<void> => {
+        await vscode.env.openExternal(vscode.Uri.parse(MARKETPLACE_EXTENSION_URL));
+    };
+
+    private findExtensionSourceRoot(): string | undefined {
+        const extensionPathCandidate = this.context.extensionPath
+            ? path.resolve(this.context.extensionPath, '../..')
+            : undefined;
+        const workspaceCandidates = vscode.workspace.workspaceFolders?.map(folder => folder.uri.fsPath) || [];
+
+        return [extensionPathCandidate, ...workspaceCandidates].find(isExtensionSourceRoot);
+    }
+
+    rebuildDevVsix = async (): Promise<void> => {
+        const sourceRoot = this.findExtensionSourceRoot();
+        if (!sourceRoot) {
+            await vscode.env.openExternal(vscode.Uri.parse(DEV_BUILD_INSTRUCTIONS_URL));
+            return;
+        }
+
+        const terminal = vscode.window.createTerminal({
+            name: i18n.t('Intelli Git Dev Build'),
+            cwd: sourceRoot
+        });
+        terminal.show();
+        terminal.sendText('npm run install:extension:dev');
     };
 
     initializeRepository = async (): Promise<void> => {

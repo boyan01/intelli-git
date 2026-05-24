@@ -444,5 +444,9 @@
     "Use Target": "Use Target",
     "version.expires.warning": "This Early Access build will expire in {{days}} days. Please update Intelli Git to continue using it.",
     "version.expired.title": "Early Access Build Expired",
-    "version.expired.description": "This Early Access build has expired. Please update Intelli Git to continue using it."
+    "version.expired.description": "This Early Access build has expired. Please update Intelli Git to continue using it.",
+    "version.expired.installLatestRelease": "Install latest release",
+    "version.expired.openFeedback": "Open feedback",
+    "version.expired.rebuildDevVsix": "Rebuild dev VSIX",
+    "Intelli Git Dev Build": "Intelli Git Dev Build"
 }

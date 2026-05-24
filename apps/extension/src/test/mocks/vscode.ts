@@ -3,6 +3,8 @@ const executedCommands: Array<{ command: string; args: unknown[] }> = [];
 const warningMessages: Array<{ message: string; args: unknown[] }> = [];
 const informationMessages: Array<{ message: string; args: unknown[] }> = [];
 const errorMessages: Array<{ message: string; args: unknown[] }> = [];
+const openedExternalUris: MockUri[] = [];
+const createdTerminals: Array<{ options: unknown; sentText: string[]; shown: boolean }> = [];
 let languageModels: unknown[] = [];
 let workspaceFoldersValue: Array<{ uri: MockUri; name: string; index: number }> | undefined;
 let warningMessageResponse: unknown;
@@ -140,6 +142,33 @@ export const window = {
     async showErrorMessage(message: string, ...args: unknown[]): Promise<unknown> {
         errorMessages.push({ message, args });
         return undefined;
+    },
+    createTerminal(options: unknown) {
+        const terminal = {
+            options,
+            sentText: [] as string[],
+            shown: false
+        };
+        createdTerminals.push(terminal);
+        return {
+            show() {
+                terminal.shown = true;
+            },
+            sendText(text: string) {
+                terminal.sentText.push(text);
+            },
+            dispose() { }
+        };
+    }
+};
+
+export const env = {
+    async openExternal(uri: MockUri): Promise<boolean> {
+        openedExternalUris.push(uri);
+        return true;
+    },
+    clipboard: {
+        async writeText(_value: string): Promise<void> { }
     }
 };
 
@@ -240,4 +269,20 @@ export function __setWorkspaceFolders(paths: string[] | undefined): void {
         index
     }));
     workspaceFolderEmitter.fire();
+}
+
+export function __getOpenedExternalUris(): MockUri[] {
+    return openedExternalUris;
+}
+
+export function __resetOpenedExternalUris(): void {
+    openedExternalUris.length = 0;
+}
+
+export function __getCreatedTerminals(): Array<{ options: unknown; sentText: string[]; shown: boolean }> {
+    return createdTerminals;
+}
+
+export function __resetCreatedTerminals(): void {
+    createdTerminals.length = 0;
 }

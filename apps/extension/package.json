@@ -1271,9 +1271,10 @@
   },
   "scripts": {
     "clean": "rm -rf out",
-    "package": "vsce package --allow-missing-repository --baseContentUrl ${VSCE_BASE_CONTENT_URL:-https://raw.githubusercontent.com/boyan01/intelli-git/main/apps/extension} --baseImagesUrl ${VSCE_BASE_IMAGES_URL:-https://boyan01.github.io/intelli_git} -o ../../out/intelli-git-${npm_package_version}.vsix",
+    "package": "INTELLI_GIT_BUILD_CHANNEL=marketplace vsce package --allow-missing-repository --baseContentUrl ${VSCE_BASE_CONTENT_URL:-https://raw.githubusercontent.com/boyan01/intelli-git/main/apps/extension} --baseImagesUrl ${VSCE_BASE_IMAGES_URL:-https://boyan01.github.io/intelli_git} -o ../../out/intelli-git-${npm_package_version}.vsix && npm run audit:release-channel -- --channel marketplace --vsix ../../out/intelli-git-${npm_package_version}.vsix",
     "package:dev": "node scripts/package-dev.js",
-    "publish:marketplace": "vsce publish --allow-missing-repository --baseContentUrl ${VSCE_BASE_CONTENT_URL:-https://raw.githubusercontent.com/boyan01/intelli-git/main/apps/extension} --baseImagesUrl ${VSCE_BASE_IMAGES_URL:-https://boyan01.github.io/intelli_git}",
+    "publish:marketplace": "INTELLI_GIT_BUILD_CHANNEL=marketplace vsce publish --allow-missing-repository --baseContentUrl ${VSCE_BASE_CONTENT_URL:-https://raw.githubusercontent.com/boyan01/intelli-git/main/apps/extension} --baseImagesUrl ${VSCE_BASE_IMAGES_URL:-https://boyan01.github.io/intelli_git}",
+    "audit:release-channel": "node scripts/audit-release-channel.js",
     "vscode:prepublish": "npm run compile",
     "generate:icons": "node scripts/generate-icons.js",
     "sync:l10n": "node scripts/sync-l10n.js",

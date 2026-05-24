@@ -1,4 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import { ExtensionRpcHandler } from './ExtensionRpcHandler';
 import { GitReadRpcHandler } from './GitReadRpcHandler';
 import type { ChangelistState } from '@shared/messages';
@@ -16,6 +19,11 @@ const vscodeTestMock = vscodeMock as unknown as {
     __resetWindowMessages(): void;
     __setLanguageModels(models: unknown[]): void;
     __resetLanguageModels(): void;
+    __getOpenedExternalUris(): Array<{ toString(): string }>;
+    __resetOpenedExternalUris(): void;
+    __getCreatedTerminals(): Array<{ options: unknown; sentText: string[]; shown: boolean }>;
+    __resetCreatedTerminals(): void;
+    __setWorkspaceFolders(paths: string[] | undefined): void;
 };
 
 function createTextStream(text: string): AsyncIterable<string> {
@@ -28,6 +36,7 @@ function createTextStream(text: string): AsyncIterable<string> {
 
 afterEach(() => {
     vscodeTestMock.__resetLanguageModels();
+    vscodeTestMock.__setWorkspaceFolders(undefined);
 });
 
 function createStagedChangelistState(): ChangelistState {
@@ -462,6 +471,46 @@ describe('ExtensionRpcHandler no repository state', () => {
             command: 'intelli-git.ai.configureProvider',
             args: []
         });
+    });
+
+    it('opens expired dev build support actions from the webview', async () => {
+        vscodeTestMock.__resetExecutedCommands();
+        vscodeTestMock.__resetOpenedExternalUris();
+        const handler = createNoRepoHandler();
+
+        await handler.openFeedback();
+        await handler.openLatestRelease();
+
+        expect(vscodeTestMock.__getExecutedCommands()).toContainEqual({
+            command: 'intelli-git.openFeedback',
+            args: []
+        });
+        expect(vscodeTestMock.__getOpenedExternalUris().map(uri => uri.toString())).toEqual([
+            'https://marketplace.visualstudio.com/items?itemName=boyan01.intelli-git'
+        ]);
+    });
+
+    it('prepares a dev rebuild terminal when the source workspace is open', async () => {
+        vscodeTestMock.__resetCreatedTerminals();
+        const sourceRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'intelli-git-source-'));
+        fs.mkdirSync(path.join(sourceRoot, 'apps/extension'), { recursive: true });
+        fs.writeFileSync(path.join(sourceRoot, 'package.json'), JSON.stringify({ name: 'idea-commit-pannel-monorepo' }));
+        fs.writeFileSync(path.join(sourceRoot, 'apps/extension/package.json'), JSON.stringify({ name: 'intelli-git' }));
+        vscodeTestMock.__setWorkspaceFolders([sourceRoot]);
+        const handler = createNoRepoHandler();
+
+        await handler.rebuildDevVsix();
+
+        expect(vscodeTestMock.__getCreatedTerminals()).toEqual([{
+            options: {
+                name: 'Intelli Git Dev Build',
+                cwd: sourceRoot
+            },
+            sentText: ['npm run install:extension:dev'],
+            shown: true
+        }]);
+
+        vscodeTestMock.__setWorkspaceFolders(undefined);
     });
 });
 

@@ -13,6 +13,8 @@ const originalPackageJson = baseVersion === packageData.version
 const baseContentUrl = process.env.VSCE_BASE_CONTENT_URL || 'https://raw.githubusercontent.com/boyan01/intelli-git/main/apps/extension';
 const baseImagesUrl = process.env.VSCE_BASE_IMAGES_URL || 'https://boyan01.github.io/intelli_git';
 const shouldInstall = process.argv.includes('--install');
+process.env.INTELLI_GIT_BUILD_CHANNEL = 'dev';
+process.env.MODE = process.env.MODE || 'dev';
 let vscodeCli = process.env.VSCODE_CLI;
 if (!vscodeCli) {
     // Dynamically detect the CLI path when running inside Antigravity IDE's integrated terminal
@@ -66,6 +68,13 @@ try {
     execSync(`vsce package --allow-missing-repository --skip-license --baseContentUrl "${baseContentUrl}" --baseImagesUrl "${baseImagesUrl}" -o "${outFileArg}"`, { stdio: ['ignore', process.stdout, process.stderr] });
 
     console.log(`\nSuccessfully packaged version to: ${outFilePath}`);
+    execFileSync(process.execPath, [
+        path.join(__dirname, 'audit-release-channel.js'),
+        '--channel',
+        'dev',
+        '--vsix',
+        outFilePath
+    ], { stdio: ['ignore', process.stdout, process.stderr] });
 
     if (shouldInstall) {
         console.log(`Installing extension with ${vscodeCli}...`);

@@ -9,9 +9,21 @@ const isWatch = process.argv.includes('--watch');
 const sharedAlias = path.resolve(repoRoot, 'packages/shared');
 const sourceRoot = path.resolve(extensionRoot, 'src');
 
-function createMacroReplacePlugin(finalBuildTime) {
+function resolveBuildChannel(value, mode) {
+  if (value === 'dev' || value === 'marketplace') {
+    return value;
+  }
+  return mode === 'dev' ? 'dev' : 'marketplace';
+}
+
+function createMacroReplacePlugin(finalBuildTime, buildChannel) {
+  const isDevBuild = buildChannel === 'dev';
   const buildTimeLiteral = JSON.stringify(String(finalBuildTime));
-  const expiredExpr = `(Date.now() - ${finalBuildTime} > 30 * 24 * 60 * 60 * 1000)`;
+  const buildChannelLiteral = JSON.stringify(buildChannel);
+  const isDevBuildLiteral = JSON.stringify(isDevBuild);
+  const expiredExpr = isDevBuild
+    ? `(Date.now() - ${finalBuildTime} > 30 * 24 * 60 * 60 * 1000)`
+    : 'false';
 
   return {
     name: 'macro-replace',
@@ -24,6 +36,8 @@ function createMacroReplacePlugin(finalBuildTime) {
         const contents = await fs.readFile(args.path, 'utf8');
         const replaced = contents
           .replaceAll('__BUILD_TIME__', buildTimeLiteral)
+          .replaceAll('__BUILD_CHANNEL__', buildChannelLiteral)
+          .replaceAll('__IS_DEV_BUILD__', isDevBuildLiteral)
           .replaceAll('__IS_EXPIRED__', expiredExpr);
 
         return {
@@ -45,6 +59,7 @@ async function createBuildOptions() {
   const { loadEnv } = await import('vite');
   const mode = process.env.MODE || process.env.NODE_ENV || 'production';
   const env = loadEnv(mode, repoRoot, '');
+  const buildChannel = resolveBuildChannel(process.env.INTELLI_GIT_BUILD_CHANNEL || env.INTELLI_GIT_BUILD_CHANNEL, mode);
   const daysAgo = parseFloat(env.DEBUG_BUILD_DAYS_AGO || '0');
   const finalBuildTime = Date.now() - (daysAgo * 24 * 60 * 60 * 1000);
 
@@ -63,7 +78,7 @@ async function createBuildOptions() {
       '@shared': sharedAlias,
     },
     external: ['vscode'],
-    plugins: [createMacroReplacePlugin(finalBuildTime)],
+    plugins: [createMacroReplacePlugin(finalBuildTime, buildChannel)],
   };
 }
 

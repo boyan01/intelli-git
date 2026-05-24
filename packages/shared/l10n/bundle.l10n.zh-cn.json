@@ -446,5 +446,9 @@
     "File status not found for {0}": "未找到 {0} 的文件状态",
     "version.expires.warning": "当前 Early Access 版本将于 {{days}} 天后过期，请更新 Intelli Git 以继续使用。",
     "version.expired.title": "Early Access 版本已过期",
-    "version.expired.description": "当前 Early Access 版本已过期，请更新 Intelli Git 以继续使用。"
+    "version.expired.description": "当前 Early Access 版本已过期，请更新 Intelli Git 以继续使用。",
+    "version.expired.installLatestRelease": "安装最新正式版",
+    "version.expired.openFeedback": "打开反馈",
+    "version.expired.rebuildDevVsix": "重新构建 dev VSIX",
+    "Intelli Git Dev Build": "Intelli Git Dev Build"
 }

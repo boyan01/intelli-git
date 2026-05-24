@@ -308,6 +308,9 @@ export interface ExtensionMethods {
     focusGitLog: () => Promise<void>;
     switchRepository: () => Promise<void>;
     openFolder: () => Promise<void>;
+    openFeedback: () => Promise<void>;
+    openLatestRelease: () => Promise<void>;
+    rebuildDevVsix: () => Promise<void>;
     initializeRepository: () => Promise<void>;
     configureAIProvider: () => Promise<void>;
     pickBranch: () => Promise<void>;

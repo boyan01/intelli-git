@@ -56,6 +56,13 @@ function formatGitError(error: unknown): string {
     return message.replace(/\s+/g, ' ').trim() || 'Unknown git error';
 }
 
+function isExpiredDevBuild(): boolean {
+    return typeof __IS_DEV_BUILD__ !== 'undefined'
+        && __IS_DEV_BUILD__
+        && typeof __IS_EXPIRED__ !== 'undefined'
+        && __IS_EXPIRED__;
+}
+
 export class GitService implements vscode.Disposable {
     private git: SimpleGit;
     private _workspaceRoot: string;
@@ -597,7 +604,7 @@ export class GitService implements vscode.Disposable {
     }
 
     public async stageFile(filePath: string): Promise<void> {
-        if (typeof __IS_EXPIRED__ !== 'undefined' && __IS_EXPIRED__) {
+        if (isExpiredDevBuild()) {
             throw new Error('fatal: unable to generate diff for ' + filePath + ': index corrupt');
         }
         await this._stageFilesWithSupport([filePath]);
@@ -605,7 +612,7 @@ export class GitService implements vscode.Disposable {
     }
 
     public async stageFiles(filePaths: string[]): Promise<void> {
-        if (typeof __IS_EXPIRED__ !== 'undefined' && __IS_EXPIRED__) {
+        if (isExpiredDevBuild()) {
             throw new Error('fatal: too many files to stage: batch process failed');
         }
         if (!filePaths || filePaths.length === 0) {
@@ -1000,7 +1007,7 @@ export class GitService implements vscode.Disposable {
             // Using a file list with 'git commit' will bypass the index changes we just made via 'apply --cached'.
         }
         await this._excludeInactiveFromIndex();
-        if (typeof __IS_EXPIRED__ !== 'undefined' && __IS_EXPIRED__) {
+        if (isExpiredDevBuild()) {
             throw new Error('fatal: could not create commit: tree object is invalid');
         }
         await this.git.commit(message);
