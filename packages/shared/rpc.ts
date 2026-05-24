@@ -10,6 +10,8 @@ export interface RpcResponse {
     id: string;
     result?: any;
     error?: string;
+    errorCode?: string;
+    errorData?: unknown;
 }
 
 export type RpcMessage = RpcRequest | RpcResponse;
@@ -27,6 +29,17 @@ interface PendingRequest {
 }
 
 export type RpcSchema = { [key: string]: (...args: any[]) => any };
+
+export class RpcError extends Error {
+    constructor(
+        message: string,
+        public readonly code?: string,
+        public readonly data?: unknown
+    ) {
+        super(message);
+        this.name = 'RpcError';
+    }
+}
 
 export interface RpcTraceEvent {
     method: string;
@@ -187,7 +200,9 @@ export class RpcPeer<TRemote = any, TLocal = any> {
             this.postMessageTarget.postMessage({
                 type: 'rpc-response',
                 id,
-                error: messageText
+                error: messageText,
+                errorCode: typeof error.code === 'string' ? error.code : undefined,
+                errorData: error.data
             });
             this.trace({
                 method,
@@ -201,7 +216,7 @@ export class RpcPeer<TRemote = any, TLocal = any> {
     }
 
     private handleResponse(message: RpcResponse) {
-        const { id, result, error } = message;
+        const { id, result, error, errorCode, errorData } = message;
         if (this.pendingRequests.has(id)) {
             const { resolve, reject, timeout, method, startedAt } = this.pendingRequests.get(id)!;
             this.pendingRequests.delete(id);
@@ -216,7 +231,7 @@ export class RpcPeer<TRemote = any, TLocal = any> {
                     ok: false,
                     error
                 });
-                reject(new Error(error));
+                reject(new RpcError(error, errorCode, errorData));
             } else {
                 this.trace({
                     method,

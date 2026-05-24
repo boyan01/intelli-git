@@ -9,10 +9,17 @@ export function usePushData(selectedRemote: string, selectedRemoteBranch: string
     const [commits, setCommits] = useState<CommitDetails[]>([]);
     const [totalCommits, setTotalCommits] = useState(0);
     const [hasMore, setHasMore] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
     const [isLoadingMore, setIsLoadingMore] = useState(false);
 
     const loadCommits = useCallback(async () => {
-        if (!selectedRemote || !selectedRemoteBranch) return;
+        if (!selectedRemote || !selectedRemoteBranch) {
+            setCommits([]);
+            setTotalCommits(0);
+            setHasMore(false);
+            return;
+        }
+        setIsLoading(true);
         try {
             // Reset hasMore when branch changes
             setHasMore(false);
@@ -27,6 +34,8 @@ export function usePushData(selectedRemote: string, selectedRemoteBranch: string
             setTotalCommits(data.totalCount);
         } catch (error) {
             console.error('Failed to load push commits:', error);
+        } finally {
+            setIsLoading(false);
         }
     }, [selectedRemote, selectedRemoteBranch]);
 
@@ -67,7 +76,9 @@ export function usePushData(selectedRemote: string, selectedRemoteBranch: string
         commits,
         totalCommits,
         hasMore,
+        isLoading,
         isLoadingMore,
+        reload: loadCommits,
         handleLoadMore,
     };
 }

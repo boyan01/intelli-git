@@ -84,6 +84,61 @@
     outline: none;
 }
 
+.emptyState {
+    min-height: 180px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 24px 16px;
+    color: var(--vscode-descriptionForeground);
+    text-align: center;
+}
+
+.emptyIcon {
+    font-size: 24px;
+    color: var(--vscode-testing-iconPassed, var(--vscode-descriptionForeground));
+}
+
+.emptyTitle {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--vscode-foreground);
+}
+
+.emptyDescription {
+    max-width: 260px;
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.emptyActions {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 4px;
+    flex-wrap: wrap;
+}
+
+.emptyAction {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 9px;
+    border: 1px solid var(--vscode-button-border, transparent);
+    border-radius: 3px;
+    background: var(--vscode-button-secondaryBackground);
+    color: var(--vscode-button-secondaryForeground);
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.emptyAction:hover {
+    background: var(--vscode-button-secondaryHoverBackground);
+}
+
 /* Changes View */
 .changesSection {
     display: flex;

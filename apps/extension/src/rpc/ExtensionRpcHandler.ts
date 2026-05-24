@@ -12,7 +12,8 @@ import type {
     FileReferenceInput,
     RepositoryCommitViewState,
     RepositoryFileReference,
-    PushTarget
+    PushTarget,
+    PushResult
 } from '@shared/messages';
 import { GitService } from '../services/GitService';
 import { RepositoryManager } from '../services/RepositoryManager';
@@ -173,6 +174,14 @@ export class ExtensionRpcHandler {
         );
     }
 
+    private createPushRejectedBehindError(behind: number): Error & { code: string; data: { behind: number } } {
+        const error = new Error(i18n.t('Push rejected because the remote branch has new commits.'));
+        return Object.assign(error, {
+            code: 'PUSH_REJECTED_BEHIND',
+            data: { behind }
+        });
+    }
+
     private async pushCurrentBranchToTarget(
         gitService: GitService,
         target: PushTarget,
@@ -218,7 +227,7 @@ export class ExtensionRpcHandler {
                 }
 
                 const branchStatus = await gitService.branchRemote.getBranchStatus();
-                throw new Error(`PUSH_REJECTED_BEHIND:${branchStatus.behind || 1}`, { cause: error });
+                throw this.createPushRejectedBehindError(branchStatus.behind || 1);
             }
 
             throw error;
@@ -422,12 +431,23 @@ export class ExtensionRpcHandler {
         )
     }
 
-    push = async (params: { force: boolean; pushTags: boolean; noVerify?: boolean; remote: string; branch: string }): Promise<void> => {
+    push = async (params: { force: boolean; pushTags: boolean; noVerify?: boolean; remote: string; branch: string }): Promise<PushResult> => {
+        if (params.force) {
+            const confirmed = await this.confirmForcePush({
+                remote: params.remote,
+                branch: params.branch
+            });
+            if (!confirmed) {
+                return { pushed: false };
+            }
+        }
+
         await this.pushCurrentBranchToTarget(
             this.gitService,
             { remote: params.remote, branch: params.branch },
             { force: params.force, pushTags: params.pushTags, noVerify: params.noVerify }
         );
+        return { pushed: true };
     };
 
     confirmForcePush = async (params: { remote: string; branch: string }): Promise<boolean> => {

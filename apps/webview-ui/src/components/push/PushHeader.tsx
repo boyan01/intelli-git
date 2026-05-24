@@ -246,7 +246,7 @@ export const PushHeader: React.FC<PushHeaderProps> = ({
                         </div>
                     )}
                     {isNewBranch && (
-                        <span className={styles.newBadge}>NEW</span>
+                        <span className={styles.newBadge}>{t('New remote branch')}</span>
                     )}
                 </div>
             </div>

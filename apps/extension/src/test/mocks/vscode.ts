@@ -1,6 +1,10 @@
 let changelistMode = 'staged';
 const executedCommands: Array<{ command: string; args: unknown[] }> = [];
+const warningMessages: Array<{ message: string; args: unknown[] }> = [];
+const informationMessages: Array<{ message: string; args: unknown[] }> = [];
+const errorMessages: Array<{ message: string; args: unknown[] }> = [];
 let workspaceFoldersValue: Array<{ uri: MockUri; name: string; index: number }> | undefined;
+let warningMessageResponse: unknown;
 
 export class EventEmitter<T> {
     private listeners = new Set<(event: T) => unknown>();
@@ -121,6 +125,21 @@ export const commands = {
     }
 };
 
+export const window = {
+    async showWarningMessage(message: string, ...args: unknown[]): Promise<unknown> {
+        warningMessages.push({ message, args });
+        return warningMessageResponse;
+    },
+    async showInformationMessage(message: string, ...args: unknown[]): Promise<unknown> {
+        informationMessages.push({ message, args });
+        return undefined;
+    },
+    async showErrorMessage(message: string, ...args: unknown[]): Promise<unknown> {
+        errorMessages.push({ message, args });
+        return undefined;
+    }
+};
+
 export const DiagnosticSeverity = {
     Error: 0
 } as const;
@@ -154,6 +173,21 @@ export function __getExecutedCommands(): Array<{ command: string; args: unknown[
 
 export function __resetExecutedCommands(): void {
     executedCommands.length = 0;
+}
+
+export function __setWarningMessageResponse(value: unknown): void {
+    warningMessageResponse = value;
+}
+
+export function __getWarningMessages(): Array<{ message: string; args: unknown[] }> {
+    return warningMessages;
+}
+
+export function __resetWindowMessages(): void {
+    warningMessages.length = 0;
+    informationMessages.length = 0;
+    errorMessages.length = 0;
+    warningMessageResponse = undefined;
 }
 
 export function __setWorkspaceFolders(paths: string[] | undefined): void {

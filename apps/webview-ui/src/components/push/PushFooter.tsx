@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import styles from './PushFooter.module.css';
 import { rpc } from '@/lib/rpc_client';
+import { describePushError } from './pushError';
 
 export interface PushOptions {
     force: boolean;
@@ -41,19 +42,19 @@ export const PushFooter: React.FC<PushFooterProps> = ({
     });
     const dropdownRef = useRef<HTMLDivElement>(null);
 
-    const parsePushError = (rawMessage: string): PushErrorState => {
-        if (rawMessage.startsWith('PUSH_REJECTED_BEHIND:')) {
-            const behindCount = Number.parseInt(rawMessage.split(':')[1] || '0', 10);
+    const getPushErrorState = (rawError: unknown): PushErrorState => {
+        const descriptor = describePushError(rawError);
+        if (descriptor.kind === 'behind') {
             return {
-                message: behindCount > 0
-                    ? t('Push blocked: remote branch is ahead by {{count}} commit. Pull first to reconcile changes.', { count: behindCount })
+                message: descriptor.behindCount && descriptor.behindCount > 0
+                    ? t('Push blocked: remote branch is ahead by {{count}} commit. Pull first to reconcile changes.', { count: descriptor.behindCount })
                     : t('Push blocked: remote branch has new commits. Pull first to reconcile changes.'),
                 canPull: true
             };
         }
 
         return {
-            message: rawMessage,
+            message: descriptor.message,
             canPull: false
         };
     };
@@ -67,32 +68,25 @@ export const PushFooter: React.FC<PushFooterProps> = ({
 
         setError(null);
         try {
-            if (options.force) {
-                const confirmed = await rpc.confirmForcePush({
-                    remote: selectedRemote,
-                    branch: selectedRemoteBranch
-                });
-                if (!confirmed) {
-                    return;
-                }
-            }
-
             setPushStatus('pushing');
-            await rpc.push({
+            const result = await rpc.push({
                 force: options.force,
                 pushTags: options.tags,
                 noVerify: options.noVerify,
                 remote: selectedRemote,
                 branch: selectedRemoteBranch
             });
+            if (!result.pushed) {
+                setPushStatus('idle');
+                return;
+            }
             setPushStatus('success');
             onPushComplete();
 
             // Reset to idle after 2 seconds
             setTimeout(() => setPushStatus('idle'), 2000);
         } catch (e) {
-            const errMsg = e instanceof Error ? e.message : String(e);
-            setError(parsePushError(errMsg));
+            setError(getPushErrorState(e));
             setPushStatus('error');
         }
     };
@@ -115,6 +109,13 @@ export const PushFooter: React.FC<PushFooterProps> = ({
             return {
                 text: t('Push Completed'),
                 variant: 'success' as const,
+                icon: 'codicon-check'
+            };
+        }
+        if (commitCount === 0) {
+            return {
+                text: t('Everything up to date'),
+                variant: 'secondary' as const,
                 icon: 'codicon-check'
             };
         }
@@ -167,6 +168,12 @@ export const PushFooter: React.FC<PushFooterProps> = ({
                     >
                         <i className="codicon codicon-close" />
                     </button>
+                </div>
+            )}
+            {options.force && commitCount > 0 && pushStatus !== 'success' && (
+                <div className={styles.forceWarning}>
+                    <i className="codicon codicon-warning" />
+                    <span>{t('Force Push uses --force-with-lease and can rewrite remote history. You will be asked to confirm before pushing.')}</span>
                 </div>
             )}
             <div

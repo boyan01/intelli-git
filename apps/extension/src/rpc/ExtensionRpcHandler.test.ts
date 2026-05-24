@@ -11,6 +11,9 @@ import * as vscodeMock from 'vscode';
 const vscodeTestMock = vscodeMock as unknown as {
     __getExecutedCommands(): Array<{ command: string; args: unknown[] }>;
     __resetExecutedCommands(): void;
+    __setWarningMessageResponse(value: unknown): void;
+    __getWarningMessages(): Array<{ message: string; args: unknown[] }>;
+    __resetWindowMessages(): void;
 };
 
 function createStagedChangelistState(): ChangelistState {
@@ -215,6 +218,51 @@ describe('ExtensionRpcHandler commit', () => {
 });
 
 describe('ExtensionRpcHandler push', () => {
+    it('confirms force pushes in the RPC handler before pushing', async () => {
+        vscodeTestMock.__resetWindowMessages();
+        vscodeTestMock.__setWarningMessageResponse('Force Push');
+        const branchRemote = {
+            getBranches: vi.fn().mockResolvedValue({ current: 'main', all: ['main'] }),
+            getUpstreamBranch: vi.fn().mockResolvedValue('origin/main'),
+            forcePush: vi.fn().mockResolvedValue(undefined)
+        };
+        const handler = createHandler({
+            branchRemote
+        } as unknown as Partial<GitService>);
+
+        await expect(handler.push({
+            force: true,
+            pushTags: false,
+            remote: 'origin',
+            branch: 'main'
+        })).resolves.toEqual({ pushed: true });
+
+        expect(vscodeTestMock.__getWarningMessages()[0].message).toBe('Force push to origin/main? This can overwrite remote commits. Intelli Git will use --force-with-lease to avoid overwriting newer remote updates.');
+        expect(branchRemote.forcePush).toHaveBeenCalledWith('origin', 'main:main', {
+            noVerify: undefined,
+            setUpstream: false
+        });
+    });
+
+    it('cancels force pushes when confirmation is declined', async () => {
+        vscodeTestMock.__resetWindowMessages();
+        const branchRemote = {
+            forcePush: vi.fn().mockResolvedValue(undefined)
+        };
+        const handler = createHandler({
+            branchRemote
+        } as unknown as Partial<GitService>);
+
+        await expect(handler.push({
+            force: true,
+            pushTags: false,
+            remote: 'origin',
+            branch: 'main'
+        })).resolves.toEqual({ pushed: false });
+
+        expect(branchRemote.forcePush).not.toHaveBeenCalled();
+    });
+
     it('fetches and reports behind count when a normal push is rejected', async () => {
         const branchRemote = {
             getBranches: vi.fn().mockResolvedValue({ current: 'main', all: ['main'] }),
@@ -232,7 +280,11 @@ describe('ExtensionRpcHandler push', () => {
             pushTags: false,
             remote: 'origin',
             branch: 'main'
-        })).rejects.toThrow('PUSH_REJECTED_BEHIND:2');
+        })).rejects.toMatchObject({
+            message: 'Push rejected because the remote branch has new commits.',
+            code: 'PUSH_REJECTED_BEHIND',
+            data: { behind: 2 }
+        });
 
         expect(branchRemote.push).toHaveBeenCalledWith('origin', 'main:main', {
             noVerify: undefined,

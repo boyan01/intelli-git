@@ -224,7 +224,7 @@ export interface ExtensionMethods {
     getPushCommits: (params: { remote: string; branch: string; limit?: number; skip?: number }) => Promise<PushCommitsData>;
     getCommitFiles: (hash: string) => Promise<CommitFile[]>;
     getMultiCommitFiles: (hashes: string[]) => Promise<CommitFile[]>;
-    push: (params: { force: boolean; pushTags: boolean; noVerify?: boolean; remote: string; branch: string }) => Promise<void>;
+    push: (params: { force: boolean; pushTags: boolean; noVerify?: boolean; remote: string; branch: string }) => Promise<PushResult>;
     confirmForcePush: (params: { remote: string; branch: string }) => Promise<boolean>;
     openDiff: (path: string | { path: string; repoPath?: string; staged?: boolean }, staged?: boolean) => Promise<void>;
     closeWebView: () => Promise<void>;
@@ -301,6 +301,10 @@ export interface PushCommitsData {
     commits: CommitDetails[];
     hasMore: boolean;
     totalCount: number;
+}
+
+export interface PushResult {
+    pushed: boolean;
 }
 
 export interface WebviewMethods {

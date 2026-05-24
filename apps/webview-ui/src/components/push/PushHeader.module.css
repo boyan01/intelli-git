@@ -103,15 +103,20 @@
 .remoteWrapper {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     min-width: 0;
     flex: 1;
-    gap: 8px;
+    column-gap: 8px;
+    row-gap: 4px;
 }
 
 /* Remote Display (Non-editing state) */
 .remoteDisplay {
     display: flex;
     align-items: center;
+    min-width: 0;
+    max-width: 100%;
+    flex: 0 1 auto;
     overflow: visible;
     position: relative;
     /* Ensure height aligns with input */
@@ -187,6 +192,8 @@
     display: flex;
     align-items: center;
     position: relative;
+    flex: 1 1 140px;
+    min-width: 0;
     background: var(--vscode-input-background);
     border: 1px solid var(--vscode-input-border);
     border-radius: 2px;
@@ -258,14 +265,14 @@
 }
 
 .newBadge {
+    flex: 0 0 auto;
     background-color: var(--vscode-badge-background);
     color: var(--vscode-badge-foreground);
     font-size: 9px;
-    padding: 0 4px;
+    padding: 0 5px;
     border-radius: 2px;
-    text-transform: uppercase;
     font-weight: 600;
-    min-width: 20px;
+    white-space: nowrap;
     text-align: center;
     line-height: 14px;
     height: 14px;

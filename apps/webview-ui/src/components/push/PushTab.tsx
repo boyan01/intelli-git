@@ -1,5 +1,5 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
-import { rpcEvents } from '@/lib/rpc_client';
+import { rpc, rpcEvents } from '@/lib/rpc_client';
 import { logger } from '@/utils/logger';
 import { useRpcEvent } from '@/hooks/useRpcEvent';
 import { PushHeader } from './PushHeader';
@@ -48,7 +48,9 @@ export function PushTab({
         commits,
         totalCommits,
         hasMore,
+        isLoading,
         isLoadingMore,
+        reload,
         handleLoadMore
     } = usePushData(selectedRemote, selectedRemoteBranch);
 
@@ -86,6 +88,17 @@ export function PushTab({
         }
     }, [onCommitTargetChanged, reviewingCommitTarget, setSelectedRemoteBranch]);
 
+    const handleFetch = useCallback(async () => {
+        await rpc.fetch();
+        await reload();
+    }, [reload]);
+
+    const handleOpenGitLog = useCallback(() => {
+        void rpc.focusGitLog();
+    }, []);
+
+    const showEmptyState = !isLoading && totalCommits === 0 && Boolean(selectedRemote && selectedRemoteBranch);
+
     return (
         <div className={styles.container}>
             {/* Header */}
@@ -106,7 +119,34 @@ export function PushTab({
 
             {/* Scroll Area */}
             <div className={styles.scrollArea} ref={scrollAreaRef} tabIndex={0}>
-                {viewMode === 'commits' && (
+                {isLoading && commits.length === 0 && (
+                    <div className={styles.emptyState}>
+                        <i className={`codicon codicon-loading codicon-modifier-spin ${styles.emptyIcon}`} />
+                        <div className={styles.emptyTitle}>{t('Loading...')}</div>
+                    </div>
+                )}
+
+                {showEmptyState && (
+                    <div className={styles.emptyState}>
+                        <i className={`codicon codicon-check ${styles.emptyIcon}`} />
+                        <div className={styles.emptyTitle}>{t('Everything up to date')}</div>
+                        <div className={styles.emptyDescription}>
+                            {t('No outgoing commits for {{target}}.', { target: `${selectedRemote}/${selectedRemoteBranch}` })}
+                        </div>
+                        <div className={styles.emptyActions}>
+                            <button className={styles.emptyAction} onClick={handleFetch}>
+                                <i className="codicon codicon-cloud-download" />
+                                <span>{t('Fetch')}</span>
+                            </button>
+                            <button className={styles.emptyAction} onClick={handleOpenGitLog}>
+                                <i className="codicon codicon-history" />
+                                <span>{t('Open Git Log')}</span>
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {!isLoading && !showEmptyState && viewMode === 'commits' && (
                     <>
                         {commits.map((commit, index) => (
                             <CommitAccordionItem
@@ -142,7 +182,7 @@ export function PushTab({
                     </>
                 )}
 
-                {viewMode === 'changes' && (
+                {!isLoading && !showEmptyState && viewMode === 'changes' && (
                     <PushChangesView
                         commits={commits}
                         changesViewMode={changesViewMode}
