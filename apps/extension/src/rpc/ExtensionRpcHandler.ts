@@ -11,7 +11,8 @@ import type {
     GitLogRevealRequest,
     FileReferenceInput,
     RepositoryCommitViewState,
-    RepositoryFileReference
+    RepositoryFileReference,
+    PushTarget
 } from '@shared/messages';
 import { GitService } from '../services/GitService';
 import { RepositoryManager } from '../services/RepositoryManager';
@@ -170,6 +171,58 @@ export class ExtensionRpcHandler {
             normalizedMessage.includes('failed to push some refs') ||
             normalizedMessage.includes('tip of your current branch is behind')
         );
+    }
+
+    private async pushCurrentBranchToTarget(
+        gitService: GitService,
+        target: PushTarget,
+        options: { force?: boolean; pushTags?: boolean; noVerify?: boolean; setUpstreamToTarget?: boolean } = {}
+    ): Promise<void> {
+        const branches = await gitService.branchRemote.getBranches();
+        const currentBranch = branches.current;
+        if (!currentBranch) {
+            throw new Error(i18n.t('No current branch to push.'));
+        }
+
+        const hadUpstream = await gitService.branchRemote.getUpstreamBranch();
+        const setUpstreamWithPush = !hadUpstream && options.setUpstreamToTarget;
+        const pushOptions = {
+            noVerify: options.noVerify,
+            setUpstream: setUpstreamWithPush
+        };
+
+        try {
+            if (options.force) {
+                await gitService.branchRemote.forcePush(target.remote, `${currentBranch}:${target.branch}`, pushOptions);
+            } else {
+                await gitService.branchRemote.push(target.remote, `${currentBranch}:${target.branch}`, pushOptions);
+            }
+
+            if (!hadUpstream && !setUpstreamWithPush && target.branch === currentBranch) {
+                try {
+                    await gitService.branchRemote.setUpstreamBranch(target.remote, target.branch);
+                } catch (e) {
+                    logger.error('Failed to set upstream:', e);
+                }
+            }
+
+            if (options.pushTags) {
+                await gitService.branchRemote.pushTags(target.remote);
+            }
+        } catch (error) {
+            if (!options.force && this.isBehindPushError(error)) {
+                try {
+                    await gitService.branchRemote.fetch();
+                } catch (fetchError) {
+                    logger.warn('Fetch after push rejection failed:', fetchError);
+                }
+
+                const branchStatus = await gitService.branchRemote.getBranchStatus();
+                throw new Error(`PUSH_REJECTED_BEHIND:${branchStatus.behind || 1}`, { cause: error });
+            }
+
+            throw error;
+        }
     }
 
     private normalizeModelIdentifier(value: string | undefined): string {
@@ -370,49 +423,11 @@ export class ExtensionRpcHandler {
     }
 
     push = async (params: { force: boolean; pushTags: boolean; noVerify?: boolean; remote: string; branch: string }): Promise<void> => {
-        const branches = await this.gitService.branchRemote.getBranches();
-        const currentBranch = branches.current;
-
-        // Check if upstream was set before push
-        const hadUpstream = await this.gitService.branchRemote.getUpstreamBranch();
-
-        const pushOptions = {
-            noVerify: params.noVerify
-        };
-
-        try {
-            if (params.force) {
-                await this.gitService.branchRemote.forcePush(params.remote, `${currentBranch}:${params.branch}`, pushOptions);
-            } else {
-                await this.gitService.branchRemote.push(params.remote, `${currentBranch}:${params.branch}`, pushOptions);
-            }
-
-            // Auto-set upstream if not previously set and pushing to same-named branch
-            if (!hadUpstream && params.branch === currentBranch) {
-                try {
-                    await this.gitService.branchRemote.setUpstreamBranch(params.remote, params.branch);
-                } catch (e) {
-                    logger.error('Failed to set upstream:', e);
-                }
-            }
-
-            if (params.pushTags) {
-                await this.gitService.branchRemote.pushTags(params.remote);
-            }
-        } catch (error) {
-            if (!params.force && this.isBehindPushError(error)) {
-                try {
-                    await this.gitService.branchRemote.fetch();
-                } catch (fetchError) {
-                    logger.warn('Fetch after push rejection failed:', fetchError);
-                }
-
-                const branchStatus = await this.gitService.branchRemote.getBranchStatus();
-                throw new Error(`PUSH_REJECTED_BEHIND:${branchStatus.behind || 1}`, { cause: error });
-            }
-
-            throw error;
-        }
+        await this.pushCurrentBranchToTarget(
+            this.gitService,
+            { remote: params.remote, branch: params.branch },
+            { force: params.force, pushTags: params.pushTags, noVerify: params.noVerify }
+        );
     };
 
     confirmForcePush = async (params: { remote: string; branch: string }): Promise<boolean> => {
@@ -735,11 +750,21 @@ export class ExtensionRpcHandler {
         return branches.length === 1 ? branches[0] : branches.join(',');
     };
 
-    commit = async (params: { message: string; amend: boolean; files: FileReferenceInput[]; push?: boolean }): Promise<void> => {
+    commit = async (params: { message: string; amend: boolean; files: FileReferenceInput[]; push?: boolean; pushTarget?: PushTarget }): Promise<void> => {
+        if (params.push && !params.pushTarget) {
+            throw new Error(i18n.t('Commit & Push requires a confirmed push target.'));
+        }
+        if (params.pushTarget && (!params.pushTarget.remote.trim() || !params.pushTarget.branch.trim())) {
+            throw new Error(i18n.t('Commit & Push requires a confirmed push target.'));
+        }
+
         const groups = this.groupFileReferences(params.files || []);
         const entries = groups.size > 0 ? Array.from(groups.entries()) : [[undefined, []] as [string | undefined, string[]]];
         if (params.amend && entries.length > 1) {
             throw new Error('Amend supports one repository at a time');
+        }
+        if (params.pushTarget && entries.length > 1) {
+            throw new Error(i18n.t('Commit & Push supports one repository at a time.'));
         }
 
         const failures: string[] = [];
@@ -747,6 +772,7 @@ export class ExtensionRpcHandler {
         for (const [repoPath, files] of entries) {
             const gitService = this.getServiceForRepo(repoPath);
             const repoName = this.getRepositoryName(repoPath, gitService);
+            let committedHash: string | undefined;
 
             try {
                 const changelistState = gitService.changelistStateService?.getState();
@@ -770,10 +796,16 @@ export class ExtensionRpcHandler {
                     await gitService.commit(params.message, undefined);
                 }
 
-                if (params.push) {
-                    const branches = await gitService.branchRemote.getBranches();
-                    if (branches.current) {
-                        await gitService.branchRemote.push('origin', branches.current);
+                if (params.pushTarget) {
+                    const lastCommit = await gitService.getLastCommitInfo();
+                    committedHash = lastCommit?.shortHash || lastCommit?.hash.substring(0, 7);
+                    try {
+                        await this.pushCurrentBranchToTarget(gitService, params.pushTarget, { setUpstreamToTarget: true });
+                    } catch (pushError) {
+                        const pushMessage = pushError instanceof Error ? pushError.message : String(pushError);
+                        throw new Error(committedHash
+                            ? i18n.t('Commit {0} succeeded; push to {1}/{2} failed: {3}', committedHash, params.pushTarget.remote, params.pushTarget.branch, pushMessage)
+                            : i18n.t('Commit succeeded; push to {0}/{1} failed: {2}', params.pushTarget.remote, params.pushTarget.branch, pushMessage), { cause: pushError });
                     }
                 }
             } catch (e) {

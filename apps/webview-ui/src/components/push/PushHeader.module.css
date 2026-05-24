@@ -14,6 +14,31 @@
     /* margin-bottom: 4px; */
 }
 
+.headerActions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.useTargetBtn {
+    border: none;
+    border-radius: 3px;
+    padding: 3px 8px;
+    background: var(--vscode-button-secondaryBackground);
+    color: var(--vscode-button-secondaryForeground);
+    font-size: 11px;
+    cursor: pointer;
+}
+
+.useTargetBtn:hover:not(:disabled) {
+    background: var(--vscode-button-secondaryHoverBackground);
+}
+
+.useTargetBtn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
 .iconBtn {
     padding: 2px;
     border-radius: 3px;

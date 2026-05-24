@@ -97,6 +97,11 @@ export interface CommitViewState {
     activeRepository?: RepositoryInfo;
 }
 
+export interface PushTarget {
+    remote: string;
+    branch: string;
+}
+
 export interface ChangelistFileSelection {
     repoPath?: string;
     path: string;
@@ -230,7 +235,7 @@ export interface ExtensionMethods {
     getBranchInfo: () => Promise<BranchInfo>;
     getStashList: () => Promise<StashItem[]>;
     getStashFiles: (index: number) => Promise<CommitFile[]>;
-    commit: (params: { message: string; amend: boolean; files: FileReferenceInput[]; push?: boolean }) => Promise<void>;
+    commit: (params: { message: string; amend: boolean; files: FileReferenceInput[]; push?: boolean; pushTarget?: PushTarget }) => Promise<void>;
     stage: (path: FileReferenceInput) => Promise<void>;
     stageFiles: (paths: FileReferenceInput[]) => Promise<void>;
     unstage: (path: FileReferenceInput) => Promise<void>;
@@ -286,6 +291,7 @@ export interface ExtensionMethods {
 
 
 export interface PushInitState {
+    repositoryPath?: string;
     localBranch: string;
     remotes: string[];
     upstream?: string;

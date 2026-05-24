@@ -4,7 +4,7 @@ import styles from './CommitForm.module.css';
 import { rpc } from '../../lib/rpc_client';
 import type { RepositoryFileReference, RepositoryInfo } from '@shared/messages';
 
-interface CommitOptions {
+export interface CommitOptions {
     push: boolean;
     signOff: boolean;
 }
@@ -17,8 +17,17 @@ interface CommitFormProps {
     addedCount?: number;
     modifiedCount?: number;
     deletedCount?: number;
+    pushTarget?: {
+        remote: string;
+        branch: string;
+        isConfirmed: boolean;
+    };
+    isPushTargetLoading?: boolean;
+    options: CommitOptions;
+    onReviewPushTarget?: () => void;
     onMessageChange: (msg: string) => void;
     onAmendChange: (amend: boolean) => void;
+    onOptionsChange: React.Dispatch<React.SetStateAction<CommitOptions>>;
     onCommitSuccess?: () => void;
 }
 
@@ -30,22 +39,23 @@ export const CommitForm: React.FC<CommitFormProps> = ({
     addedCount = 0,
     modifiedCount = 0,
     deletedCount = 0,
+    pushTarget,
+    isPushTargetLoading = false,
+    options,
+    onReviewPushTarget,
     onMessageChange,
     onAmendChange,
+    onOptionsChange,
     onCommitSuccess
 }) => {
     const { t } = useTranslation();
     const [isGenerating, setIsGenerating] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-    const [options, setOptions] = useState<CommitOptions>({
-        push: false,
-        signOff: false
-    });
     const dropdownRef = useRef<HTMLDivElement>(null);
 
     const toggleOption = (key: keyof CommitOptions) => {
-        setOptions(prev => ({ ...prev, [key]: !prev[key] }));
+        onOptionsChange(prev => ({ ...prev, [key]: !prev[key] }));
     };
 
     const handleGenerateMessage = async () => {
@@ -68,18 +78,38 @@ export const CommitForm: React.FC<CommitFormProps> = ({
         if (files.length === 0 && !amend) {
             return;
         }
+        const repoCount = new Set(files.map(file => file.repoPath || '')).size;
+        if (options.push && repoCount > 1) {
+            setError(t('Commit & Push supports one repository at a time.'));
+            return;
+        }
+        if (options.push) {
+            if (isPushTargetLoading) {
+                setError(t('Push target is still loading.'));
+                return;
+            }
+            if (!pushTarget?.isConfirmed) {
+                onReviewPushTarget?.();
+                return;
+            }
+        }
         try {
             await rpc.commit({
                 message: options.signOff ? `${message}\n\nSigned-off-by: ` : message,
                 files,
                 amend: amend,
-                push: options.push
+                pushTarget: options.push && pushTarget?.isConfirmed
+                    ? { remote: pushTarget.remote, branch: pushTarget.branch }
+                    : undefined
             });
             onMessageChange('');
             onCommitSuccess?.();
         } catch (e) {
             const errMsg = e instanceof Error ? e.message : String(e);
-            setError(t('Commit failed: {{message}}', { message: errMsg }));
+            const key = errMsg.includes('succeeded; push to')
+                ? 'Push after commit failed: {{message}}'
+                : 'Commit failed: {{message}}';
+            setError(t(key, { message: errMsg }));
         }
     };
 
@@ -128,6 +158,11 @@ export const CommitForm: React.FC<CommitFormProps> = ({
         repoPath,
         count
     }));
+    const repoCount = planItems.length || new Set(selectedFiles.map(file => file.repoPath || '')).size;
+    const pushTargetLabel = pushTarget?.remote && pushTarget.branch
+        ? `${pushTarget.remote}/${pushTarget.branch}`
+        : t('No push target');
+    const pushTargetNeedsReview = !pushTarget?.isConfirmed;
 
     return (
         <div className={styles.commitSection}>
@@ -189,6 +224,33 @@ export const CommitForm: React.FC<CommitFormProps> = ({
                             <span>{t('{{count}} files', { count: item.count })}</span>
                         </div>
                     ))}
+                </div>
+            )}
+
+            {options.push && (
+                <div className={`${styles.pushTargetRow} ${pushTargetNeedsReview || repoCount > 1 ? styles.pushTargetWarning : ''}`}>
+                    <div className={styles.pushTargetInfo}>
+                        <i className={`codicon ${pushTargetNeedsReview || repoCount > 1 ? 'codicon-warning' : 'codicon-repo-push'}`} />
+                        <span className={styles.pushTargetLabel}>{t('Push target:')}</span>
+                        <span className={styles.pushTargetValue}>
+                            {repoCount > 1
+                                ? t('Select one repository to push after commit')
+                                : isPushTargetLoading
+                                    ? t('Loading...')
+                                    : pushTargetNeedsReview
+                                        ? t('Review target before pushing')
+                                        : pushTargetLabel}
+                        </span>
+                    </div>
+                    {repoCount <= 1 && (
+                        <button
+                            type="button"
+                            className={styles.pushTargetButton}
+                            onClick={onReviewPushTarget}
+                        >
+                            {pushTargetNeedsReview ? t('Review...') : t('Change...')}
+                        </button>
+                    )}
                 </div>
             )}
 

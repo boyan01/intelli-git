@@ -19,6 +19,7 @@ export class GitReadRpcHandler {
 
     getPushInitState = async (): Promise<PushInitState> => {
         return this.repositoryManager.getActiveService()?.branchRemote.getPushInitState() ?? {
+            repositoryPath: undefined,
             localBranch: '',
             remotes: []
         };

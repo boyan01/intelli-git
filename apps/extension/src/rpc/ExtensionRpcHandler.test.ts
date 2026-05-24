@@ -128,6 +128,90 @@ describe('ExtensionRpcHandler commit', () => {
         expect(commitA).toHaveBeenCalledWith('Commit workspace changes', undefined);
         expect(commitB).toHaveBeenCalledWith('Commit workspace changes', undefined);
     });
+
+    it('rejects legacy commit push intent without a confirmed target', async () => {
+        const commit = vi.fn().mockResolvedValue(undefined);
+        const handler = createHandler({ commit });
+
+        await expect(handler.commit({
+            message: 'Commit and push',
+            amend: false,
+            files: ['file.txt'],
+            push: true
+        })).rejects.toThrow('Commit & Push requires a confirmed push target.');
+
+        expect(commit).not.toHaveBeenCalled();
+    });
+
+    it('pushes commit output to the confirmed target and sets upstream from that target', async () => {
+        const commit = vi.fn().mockResolvedValue(undefined);
+        const branchRemote = {
+            getBranches: vi.fn().mockResolvedValue({ current: 'feature', all: ['feature'] }),
+            getUpstreamBranch: vi.fn().mockResolvedValue(undefined),
+            push: vi.fn().mockResolvedValue(undefined),
+            setUpstreamBranch: vi.fn().mockResolvedValue(undefined)
+        };
+        const handler = createHandler({
+            commit,
+            branchRemote,
+            getLastCommitInfo: vi.fn().mockResolvedValue({
+                hash: 'abcdef1234567890',
+                shortHash: 'abcdef1',
+                subject: 'Commit and push',
+                message: 'Commit and push',
+                files: []
+            })
+        } as unknown as Partial<GitService>);
+
+        await handler.commit({
+            message: 'Commit and push',
+            amend: false,
+            files: ['file.txt'],
+            pushTarget: { remote: 'fork', branch: 'review/feature' }
+        });
+
+        expect(commit).toHaveBeenCalledWith('Commit and push', undefined);
+        expect(branchRemote.push).toHaveBeenCalledWith('fork', 'feature:review/feature', {
+            noVerify: undefined,
+            setUpstream: true
+        });
+        expect(branchRemote.setUpstreamBranch).not.toHaveBeenCalled();
+    });
+
+    it('reports the committed hash when push after commit fails', async () => {
+        const commit = vi.fn().mockResolvedValue(undefined);
+        const branchRemote = {
+            getBranches: vi.fn().mockResolvedValue({ current: 'feature', all: ['feature'] }),
+            getUpstreamBranch: vi.fn().mockResolvedValue('origin/feature'),
+            push: vi.fn().mockRejectedValue(new Error('remote rejected')),
+            fetch: vi.fn().mockResolvedValue(undefined),
+            getBranchStatus: vi.fn().mockResolvedValue({ ahead: 1, behind: 0 })
+        };
+        const handler = createHandler({
+            commit,
+            branchRemote,
+            getLastCommitInfo: vi.fn().mockResolvedValue({
+                hash: 'abcdef1234567890',
+                shortHash: 'abcdef1',
+                subject: 'Commit and push',
+                message: 'Commit and push',
+                files: []
+            })
+        } as unknown as Partial<GitService>);
+
+        await expect(handler.commit({
+            message: 'Commit and push',
+            amend: false,
+            files: ['file.txt'],
+            pushTarget: { remote: 'fork', branch: 'feature' }
+        })).rejects.toThrow('workspace: Commit abcdef1 succeeded; push to fork/feature failed: remote rejected');
+
+        expect(commit).toHaveBeenCalledWith('Commit and push', undefined);
+        expect(branchRemote.push).toHaveBeenCalledWith('fork', 'feature:feature', {
+            noVerify: undefined,
+            setUpstream: false
+        });
+    });
 });
 
 describe('ExtensionRpcHandler push', () => {
@@ -150,7 +234,10 @@ describe('ExtensionRpcHandler push', () => {
             branch: 'main'
         })).rejects.toThrow('PUSH_REJECTED_BEHIND:2');
 
-        expect(branchRemote.push).toHaveBeenCalledWith('origin', 'main:main', { noVerify: undefined });
+        expect(branchRemote.push).toHaveBeenCalledWith('origin', 'main:main', {
+            noVerify: undefined,
+            setUpstream: false
+        });
         expect(branchRemote.fetch).toHaveBeenCalledOnce();
         expect(branchRemote.getBranchStatus).toHaveBeenCalledOnce();
     });

@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useLayoutEffect, useEffect } from 'react
 import { CommitView } from '../commit/CommitView';
 import { StashView } from '../stash/StashView';
 import { PushTab } from '../push/PushTab';
+import type { CommitOptions } from '../commit/CommitForm';
 import { useTranslation } from 'react-i18next';
 import { usePersistedState } from '../../hooks/usePersistedState';
 import { useRpcData } from '../../hooks/useRpcData';
@@ -12,6 +13,7 @@ import { BranchStatus } from '../common/BranchStatus';
 import { VersionCheckBanner } from '../common/VersionCheckBanner';
 import { VersionExpiredPanel } from '../common/VersionExpiredPanel';
 import { WorktreeDrawer } from './WorktreeDrawer';
+import { usePushBranches } from '../push/hooks/usePushBranches';
 import styles from './LocalChangesView.module.css';
 
 const defaultBranchInfo: BranchInfo = {
@@ -71,6 +73,12 @@ export function LocalChangesView() {
         initialValue: [] as WorktreeInfo[]
     });
     const [worktreeDrawerOpen, setWorktreeDrawerOpen] = useState(false);
+    const [reviewingCommitPushTarget, setReviewingCommitPushTarget] = useState(false);
+    const [commitOptions, setCommitOptions] = useState<CommitOptions>({
+        push: false,
+        signOff: false
+    });
+    const pushBranches = usePushBranches();
 
     // Determine initial tab: use persisted value only if set within 10 seconds
     const [activeTab, setActiveTabState] = useState<'commit' | 'stash' | 'push'>(() => {
@@ -147,6 +155,28 @@ export function LocalChangesView() {
             setWorktreeDrawerOpen(open => !open);
         });
     }, []);
+
+    useEffect(() => {
+        if (activeTab !== 'push' && reviewingCommitPushTarget) {
+            setReviewingCommitPushTarget(false);
+        }
+    }, [activeTab, reviewingCommitPushTarget]);
+
+    const reviewCommitPushTarget = useCallback(() => {
+        setReviewingCommitPushTarget(true);
+        setActiveTab('push');
+    }, [setActiveTab]);
+
+    const returnToCommitAfterTargetConfirmation = useCallback(() => {
+        pushBranches.confirmSelectedTarget();
+        setReviewingCommitPushTarget(false);
+        setActiveTab('commit');
+    }, [pushBranches, setActiveTab]);
+
+    const returnToCommitAfterTargetChange = useCallback(() => {
+        setReviewingCommitPushTarget(false);
+        setActiveTab('commit');
+    }, [setActiveTab]);
 
     const isRebasing = branches.rebaseStatus && branches.rebaseStatus !== 'none';
     const { isExpired } = useVersionCheck();
@@ -238,9 +268,25 @@ export function LocalChangesView() {
             </div>
 
             <div className={styles.content}>
-                {activeTab === 'commit' && <CommitView rebaseStatus={branches?.rebaseStatus} />}
+                {activeTab === 'commit' && (
+                    <CommitView
+                        rebaseStatus={branches?.rebaseStatus}
+                        pushTarget={pushBranches.pushTarget}
+                        isPushTargetLoading={pushBranches.isInitStateLoading}
+                        commitOptions={commitOptions}
+                        onReviewPushTarget={reviewCommitPushTarget}
+                        onCommitOptionsChange={setCommitOptions}
+                    />
+                )}
                 {activeTab === 'stash' && <StashView />}
-                {activeTab === 'push' && <PushTab />}
+                {activeTab === 'push' && (
+                    <PushTab
+                        pushBranches={pushBranches}
+                        reviewingCommitTarget={reviewingCommitPushTarget}
+                        onUseTargetForCommit={returnToCommitAfterTargetConfirmation}
+                        onCommitTargetChanged={returnToCommitAfterTargetChange}
+                    />
+                )}
             </div>
         </div >
     );

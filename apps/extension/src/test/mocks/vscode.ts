@@ -131,6 +131,15 @@ export const languages = {
     }
 };
 
+export const l10n = {
+    t(message: string, ...args: Array<string | number | boolean>): string {
+        return args.reduce<string>(
+            (result, value, index) => result.replace(`{${index}}`, String(value)),
+            message
+        );
+    }
+};
+
 export function __setChangelistMode(mode: string): void {
     changelistMode = mode;
 }

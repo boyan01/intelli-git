@@ -12,7 +12,21 @@ import { usePushData } from './hooks/usePushData';
 
 import styles from './PushTab.module.css';
 
-export function PushTab() {
+type PushBranchesState = ReturnType<typeof usePushBranches>;
+
+interface PushTabProps {
+    pushBranches: PushBranchesState;
+    reviewingCommitTarget?: boolean;
+    onUseTargetForCommit?: () => void;
+    onCommitTargetChanged?: () => void;
+}
+
+export function PushTab({
+    pushBranches,
+    reviewingCommitTarget = false,
+    onUseTargetForCommit,
+    onCommitTargetChanged
+}: PushTabProps) {
     const { t } = useTranslation();
     const scrollAreaRef = useRef<HTMLDivElement>(null);
 
@@ -24,9 +38,10 @@ export function PushTab() {
         setSelectedRemote,
         selectedRemoteBranch,
         setSelectedRemoteBranch,
+        confirmSelectedTarget,
         isRemoteBranchesLoading,
         isInitStateLoading
-    } = usePushBranches();
+    } = pushBranches;
 
     // 2. Data State (Commits & Push)
     const {
@@ -57,6 +72,20 @@ export function PushTab() {
         setExpandedCommitHash(prev => prev === hash ? null : hash);
     }, []);
 
+    const handleRemoteChange = useCallback((remote: string) => {
+        setSelectedRemote(remote);
+        if (reviewingCommitTarget) {
+            onCommitTargetChanged?.();
+        }
+    }, [onCommitTargetChanged, reviewingCommitTarget, setSelectedRemote]);
+
+    const handleRemoteBranchChange = useCallback((branch: string) => {
+        setSelectedRemoteBranch(branch);
+        if (reviewingCommitTarget) {
+            onCommitTargetChanged?.();
+        }
+    }, [onCommitTargetChanged, reviewingCommitTarget, setSelectedRemoteBranch]);
+
     return (
         <div className={styles.container}>
             {/* Header */}
@@ -69,8 +98,10 @@ export function PushTab() {
                 isLoading={isRemoteBranchesLoading}
                 showTargetPlaceholder={isInitStateLoading && !selectedRemote && !selectedRemoteBranch}
                 onToggleView={() => setViewMode(m => m === 'commits' ? 'changes' : 'commits')}
-                onRemoteChange={setSelectedRemote}
-                onRemoteBranchChange={setSelectedRemoteBranch}
+                onRemoteChange={handleRemoteChange}
+                onRemoteBranchChange={handleRemoteBranchChange}
+                showCommitTargetAction={reviewingCommitTarget}
+                onUseTargetForCommit={onUseTargetForCommit}
             />
 
             {/* Scroll Area */}
@@ -127,6 +158,7 @@ export function PushTab() {
                 selectedRemote={selectedRemote}
                 selectedRemoteBranch={selectedRemoteBranch}
                 onPushComplete={() => {
+                    confirmSelectedTarget();
                     // The backend sends a refresh event on git push, which triggers data reload.
                 }}
             />

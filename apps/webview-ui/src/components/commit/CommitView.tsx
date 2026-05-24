@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef, type Dispatch, type SetStateAction } from 'react';
 import { ChangelistTree } from './ChangelistTree';
 import { CommitForm } from './CommitForm';
 import { RebaseForm } from './RebaseForm';
@@ -10,6 +10,7 @@ import styles from './CommitView.module.css';
 import { rpc, rpcEvents } from '../../lib/rpc_client';
 import type { BranchInfo, ChangelistState, FileStatus, LastCommitInfo, RepositoryCommitViewState, RepositoryFileReference } from '@shared/messages';
 import type { ChangelistBackgroundContext } from '@shared/webviewContext';
+import type { CommitOptions } from './CommitForm';
 import {
     buildWorkspaceChangelists,
     getWorkspaceFileStats,
@@ -21,6 +22,15 @@ import {
 
 interface CommitViewProps {
     rebaseStatus?: BranchInfo['rebaseStatus'];
+    pushTarget?: {
+        remote: string;
+        branch: string;
+        isConfirmed: boolean;
+    };
+    isPushTargetLoading?: boolean;
+    commitOptions: CommitOptions;
+    onReviewPushTarget?: () => void;
+    onCommitOptionsChange: Dispatch<SetStateAction<CommitOptions>>;
 }
 
 function getActiveChangelistName(changelistState: ChangelistState): string | undefined {
@@ -73,7 +83,14 @@ function CommitViewStatePanel({ icon, title, description, detail, actions = [] }
     );
 }
 
-export function CommitView({ rebaseStatus }: CommitViewProps) {
+export function CommitView({
+    rebaseStatus,
+    pushTarget,
+    isPushTargetLoading = false,
+    commitOptions,
+    onReviewPushTarget,
+    onCommitOptionsChange
+}: CommitViewProps) {
     const { t } = useTranslation();
     const loadCommitViewState = useCallback(() => rpc.getCommitViewState(), []);
     const initialChangelistState = useMemo(() => ({
@@ -380,8 +397,13 @@ export function CommitView({ rebaseStatus }: CommitViewProps) {
                     addedCount={fileStats.added}
                     modifiedCount={fileStats.modified}
                     deletedCount={fileStats.deleted}
+                    pushTarget={pushTarget}
+                    isPushTargetLoading={isPushTargetLoading}
+                    options={commitOptions}
+                    onReviewPushTarget={onReviewPushTarget}
                     onMessageChange={setCommitMessage}
                     onAmendChange={setAmend}
+                    onOptionsChange={onCommitOptionsChange}
                     onCommitSuccess={handleCommitSuccess}
                 />
             )}

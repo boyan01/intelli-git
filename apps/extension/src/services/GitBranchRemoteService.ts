@@ -268,8 +268,11 @@ export class GitBranchRemoteService {
         }
     }
 
-    public async push(remote: string, branch: string, options?: { noVerify?: boolean }): Promise<void> {
+    public async push(remote: string, branch: string, options?: { noVerify?: boolean; setUpstream?: boolean }): Promise<void> {
         const args: string[] = [];
+        if (options?.setUpstream) {
+            args.push('--set-upstream');
+        }
         if (options?.noVerify) {
             args.push('--no-verify');
         }
@@ -277,8 +280,11 @@ export class GitBranchRemoteService {
         this.options.notifyChanged();
     }
 
-    public async forcePush(remote: string, branch: string, options?: { noVerify?: boolean }): Promise<void> {
+    public async forcePush(remote: string, branch: string, options?: { noVerify?: boolean; setUpstream?: boolean }): Promise<void> {
         const args: string[] = ['--force-with-lease'];
+        if (options?.setUpstream) {
+            args.push('--set-upstream');
+        }
         if (options?.noVerify) {
             args.push('--no-verify');
         }
@@ -747,6 +753,7 @@ export class GitBranchRemoteService {
         const upstream = await this.getUpstreamBranch(branches.current);
 
         return {
+            repositoryPath: this.options.gitRoot,
             localBranch: branches.current,
             remotes: remotes.length > 0 ? remotes : ['origin'],
             upstream: upstream ?? undefined

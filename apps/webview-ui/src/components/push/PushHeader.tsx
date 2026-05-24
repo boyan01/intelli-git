@@ -10,9 +10,11 @@ export interface PushHeaderProps {
     viewMode: 'commits' | 'changes';
     isLoading?: boolean;
     showTargetPlaceholder?: boolean;
+    showCommitTargetAction?: boolean;
     onToggleView: () => void;
     onRemoteChange: (remote: string) => void;
     onRemoteBranchChange: (branch: string) => void;
+    onUseTargetForCommit?: () => void;
 }
 
 export const PushHeader: React.FC<PushHeaderProps> = ({
@@ -23,9 +25,11 @@ export const PushHeader: React.FC<PushHeaderProps> = ({
     viewMode,
     isLoading = false,
     showTargetPlaceholder = false,
+    showCommitTargetAction = false,
     onToggleView,
     onRemoteChange,
-    onRemoteBranchChange
+    onRemoteBranchChange,
+    onUseTargetForCommit
 }) => {
     const { t } = useTranslation();
 
@@ -133,13 +137,24 @@ export const PushHeader: React.FC<PushHeaderProps> = ({
         <div className={styles.headerContainer}>
             <div className={styles.headerTitleRow}>
                 <div className={styles.pushTargetLabel}>{t('Push Target')}</div>
-                <button
-                    className={styles.iconBtn}
-                    onClick={onToggleView}
-                    title={viewMode === 'commits' ? t('Switch to Changes') : t('Switch to Commits')}
-                >
-                    <i className={`codicon ${viewMode === 'commits' ? 'codicon-git-commit' : 'codicon-files'}`} />
-                </button>
+                <div className={styles.headerActions}>
+                    {showCommitTargetAction && (
+                        <button
+                            className={styles.useTargetBtn}
+                            onClick={onUseTargetForCommit}
+                            disabled={!selectedRemote || !selectedRemoteBranch}
+                        >
+                            {t('Use Target')}
+                        </button>
+                    )}
+                    <button
+                        className={styles.iconBtn}
+                        onClick={onToggleView}
+                        title={viewMode === 'commits' ? t('Switch to Changes') : t('Switch to Commits')}
+                    >
+                        <i className={`codicon ${viewMode === 'commits' ? 'codicon-git-commit' : 'codicon-files'}`} />
+                    </button>
+                </div>
             </div>
             <div className={styles.branchRow}>
                 <div className={styles.arrowRow}>

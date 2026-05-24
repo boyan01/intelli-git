@@ -156,6 +156,68 @@
     line-height: 18px;
 }
 
+.pushTargetRow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin: 0 8px 8px;
+    padding: 5px 8px;
+    border: 1px solid var(--vscode-panel-border);
+    border-radius: 4px;
+    background: var(--vscode-sideBarSectionHeader-background);
+    font-size: 12px;
+}
+
+.pushTargetWarning {
+    border-color: var(--vscode-inputValidation-warningBorder);
+}
+
+.pushTargetInfo {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    gap: 6px;
+}
+
+.pushTargetInfo i {
+    flex-shrink: 0;
+    color: var(--vscode-descriptionForeground);
+}
+
+.pushTargetWarning .pushTargetInfo i {
+    color: var(--vscode-editorWarning-foreground);
+}
+
+.pushTargetLabel {
+    color: var(--vscode-descriptionForeground);
+    white-space: nowrap;
+}
+
+.pushTargetValue {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: var(--vscode-editor-font-family);
+}
+
+.pushTargetButton {
+    flex-shrink: 0;
+    border: none;
+    border-radius: 3px;
+    padding: 2px 6px;
+    background: transparent;
+    color: var(--vscode-textLink-foreground);
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.pushTargetButton:hover {
+    background: var(--vscode-toolbar-hoverBackground);
+    color: var(--vscode-textLink-activeForeground);
+}
+
 .errorMessage {
     display: flex;
     align-items: center;

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { rpc } from '@/lib/rpc_client';
 import { usePersistedState } from '../../../hooks/usePersistedState';
 import { useRpcData } from '@/hooks/useRpcData';
+import { resolvePushTarget } from '../pushTarget';
 
 export function usePushBranches() {
     const loadPushInitState = useCallback(async () => await rpc.getPushInitState(), []);
@@ -13,7 +14,7 @@ export function usePushBranches() {
     } = useRpcData(
         loadPushInitState,
         {
-            initialValue: { localBranch: '', remotes: [] },
+            initialValue: { repositoryPath: '', localBranch: '', remotes: [] },
             refreshOnEvent: true,
             cacheKey: 'push.initState'
         }
@@ -22,6 +23,7 @@ export function usePushBranches() {
     // 2. State for User Selection
     const [selectedRemoteOverride, setSelectedRemoteOverride] = useState<string>('');
     const [selectedRemoteBranchOverride, setSelectedRemoteBranchOverride] = useState<string>('');
+    const [manualTargetConfirmed, setManualTargetConfirmed] = useState(false);
 
     // 3. Persisted State
     const [savedSelection, setSavedSelection] = usePersistedState('push.branchSelection');
@@ -30,50 +32,19 @@ export function usePushBranches() {
     useEffect(() => {
         setSelectedRemoteOverride('');
         setSelectedRemoteBranchOverride('');
-    }, [initState.localBranch]);
+        setManualTargetConfirmed(false);
+    }, [initState.localBranch, initState.repositoryPath]);
 
 
-    const defaultSelection = useMemo(() => {
-        if (!initState.localBranch) {
-            return { remote: '', remoteBranch: '' };
+    const defaultSelection = useMemo(() => resolvePushTarget(
+        initState,
+        savedSelection,
+        {
+            remote: selectedRemoteOverride || undefined,
+            remoteBranch: selectedRemoteBranchOverride || undefined,
+            confirmed: manualTargetConfirmed
         }
-
-        const { localBranch, remotes, upstream } = initState;
-        const saved = savedSelection;
-
-        let remote = '';
-        let remoteBranch = '';
-
-        if (saved.localBranch === localBranch) {
-            if (saved.remote && remotes.includes(saved.remote)) {
-                remote = saved.remote;
-            }
-            if (saved.remoteBranch) {
-                remoteBranch = saved.remoteBranch;
-            }
-        }
-
-        if (!remote && upstream) {
-            const parts = upstream.split('/');
-            if (parts.length > 1) {
-                const upstreamRemote = parts[0];
-                if (remotes.includes(upstreamRemote)) {
-                    remote = upstreamRemote;
-                    remoteBranch = parts.slice(1).join('/');
-                }
-            }
-        }
-
-        if (!remote) {
-            remote = remotes[0] || 'origin';
-        }
-
-        if (!remoteBranch) {
-            remoteBranch = localBranch;
-        }
-
-        return { remote, remoteBranch };
-    }, [initState, savedSelection]);
+    ), [initState, savedSelection, selectedRemoteOverride, selectedRemoteBranchOverride, manualTargetConfirmed]);
 
     const selectedRemote = selectedRemoteOverride || defaultSelection.remote;
 
@@ -132,27 +103,57 @@ export function usePushBranches() {
         return remoteBranches[0] || candidate;
     }, [selectedRemoteBranchOverride, defaultSelection.remoteBranch, selectedRemote, remoteBranches, initState.localBranch]);
 
+    const isPushTargetConfirmed = useMemo(() => {
+        if (!selectedRemote || !selectedRemoteBranch) {
+            return false;
+        }
+        if (defaultSelection.confirmation === 'unconfirmed') {
+            return false;
+        }
+        if (defaultSelection.remote !== selectedRemote) {
+            return false;
+        }
+        if (defaultSelection.remoteBranch !== selectedRemoteBranch) {
+            return false;
+        }
+        return true;
+    }, [defaultSelection, selectedRemote, selectedRemoteBranch]);
 
-    // 7. Save Selection Persistence
-    useEffect(() => {
-        if (initState.localBranch && selectedRemote && selectedRemoteBranch) {
+    const persistSelection = useCallback((remote: string, remoteBranch: string, confirmed: boolean) => {
+        if (initState.localBranch && remote && remoteBranch) {
             setSavedSelection({
+                repositoryPath: initState.repositoryPath,
                 localBranch: initState.localBranch,
-                remote: selectedRemote,
-                remoteBranch: selectedRemoteBranch
+                remote,
+                remoteBranch,
+                confirmed
             });
         }
-    }, [initState.localBranch, selectedRemote, selectedRemoteBranch, setSavedSelection]);
+    }, [initState.localBranch, initState.repositoryPath, setSavedSelection]);
+
+    const confirmSelectedTarget = useCallback(() => {
+        if (!selectedRemote || !selectedRemoteBranch) {
+            return;
+        }
+
+        setManualTargetConfirmed(true);
+        persistSelection(selectedRemote, selectedRemoteBranch, true);
+    }, [persistSelection, selectedRemote, selectedRemoteBranch]);
 
     const handleSelectedRemoteChange = useCallback((remote: string) => {
         setSelectedRemoteOverride(remote);
-    }, []);
+        setManualTargetConfirmed(true);
+        persistSelection(remote, selectedRemoteBranch || initState.localBranch, true);
+    }, [initState.localBranch, persistSelection, selectedRemoteBranch]);
 
     const handleSelectedRemoteBranchChange = useCallback((remoteBranch: string) => {
         setSelectedRemoteBranchOverride(remoteBranch);
-    }, []);
+        setManualTargetConfirmed(true);
+        persistSelection(selectedRemote, remoteBranch, true);
+    }, [persistSelection, selectedRemote]);
 
     return {
+        repositoryPath: initState.repositoryPath,
         localBranch: initState.localBranch,
         remotes: initState.remotes,
         remoteBranches,
@@ -160,6 +161,15 @@ export function usePushBranches() {
         setSelectedRemote: handleSelectedRemoteChange,
         selectedRemoteBranch,
         setSelectedRemoteBranch: handleSelectedRemoteBranchChange,
+        pushTarget: selectedRemote && selectedRemoteBranch
+            ? {
+                remote: selectedRemote,
+                branch: selectedRemoteBranch,
+                isConfirmed: isPushTargetConfirmed,
+                confirmation: defaultSelection.confirmation
+            }
+            : undefined,
+        confirmSelectedTarget,
         isRemoteBranchesLoading,
         isInitStateLoading,
     };
