@@ -173,8 +173,7 @@
       },
       {
         "command": "intelli-git.changelistMode.staged.current",
-        "title": "%intelli-git.commands.changelistMode.staged.current.title%",
-        "icon": "$(check)"
+        "title": "%intelli-git.commands.changelistMode.staged.current.title%"
       },
       {
         "command": "intelli-git.changelistMode.changes",
@@ -182,8 +181,7 @@
       },
       {
         "command": "intelli-git.changelistMode.changes.current",
-        "title": "%intelli-git.commands.changelistMode.changes.current.title%",
-        "icon": "$(check)"
+        "title": "%intelli-git.commands.changelistMode.changes.current.title%"
       },
       {
         "command": "intelli-git.copyCommitHash",
@@ -871,22 +869,22 @@
       "intelli-git.changelistMode": [
         {
           "command": "intelli-git.changelistMode.staged.current",
-          "when": "changelistMode == 'staged'",
+          "when": "changelistMode == 'staged' || intelli-git.changelistMode == 'staged'",
           "group": "1_mode@1"
         },
         {
           "command": "intelli-git.changelistMode.staged",
-          "when": "changelistMode != 'staged'",
+          "when": "changelistMode == 'changes' || intelli-git.changelistMode == 'changes'",
           "group": "1_mode@1"
         },
         {
           "command": "intelli-git.changelistMode.changes.current",
-          "when": "changelistMode == 'changes'",
+          "when": "changelistMode == 'changes' || intelli-git.changelistMode == 'changes'",
           "group": "1_mode@2"
         },
         {
           "command": "intelli-git.changelistMode.changes",
-          "when": "changelistMode != 'changes'",
+          "when": "changelistMode == 'staged' || intelli-git.changelistMode == 'staged'",
           "group": "1_mode@2"
         }
       ],
