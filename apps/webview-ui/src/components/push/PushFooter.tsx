@@ -231,7 +231,7 @@ export const PushFooter: React.FC<PushFooterProps> = ({
                             onClick={() => toggleOption('noVerify')}
                         >
                             <div className={styles.itemContent}>
-                                <span className={styles.ciLabel}>CI</span>
+                                <span className={styles.ciLabel}>{t('CI')}</span>
                                 <span>{t('Skip CI Verification')}</span>
                             </div>
                             {options.noVerify && <i className="codicon codicon-check" />}

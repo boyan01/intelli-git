@@ -243,7 +243,7 @@ export function LocalChangesView() {
                         <div
                             className={`${styles.branchIndicator} ${styles.rebaseActive}`}
                             onClick={() => rpc.pickBranch()}
-                            title={`Rebase in progress (${branches.rebaseStatus})`}
+                            title={t('Rebase in progress ({{status}})', { status: branches.rebaseStatus })}
                         >
                             <RebaseIndicator status={branches.rebaseStatus as 'interactive' | 'merging'} />
                         </div>
