@@ -20,6 +20,25 @@ export interface RemoteLinkInfo {
     capabilities: RemoteLinkCapabilities;
 }
 
+export type AiProviderId = 'copilot' | 'anthropic' | 'google' | 'custom';
+
+export interface AiProviderStatus {
+    provider: AiProviderId;
+    label: string;
+    model: string;
+    isConfigured: boolean;
+    canSelectModel: boolean;
+    detail?: string;
+}
+
+export interface AiProviderTestResult {
+    ok: boolean;
+    message: string;
+}
+
+export const AI_PROVIDER_SETUP_REQUIRED_CODE = 'AI_PROVIDER_SETUP_REQUIRED';
+export const AI_COPILOT_MODEL_UNAVAILABLE_CODE = 'AI_COPILOT_MODEL_UNAVAILABLE';
+
 export interface GitHunk {
     id: string; // File path + change block signature (e.g., oldStart/newStart/content hash)
     lineRange: string; // e.g., "L10-20"
@@ -258,7 +277,11 @@ export interface ExtensionMethods {
     stageAll: () => Promise<void>;
     unstageAll: () => Promise<void>;
     stageTracked: () => Promise<void>;
+    getAIProviderStatus: () => Promise<AiProviderStatus>;
     generateCommitMessage: (files?: FileReferenceInput[]) => Promise<string>;
+    testAIProvider: () => Promise<AiProviderTestResult>;
+    selectCopilotModel: () => Promise<void>;
+    openCommitPromptSettings: () => Promise<void>;
     stash: (params: { message?: string; files: FileReferenceInput[]; stagedOnly?: boolean }) => Promise<void>;
     deleteFiles: (files: FileReferenceInput[]) => Promise<void>;
     rollback: (files: FileReferenceInput[]) => Promise<void>;

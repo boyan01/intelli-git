@@ -1,8 +1,15 @@
-import React, { useState, useRef } from 'react';
+import React, { useCallback, useEffect, useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import styles from './CommitForm.module.css';
 import { rpc } from '../../lib/rpc_client';
-import type { RepositoryFileReference, RepositoryInfo } from '@shared/messages';
+import { RpcError } from '@shared/rpc';
+import {
+    AI_COPILOT_MODEL_UNAVAILABLE_CODE,
+    AI_PROVIDER_SETUP_REQUIRED_CODE,
+    type AiProviderStatus,
+    type RepositoryFileReference,
+    type RepositoryInfo
+} from '@shared/messages';
 
 export interface CommitOptions {
     push: boolean;
@@ -51,29 +58,106 @@ export const CommitForm: React.FC<CommitFormProps> = ({
     const { t } = useTranslation();
     const [isGenerating, setIsGenerating] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [errorAction, setErrorAction] = useState<'configure' | 'selectCopilotModel' | null>(null);
+    const [aiProviderStatus, setAiProviderStatus] = useState<AiProviderStatus | null>(null);
+    const [isAiMenuOpen, setIsAiMenuOpen] = useState(false);
+    const [isTestingProvider, setIsTestingProvider] = useState(false);
+    const [aiNotice, setAiNotice] = useState<{ ok: boolean; message: string } | null>(null);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
+    const aiDropdownRef = useRef<HTMLDivElement>(null);
 
     const toggleOption = (key: keyof CommitOptions) => {
         onOptionsChange(prev => ({ ...prev, [key]: !prev[key] }));
     };
 
-    const handleGenerateMessage = async () => {
+    const loadAIProviderStatus = useCallback(async () => {
+        try {
+            setAiProviderStatus(await rpc.getAIProviderStatus());
+        } catch (e) {
+            console.error('Failed to load AI provider status', e);
+        }
+    }, []);
+
+    useEffect(() => {
+        void loadAIProviderStatus();
+    }, [loadAIProviderStatus]);
+
+    const clearError = () => {
         setError(null);
+        setErrorAction(null);
+    };
+
+    const configureAIProvider = async () => {
+        await rpc.configureAIProvider();
+        await loadAIProviderStatus();
+    };
+
+    const selectCopilotModel = async () => {
+        await rpc.selectCopilotModel();
+        await loadAIProviderStatus();
+    };
+
+    const openCommitPromptSettings = async () => {
+        await rpc.openCommitPromptSettings();
+    };
+
+    const handleTestAIProvider = async () => {
+        setAiNotice(null);
+        setIsTestingProvider(true);
+        try {
+            const result = await rpc.testAIProvider();
+            setAiNotice(result);
+            await loadAIProviderStatus();
+        } catch (e) {
+            const message = e instanceof Error ? e.message : String(e);
+            setAiNotice({ ok: false, message });
+        } finally {
+            setIsTestingProvider(false);
+        }
+    };
+
+    const handleErrorAction = async () => {
+        if (errorAction === 'selectCopilotModel') {
+            await selectCopilotModel();
+            return;
+        }
+
+        if (errorAction === 'configure') {
+            await configureAIProvider();
+        }
+    };
+
+    const handleGenerateMessage = async () => {
+        clearError();
+        if (selectedFiles.length === 0) {
+            setError(t('Select changes to generate a commit message.'));
+            return;
+        }
+
         setIsGenerating(true);
         try {
             const msg = await rpc.generateCommitMessage(selectedFiles);
+            if (!msg.trim()) {
+                setError(t('Select changes to generate a commit message.'));
+                return;
+            }
             onMessageChange(msg);
         } catch (e) {
             const errMsg = e instanceof Error ? e.message : String(e);
             setError(t('Generate failed: {{message}}', { message: errMsg }));
+            if (e instanceof RpcError && e.code === AI_COPILOT_MODEL_UNAVAILABLE_CODE) {
+                setErrorAction('selectCopilotModel');
+            } else if (e instanceof RpcError && e.code === AI_PROVIDER_SETUP_REQUIRED_CODE) {
+                setErrorAction('configure');
+            }
         } finally {
             setIsGenerating(false);
         }
     };
 
     const handleCommit = async () => {
-        setError(null);
+        clearError();
         const files = selectedFiles;
         if (files.length === 0 && !amend) {
             return;
@@ -163,6 +247,8 @@ export const CommitForm: React.FC<CommitFormProps> = ({
         ? `${pushTarget.remote}/${pushTarget.branch}`
         : t('No push target');
     const pushTargetNeedsReview = !pushTarget?.isConfirmed;
+    const aiProviderLabel = aiProviderStatus?.label || t('Loading...');
+    const aiProviderModel = aiProviderStatus?.model || t('Not set');
 
     return (
         <div className={styles.commitSection}>
@@ -178,11 +264,17 @@ export const CommitForm: React.FC<CommitFormProps> = ({
                         <span>{t('Amend')}</span>
                     </label>
 
-                    <span
-                        className={styles.generateButtonContext}
+                    <div
+                        className={styles.generateControl}
+                        ref={aiDropdownRef}
                         data-vscode-context={JSON.stringify({
                             webviewSection: 'commitGenerateButton'
                         })}
+                        onBlur={(e) => {
+                            if (!aiDropdownRef.current?.contains(e.relatedTarget as Node)) {
+                                setIsAiMenuOpen(false);
+                            }
+                        }}
                     >
                         <button
                             className={`${styles.iconBtn} ${styles.generateBtn} ${isGenerating ? styles.generateBtnLoading : ''}`}
@@ -192,7 +284,74 @@ export const CommitForm: React.FC<CommitFormProps> = ({
                         >
                             <i className={`codicon ${isGenerating ? 'codicon-loading codicon-modifier-spin' : 'codicon-sparkle'}`}></i>
                         </button>
-                    </span>
+                        <button
+                            className={styles.generateMenuBtn}
+                            onClick={() => {
+                                setIsAiMenuOpen(current => !current);
+                                void loadAIProviderStatus();
+                            }}
+                            aria-label={t('AI Provider')}
+                        >
+                            <i className={`codicon codicon-chevron-down ${isAiMenuOpen ? styles.generateChevronOpen : ''}`} />
+                        </button>
+
+                        {isAiMenuOpen && (
+                            <div className={styles.aiDropdown}>
+                                <div className={styles.dropdownHeader}>
+                                    {t('AI Provider')}
+                                </div>
+                                <div className={styles.aiProviderSummary}>
+                                    <div className={styles.aiProviderSummaryRow}>
+                                        <span>{t('Provider')}</span>
+                                        <strong>{aiProviderLabel}</strong>
+                                    </div>
+                                    <div className={styles.aiProviderSummaryRow}>
+                                        <span>{t('Model')}</span>
+                                        <strong>{aiProviderModel}</strong>
+                                    </div>
+                                    {aiProviderStatus?.detail && (
+                                        <div className={styles.aiProviderDetail}>{aiProviderStatus.detail}</div>
+                                    )}
+                                </div>
+
+                                <button className={styles.dropdownItem} onClick={configureAIProvider}>
+                                    <div className={styles.itemContent}>
+                                        <i className="codicon codicon-settings-gear" />
+                                        <span>{t('Configure AI Provider')}</span>
+                                    </div>
+                                </button>
+
+                                {aiProviderStatus?.canSelectModel && (
+                                    <button className={styles.dropdownItem} onClick={selectCopilotModel}>
+                                        <div className={styles.itemContent}>
+                                            <i className="codicon codicon-list-selection" />
+                                            <span>{t('Select Copilot Model')}</span>
+                                        </div>
+                                    </button>
+                                )}
+
+                                <button className={styles.dropdownItem} onClick={handleTestAIProvider} disabled={isTestingProvider}>
+                                    <div className={styles.itemContent}>
+                                        <i className={`codicon ${isTestingProvider ? 'codicon-loading codicon-modifier-spin' : 'codicon-debug-start'}`} />
+                                        <span>{isTestingProvider ? t('Testing...') : t('Test Provider')}</span>
+                                    </div>
+                                </button>
+
+                                <button className={styles.dropdownItem} onClick={openCommitPromptSettings}>
+                                    <div className={styles.itemContent}>
+                                        <i className="codicon codicon-edit" />
+                                        <span>{t('Edit Commit Prompt')}</span>
+                                    </div>
+                                </button>
+
+                                {aiNotice && (
+                                    <div className={`${styles.aiNotice} ${aiNotice.ok ? styles.aiNoticeSuccess : styles.aiNoticeError}`}>
+                                        {aiNotice.message}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 {(addedCount > 0 || modifiedCount > 0 || deletedCount > 0) && (
@@ -203,6 +362,13 @@ export const CommitForm: React.FC<CommitFormProps> = ({
                     </div>
                 )}
             </div>
+
+            {selectedFiles.length === 0 && (
+                <div className={styles.aiHint}>
+                    <i className="codicon codicon-info" />
+                    <span>{t('Select changes to generate a commit message.')}</span>
+                </div>
+            )}
 
             <textarea
                 value={message}
@@ -258,9 +424,14 @@ export const CommitForm: React.FC<CommitFormProps> = ({
                 <div className={styles.errorMessage}>
                     <i className="codicon codicon-warning"></i>
                     <span>{error}</span>
+                    {errorAction && (
+                        <button className={styles.errorActionBtn} onClick={handleErrorAction}>
+                            {errorAction === 'selectCopilotModel' ? t('Select Copilot Model') : t('Configure AI Provider')}
+                        </button>
+                    )}
                     <button
                         className={styles.dismissBtn}
-                        onClick={() => setError(null)}
+                        onClick={clearError}
                         title={t('Dismiss')}
                     >
                         <i className="codicon codicon-close"></i>

@@ -1,6 +1,13 @@
 import * as vscode from 'vscode';
 import { i18n } from '../utils/i18n';
-import { AiProvider } from '../services/ai';
+import {
+    AiProvider,
+    DEFAULT_COPILOT_MODEL,
+    DEFAULT_CUSTOM_OPENAI_API_URL,
+    DEFAULT_CUSTOM_OPENAI_MODEL,
+    DEFAULT_GOOGLE_API_URL,
+    DEFAULT_GOOGLE_MODEL
+} from '../services/ai';
 import { getAiApiKey, setAiApiKey, type SecretBackedAiProvider } from '../utils/aiSecrets';
 
 interface CopilotModelPickItem extends vscode.QuickPickItem {
@@ -21,7 +28,6 @@ interface ProviderActionPickItem extends vscode.QuickPickItem {
     action: 'setCurrent' | 'setApiKey' | 'clearApiKey' | 'changeModel' | 'changeApiUrl' | 'openSettingsJson';
 }
 
-const DEFAULT_COPILOT_MODEL = 'gpt-5-mini';
 const SECRET_BACKED_PROVIDERS: SecretBackedAiProvider[] = ['anthropic', 'google', 'custom'];
 
 export function registerAiCommands(context: vscode.ExtensionContext) {
@@ -365,11 +371,11 @@ function getProviderApiUrl(provider: SecretBackedAiProvider): string {
 
 function getProviderDefaultModel(provider: SecretBackedAiProvider): string {
     if (provider === AiProvider.Google) {
-        return 'gemini-1.5-flash';
+        return DEFAULT_GOOGLE_MODEL;
     }
 
     if (provider === AiProvider.OpenAi) {
-        return 'gpt-3.5-turbo';
+        return DEFAULT_CUSTOM_OPENAI_MODEL;
     }
 
     return '';
@@ -377,11 +383,11 @@ function getProviderDefaultModel(provider: SecretBackedAiProvider): string {
 
 function getProviderDefaultApiUrl(provider: SecretBackedAiProvider): string {
     if (provider === AiProvider.Google) {
-        return 'https://generativelanguage.googleapis.com';
+        return DEFAULT_GOOGLE_API_URL;
     }
 
     if (provider === AiProvider.OpenAi) {
-        return 'https://api.openai.com/v1';
+        return DEFAULT_CUSTOM_OPENAI_API_URL;
     }
 
     return '';

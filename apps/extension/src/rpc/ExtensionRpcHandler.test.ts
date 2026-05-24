@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ExtensionRpcHandler } from './ExtensionRpcHandler';
 import { GitReadRpcHandler } from './GitReadRpcHandler';
 import type { ChangelistState } from '@shared/messages';
@@ -14,7 +14,21 @@ const vscodeTestMock = vscodeMock as unknown as {
     __setWarningMessageResponse(value: unknown): void;
     __getWarningMessages(): Array<{ message: string; args: unknown[] }>;
     __resetWindowMessages(): void;
+    __setLanguageModels(models: unknown[]): void;
+    __resetLanguageModels(): void;
 };
+
+function createTextStream(text: string): AsyncIterable<string> {
+    return {
+        async *[Symbol.asyncIterator]() {
+            yield text;
+        }
+    };
+}
+
+afterEach(() => {
+    vscodeTestMock.__resetLanguageModels();
+});
 
 function createStagedChangelistState(): ChangelistState {
     return {
@@ -448,6 +462,61 @@ describe('ExtensionRpcHandler no repository state', () => {
             command: 'intelli-git.ai.configureProvider',
             args: []
         });
+    });
+});
+
+describe('ExtensionRpcHandler AI provider', () => {
+    it('reports the default Copilot provider and model', async () => {
+        const handler = createNoRepoHandler();
+
+        await expect(handler.getAIProviderStatus()).resolves.toMatchObject({
+            provider: 'copilot',
+            label: 'Copilot',
+            model: 'gpt-5-mini',
+            isConfigured: true,
+            canSelectModel: true
+        });
+    });
+
+    it('tests the selected provider with the configured model', async () => {
+        const sendRequest = vi.fn().mockResolvedValue({
+            text: createTextStream('OK')
+        });
+        vscodeTestMock.__setLanguageModels([{
+            id: 'gpt-5-mini',
+            name: 'GPT-5 mini',
+            family: 'gpt-5-mini',
+            vendor: 'copilot',
+            sendRequest
+        }]);
+        const handler = createNoRepoHandler();
+
+        await expect(handler.testAIProvider()).resolves.toMatchObject({
+            ok: true
+        });
+        expect(sendRequest).toHaveBeenCalledOnce();
+    });
+
+    it('returns provider test failures without throwing', async () => {
+        const handler = createNoRepoHandler();
+
+        await expect(handler.testAIProvider()).resolves.toMatchObject({
+            ok: false,
+            message: 'extension.noCopilotModelsAvailable'
+        });
+    });
+
+    it('opens AI configuration commands from the provider menu', async () => {
+        vscodeTestMock.__resetExecutedCommands();
+        const handler = createNoRepoHandler();
+
+        await handler.selectCopilotModel();
+        await handler.openCommitPromptSettings();
+
+        expect(vscodeTestMock.__getExecutedCommands()).toEqual([
+            { command: 'intelli-git.ai.selectCopilotModel', args: [] },
+            { command: 'intelli-git.ai.openCommitPromptSettings', args: [] }
+        ]);
     });
 });
 

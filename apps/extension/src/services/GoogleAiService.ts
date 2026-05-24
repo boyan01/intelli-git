@@ -3,6 +3,7 @@ import * as https from 'https';
 import * as http from 'http';
 import { i18n } from '../utils/i18n';
 import { logger } from '../utils/logger';
+import { DEFAULT_GOOGLE_API_URL, DEFAULT_GOOGLE_MODEL } from './ai';
 
 interface GoogleMessagePart {
     text: string;
@@ -255,10 +256,10 @@ export class GoogleAiService {
         let apiUrl = config.get<string>('apiUrl', '');
 
         if (!model) {
-            model = 'gemini-1.5-flash';
+            model = DEFAULT_GOOGLE_MODEL;
         }
         if (!apiUrl) {
-            apiUrl = 'https://generativelanguage.googleapis.com';
+            apiUrl = DEFAULT_GOOGLE_API_URL;
         }
 
         if (!apiKey) {

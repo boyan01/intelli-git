@@ -2,6 +2,10 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import { RpcPeer } from '@shared/rpc';
+import {
+    AI_COPILOT_MODEL_UNAVAILABLE_CODE,
+    AI_PROVIDER_SETUP_REQUIRED_CODE
+} from '@shared/messages';
 import type {
     WebviewMethods,
     ExtensionMethods,
@@ -13,7 +17,10 @@ import type {
     RepositoryCommitViewState,
     RepositoryFileReference,
     PushTarget,
-    PushResult
+    PushResult,
+    AiProviderStatus,
+    AiProviderTestResult,
+    AiProviderId
 } from '@shared/messages';
 import { GitService } from '../services/GitService';
 import { RepositoryManager } from '../services/RepositoryManager';
@@ -23,7 +30,15 @@ import { AnthropicService } from '../services/AnthropicService';
 import { GoogleAiService } from '../services/GoogleAiService';
 import { OpenAiService } from '../services/CustomOpenAiService';
 import { i18n } from '../utils/i18n';
-import { AiProvider, DEFAULT_COMMIT_MESSAGE_PROMPT } from '../services/ai';
+import {
+    AiProvider,
+    DEFAULT_COMMIT_MESSAGE_PROMPT,
+    DEFAULT_COPILOT_MODEL,
+    DEFAULT_CUSTOM_OPENAI_API_URL,
+    DEFAULT_CUSTOM_OPENAI_MODEL,
+    DEFAULT_GOOGLE_API_URL,
+    DEFAULT_GOOGLE_MODEL
+} from '../services/ai';
 import { logger } from '../utils/logger';
 import { getAiApiKey } from '../utils/aiSecrets';
 import { createRevisionContentUri, createStashContentUri } from '../utils/repositoryContentUri';
@@ -42,6 +57,13 @@ function normalizeExistingPath(filePath: string): string {
 
 function isRepositoryFileReference(value: FileReferenceInput): value is RepositoryFileReference {
     return typeof value === 'object' && value !== null && typeof value.path === 'string';
+}
+
+function createRpcError(message: string, code: string, data?: unknown): Error {
+    const error = new Error(message) as Error & { code?: string; data?: unknown };
+    error.code = code;
+    error.data = data;
+    return error;
 }
 
 export interface ExtensionRpcHandlerOptions {
@@ -383,7 +405,11 @@ export class ExtensionRpcHandler {
                 stageAll: this.stageAll,
                 unstageAll: this.unstageAll,
                 stageTracked: this.stageTracked,
+                getAIProviderStatus: this.getAIProviderStatus,
                 generateCommitMessage: this.generateCommitMessage,
+                testAIProvider: this.testAIProvider,
+                selectCopilotModel: this.selectCopilotModel,
+                openCommitPromptSettings: this.openCommitPromptSettings,
                 stash: this.stash,
                 deleteFiles: this.deleteFiles,
                 rollback: this.rollback,
@@ -1035,6 +1061,14 @@ export class ExtensionRpcHandler {
         await vscode.commands.executeCommand('intelli-git.ai.configureProvider');
     };
 
+    selectCopilotModel = async (): Promise<void> => {
+        await vscode.commands.executeCommand('intelli-git.ai.selectCopilotModel');
+    };
+
+    openCommitPromptSettings = async (): Promise<void> => {
+        await vscode.commands.executeCommand('intelli-git.ai.openCommitPromptSettings');
+    };
+
     showErrorMessage = async (message: string): Promise<void> => {
         vscode.window.showErrorMessage(message);
     };
@@ -1100,6 +1134,47 @@ export class ExtensionRpcHandler {
             await this.gitService.resolveConflict(params.path, params.side);
         } catch (e) {
             vscode.window.showErrorMessage(i18n.t('extension.resolveConflictFailed', `${e}`));
+        }
+    };
+
+    getAIProviderStatus = async (): Promise<AiProviderStatus> => {
+        const provider = this.getCurrentAiProvider();
+        const model = this.getAiProviderModel(provider);
+        const configurationIssue = await this.getAiProviderConfigurationIssue(provider);
+
+        return {
+            provider,
+            label: this.getAiProviderLabel(provider),
+            model,
+            isConfigured: !configurationIssue,
+            canSelectModel: provider === AiProvider.Copilot,
+            detail: configurationIssue
+        };
+    };
+
+    testAIProvider = async (): Promise<AiProviderTestResult> => {
+        try {
+            const status = await this.getAIProviderStatus();
+            const model = await this.getAIModel();
+            const response = await model.sendRequest(
+                [vscode.LanguageModelChatMessage.User('Reply with OK to confirm Intelli Git can reach this AI provider.')],
+                {},
+                new vscode.CancellationTokenSource().token
+            );
+
+            for await (const _fragment of response.text) {
+                break;
+            }
+
+            return {
+                ok: true,
+                message: i18n.t('extension.aiProviderTestSucceeded', status.label, model.name || model.id)
+            };
+        } catch (e: any) {
+            return {
+                ok: false,
+                message: e?.message || String(e)
+            };
         }
     };
 
@@ -1171,14 +1246,107 @@ export class ExtensionRpcHandler {
         }
     };
 
-    private async getAIModel(): Promise<vscode.LanguageModelChat> {
+    private getCurrentAiProvider(): AiProviderId {
         const provider = vscode.workspace.getConfiguration('intelli-git.ai').get<string>('provider', AiProvider.Copilot);
+        if (
+            provider === AiProvider.Copilot ||
+            provider === AiProvider.Anthropic ||
+            provider === AiProvider.Google ||
+            provider === AiProvider.OpenAi
+        ) {
+            return provider;
+        }
+
+        return AiProvider.Copilot;
+    }
+
+    private getAiProviderLabel(provider: AiProviderId): string {
+        if (provider === AiProvider.Copilot) {
+            return 'Copilot';
+        }
+
+        if (provider === AiProvider.Anthropic) {
+            return 'Anthropic';
+        }
+
+        if (provider === AiProvider.Google) {
+            return 'Google';
+        }
+
+        return 'Custom OpenAI-Compatible';
+    }
+
+    private getAiProviderModel(provider: AiProviderId): string {
+        if (provider === AiProvider.Copilot) {
+            return vscode.workspace.getConfiguration('intelli-git.ai.copilot').get<string>('model', DEFAULT_COPILOT_MODEL);
+        }
+
+        const configuredModel = vscode.workspace.getConfiguration(`intelli-git.ai.${provider}`).get<string>('model', '');
+        if (configuredModel) {
+            return configuredModel;
+        }
+
+        if (provider === AiProvider.Google) {
+            return DEFAULT_GOOGLE_MODEL;
+        }
+
+        if (provider === AiProvider.OpenAi) {
+            return DEFAULT_CUSTOM_OPENAI_MODEL;
+        }
+
+        return '';
+    }
+
+    private getAiProviderApiUrl(provider: AiProviderId): string {
+        if (provider === AiProvider.Copilot) {
+            return '';
+        }
+
+        const configuredApiUrl = vscode.workspace.getConfiguration(`intelli-git.ai.${provider}`).get<string>('apiUrl', '');
+        if (configuredApiUrl) {
+            return configuredApiUrl;
+        }
+
+        if (provider === AiProvider.Google) {
+            return DEFAULT_GOOGLE_API_URL;
+        }
+
+        if (provider === AiProvider.OpenAi) {
+            return DEFAULT_CUSTOM_OPENAI_API_URL;
+        }
+
+        return '';
+    }
+
+    private async getAiProviderConfigurationIssue(provider: AiProviderId): Promise<string | undefined> {
+        if (provider === AiProvider.Copilot || provider === AiProvider.OpenAi) {
+            return undefined;
+        }
+
+        const apiKey = await getAiApiKey(this.context, provider);
+        if (!apiKey) {
+            return i18n.t('extension.apiKeyMissing');
+        }
+
+        if (provider === AiProvider.Anthropic && !this.getAiProviderApiUrl(provider)) {
+            return i18n.t('extension.apiUrlMissing');
+        }
+
+        return undefined;
+    }
+
+    private async getAIModel(): Promise<vscode.LanguageModelChat> {
+        const provider = this.getCurrentAiProvider();
 
         if (provider === AiProvider.Anthropic) {
             const apiKey = await getAiApiKey(this.context, 'anthropic');
             const model = new AnthropicService().getModel(apiKey);
             if (!model) {
-                throw new Error(apiKey ? i18n.t('extension.anthropicApiUrlMissing') : i18n.t('extension.anthropicApiKeyMissing'));
+                throw createRpcError(
+                    apiKey ? i18n.t('extension.anthropicApiUrlMissing') : i18n.t('extension.anthropicApiKeyMissing'),
+                    AI_PROVIDER_SETUP_REQUIRED_CODE,
+                    { provider, action: 'configure' }
+                );
             }
             return model;
         }
@@ -1187,7 +1355,11 @@ export class ExtensionRpcHandler {
             const apiKey = await getAiApiKey(this.context, 'google');
             const model = new GoogleAiService().getModel(apiKey);
             if (!model) {
-                throw new Error(i18n.t('extension.googleApiKeyMissing'));
+                throw createRpcError(
+                    i18n.t('extension.googleApiKeyMissing'),
+                    AI_PROVIDER_SETUP_REQUIRED_CODE,
+                    { provider, action: 'configure' }
+                );
             }
             return model;
         }
@@ -1196,14 +1368,18 @@ export class ExtensionRpcHandler {
             const apiKey = await getAiApiKey(this.context, 'custom');
             const model = new OpenAiService().getModel(apiKey);
             if (!model) {
-                throw new Error(i18n.t('extension.noAIModel')); // generic error or specific custom one if added
+                throw createRpcError(
+                    i18n.t('extension.noAIModel'),
+                    AI_PROVIDER_SETUP_REQUIRED_CODE,
+                    { provider, action: 'configure' }
+                );
             }
             return model;
         }
 
         // Default: use Copilot
         const preferredCopilotModel = this.normalizeModelIdentifier(
-            vscode.workspace.getConfiguration('intelli-git.ai.copilot').get<string>('model', 'gpt-5-mini')
+            vscode.workspace.getConfiguration('intelli-git.ai.copilot').get<string>('model', DEFAULT_COPILOT_MODEL)
         );
 
         const copilotModels = await vscode.lm.selectChatModels({ vendor: 'copilot' });
@@ -1218,11 +1394,19 @@ export class ExtensionRpcHandler {
         });
 
         if (!model && copilotModels.length > 0) {
-            throw new Error(`The configured GitHub Copilot model "${preferredCopilotModel}" is not currently available. Please select an available model in Intelli Git settings or run "Intelli: Select Copilot Model".`);
+            throw createRpcError(
+                i18n.t('extension.copilotModelUnavailable', preferredCopilotModel),
+                AI_COPILOT_MODEL_UNAVAILABLE_CODE,
+                { provider, action: 'selectCopilotModel' }
+            );
         }
 
         if (!model) {
-            throw new Error('No GitHub Copilot model is currently available. Please ensure GitHub Copilot Chat is installed and enabled.');
+            throw createRpcError(
+                i18n.t('extension.noCopilotModelsAvailable'),
+                AI_PROVIDER_SETUP_REQUIRED_CODE,
+                { provider, action: 'configure' }
+            );
         }
 
         logger.info('Using copilot AI model:', model.id, model.name, model.vendor);

@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as https from 'https';
 import * as http from 'http';
 import { i18n } from '../utils/i18n';
+import { DEFAULT_CUSTOM_OPENAI_API_URL, DEFAULT_CUSTOM_OPENAI_MODEL } from './ai';
 
 interface OpenAiMessage {
     role: 'user' | 'assistant' | 'system';
@@ -204,11 +205,11 @@ export class OpenAiService {
         let apiUrl = config.get<string>('apiUrl', '');
 
         if (!model) {
-            model = 'gpt-3.5-turbo';
+            model = DEFAULT_CUSTOM_OPENAI_MODEL;
         }
 
         if (!apiUrl) {
-            apiUrl = 'https://api.openai.com/v1';
+            apiUrl = DEFAULT_CUSTOM_OPENAI_API_URL;
         }
 
         return new CustomOpenAiLanguageModel(model, apiKey, apiUrl);

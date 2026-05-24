@@ -3,6 +3,7 @@ const executedCommands: Array<{ command: string; args: unknown[] }> = [];
 const warningMessages: Array<{ message: string; args: unknown[] }> = [];
 const informationMessages: Array<{ message: string; args: unknown[] }> = [];
 const errorMessages: Array<{ message: string; args: unknown[] }> = [];
+let languageModels: unknown[] = [];
 let workspaceFoldersValue: Array<{ uri: MockUri; name: string; index: number }> | undefined;
 let warningMessageResponse: unknown;
 
@@ -30,7 +31,9 @@ export class EventEmitter<T> {
 }
 
 export const ConfigurationTarget = {
-    Workspace: 2
+    Global: 1,
+    Workspace: 2,
+    WorkspaceFolder: 3
 } as const;
 
 export const workspace = {
@@ -150,6 +153,38 @@ export const languages = {
     }
 };
 
+export const LanguageModelChatMessageRole = {
+    User: 1,
+    Assistant: 2
+} as const;
+
+export class LanguageModelTextPart {
+    constructor(public readonly value: string) { }
+}
+
+export const LanguageModelChatMessage = {
+    User(content: string) {
+        return {
+            role: LanguageModelChatMessageRole.User,
+            content
+        };
+    }
+};
+
+export class CancellationTokenSource {
+    public readonly token = {
+        isCancellationRequested: false
+    };
+
+    dispose(): void { }
+}
+
+export const lm = {
+    async selectChatModels(): Promise<unknown[]> {
+        return languageModels;
+    }
+};
+
 export const l10n = {
     t(message: string, ...args: Array<string | number | boolean>): string {
         return args.reduce<string>(
@@ -188,6 +223,14 @@ export function __resetWindowMessages(): void {
     informationMessages.length = 0;
     errorMessages.length = 0;
     warningMessageResponse = undefined;
+}
+
+export function __setLanguageModels(models: unknown[]): void {
+    languageModels = models;
+}
+
+export function __resetLanguageModels(): void {
+    languageModels = [];
 }
 
 export function __setWorkspaceFolders(paths: string[] | undefined): void {

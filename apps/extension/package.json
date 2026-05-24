@@ -1258,7 +1258,7 @@
         },
         "intelli-git.ai.custom.model": {
           "type": "string",
-          "default": "",
+          "default": "gpt-3.5-turbo",
           "description": "%intelli-git.config.ai.custom.model.description%"
         },
         "intelli-git.ai.custom.apiUrl": {
