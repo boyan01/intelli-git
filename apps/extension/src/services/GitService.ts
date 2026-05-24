@@ -1211,6 +1211,19 @@ export class GitService implements vscode.Disposable {
         }
     }
 
+    public async getStagedDiffForFiles(files: string[]): Promise<string> {
+        if (!files || files.length === 0) {
+            return '';
+        }
+
+        try {
+            const repoFiles = files.map(f => this.toRepoPath(f));
+            return await this.git.diff(['--cached', '--', ...repoFiles]);
+        } catch {
+            return '';
+        }
+    }
+
     /**
      * Get diff for specific files.
      * Uses `git diff HEAD -- <files>` to get changes relative to HEAD for modified/deleted files.

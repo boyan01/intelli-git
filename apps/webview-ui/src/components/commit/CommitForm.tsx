@@ -7,13 +7,20 @@ import {
     AI_COPILOT_MODEL_UNAVAILABLE_CODE,
     AI_PROVIDER_SETUP_REQUIRED_CODE,
     type AiProviderStatus,
+    type CommitMessageGenerationMode,
     type RepositoryFileReference,
     type RepositoryInfo
 } from '@shared/messages';
+import { applyGeneratedCommitMessage, type CommitMessageSelection } from './commitMessageUpdate';
 
 export interface CommitOptions {
     push: boolean;
     signOff: boolean;
+}
+
+interface PendingGeneration {
+    mode: CommitMessageGenerationMode;
+    selection?: CommitMessageSelection;
 }
 
 interface CommitFormProps {
@@ -63,7 +70,11 @@ export const CommitForm: React.FC<CommitFormProps> = ({
     const [isAiMenuOpen, setIsAiMenuOpen] = useState(false);
     const [isTestingProvider, setIsTestingProvider] = useState(false);
     const [aiNotice, setAiNotice] = useState<{ ok: boolean; message: string } | null>(null);
+    const [aiScope, setAiScope] = useState<{ fileCount: number; hunkCount: number; amend: boolean } | null>(null);
+    const [pendingGeneration, setPendingGeneration] = useState<PendingGeneration | null>(null);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const latestMessageRef = useRef(message);
     const dropdownRef = useRef<HTMLDivElement>(null);
     const aiDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -83,9 +94,18 @@ export const CommitForm: React.FC<CommitFormProps> = ({
         void loadAIProviderStatus();
     }, [loadAIProviderStatus]);
 
+    useEffect(() => {
+        latestMessageRef.current = message;
+    }, [message]);
+
+    useEffect(() => {
+        setAiScope(null);
+    }, [selectedFiles, amend]);
+
     const clearError = () => {
         setError(null);
         setErrorAction(null);
+        setPendingGeneration(null);
     };
 
     const configureAIProvider = async () => {
@@ -128,21 +148,86 @@ export const CommitForm: React.FC<CommitFormProps> = ({
         }
     };
 
-    const handleGenerateMessage = async () => {
+    const getMessageSelection = (): CommitMessageSelection => {
+        const textarea = textareaRef.current;
+        const start = textarea?.selectionStart ?? 0;
+        const end = textarea?.selectionEnd ?? start;
+        return { start, end };
+    };
+
+    const getSelectedMessageText = (selection: CommitMessageSelection): string => {
+        return message.slice(selection.start, selection.end);
+    };
+
+    const getGenerationConfirmationMessage = (mode: CommitMessageGenerationMode): string | null => {
+        if (mode === 'full' && message.trim()) {
+            return t('Generating a full commit message will replace the current message.');
+        }
+
+        if (mode === 'subject') {
+            const subject = message.split(/\r?\n/)[0]?.trim();
+            return subject ? t('Generating a subject will replace the current subject.') : null;
+        }
+
+        if (mode === 'body') {
+            const lineBreak = message.indexOf('\n');
+            const body = lineBreak === -1 ? '' : message.slice(lineBreak).trim();
+            return body ? t('Generating a body will replace the current body.') : null;
+        }
+
+        return null;
+    };
+
+    const handleGenerateMessage = async (
+        mode: CommitMessageGenerationMode = 'full',
+        confirmed = false,
+        pendingSelection?: CommitMessageSelection
+    ) => {
         clearError();
         if (selectedFiles.length === 0) {
             setError(t('Select changes to generate a commit message.'));
             return;
         }
 
+        const selection = pendingSelection || getMessageSelection();
+        const selectedText = mode === 'rewrite' ? getSelectedMessageText(selection) : undefined;
+        if (mode === 'rewrite' && !selectedText?.trim()) {
+            setError(t('Select commit message text to rewrite.'));
+            return;
+        }
+
+        const confirmationMessage = confirmed ? null : getGenerationConfirmationMessage(mode);
+        if (confirmationMessage) {
+            setPendingGeneration({ mode, selection });
+            setError(confirmationMessage);
+            return;
+        }
+
+        const requestMessage = message;
         setIsGenerating(true);
         try {
-            const msg = await rpc.generateCommitMessage(selectedFiles);
-            if (!msg.trim()) {
+            const result = await rpc.generateCommitMessage({
+                files: selectedFiles,
+                mode,
+                currentMessage: requestMessage,
+                selectedText,
+                amend
+            });
+            if (!result.message.trim()) {
                 setError(t('Select changes to generate a commit message.'));
                 return;
             }
-            onMessageChange(msg);
+            if (latestMessageRef.current !== requestMessage) {
+                setError(t('Commit message changed while AI was generating. Run generation again.'));
+                return;
+            }
+            onMessageChange(applyGeneratedCommitMessage(requestMessage, result.message, result.mode, selection));
+            setAiScope({
+                fileCount: result.fileCount,
+                hunkCount: result.hunkCount,
+                amend
+            });
+            setIsAiMenuOpen(false);
         } catch (e) {
             const errMsg = e instanceof Error ? e.message : String(e);
             setError(t('Generate failed: {{message}}', { message: errMsg }));
@@ -154,6 +239,14 @@ export const CommitForm: React.FC<CommitFormProps> = ({
         } finally {
             setIsGenerating(false);
         }
+    };
+
+    const confirmPendingGeneration = () => {
+        if (!pendingGeneration) {
+            return;
+        }
+
+        void handleGenerateMessage(pendingGeneration.mode, true, pendingGeneration.selection);
     };
 
     const handleCommit = async () => {
@@ -249,6 +342,15 @@ export const CommitForm: React.FC<CommitFormProps> = ({
     const pushTargetNeedsReview = !pushTarget?.isConfirmed;
     const aiProviderLabel = aiProviderStatus?.label || t('Loading...');
     const aiProviderModel = aiProviderStatus?.model || t('Not set');
+    const aiScopeLabel = selectedFiles.length > 0
+        ? aiScope
+            ? aiScope.amend
+                ? t('Amend AI scope: {{files}} files, {{hunks}} change blocks', { files: aiScope.fileCount, hunks: aiScope.hunkCount })
+                : t('AI scope: {{files}} files, {{hunks}} change blocks', { files: aiScope.fileCount, hunks: aiScope.hunkCount })
+            : amend
+                ? t('Amend AI scope: {{files}} selected files', { files: selectedFiles.length })
+                : t('AI scope: {{files}} selected files', { files: selectedFiles.length })
+        : null;
 
     return (
         <div className={styles.commitSection}>
@@ -278,7 +380,7 @@ export const CommitForm: React.FC<CommitFormProps> = ({
                     >
                         <button
                             className={`${styles.iconBtn} ${styles.generateBtn} ${isGenerating ? styles.generateBtnLoading : ''}`}
-                            onClick={handleGenerateMessage}
+                            onClick={() => void handleGenerateMessage('full')}
                             disabled={isGenerating || selectedFiles.length === 0}
                             title={t('Generate')}
                         >
@@ -297,6 +399,28 @@ export const CommitForm: React.FC<CommitFormProps> = ({
 
                         {isAiMenuOpen && (
                             <div className={styles.aiDropdown}>
+                                <div className={styles.dropdownHeader}>
+                                    {t('Generate Message')}
+                                </div>
+                                <button className={styles.dropdownItem} onClick={() => void handleGenerateMessage('subject')} disabled={isGenerating || selectedFiles.length === 0}>
+                                    <div className={styles.itemContent}>
+                                        <i className="codicon codicon-sparkle" />
+                                        <span>{t('Generate Subject')}</span>
+                                    </div>
+                                </button>
+                                <button className={styles.dropdownItem} onClick={() => void handleGenerateMessage('body')} disabled={isGenerating || selectedFiles.length === 0}>
+                                    <div className={styles.itemContent}>
+                                        <i className="codicon codicon-list-unordered" />
+                                        <span>{t('Generate Body')}</span>
+                                    </div>
+                                </button>
+                                <button className={styles.dropdownItem} onClick={() => void handleGenerateMessage('rewrite')} disabled={isGenerating || selectedFiles.length === 0}>
+                                    <div className={styles.itemContent}>
+                                        <i className="codicon codicon-edit" />
+                                        <span>{t('Rewrite Selection')}</span>
+                                    </div>
+                                </button>
+
                                 <div className={styles.dropdownHeader}>
                                     {t('AI Provider')}
                                 </div>
@@ -370,7 +494,15 @@ export const CommitForm: React.FC<CommitFormProps> = ({
                 </div>
             )}
 
+            {aiScopeLabel && (
+                <div className={styles.aiHint}>
+                    <i className="codicon codicon-symbol-event" />
+                    <span>{aiScopeLabel}</span>
+                </div>
+            )}
+
             <textarea
+                ref={textareaRef}
                 value={message}
                 onChange={(e) => onMessageChange(e.target.value)}
                 placeholder={t('Commit Message')}
@@ -424,6 +556,11 @@ export const CommitForm: React.FC<CommitFormProps> = ({
                 <div className={styles.errorMessage}>
                     <i className="codicon codicon-warning"></i>
                     <span>{error}</span>
+                    {pendingGeneration && (
+                        <button className={styles.errorActionBtn} onClick={confirmPendingGeneration}>
+                            {t('Replace')}
+                        </button>
+                    )}
                     {errorAction && (
                         <button className={styles.errorActionBtn} onClick={handleErrorAction}>
                             {errorAction === 'selectCopilotModel' ? t('Select Copilot Model') : t('Configure AI Provider')}

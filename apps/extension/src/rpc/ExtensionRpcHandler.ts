@@ -20,7 +20,10 @@ import type {
     PushResult,
     AiProviderStatus,
     AiProviderTestResult,
-    AiProviderId
+    AiProviderId,
+    CommitMessageGenerationMode,
+    CommitMessageGenerationRequest,
+    CommitMessageGenerationResult
 } from '@shared/messages';
 import { GitService } from '../services/GitService';
 import { RepositoryManager } from '../services/RepositoryManager';
@@ -64,6 +67,37 @@ function createRpcError(message: string, code: string, data?: unknown): Error {
     error.code = code;
     error.data = data;
     return error;
+}
+
+function countDiffFiles(diff: string): number {
+    return diff.match(/^diff --git /gm)?.length || 0;
+}
+
+function countDiffHunks(diff: string): number {
+    return diff.match(/^@@ /gm)?.length || 0;
+}
+
+function createCommitMessageGenerationPrompt(
+    basePrompt: string,
+    mode: CommitMessageGenerationMode,
+    amend: boolean | undefined
+): string {
+    const scope = amend ? 'the current amend selection' : 'the selected changes';
+    const modeInstruction = (() => {
+        switch (mode) {
+            case 'subject':
+                return `Generate only the commit subject line for ${scope}. Keep it concise. Do not include a body, markdown, bullets, or code fences.`;
+            case 'body':
+                return `Generate only the commit message body for ${scope}. Do not include a subject line, markdown code fences, or trailers.`;
+            case 'rewrite':
+                return 'Rewrite only the provided selected commit message text. Preserve its intent and scope, improve clarity, and return only the replacement text.';
+            case 'full':
+            default:
+                return `Generate a complete commit message for ${scope}. Return only the commit message text without markdown code fences.`;
+        }
+    })();
+
+    return `${basePrompt}\n\n${modeInstruction}`;
 }
 
 export interface ExtensionRpcHandlerOptions {
@@ -1178,9 +1212,11 @@ export class ExtensionRpcHandler {
         }
     };
 
-    generateCommitMessage = async (files?: FileReferenceInput[]): Promise<string> => {
+    generateCommitMessage = async (request?: CommitMessageGenerationRequest): Promise<CommitMessageGenerationResult> => {
         try {
             let diff = '';
+            const files = request?.files;
+            const mode = request?.mode || 'full';
 
             if (files && files.length > 0) {
                 const parts: string[] = [];
@@ -1195,7 +1231,7 @@ export class ExtensionRpcHandler {
                         const plan = gitService.changelistStateService?.buildCommitPlan(status, repoFiles);
                         repoDiff = plan ? await gitService.getDiffForChangelistPlan(plan, status) : '';
                     } else {
-                        repoDiff = await gitService.getDiffForFiles(repoFiles);
+                        repoDiff = await gitService.getStagedDiffForFiles(repoFiles);
                     }
 
                     if (repoDiff) {
@@ -1216,7 +1252,12 @@ export class ExtensionRpcHandler {
             }
 
             if (!diff) {
-                return '';
+                return {
+                    message: '',
+                    mode,
+                    fileCount: 0,
+                    hunkCount: 0
+                };
             }
 
             const model = await this.getAIModel();
@@ -1226,9 +1267,18 @@ export class ExtensionRpcHandler {
                 .trim() || DEFAULT_COMMIT_MESSAGE_PROMPT;
 
             const messages = [
-                vscode.LanguageModelChatMessage.User(commitPrompt),
-                vscode.LanguageModelChatMessage.User(diff)
+                vscode.LanguageModelChatMessage.User(createCommitMessageGenerationPrompt(commitPrompt, mode, request?.amend))
             ];
+            const selectedText = request?.selectedText?.trim();
+            const currentMessage = request?.currentMessage?.trim();
+
+            if (mode === 'rewrite' && selectedText) {
+                messages.push(vscode.LanguageModelChatMessage.User(`Selected commit message text:\n${selectedText}`));
+            } else if (currentMessage) {
+                messages.push(vscode.LanguageModelChatMessage.User(`Current commit message:\n${currentMessage}`));
+            }
+
+            messages.push(vscode.LanguageModelChatMessage.User(`Diff:\n${diff}`));
 
             logger.debug('Generating commit message:', diff.length);
             const response = await model.sendRequest(messages, {}, new vscode.CancellationTokenSource().token);
@@ -1239,7 +1289,12 @@ export class ExtensionRpcHandler {
                 fullMessage += fragment;
             }
             logger.debug('Generated commit message:', fullMessage);
-            return fullMessage.trim();
+            return {
+                message: fullMessage.trim(),
+                mode,
+                fileCount: countDiffFiles(diff),
+                hunkCount: countDiffHunks(diff)
+            };
         } catch (e) {
             logger.error('Error generating commit message:', e);
             throw e;

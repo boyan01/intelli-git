@@ -518,6 +518,54 @@ describe('ExtensionRpcHandler AI provider', () => {
             { command: 'intelli-git.ai.openCommitPromptSettings', args: [] }
         ]);
     });
+
+    it('generates scoped commit messages with diff metadata', async () => {
+        const diff = [
+            'diff --git a/src/file.ts b/src/file.ts',
+            '--- a/src/file.ts',
+            '+++ b/src/file.ts',
+            '@@ -1 +1 @@',
+            '-old',
+            '+new'
+        ].join('\n');
+        const sendRequest = vi.fn().mockResolvedValue({
+            text: createTextStream('Refine AI scoped generation')
+        });
+        const getStagedDiffForFiles = vi.fn().mockResolvedValue(diff);
+        const getDiffForFiles = vi.fn();
+        vscodeTestMock.__setLanguageModels([{
+            id: 'gpt-5-mini',
+            name: 'GPT-5 mini',
+            family: 'gpt-5-mini',
+            vendor: 'copilot',
+            sendRequest
+        }]);
+        const handler = createHandler({
+            getStagedDiffForFiles,
+            getDiffForFiles
+        });
+
+        await expect(handler.generateCommitMessage({
+            files: ['src/file.ts'],
+            mode: 'subject',
+            currentMessage: 'Old subject\n\nExisting body',
+            amend: true
+        })).resolves.toEqual({
+            message: 'Refine AI scoped generation',
+            mode: 'subject',
+            fileCount: 1,
+            hunkCount: 1
+        });
+
+        expect(getStagedDiffForFiles).toHaveBeenCalledWith(['src/file.ts']);
+        expect(getDiffForFiles).not.toHaveBeenCalled();
+        const messages = sendRequest.mock.calls[0][0] as Array<{ content: string }>;
+        const prompt = messages.map(message => message.content).join('\n');
+        expect(prompt).toContain('Generate only the commit subject line for the current amend selection.');
+        expect(prompt).toContain('Current commit message:\nOld subject\n\nExisting body');
+        expect(prompt).toContain('Diff:\n');
+        expect(prompt).toContain('+new');
+    });
 });
 
 describe('ExtensionRpcHandler openDiff', () => {

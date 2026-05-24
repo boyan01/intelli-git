@@ -39,6 +39,23 @@ export interface AiProviderTestResult {
 export const AI_PROVIDER_SETUP_REQUIRED_CODE = 'AI_PROVIDER_SETUP_REQUIRED';
 export const AI_COPILOT_MODEL_UNAVAILABLE_CODE = 'AI_COPILOT_MODEL_UNAVAILABLE';
 
+export type CommitMessageGenerationMode = 'full' | 'subject' | 'body' | 'rewrite';
+
+export interface CommitMessageGenerationRequest {
+    files?: FileReferenceInput[];
+    mode?: CommitMessageGenerationMode;
+    currentMessage?: string;
+    selectedText?: string;
+    amend?: boolean;
+}
+
+export interface CommitMessageGenerationResult {
+    message: string;
+    mode: CommitMessageGenerationMode;
+    fileCount: number;
+    hunkCount: number;
+}
+
 export interface GitHunk {
     id: string; // File path + change block signature (e.g., oldStart/newStart/content hash)
     lineRange: string; // e.g., "L10-20"
@@ -278,7 +295,7 @@ export interface ExtensionMethods {
     unstageAll: () => Promise<void>;
     stageTracked: () => Promise<void>;
     getAIProviderStatus: () => Promise<AiProviderStatus>;
-    generateCommitMessage: (files?: FileReferenceInput[]) => Promise<string>;
+    generateCommitMessage: (request?: CommitMessageGenerationRequest) => Promise<CommitMessageGenerationResult>;
     testAIProvider: () => Promise<AiProviderTestResult>;
     selectCopilotModel: () => Promise<void>;
     openCommitPromptSettings: () => Promise<void>;

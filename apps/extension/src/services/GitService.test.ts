@@ -456,6 +456,64 @@ describe('GitService staging inactive changes', () => {
         expect(worktreeDiff).toContain('ten unstaged');
     });
 
+    it('returns only indexed changes when building a staged scoped diff', async () => {
+        fs.writeFileSync(path.join(tempDir, 'partial.txt'), [
+            'one',
+            'two',
+            'three',
+            'four',
+            'five',
+            'six',
+            'seven',
+            'eight',
+            'nine',
+            'ten',
+            'eleven',
+            'twelve',
+            ''
+        ].join('\n'));
+        await git.add('partial.txt');
+        await git.commit('Initial commit');
+
+        fs.writeFileSync(path.join(tempDir, 'partial.txt'), [
+            'one staged',
+            'two',
+            'three',
+            'four',
+            'five',
+            'six',
+            'seven',
+            'eight',
+            'nine',
+            'ten unstaged',
+            'eleven',
+            'twelve',
+            ''
+        ].join('\n'));
+
+        const partialPatch = path.join(tempDir, 'partial.patch');
+        fs.writeFileSync(partialPatch, [
+            'diff --git a/partial.txt b/partial.txt',
+            'index 1111111..2222222 100644',
+            '--- a/partial.txt',
+            '+++ b/partial.txt',
+            '@@ -1,4 +1,4 @@',
+            '-one',
+            '+one staged',
+            ' two',
+            ' three',
+            ' four',
+            ''
+        ].join('\n'));
+        await git.raw(['apply', '--cached', partialPatch]);
+
+        const service = new GitService(tempDir, tempDir, git);
+        const diff = await service.getStagedDiffForFiles(['partial.txt']);
+
+        expect(diff).toContain('+one staged');
+        expect(diff).not.toContain('ten unstaged');
+    });
+
     it('amends only the message when files is an empty array', async () => {
         fs.writeFileSync(path.join(tempDir, 'initial.txt'), 'initial\n');
         await git.add('initial.txt');
