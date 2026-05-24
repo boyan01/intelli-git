@@ -450,6 +450,230 @@
           "when": "false"
         },
         {
+          "command": "intelli-git.repository.removeFromWorkspace",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.worktrees.toggleDrawer",
+          "when": "intelli-git.hasActiveRepository"
+        },
+        {
+          "command": "intelli-git.openLogAtCurrentBlame",
+          "when": "intelli-git.hasActiveRepository"
+        },
+        {
+          "command": "intelli-git.showFileHistory",
+          "when": "intelli-git.hasActiveRepository"
+        },
+        {
+          "command": "intelli-git.branch.create",
+          "when": "intelli-git.hasActiveRepository"
+        },
+        {
+          "command": "intelli-git.changelist.createList",
+          "when": "intelli-git.hasActiveRepository"
+        },
+        {
+          "command": "intelli-git.copyCommitHash",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.stashPop",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.stashApply",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.stashDrop",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.stashShowDiff",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.branch.checkout",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.branch.rebase",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.branch.merge",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.branch.rename",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.branch.delete",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.branch.pull",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.branch.push",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.branch.update",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.log.resetSoft",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.log.resetMixed",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.log.resetHard",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.log.checkout",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.log.openOnGitHub",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.log.createBranch",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.log.cherryPick",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.log.revert",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.log.undoCommit",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.log.editMessage",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.changelist.openFile",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.changelist.showDiff",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.changelist.rollback",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.changelist.stash",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.changelist.delete",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.changelist.markInactive",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.changelist.markActive",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.changelist.stage",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.changelist.unstage",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.changelist.acceptCurrent",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.changelist.acceptIncoming",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.copyAuthorEmail",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.sendAuthorEmail",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.log.file.showDiff",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.log.file.compareWithLocal",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.log.file.openRepositoryVersion",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.log.file.revertChanges",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.log.file.cherryPickChanges",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.log.file.createPatch",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.moveHunkToInactive",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.moveHunkToActive",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.changelist.renameList",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.changelist.deleteList",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.changelist.setActiveList",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.changelist.moveToList",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.revealCurrentChangeBlock",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.hunk.toggleInactive",
+          "when": "false"
+        },
+        {
           "command": "intelli-git.changelistMode.staged",
           "when": "false"
         },
