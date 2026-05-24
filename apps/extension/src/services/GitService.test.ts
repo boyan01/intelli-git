@@ -678,6 +678,22 @@ describe('GitService branch remote workflows', () => {
         expect(fs.readFileSync(path.join(tempDir, 'notes.txt'), 'utf8')).toBe('local only\n');
     });
 
+    it('summarizes tracked and untracked files for destructive operation previews', async () => {
+        await writeFileAndCommit('tracked.txt', 'base\n', 'Initial commit');
+        fs.writeFileSync(path.join(tempDir, 'tracked.txt'), 'changed\n');
+        fs.writeFileSync(path.join(tempDir, 'staged.txt'), 'staged\n');
+        await git.add('staged.txt');
+        fs.writeFileSync(path.join(tempDir, 'notes.txt'), 'untracked\n');
+
+        const service = new GitService(tempDir, tempDir, git);
+        const preview = await service.getLocalChangePreview();
+
+        expect(preview.trackedCount).toBe(2);
+        expect(preview.untrackedCount).toBe(1);
+        expect(preview.sampleFiles).toEqual(expect.arrayContaining(['staged.txt', 'tracked.txt']));
+        expect(preview.sampleFiles).not.toContain('notes.txt');
+    });
+
     it('merges through temporary stash and restores staged and untracked files', async () => {
         await writeFileAndCommit('base.txt', 'base\n', 'Initial commit');
         await git.branch(['-M', 'main']);

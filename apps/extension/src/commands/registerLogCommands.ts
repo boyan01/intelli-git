@@ -1,5 +1,33 @@
 import * as vscode from 'vscode';
 import { GitService } from '../services/GitService';
+import type { LocalChangePreview } from '../services/GitService';
+
+function formatSampleFiles(files: string[]): string[] {
+    if (files.length === 0) {
+        return [];
+    }
+
+    return [
+        vscode.l10n.t('Sample files:'),
+        ...files.map(file => `- ${file}`)
+    ];
+}
+
+function createResetHardPreviewMessage(hash: string, preview: LocalChangePreview): string {
+    const lines = [
+        vscode.l10n.t('Reset current branch to {0} (Hard)?', hash),
+        preview.trackedCount > 0
+            ? vscode.l10n.t('This will discard tracked local changes: {0} file(s).', preview.trackedCount)
+            : vscode.l10n.t('No tracked local changes will be discarded.'),
+        preview.untrackedCount > 0
+            ? vscode.l10n.t('Untracked files are not removed by reset --hard: {0} file(s).', preview.untrackedCount)
+            : undefined,
+        ...formatSampleFiles(preview.sampleFiles),
+        vscode.l10n.t('Recovery: use Git reflog to find the previous HEAD.')
+    ];
+
+    return lines.filter(Boolean).join('\n');
+}
 
 export function registerLogCommands(
     context: vscode.ExtensionContext,
@@ -68,7 +96,8 @@ export function registerLogCommands(
         vscode.commands.registerCommand('intelli-git.log.resetHard', async (arg) => {
             const hash = getCommitHash(arg);
             if (!hash) return;
-            if (await confirmAction(vscode.l10n.t('Reset current branch to {0} (Hard)?\nALL LOCAL CHANGES WILL BE LOST.', hash), vscode.l10n.t('Reset Hard'))) {
+            const preview = await gitService.getLocalChangePreview();
+            if (await confirmAction(createResetHardPreviewMessage(hash, preview), vscode.l10n.t('Reset Hard'))) {
                 try {
                     await gitService.branchRemote.reset('hard', hash);
                     vscode.window.showInformationMessage(vscode.l10n.t('Hard reset successful.'));
@@ -180,7 +209,7 @@ export function registerLogCommands(
             const isPushed = await gitService.branchRemote.isCommitPushed(hash);
             if (isPushed) {
                 vscode.window.showWarningMessage(
-                    vscode.l10n.t('Cannot undo commit {0}: it has already been pushed to remote.', hash)
+                    vscode.l10n.t('Cannot undo commit {0}: it has already been pushed to remote. Use Revert to create a safe inverse commit.', hash)
                 );
                 return;
             }

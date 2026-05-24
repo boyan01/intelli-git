@@ -2,6 +2,31 @@ import * as vscode from 'vscode';
 import { GitService } from '../services/GitService';
 import { GitLogViewProvider } from '../providers/GitLogViewProvider';
 import { handleCheckoutWorktreeConflict } from '../ui/checkoutWorktreeConflict';
+import type { CommitDetails } from '@shared/messages';
+
+function formatCommitSamples(commits: CommitDetails[]): string[] {
+    if (commits.length === 0) {
+        return [];
+    }
+
+    return [
+        vscode.l10n.t('Sample commits:'),
+        ...commits.map(commit => `- ${commit.shortHash} ${commit.subject}`)
+    ];
+}
+
+function createForceUpdatePreviewMessage(branch: string, remote: string, commitCount: number, sampleCommits: CommitDetails[]): string {
+    const lines = [
+        vscode.l10n.t('Branch {0} has diverged from {1}/{0}.', branch, remote),
+        commitCount > 0
+            ? vscode.l10n.t('Force update will discard {0} local commit(s).', commitCount)
+            : vscode.l10n.t('Force update may discard local commits.'),
+        ...formatCommitSamples(sampleCommits),
+        vscode.l10n.t('Recovery: use Git reflog for branch {0} to find the previous HEAD.', branch)
+    ];
+
+    return lines.join('\n');
+}
 
 export function registerBranchCommands(
     context: vscode.ExtensionContext,
@@ -220,8 +245,14 @@ export function registerBranchCommands(
                 } else {
                     const result = await gitService.branchRemote.updateBranch(branch, false);
                     if (result === 'diverged') {
+                        const remotes = await gitService.branchRemote.getRemotes();
+                        const remote = remotes.length > 0 ? remotes[0] : 'origin';
+                        const [commitCount, sampleCommits] = await Promise.all([
+                            gitService.branchRemote.getCommitsToPushCount(branch, remote, branch),
+                            gitService.branchRemote.getCommitsToPush(branch, remote, branch, { maxCount: 5 })
+                        ]);
                         const confirm = await vscode.window.showWarningMessage(
-                            vscode.l10n.t('Branch {0} has diverged from remote. Force update will discard local commits.', branch),
+                            createForceUpdatePreviewMessage(branch, remote, commitCount, sampleCommits),
                             { modal: true },
                             vscode.l10n.t('Force Update')
                         );

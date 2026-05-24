@@ -16,6 +16,12 @@ interface ExtensionGitStateSnapshot {
     changelists?: ChangelistStateSnapshot;
 }
 
+export interface LocalChangePreview {
+    trackedCount: number;
+    untrackedCount: number;
+    sampleFiles: string[];
+}
+
 const SIMPLE_GIT_UNSAFE_ENV_KEYS = new Set([
     'editor',
     'git_askpass',
@@ -404,6 +410,25 @@ export class GitService implements vscode.Disposable {
 
     public getGitRoot(): string {
         return this._gitRoot;
+    }
+
+    public async getLocalChangePreview(sampleLimit: number = 5): Promise<LocalChangePreview> {
+        const status = await this.getStatus();
+        const trackedFiles = new Map<string, FileStatus>();
+        for (const file of status) {
+            if (file.status !== '?' && !trackedFiles.has(file.path)) {
+                trackedFiles.set(file.path, file);
+            }
+        }
+        const untrackedFiles = status.filter(file => file.status === '?');
+
+        return {
+            trackedCount: trackedFiles.size,
+            untrackedCount: untrackedFiles.length,
+            sampleFiles: Array.from(trackedFiles.values())
+                .slice(0, sampleLimit)
+                .map(file => file.displayPath || file.path)
+        };
     }
 
     public getBlameCommitForLine = async (filePath: string, line: number): Promise<string | null> => {
