@@ -104,6 +104,9 @@ npm run test
 # Create a Marketplace-ready .vsix package
 npm run package:extension
 
+# Create an Open VSX-ready .vsix package
+npm run package:extension:open-vsx
+
 # Create a dev .vsix package
 npm run package:extension:dev
 ```
@@ -113,6 +116,9 @@ npm run package:extension:dev
 ```bash
 # Requires a Visual Studio Marketplace publisher and vsce login/PAT setup
 npm run publish:extension:marketplace
+
+# Requires OVSX_PAT for the Open VSX namespace
+npm run publish:extension:open-vsx
 ```
 
 ### Development Workflow

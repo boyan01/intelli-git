@@ -12,9 +12,11 @@
     "watch": "npm run watch --workspaces --if-present",
     "watch:extension": "concurrently -n \"extension,webview\" -c \"cyan,magenta\" \"npm run watch --workspace intelli-git\" \"npm run watch --workspace webview-ui\"",
     "package:extension": "INTELLI_GIT_BUILD_CHANNEL=marketplace npm run package --workspace=intelli-git",
+    "package:extension:open-vsx": "INTELLI_GIT_BUILD_CHANNEL=marketplace npm run package:open-vsx --workspace=intelli-git",
     "package:extension:dev": "INTELLI_GIT_BUILD_CHANNEL=dev MODE=dev npm run package:dev --workspace=intelli-git",
     "install:extension:dev": "INTELLI_GIT_BUILD_CHANNEL=dev MODE=dev npm run package:dev --workspace=intelli-git -- --install",
     "publish:extension:marketplace": "INTELLI_GIT_BUILD_CHANNEL=marketplace npm run publish:marketplace --workspace=intelli-git",
+    "publish:extension:open-vsx": "INTELLI_GIT_BUILD_CHANNEL=marketplace npm run publish:open-vsx --workspace=intelli-git",
     "lint": "npm run lint --workspaces --if-present",
     "test": "npm run test --workspaces --if-present"
   },
