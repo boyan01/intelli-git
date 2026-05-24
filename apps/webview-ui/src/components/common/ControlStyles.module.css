@@ -1,0 +1,239 @@
+.iconButton {
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 3px;
+    background: transparent;
+    color: var(--vscode-foreground);
+    cursor: pointer;
+}
+
+.iconButton:hover:not(:disabled) {
+    background: var(--vscode-toolbar-hoverBackground);
+}
+
+.iconButton:focus-visible {
+    outline: 1px solid var(--vscode-focusBorder);
+    outline-offset: -1px;
+}
+
+.iconButton:disabled {
+    opacity: 0.45;
+    color: var(--vscode-disabledForeground, var(--vscode-descriptionForeground));
+    cursor: not-allowed;
+}
+
+.iconButton:disabled:hover {
+    background: transparent;
+}
+
+.splitButton {
+    position: relative;
+    display: inline-flex;
+    width: 100%;
+    border-radius: 3px;
+    overflow: visible;
+}
+
+.splitMainButton {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border: none;
+    border-radius: 3px 0 0 3px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.15s ease, opacity 0.15s ease;
+}
+
+.splitMainButton:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.splitMainButton:focus-visible {
+    outline: 1px solid var(--vscode-focusBorder);
+    outline-offset: -1px;
+}
+
+.splitOptionsButton {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-left: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 0 3px 3px 0;
+    cursor: pointer;
+    transition: background-color 0.15s ease, filter 0.15s ease, opacity 0.15s ease;
+}
+
+.splitOptionsButton:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.splitOptionsButton:focus-visible {
+    outline: 1px solid var(--vscode-focusBorder);
+    outline-offset: -1px;
+}
+
+.buttonPrimary {
+    background-color: var(--vscode-button-background);
+    color: var(--vscode-button-foreground);
+}
+
+.buttonPrimary:hover:not(:disabled) {
+    background-color: var(--vscode-button-hoverBackground);
+}
+
+.buttonSecondary {
+    background-color: var(--vscode-button-secondaryBackground);
+    color: var(--vscode-button-secondaryForeground);
+}
+
+.buttonSecondary:hover:not(:disabled) {
+    background-color: var(--vscode-button-secondaryHoverBackground);
+}
+
+.chevron {
+    transition: transform 0.2s ease;
+    transform: rotate(180deg);
+}
+
+.chevronOpen {
+    transform: rotate(0deg);
+}
+
+.dropdownMenu {
+    position: absolute;
+    bottom: 100%;
+    right: 0;
+    width: auto;
+    background-color: var(--vscode-dropdown-background);
+    border: 1px solid var(--vscode-dropdown-border);
+    border-radius: 4px;
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.3);
+    z-index: 100;
+    overflow: hidden;
+}
+
+.dropdownHeader {
+    padding: 6px 10px 4px;
+    color: var(--vscode-descriptionForeground);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+.dropdownItem {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    border: none;
+    background: transparent;
+    color: var(--vscode-foreground);
+    font-size: 12px;
+    cursor: pointer;
+    transition: background-color 0.1s ease;
+}
+
+.dropdownItem:hover:not(:disabled) {
+    background-color: var(--vscode-list-hoverBackground);
+}
+
+.dropdownItem:focus-visible {
+    outline: 1px solid var(--vscode-focusBorder);
+    outline-offset: -1px;
+}
+
+.dropdownItem:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.dropdownItem:disabled:hover {
+    background: transparent;
+}
+
+.dropdownItemContent {
+    display: flex;
+    align-items: center;
+}
+
+.dropdownItemContent :global(.codicon) {
+    color: var(--vscode-descriptionForeground);
+}
+
+.dropdownItem:hover:not(:disabled) .dropdownItemContent :global(.codicon) {
+    color: var(--vscode-foreground);
+}
+
+.dropdownDivider {
+    margin: 4px 0;
+    border-top: 1px solid var(--vscode-dropdown-border);
+}
+
+.emptyState {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: var(--vscode-descriptionForeground);
+    text-align: center;
+}
+
+.emptyIcon {
+    color: var(--vscode-descriptionForeground);
+}
+
+.emptyTitle {
+    color: var(--vscode-foreground);
+    font-weight: 600;
+}
+
+.emptyDescription {
+    color: var(--vscode-descriptionForeground);
+    font-size: 12px;
+}
+
+.emptyActions {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.secondaryActionButton {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--vscode-button-border, transparent);
+    border-radius: 3px;
+    background: var(--vscode-button-secondaryBackground);
+    color: var(--vscode-button-secondaryForeground);
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.secondaryActionButton:hover:not(:disabled) {
+    background: var(--vscode-button-secondaryHoverBackground);
+}
+
+.secondaryActionButton:focus-visible {
+    outline: 1px solid var(--vscode-focusBorder);
+    outline-offset: 2px;
+}
+
+.secondaryActionButton:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}

@@ -87,21 +87,9 @@
 }
 
 .generateMenuBtn {
+    composes: iconButton from '../common/ControlStyles.module.css';
     width: 18px;
     height: 22px;
-    padding: 0;
-    background: transparent;
-    border: none;
-    color: var(--vscode-foreground);
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 3px;
-}
-
-.generateMenuBtn:hover {
-    background: var(--vscode-toolbar-hoverBackground);
 }
 
 .generateChevronOpen {
@@ -109,17 +97,14 @@
 }
 
 .aiDropdown {
-    position: absolute;
+    composes: dropdownMenu from '../common/ControlStyles.module.css';
     bottom: 100%;
+    right: auto;
     left: 0;
     width: 260px;
     max-height: 160px;
     margin-bottom: 4px;
-    background-color: var(--vscode-dropdown-background);
-    border: 1px solid var(--vscode-dropdown-border);
-    border-radius: 4px;
-    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.3);
-    z-index: 100;
+    overflow-x: hidden;
     overflow-y: auto;
 }
 
@@ -374,130 +359,61 @@
 
 /* Split Button Container */
 .splitButton {
-    position: relative;
-    display: inline-flex;
-    width: 100%;
-    border-radius: 3px;
-    overflow: visible;
+    composes: splitButton from '../common/ControlStyles.module.css';
 }
 
 /* Main action button */
 .mainBtn {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
+    composes: splitMainButton from '../common/ControlStyles.module.css';
     padding: 6px 12px;
-    border: none;
-    border-radius: 3px 0 0 3px;
     font-size: 12px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: background-color 0.15s ease, opacity 0.15s ease;
-}
-
-.mainBtn:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
 }
 
 /* Options trigger button */
 .optionsBtn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    composes: splitOptionsButton from '../common/ControlStyles.module.css';
     padding: 6px 8px;
-    border: none;
-    border-left: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 0 3px 3px 0;
-    cursor: pointer;
-    transition: background-color 0.15s ease;
 }
 
 .optionsBtnDisabled {
     opacity: 0.6;
+    cursor: not-allowed;
 }
 
 /* Button variants */
 .primary {
-    background-color: var(--vscode-button-background);
-    color: var(--vscode-button-foreground);
-}
-
-.primary:hover:not(:disabled) {
-    background-color: var(--vscode-button-hoverBackground);
+    composes: buttonPrimary from '../common/ControlStyles.module.css';
 }
 
 .secondary {
-    background-color: var(--vscode-button-secondaryBackground);
-    color: var(--vscode-button-secondaryForeground);
-}
-
-.secondary:hover:not(:disabled) {
-    background-color: var(--vscode-button-secondaryHoverBackground);
+    composes: buttonSecondary from '../common/ControlStyles.module.css';
 }
 
 /* Chevron animation */
 .chevron {
-    transition: transform 0.2s ease;
-    transform: rotate(180deg);
+    composes: chevron from '../common/ControlStyles.module.css';
 }
 
 .chevronOpen {
-    transform: rotate(0deg);
+    composes: chevronOpen from '../common/ControlStyles.module.css';
 }
 
 /* Dropdown menu */
 .dropdown {
-    position: absolute;
+    composes: dropdownMenu from '../common/ControlStyles.module.css';
     bottom: 100%;
     right: 0;
-    width: auto;
     min-width: 150px;
     margin-bottom: 4px;
-    background-color: var(--vscode-dropdown-background);
-    border: 1px solid var(--vscode-dropdown-border);
-    border-radius: 4px;
-    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.3);
-    z-index: 100;
-    overflow: hidden;
 }
 
 .dropdownHeader {
-    padding: 6px 10px 4px;
-    font-size: 10px;
-    font-weight: 600;
-    color: var(--vscode-descriptionForeground);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+    composes: dropdownHeader from '../common/ControlStyles.module.css';
 }
 
 .dropdownItem {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    width: 100%;
+    composes: dropdownItem from '../common/ControlStyles.module.css';
     padding: 6px 10px;
-    background: transparent;
-    border: none;
-    color: var(--vscode-foreground);
-    font-size: 12px;
-    cursor: pointer;
-    transition: background-color 0.1s ease;
-}
-
-.dropdownItem:hover {
-    background-color: var(--vscode-list-hoverBackground);
-}
-
-.dropdownItem:disabled {
-    cursor: not-allowed;
-    opacity: 0.5;
-}
-
-.dropdownItem:disabled:hover {
-    background: transparent;
 }
 
 .checkIcon {
@@ -509,33 +425,10 @@
 }
 
 .itemContent {
-    display: flex;
-    align-items: center;
+    composes: dropdownItemContent from '../common/ControlStyles.module.css';
     gap: 6px;
 }
 
-.itemContent .codicon {
-    color: var(--vscode-descriptionForeground);
-}
-
-.dropdownItem:hover .itemContent .codicon {
-    color: var(--vscode-foreground);
-}
-
 .iconBtn {
-    width: 22px;
-    height: 22px;
-    padding: 0;
-    background: transparent;
-    border: none;
-    color: var(--vscode-foreground);
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 3px;
-}
-
-.iconBtn:hover {
-    background: var(--vscode-toolbar-hoverBackground);
+    composes: iconButton from '../common/ControlStyles.module.css';
 }

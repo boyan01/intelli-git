@@ -29,72 +29,47 @@
 }
 
 .emptyState {
-    display: flex;
+    composes: emptyState from '../common/ControlStyles.module.css';
     min-height: 100%;
     padding: 40px 20px;
     box-sizing: border-box;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
     color: var(--vscode-foreground);
-    text-align: center;
 }
 
 .emptyIcon {
+    composes: emptyIcon from '../common/ControlStyles.module.css';
     margin-bottom: 10px;
-    color: var(--vscode-descriptionForeground);
     font-size: 28px;
 }
 
 .emptyTitle {
+    composes: emptyTitle from '../common/ControlStyles.module.css';
     max-width: 420px;
     font-size: 14px;
-    font-weight: 600;
     line-height: 20px;
 }
 
 .emptyDescription {
+    composes: emptyDescription from '../common/ControlStyles.module.css';
     max-width: 420px;
     margin-top: 6px;
-    color: var(--vscode-descriptionForeground);
-    font-size: 12px;
     line-height: 18px;
 }
 
 .emptyActions {
-    display: flex;
+    composes: emptyActions from '../common/ControlStyles.module.css';
     max-width: 100%;
     margin-top: 16px;
-    gap: 8px;
-    align-items: center;
-    justify-content: center;
-    flex-wrap: wrap;
 }
 
 .emptyButton {
-    display: inline-flex;
+    composes: secondaryActionButton from '../common/ControlStyles.module.css';
     min-height: 28px;
     padding: 4px 10px;
     box-sizing: border-box;
-    align-items: center;
-    justify-content: center;
-    border: 1px solid var(--vscode-button-border, transparent);
-    border-radius: 3px;
-    background: var(--vscode-button-secondaryBackground);
-    color: var(--vscode-button-secondaryForeground);
-    cursor: pointer;
     font: inherit;
     font-size: 12px;
     line-height: 18px;
-}
-
-.emptyButton:hover {
-    background: var(--vscode-button-secondaryHoverBackground);
-}
-
-.emptyButton:focus-visible {
-    outline: 1px solid var(--vscode-focusBorder);
-    outline-offset: 2px;
 }
 
 .loadingState {
