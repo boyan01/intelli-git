@@ -63,7 +63,15 @@ const CONTEXT_ONLY_COMMANDS = [
     'intelli-git.worktree.open',
     'intelli-git.worktree.reveal',
     'intelli-git.worktree.prune',
-    'intelli-git.worktree.remove'
+    'intelli-git.worktree.remove',
+    'intelli-git.ai.generateMessageFromWebview',
+    'intelli-git.ai.generateSubjectFromWebview',
+    'intelli-git.ai.generateBodyFromWebview',
+    'intelli-git.ai.rewriteSelectionFromWebview',
+    'intelli-git.ai.configureProviderFromWebview',
+    'intelli-git.ai.selectCopilotModelFromWebview',
+    'intelli-git.ai.testProviderFromWebview',
+    'intelli-git.ai.openCommitPromptSettingsFromWebview'
 ];
 
 const GLOBAL_COMMANDS = [

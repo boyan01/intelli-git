@@ -9,6 +9,8 @@ import {
     DEFAULT_GOOGLE_MODEL
 } from '../services/ai';
 import { getAiApiKey, setAiApiKey, type SecretBackedAiProvider } from '../utils/aiSecrets';
+import { CommitViewProvider } from '../providers/CommitViewProvider';
+import type { CommitAiAction } from '@shared/messages';
 
 interface CopilotModelPickItem extends vscode.QuickPickItem {
     model: vscode.LanguageModelChat;
@@ -30,7 +32,7 @@ interface ProviderActionPickItem extends vscode.QuickPickItem {
 
 const SECRET_BACKED_PROVIDERS: SecretBackedAiProvider[] = ['anthropic', 'google', 'custom'];
 
-export function registerAiCommands(context: vscode.ExtensionContext) {
+export function registerAiCommands(context: vscode.ExtensionContext, commitViewProvider?: CommitViewProvider) {
     context.subscriptions.push(
         vscode.commands.registerCommand('intelli-git.ai.configureProvider', async () => {
             await configureAiProvider(context);
@@ -48,6 +50,25 @@ export function registerAiCommands(context: vscode.ExtensionContext) {
             await vscode.commands.executeCommand('workbench.action.openSettings', 'intelli-git.ai.commitPrompt');
         })
     );
+
+    if (commitViewProvider) {
+        const registerCommitAiAction = (command: string, action: CommitAiAction) => {
+            return vscode.commands.registerCommand(command, () => {
+                commitViewProvider.triggerCommitAiAction(action);
+            });
+        };
+
+        context.subscriptions.push(
+            registerCommitAiAction('intelli-git.ai.generateMessageFromWebview', 'generateMessage'),
+            registerCommitAiAction('intelli-git.ai.generateSubjectFromWebview', 'generateSubject'),
+            registerCommitAiAction('intelli-git.ai.generateBodyFromWebview', 'generateBody'),
+            registerCommitAiAction('intelli-git.ai.rewriteSelectionFromWebview', 'rewriteSelection'),
+            registerCommitAiAction('intelli-git.ai.configureProviderFromWebview', 'configureProvider'),
+            registerCommitAiAction('intelli-git.ai.selectCopilotModelFromWebview', 'selectCopilotModel'),
+            registerCommitAiAction('intelli-git.ai.testProviderFromWebview', 'testProvider'),
+            registerCommitAiAction('intelli-git.ai.openCommitPromptSettingsFromWebview', 'openCommitPromptSettings')
+        );
+    }
 
     context.subscriptions.push(
         vscode.commands.registerCommand('intelli-git.ai.selectCopilotModel', async () => {
@@ -70,12 +91,13 @@ export function registerAiCommands(context: vscode.ExtensionContext) {
                 return {
                     label: model.name || model.id,
                     description: isCurrent ? i18n.t('extension.current') : undefined,
+                    iconPath: isCurrent ? new vscode.ThemeIcon('check') : undefined,
                     detail: details,
                     model
                 };
             });
 
-            const selected = await vscode.window.showQuickPick(items, {
+            const selected = await showCopilotModelQuickPick(items, {
                 title: i18n.t('extension.selectCopilotModel'),
                 placeHolder: i18n.t('extension.chooseCopilotModelForCommitGen'),
                 matchOnDescription: true,
@@ -97,6 +119,42 @@ export function registerAiCommands(context: vscode.ExtensionContext) {
             );
         })
     );
+}
+
+async function showCopilotModelQuickPick(
+    items: CopilotModelPickItem[],
+    options: vscode.QuickPickOptions
+): Promise<CopilotModelPickItem | undefined> {
+    const currentItem = items.find(item => item.description === i18n.t('extension.current'));
+    const quickPick = vscode.window.createQuickPick<CopilotModelPickItem>();
+
+    quickPick.title = options.title;
+    quickPick.placeholder = options.placeHolder;
+    quickPick.matchOnDescription = options.matchOnDescription ?? false;
+    quickPick.matchOnDetail = options.matchOnDetail ?? false;
+    quickPick.items = items;
+    if (currentItem) {
+        quickPick.activeItems = [currentItem];
+    }
+
+    return new Promise(resolve => {
+        const disposables: vscode.Disposable[] = [];
+        disposables.push(
+            quickPick.onDidAccept(() => {
+                resolve(quickPick.selectedItems[0] || quickPick.activeItems[0]);
+                quickPick.hide();
+            }),
+            quickPick.onDidHide(() => {
+                resolve(undefined);
+                for (const disposable of disposables) {
+                    disposable.dispose();
+                }
+                quickPick.dispose();
+            })
+        );
+
+        quickPick.show();
+    });
 }
 
 async function configureAiProvider(context: vscode.ExtensionContext): Promise<void> {

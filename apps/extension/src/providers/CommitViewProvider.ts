@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import type { ChangelistFileSelection } from '@shared/messages';
+import type { ChangelistFileSelection, CommitAiAction } from '@shared/messages';
 import { BaseWebviewProvider, WebviewProviderOptions } from './BaseWebviewProvider';
 import type { ExtensionRpcHandlerOptions } from '../rpc';
 
@@ -29,6 +29,13 @@ export class CommitViewProvider extends BaseWebviewProvider implements vscode.We
         if (this._view) {
             this._view.show();
             this._rpc?.proxy.toggleWorktreesDrawer();
+        }
+    }
+
+    public triggerCommitAiAction(action: CommitAiAction) {
+        if (this._view) {
+            this._view.show();
+            this._rpc?.proxy.triggerCommitAiAction(action);
         }
     }
 

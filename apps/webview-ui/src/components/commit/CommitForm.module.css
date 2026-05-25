@@ -86,66 +86,25 @@
     cursor: wait;
 }
 
-.generateMenuBtn {
-    composes: iconButton from '../common/ControlStyles.module.css';
-    width: 18px;
-    height: 22px;
-}
-
-.generateChevronOpen {
-    transform: rotate(180deg);
-}
-
-.aiDropdown {
-    composes: dropdownMenu from '../common/ControlStyles.module.css';
-    bottom: 100%;
-    right: auto;
-    left: 0;
-    width: 260px;
-    max-height: 160px;
-    margin-bottom: 4px;
-    overflow-x: hidden;
-    overflow-y: auto;
-}
-
-.aiProviderSummary {
-    padding: 4px 10px 6px;
-    border-bottom: 1px solid var(--vscode-panel-border);
-    font-size: 12px;
-}
-
-.aiProviderSummaryRow {
+.aiNotice {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    min-height: 18px;
-}
-
-.aiProviderSummary span {
-    color: var(--vscode-descriptionForeground);
-}
-
-.aiProviderSummary strong {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-weight: 500;
-}
-
-.aiProviderDetail {
-    color: var(--vscode-inputValidation-warningForeground, var(--vscode-foreground));
-    margin-top: 4px;
-    line-height: 16px;
-}
-
-.aiNotice {
-    padding: 6px 10px;
-    border-top: 1px solid var(--vscode-panel-border);
+    gap: 6px;
+    margin: 0 8px 8px 8px;
+    padding: 6px 8px;
+    border: 1px solid var(--vscode-panel-border);
+    border-radius: 4px;
     font-size: 12px;
     line-height: 16px;
     word-break: break-word;
+}
+
+.aiNotice i:first-child {
+    flex-shrink: 0;
+}
+
+.aiNotice span {
+    flex: 1;
 }
 
 .aiNoticeSuccess {
@@ -154,19 +113,6 @@
 
 .aiNoticeError {
     color: var(--vscode-inputValidation-warningForeground, var(--vscode-foreground));
-}
-
-.aiHint {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin: 6px 8px 0;
-    color: var(--vscode-descriptionForeground);
-    font-size: 12px;
-}
-
-.aiHint i {
-    flex-shrink: 0;
 }
 
 .stats {

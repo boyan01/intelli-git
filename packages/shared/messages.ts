@@ -41,6 +41,16 @@ export const AI_COPILOT_MODEL_UNAVAILABLE_CODE = 'AI_COPILOT_MODEL_UNAVAILABLE';
 
 export type CommitMessageGenerationMode = 'full' | 'subject' | 'body' | 'rewrite';
 
+export type CommitAiAction =
+    | 'generateMessage'
+    | 'generateSubject'
+    | 'generateBody'
+    | 'rewriteSelection'
+    | 'configureProvider'
+    | 'selectCopilotModel'
+    | 'testProvider'
+    | 'openCommitPromptSettings';
+
 export interface CommitMessageGenerationRequest {
     files?: FileReferenceInput[];
     mode?: CommitMessageGenerationMode;
@@ -397,6 +407,7 @@ export interface WebviewMethods {
     refresh: () => void;
     switchTab: (tab: 'commit' | 'stash' | 'push') => void;
     toggleWorktreesDrawer: () => void;
+    triggerCommitAiAction: (action: CommitAiAction) => void;
 }
 
 export interface LocalBranchInfo {

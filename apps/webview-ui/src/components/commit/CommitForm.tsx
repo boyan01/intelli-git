@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import styles from './CommitForm.module.css';
-import { rpc } from '../../lib/rpc_client';
+import { rpc, rpcEvents } from '../../lib/rpc_client';
 import { RpcError } from '@shared/rpc';
 import {
     AI_COPILOT_MODEL_UNAVAILABLE_CODE,
@@ -11,6 +11,7 @@ import {
     type RepositoryFileReference,
     type RepositoryInfo
 } from '@shared/messages';
+import type { CommitAiContext } from '@shared/webviewContext';
 import { applyGeneratedCommitMessage, type CommitMessageSelection } from './commitMessageUpdate';
 
 export interface CommitOptions {
@@ -67,16 +68,15 @@ export const CommitForm: React.FC<CommitFormProps> = ({
     const [error, setError] = useState<string | null>(null);
     const [errorAction, setErrorAction] = useState<'configure' | 'selectCopilotModel' | null>(null);
     const [aiProviderStatus, setAiProviderStatus] = useState<AiProviderStatus | null>(null);
-    const [isAiMenuOpen, setIsAiMenuOpen] = useState(false);
     const [isTestingProvider, setIsTestingProvider] = useState(false);
     const [aiNotice, setAiNotice] = useState<{ ok: boolean; message: string } | null>(null);
     const [aiScope, setAiScope] = useState<{ fileCount: number; hunkCount: number; amend: boolean } | null>(null);
     const [pendingGeneration, setPendingGeneration] = useState<PendingGeneration | null>(null);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    const [commitMessageSelection, setCommitMessageSelection] = useState<CommitMessageSelection>({ start: 0, end: 0 });
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const latestMessageRef = useRef(message);
     const dropdownRef = useRef<HTMLDivElement>(null);
-    const aiDropdownRef = useRef<HTMLDivElement>(null);
 
     const toggleOption = (key: keyof CommitOptions) => {
         onOptionsChange(prev => ({ ...prev, [key]: !prev[key] }));
@@ -123,6 +123,9 @@ export const CommitForm: React.FC<CommitFormProps> = ({
     };
 
     const handleTestAIProvider = async () => {
+        if (isTestingProvider) {
+            return;
+        }
         setAiNotice(null);
         setIsTestingProvider(true);
         try {
@@ -153,6 +156,10 @@ export const CommitForm: React.FC<CommitFormProps> = ({
         const start = textarea?.selectionStart ?? 0;
         const end = textarea?.selectionEnd ?? start;
         return { start, end };
+    };
+
+    const updateCommitMessageSelection = () => {
+        setCommitMessageSelection(getMessageSelection());
     };
 
     const getSelectedMessageText = (selection: CommitMessageSelection): string => {
@@ -227,7 +234,6 @@ export const CommitForm: React.FC<CommitFormProps> = ({
                 hunkCount: result.hunkCount,
                 amend
             });
-            setIsAiMenuOpen(false);
         } catch (e) {
             const errMsg = e instanceof Error ? e.message : String(e);
             setError(t('Generate failed: {{message}}', { message: errMsg }));
@@ -248,6 +254,42 @@ export const CommitForm: React.FC<CommitFormProps> = ({
 
         void handleGenerateMessage(pendingGeneration.mode, true, pendingGeneration.selection);
     };
+
+    useEffect(() => {
+        return rpcEvents.commitAiAction.subscribe(action => {
+            if (action === 'generateMessage') {
+                void handleGenerateMessage('full');
+                return;
+            }
+            if (action === 'generateSubject') {
+                void handleGenerateMessage('subject');
+                return;
+            }
+            if (action === 'generateBody') {
+                void handleGenerateMessage('body');
+                return;
+            }
+            if (action === 'rewriteSelection') {
+                void handleGenerateMessage('rewrite', false, commitMessageSelection);
+                return;
+            }
+            if (action === 'configureProvider') {
+                void configureAIProvider();
+                return;
+            }
+            if (action === 'selectCopilotModel') {
+                void selectCopilotModel();
+                return;
+            }
+            if (action === 'testProvider') {
+                void handleTestAIProvider();
+                return;
+            }
+            if (action === 'openCommitPromptSettings') {
+                void openCommitPromptSettings();
+            }
+        });
+    });
 
     const handleCommit = async () => {
         clearError();
@@ -340,8 +382,6 @@ export const CommitForm: React.FC<CommitFormProps> = ({
         ? `${pushTarget.remote}/${pushTarget.branch}`
         : t('No push target');
     const pushTargetNeedsReview = !pushTarget?.isConfirmed;
-    const aiProviderLabel = aiProviderStatus?.label || t('Loading...');
-    const aiProviderModel = aiProviderStatus?.model || t('Not set');
     const aiScopeLabel = selectedFiles.length > 0
         ? aiScope
             ? aiScope.amend
@@ -351,6 +391,21 @@ export const CommitForm: React.FC<CommitFormProps> = ({
                 ? t('Amend AI scope: {{files}} selected files', { files: selectedFiles.length })
                 : t('AI scope: {{files}} selected files', { files: selectedFiles.length })
         : null;
+    const hasCommitMessageSelection = commitMessageSelection.end > commitMessageSelection.start;
+    const aiButtonLabel = selectedFiles.length > 0
+        ? aiScopeLabel
+            ? `${t('Generate')}. ${aiScopeLabel}`
+            : amend
+                ? `${t('Generate')}. ${t('Amend AI scope: {{files}} selected files', { files: selectedFiles.length })}`
+                : `${t('Generate')}. ${t('AI scope: {{files}} selected files', { files: selectedFiles.length })}`
+        : t('Select changes to generate a commit message.');
+    const commitAiContext = (webviewSection: CommitAiContext['webviewSection']): CommitAiContext => ({
+        webviewSection,
+        hasSelectedChanges: selectedFiles.length > 0,
+        hasCommitMessageSelection,
+        canSelectCopilotModel: Boolean(aiProviderStatus?.canSelectModel),
+        preventDefaultContextMenuItems: false
+    });
 
     return (
         <div className={styles.commitSection}>
@@ -368,113 +423,19 @@ export const CommitForm: React.FC<CommitFormProps> = ({
 
                     <div
                         className={styles.generateControl}
-                        ref={aiDropdownRef}
-                        data-vscode-context={JSON.stringify({
-                            webviewSection: 'commitGenerateButton'
-                        })}
-                        onBlur={(e) => {
-                            if (!aiDropdownRef.current?.contains(e.relatedTarget as Node)) {
-                                setIsAiMenuOpen(false);
-                            }
-                        }}
+                        data-vscode-context={JSON.stringify(commitAiContext('commitGenerateButton'))}
+                        title={aiButtonLabel}
                     >
                         <button
                             className={`${styles.iconBtn} ${styles.generateBtn} ${isGenerating ? styles.generateBtnLoading : ''}`}
                             onClick={() => void handleGenerateMessage('full')}
                             disabled={isGenerating || selectedFiles.length === 0}
-                            title={t('Generate')}
+                            title={aiButtonLabel}
+                            aria-label={aiButtonLabel}
+                            data-vscode-context={JSON.stringify(commitAiContext('commitGenerateButton'))}
                         >
                             <i className={`codicon ${isGenerating ? 'codicon-loading codicon-modifier-spin' : 'codicon-sparkle'}`}></i>
                         </button>
-                        <button
-                            className={styles.generateMenuBtn}
-                            onClick={() => {
-                                setIsAiMenuOpen(current => !current);
-                                void loadAIProviderStatus();
-                            }}
-                            aria-label={t('AI Provider')}
-                        >
-                            <i className={`codicon codicon-chevron-down ${isAiMenuOpen ? styles.generateChevronOpen : ''}`} />
-                        </button>
-
-                        {isAiMenuOpen && (
-                            <div className={styles.aiDropdown}>
-                                <div className={styles.dropdownHeader}>
-                                    {t('Generate Message')}
-                                </div>
-                                <button className={styles.dropdownItem} onClick={() => void handleGenerateMessage('subject')} disabled={isGenerating || selectedFiles.length === 0}>
-                                    <div className={styles.itemContent}>
-                                        <i className="codicon codicon-sparkle" />
-                                        <span>{t('Generate Subject')}</span>
-                                    </div>
-                                </button>
-                                <button className={styles.dropdownItem} onClick={() => void handleGenerateMessage('body')} disabled={isGenerating || selectedFiles.length === 0}>
-                                    <div className={styles.itemContent}>
-                                        <i className="codicon codicon-list-unordered" />
-                                        <span>{t('Generate Body')}</span>
-                                    </div>
-                                </button>
-                                <button className={styles.dropdownItem} onClick={() => void handleGenerateMessage('rewrite')} disabled={isGenerating || selectedFiles.length === 0}>
-                                    <div className={styles.itemContent}>
-                                        <i className="codicon codicon-edit" />
-                                        <span>{t('Rewrite Selection')}</span>
-                                    </div>
-                                </button>
-
-                                <div className={styles.dropdownHeader}>
-                                    {t('AI Provider')}
-                                </div>
-                                <div className={styles.aiProviderSummary}>
-                                    <div className={styles.aiProviderSummaryRow}>
-                                        <span>{t('Provider')}</span>
-                                        <strong>{aiProviderLabel}</strong>
-                                    </div>
-                                    <div className={styles.aiProviderSummaryRow}>
-                                        <span>{t('Model')}</span>
-                                        <strong>{aiProviderModel}</strong>
-                                    </div>
-                                    {aiProviderStatus?.detail && (
-                                        <div className={styles.aiProviderDetail}>{aiProviderStatus.detail}</div>
-                                    )}
-                                </div>
-
-                                <button className={styles.dropdownItem} onClick={configureAIProvider}>
-                                    <div className={styles.itemContent}>
-                                        <i className="codicon codicon-settings-gear" />
-                                        <span>{t('Configure AI Provider')}</span>
-                                    </div>
-                                </button>
-
-                                {aiProviderStatus?.canSelectModel && (
-                                    <button className={styles.dropdownItem} onClick={selectCopilotModel}>
-                                        <div className={styles.itemContent}>
-                                            <i className="codicon codicon-list-selection" />
-                                            <span>{t('Select Copilot Model')}</span>
-                                        </div>
-                                    </button>
-                                )}
-
-                                <button className={styles.dropdownItem} onClick={handleTestAIProvider} disabled={isTestingProvider}>
-                                    <div className={styles.itemContent}>
-                                        <i className={`codicon ${isTestingProvider ? 'codicon-loading codicon-modifier-spin' : 'codicon-debug-start'}`} />
-                                        <span>{isTestingProvider ? t('Testing...') : t('Test Provider')}</span>
-                                    </div>
-                                </button>
-
-                                <button className={styles.dropdownItem} onClick={openCommitPromptSettings}>
-                                    <div className={styles.itemContent}>
-                                        <i className="codicon codicon-edit" />
-                                        <span>{t('Edit Commit Prompt')}</span>
-                                    </div>
-                                </button>
-
-                                {aiNotice && (
-                                    <div className={`${styles.aiNotice} ${aiNotice.ok ? styles.aiNoticeSuccess : styles.aiNoticeError}`}>
-                                        {aiNotice.message}
-                                    </div>
-                                )}
-                            </div>
-                        )}
                     </div>
                 </div>
 
@@ -487,27 +448,18 @@ export const CommitForm: React.FC<CommitFormProps> = ({
                 )}
             </div>
 
-            {selectedFiles.length === 0 && (
-                <div className={styles.aiHint}>
-                    <i className="codicon codicon-info" />
-                    <span>{t('Select changes to generate a commit message.')}</span>
-                </div>
-            )}
-
-            {aiScopeLabel && (
-                <div className={styles.aiHint}>
-                    <i className="codicon codicon-symbol-event" />
-                    <span>{aiScopeLabel}</span>
-                </div>
-            )}
-
             <textarea
                 ref={textareaRef}
                 value={message}
                 onChange={(e) => onMessageChange(e.target.value)}
+                onSelect={updateCommitMessageSelection}
+                onMouseUp={updateCommitMessageSelection}
+                onKeyUp={updateCommitMessageSelection}
+                onContextMenu={updateCommitMessageSelection}
                 placeholder={t('Commit Message')}
                 rows={4}
                 className={styles.textarea}
+                data-vscode-context={JSON.stringify(commitAiContext('commitMessageInput'))}
             />
 
             {planItems.length > 1 && (
@@ -569,6 +521,20 @@ export const CommitForm: React.FC<CommitFormProps> = ({
                     <button
                         className={styles.dismissBtn}
                         onClick={clearError}
+                        title={t('Dismiss')}
+                    >
+                        <i className="codicon codicon-close"></i>
+                    </button>
+                </div>
+            )}
+
+            {aiNotice && (
+                <div className={`${styles.aiNotice} ${aiNotice.ok ? styles.aiNoticeSuccess : styles.aiNoticeError}`}>
+                    <i className={`codicon ${aiNotice.ok ? 'codicon-check' : 'codicon-warning'}`} />
+                    <span>{aiNotice.message}</span>
+                    <button
+                        className={styles.dismissBtn}
+                        onClick={() => setAiNotice(null)}
                         title={t('Dismiss')}
                     >
                         <i className="codicon codicon-close"></i>

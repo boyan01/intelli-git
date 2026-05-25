@@ -386,7 +386,7 @@ export async function activate(context: vscode.ExtensionContext) {
         vscode.window.registerWebviewViewProvider(GitLogViewProvider.viewType, gitLogProvider)
     );
 
-    registerAiCommands(context);
+    registerAiCommands(context, provider);
     registerGlobalNavigationCommands(context, {
         gitLogProvider,
         commitViewProvider: provider,

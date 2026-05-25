@@ -1,5 +1,6 @@
 export const WEBVIEW_CONTEXT_SECTIONS = [
     'commitGenerateButton',
+    'commitMessageInput',
     'commitItem',
     'pushCommit',
     'authorName',
@@ -23,6 +24,14 @@ export type WebviewContextSection = typeof WEBVIEW_CONTEXT_SECTIONS[number];
 interface BaseWebviewContext {
     webviewSection: WebviewContextSection;
     preventDefaultContextMenuItems?: boolean;
+}
+
+export interface CommitAiContext extends BaseWebviewContext {
+    webviewSection: 'commitGenerateButton' | 'commitMessageInput';
+    hasSelectedChanges: boolean;
+    hasCommitMessageSelection: boolean;
+    canSelectCopilotModel?: boolean;
+    preventDefaultContextMenuItems?: false;
 }
 
 export interface StashItemContext extends BaseWebviewContext {
@@ -151,6 +160,7 @@ export interface WorktreeItemContext extends BaseWebviewContext {
 }
 
 export type WebviewContextPayload =
+    | CommitAiContext
     | StashItemContext
     | BranchContext
     | TagContext

@@ -376,6 +376,38 @@
         "title": "%intelli-git.commands.ai.openCommitPromptSettings.title%"
       },
       {
+        "command": "intelli-git.ai.generateMessageFromWebview",
+        "title": "%intelli-git.commands.ai.generateMessageFromWebview.title%"
+      },
+      {
+        "command": "intelli-git.ai.generateSubjectFromWebview",
+        "title": "%intelli-git.commands.ai.generateSubjectFromWebview.title%"
+      },
+      {
+        "command": "intelli-git.ai.generateBodyFromWebview",
+        "title": "%intelli-git.commands.ai.generateBodyFromWebview.title%"
+      },
+      {
+        "command": "intelli-git.ai.rewriteSelectionFromWebview",
+        "title": "%intelli-git.commands.ai.rewriteSelectionFromWebview.title%"
+      },
+      {
+        "command": "intelli-git.ai.configureProviderFromWebview",
+        "title": "%intelli-git.commands.ai.configureProviderFromWebview.title%"
+      },
+      {
+        "command": "intelli-git.ai.selectCopilotModelFromWebview",
+        "title": "%intelli-git.commands.ai.selectCopilotModelFromWebview.title%"
+      },
+      {
+        "command": "intelli-git.ai.testProviderFromWebview",
+        "title": "%intelli-git.commands.ai.testProviderFromWebview.title%"
+      },
+      {
+        "command": "intelli-git.ai.openCommitPromptSettingsFromWebview",
+        "title": "%intelli-git.commands.ai.openCommitPromptSettingsFromWebview.title%"
+      },
+      {
         "command": "intelli-git.log.file.showDiff",
         "title": "%intelli-git.commands.log.file.showDiff.title%"
       },
@@ -732,6 +764,38 @@
         {
           "command": "intelli-git.worktree.remove",
           "when": "false"
+        },
+        {
+          "command": "intelli-git.ai.generateMessageFromWebview",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.ai.generateSubjectFromWebview",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.ai.generateBodyFromWebview",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.ai.rewriteSelectionFromWebview",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.ai.configureProviderFromWebview",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.ai.selectCopilotModelFromWebview",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.ai.testProviderFromWebview",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.ai.openCommitPromptSettingsFromWebview",
+          "when": "false"
         }
       ],
       "view/title": [
@@ -1045,9 +1109,44 @@
           "group": "2_danger"
         },
         {
-          "command": "intelli-git.ai.openCommitPromptSettings",
-          "when": "webviewSection == 'commitGenerateButton'",
-          "group": "1_settings"
+          "command": "intelli-git.ai.generateMessageFromWebview",
+          "when": "(webviewSection == 'commitGenerateButton' || webviewSection == 'commitMessageInput') && hasSelectedChanges == true",
+          "group": "1_generate@0"
+        },
+        {
+          "command": "intelli-git.ai.generateSubjectFromWebview",
+          "when": "(webviewSection == 'commitGenerateButton' || webviewSection == 'commitMessageInput') && hasSelectedChanges == true",
+          "group": "1_generate@1"
+        },
+        {
+          "command": "intelli-git.ai.generateBodyFromWebview",
+          "when": "(webviewSection == 'commitGenerateButton' || webviewSection == 'commitMessageInput') && hasSelectedChanges == true",
+          "group": "1_generate@2"
+        },
+        {
+          "command": "intelli-git.ai.rewriteSelectionFromWebview",
+          "when": "(webviewSection == 'commitGenerateButton' || webviewSection == 'commitMessageInput') && hasSelectedChanges == true && hasCommitMessageSelection == true",
+          "group": "1_generate@3"
+        },
+        {
+          "command": "intelli-git.ai.configureProviderFromWebview",
+          "when": "webviewSection == 'commitGenerateButton' || webviewSection == 'commitMessageInput'",
+          "group": "2_provider@0"
+        },
+        {
+          "command": "intelli-git.ai.selectCopilotModelFromWebview",
+          "when": "(webviewSection == 'commitGenerateButton' || webviewSection == 'commitMessageInput') && canSelectCopilotModel == true",
+          "group": "2_provider@1"
+        },
+        {
+          "command": "intelli-git.ai.testProviderFromWebview",
+          "when": "webviewSection == 'commitGenerateButton' || webviewSection == 'commitMessageInput'",
+          "group": "2_provider@2"
+        },
+        {
+          "command": "intelli-git.ai.openCommitPromptSettingsFromWebview",
+          "when": "webviewSection == 'commitGenerateButton' || webviewSection == 'commitMessageInput'",
+          "group": "2_provider@3"
         },
         {
           "command": "intelli-git.copyAuthorEmail",

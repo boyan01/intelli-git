@@ -1,6 +1,6 @@
 import { RpcPeer } from '@shared/rpc';
 import { vscode } from './vscode';
-import type { ExtensionMethods, GitLogRevealRequest, WebviewMethods } from '@shared/messages';
+import type { CommitAiAction, ExtensionMethods, GitLogRevealRequest, WebviewMethods } from '@shared/messages';
 
 type Listener<T> = (data: T) => void;
 
@@ -25,6 +25,7 @@ export const rpcEvents = {
     clearGitLogFilters: new EventStream<'all' | 'branch'>(),
     switchTab: new EventStream<'commit' | 'stash' | 'push'>(),
     toggleWorktreesDrawer: new EventStream<void>(),
+    commitAiAction: new EventStream<CommitAiAction>(),
 };
 
 const _rpc = new RpcPeer<ExtensionMethods, WebviewMethods>(
@@ -52,6 +53,7 @@ _rpc.registerAll({
     refresh: () => rpcEvents.refresh.emit(),
     switchTab: (tab) => rpcEvents.switchTab.emit(tab),
     toggleWorktreesDrawer: () => rpcEvents.toggleWorktreesDrawer.emit(),
+    triggerCommitAiAction: (action) => rpcEvents.commitAiAction.emit(action),
 });
 
 window.addEventListener('message', (event) => {
