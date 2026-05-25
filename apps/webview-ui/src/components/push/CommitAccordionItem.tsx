@@ -9,6 +9,7 @@ import { formatRelativeDate } from '../../utils/dateUtils';
 import styles from './CommitAccordionItem.module.css';
 
 const TRAILER_LINE_PATTERN = /^(?:[A-Za-z][A-Za-z0-9-]*(?:-[A-Za-z0-9]+)*|BREAKING CHANGE):\s.+$/;
+const EMPTY_SELECTED_FILES = new Set<string>();
 
 export interface CommitAccordionItemProps {
     commit: CommitDetails;
@@ -101,12 +102,14 @@ export const CommitAccordionItem: React.FC<CommitAccordionItemProps> = ({
         ? activeFile.path
         : null;
 
-    const fileItems: FileStatus[] = commit.files ? commit.files.map(f => ({
-        path: f.path,
-        displayPath: f.displayPath,
-        status: f.status,
-        staged: false
-    })) : [];
+    const fileItems: FileStatus[] = useMemo(() => (
+        commit.files ? commit.files.map(f => ({
+            path: f.path,
+            displayPath: f.displayPath,
+            status: f.status,
+            staged: false
+        })) : []
+    ), [commit.files]);
 
     return (
         <div
@@ -215,7 +218,7 @@ export const CommitAccordionItem: React.FC<CommitAccordionItemProps> = ({
                             viewMode={fileViewMode}
                             readonly={true}
                             onFileClick={(path) => handleOpenFile(path, true)}
-                            selectedFiles={new Set()}
+                            selectedFiles={EMPTY_SELECTED_FILES}
                             activeFile={activeFilePath}
                             onToggleFile={() => { }}
                             onFileDoubleClick={(path) => handleOpenFile(path, false)}

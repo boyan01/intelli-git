@@ -7,6 +7,8 @@ import { ViewModeToggle } from '../common/ViewModeToggle';
 import type { CommitDetails, FileStatus } from '@shared/messages';
 import styles from './PushTab.module.css';
 
+const EMPTY_SELECTED_FILES = new Set<string>();
+
 interface PushChangesViewProps {
     commits: CommitDetails[];
     changesViewMode: 'tree' | 'list';
@@ -93,7 +95,7 @@ export const PushChangesView: React.FC<PushChangesViewProps> = ({
                     viewMode={changesViewMode}
                     readonly={true}
                     onFileClick={(path) => handleOpenFile(path, true)}
-                    selectedFiles={new Set()}
+                    selectedFiles={EMPTY_SELECTED_FILES}
                     activeFile={activeFile?.path ?? null}
                     onToggleFile={() => { }}
                     onFileDoubleClick={(path) => handleOpenFile(path, false)}
