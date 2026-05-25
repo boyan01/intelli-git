@@ -13,11 +13,12 @@ export class BranchStatusBar {
         this.gitService = gitService;
         this.repository = repository;
         this.statusBarItem = vscode.window.createStatusBarItem(
+            'intelli-git.branch',
             vscode.StatusBarAlignment.Left,
             9999
         );
+        this.statusBarItem.name = vscode.l10n.t('Intelli Git: Branch');
         this.statusBarItem.command = 'intelli-git.showBranchPicker';
-        this.statusBarItem.tooltip = vscode.l10n.t('Switch Branch');
 
         this.update();
     }
@@ -26,14 +27,16 @@ export class BranchStatusBar {
         try {
             const branches = await this.gitService.branchRemote.getBranches();
             this.currentBranch = branches.current;
-            this.statusBarItem.text = this.repository?.name
-                ? `$(repo) ${this.repository.name} $(git-branch) ${this.currentBranch}`
-                : `$(git-branch) ${this.currentBranch}`;
+            this.statusBarItem.text = `$(git-branch) ${this.currentBranch}`;
+            this.statusBarItem.tooltip = this.repository?.name
+                ? `${vscode.l10n.t('Switch Branch')} · ${this.repository.name}`
+                : vscode.l10n.t('Switch Branch');
             this.statusBarItem.show();
         } catch {
-            this.statusBarItem.text = this.repository?.name
-                ? `$(repo) ${this.repository.name} $(git-branch) ${vscode.l10n.t('No Branch')}`
-                : `$(git-branch) ${vscode.l10n.t('No Branch')}`;
+            this.statusBarItem.text = `$(git-branch) ${vscode.l10n.t('No Branch')}`;
+            this.statusBarItem.tooltip = this.repository?.name
+                ? `${vscode.l10n.t('Switch Branch')} · ${this.repository.name}`
+                : vscode.l10n.t('Switch Branch');
             this.statusBarItem.show();
         }
     }

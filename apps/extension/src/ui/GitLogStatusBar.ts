@@ -11,12 +11,16 @@ export class GitLogStatusBar {
         this.gitService = gitService;
         this.repository = repository;
         this.statusBarItem = vscode.window.createStatusBarItem(
+            'intelli-git.gitLog',
             vscode.StatusBarAlignment.Left,
             9998
         );
+        this.statusBarItem.name = vscode.l10n.t('Intelli Git: Git Log');
         this.statusBarItem.command = 'intelli-git.focusGitLog';
-        this.statusBarItem.tooltip = vscode.l10n.t('Open Git Log');
-        this.statusBarItem.text = this.repository?.name ? `$(history) ${this.repository.name}` : '$(history)';
+        this.statusBarItem.tooltip = this.repository?.name
+            ? `${vscode.l10n.t('Open Git Log')} · ${this.repository.name}`
+            : vscode.l10n.t('Open Git Log');
+        this.statusBarItem.text = '$(history)';
 
         this.update();
     }
