@@ -1,0 +1,41 @@
+.slot {
+    position: relative;
+    height: 2px;
+    flex: 0 0 2px;
+    overflow: hidden;
+}
+
+.indicator {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+}
+
+.indicator::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 36%;
+    background: var(--vscode-progressBar-background, var(--vscode-focusBorder));
+    animation: loadingProgressSweep 1.2s ease-in-out infinite;
+}
+
+@keyframes loadingProgressSweep {
+    from {
+        transform: translateX(-120%);
+    }
+
+    to {
+        transform: translateX(320%);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .indicator::before {
+        width: 100%;
+        opacity: 0.75;
+        animation: none;
+    }
+}

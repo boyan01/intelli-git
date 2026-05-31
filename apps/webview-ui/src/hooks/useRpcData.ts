@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { rpcEvents } from '../lib/rpc_client';
 import { getStoredState, updateStoredState } from '../lib/stateCache';
 import type { PersistedStateSchema } from './usePersistedState';
@@ -8,6 +8,7 @@ interface UseRpcDataOptions<T, K extends keyof PersistedStateSchema | undefined 
     initialValue: T;
     refreshOnEvent?: boolean;
     cacheKey?: K;
+    loadingOnRefresh?: boolean;
 }
 
 /**
@@ -24,7 +25,8 @@ export function useRpcData<T, K extends keyof PersistedStateSchema | undefined =
     fetcher: () => Promise<T>,
     options: UseRpcDataOptions<T, K>
 ) {
-    const { initialValue, refreshOnEvent = true, cacheKey } = options;
+    const { initialValue, refreshOnEvent = true, cacheKey, loadingOnRefresh = false } = options;
+    const hasLoadedRef = useRef(false);
 
     const [data, setData] = useState<T>(() => {
         if (cacheKey) {
@@ -41,6 +43,9 @@ export function useRpcData<T, K extends keyof PersistedStateSchema | undefined =
 
     const load = useCallback(async () => {
         try {
+            if (loadingOnRefresh && hasLoadedRef.current) {
+                setLoading(true);
+            }
             setError(null);
             const result = await fetcher();
             setData(result);
@@ -51,9 +56,10 @@ export function useRpcData<T, K extends keyof PersistedStateSchema | undefined =
             setError(e instanceof Error ? e : new Error(String(e)));
             console.error('Failed to load data:', e);
         } finally {
+            hasLoadedRef.current = true;
             setLoading(false);
         }
-    }, [cacheKey, fetcher]);
+    }, [cacheKey, fetcher, loadingOnRefresh]);
 
     useEffect(() => {
         load();

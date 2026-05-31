@@ -2,6 +2,7 @@ import { SplitPane } from '../common/SplitPane';
 import { BranchListPanel } from './BranchListPanel';
 import { LogListPanel } from './LogListPanel';
 import { CommitDetailsView } from '../common/CommitDetailsView';
+import { LoadingProgressBar } from '../common/LoadingProgressBar';
 import { useVersionCheck } from '../../hooks/useVersionCheck';
 import { VersionExpiredPanel } from '../common/VersionExpiredPanel';
 import styles from './GitLogView.module.css';
@@ -43,11 +44,11 @@ export function GitLogView() {
         reload: reloadActiveRepository
     } = useRpcData(
         loadActiveRepository,
-        { initialValue: undefined }
+        { initialValue: undefined, loadingOnRefresh: true }
     );
     const { data: branchListData, loading: branchListLoading, reload: reloadBranchList } = useRpcData(
         loadBranchListData,
-        { initialValue: emptyBranchListData }
+        { initialValue: emptyBranchListData, loadingOnRefresh: true }
     );
 
     const [branchSplitRatio, setBranchSplitRatio] = usePersistedState('gitLog.branchSplitRatio');
@@ -149,9 +150,8 @@ export function GitLogView() {
     }
 
     const logListPanel = activeRepositoryLoading && !repositoryPath ? (
-        <div className={styles.statePanel}>
-            <i className={`codicon codicon-loading codicon-modifier-spin ${styles.stateIcon}`} aria-hidden="true" />
-            <div className={styles.stateTitle}>{t('Loading...')}</div>
+        <div className={styles.loadingPlaceholder}>
+            <LoadingProgressBar active={activeRepositoryLoading} ariaLabel={t('Loading...')} />
         </div>
     ) : (
         <LogListPanel

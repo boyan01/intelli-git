@@ -3,6 +3,7 @@ import { ChangelistTree } from './ChangelistTree';
 import { CommitForm } from './CommitForm';
 import { RebaseForm } from './RebaseForm';
 import { CommitToolbar } from './CommitToolbar';
+import { LoadingProgressBar } from '../common/LoadingProgressBar';
 import { useTranslation } from 'react-i18next';
 import { usePersistedState } from '../../hooks/usePersistedState';
 import { useRpcData } from '../../hooks/useRpcData';
@@ -110,7 +111,8 @@ export function CommitView({
             workspaceRoot: '',
             hasRepository: true,
             repositories: [] as RepositoryCommitViewState[]
-        }
+        },
+        loadingOnRefresh: true
     });
     const files = commitViewState.files;
     const changelistState = commitViewState.changelistState;
@@ -243,16 +245,10 @@ export function CommitView({
         void rpc.configureAIProvider();
     }, []);
 
-    const renderStatePanel = () => {
-        if (loading && files.length === 0 && !workspaceRoot && !error) {
-            return (
-                <CommitViewStatePanel
-                    icon="codicon-loading codicon-modifier-spin"
-                    title={t('Loading...')}
-                />
-            );
-        }
+    const isInitialCommitViewLoading = loading && hasRepository && files.length === 0 && !workspaceRoot && !error;
+    const loadingIndicator = <LoadingProgressBar active={loading} ariaLabel={t('Loading...')} />;
 
+    const renderStatePanel = () => {
         if (error) {
             return (
                 <CommitViewStatePanel
@@ -319,6 +315,7 @@ export function CommitView({
     if (!hasRepository) {
         return (
             <div className={styles.commitView}>
+                {loadingIndicator}
                 <div className={styles.fileListContainer}>
                     {statePanel}
                 </div>
@@ -354,11 +351,13 @@ export function CommitView({
                 }}
             />
 
+            {loadingIndicator}
+
             <div
                 className={styles.fileListContainer}
                 {...(backgroundContext ? { 'data-vscode-context': JSON.stringify(backgroundContext) } : {})}
             >
-                {statePanel || (
+                {isInitialCommitViewLoading ? null : statePanel || (
                     <ChangelistTree
                         groups={changelists}
                         changelistState={changelistState}

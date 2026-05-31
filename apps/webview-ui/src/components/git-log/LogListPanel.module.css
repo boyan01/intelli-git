@@ -72,20 +72,6 @@
     line-height: 18px;
 }
 
-.loadingState {
-    display: flex;
-    min-height: 100%;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    color: var(--vscode-descriptionForeground);
-    font-size: 12px;
-}
-
-.loadingState i {
-    animation: spin 1s linear infinite;
-}
-
 .row {
     display: flex;
     align-items: stretch;
@@ -189,10 +175,6 @@
     color: var(--vscode-descriptionForeground);
     font-size: 11px;
     line-height: 34px;
-}
-
-.inlineLoading i {
-    animation: spin 1s linear infinite;
 }
 
 .row:hover {
@@ -330,15 +312,5 @@
 
     to {
         background-color: var(--vscode-list-activeSelectionBackground) !important;
-    }
-}
-
-@keyframes spin {
-    from {
-        transform: rotate(0deg);
-    }
-
-    to {
-        transform: rotate(360deg);
     }
 }

@@ -103,6 +103,27 @@ Technical terms, code identifiers, file paths, commands, and source-level string
 - 与现有 UI 语言集成时，颜色和主题优先使用 VS Code theme variables。
 - 保持当前 React + Vite 结构，不要随意引入新的 frontend stack。
 
+### Webview Loading Feedback
+- 本地 RPC / Git 状态读取通常很快，加载耗时低于约 `150ms` 时不要显示 loading UI，避免打开页面时闪烁。
+- Commit、changelist、branch、log 等数据刷新时，优先保留已有内容；只有超过延迟阈值后，才在当前组件顶部显示细的 indeterminate progress bar。
+- Webview 数据加载反馈优先复用 `apps/webview-ui/src/components/common/LoadingProgressBar.tsx`，不要为各页面重复实现 spinner 或独立 progress animation。
+- Progress bar 应使用 VS Code theme token，例如 `--vscode-progressBar-background`，并预留固定高度，避免出现或消失时推动布局。
+- 不要把快速本地加载做成居中 spinner 或整页阻塞状态；居中 state panel 只用于稳定的 empty、error、no repository 等状态。
+- 按钮内的 push、pull、fetch、AI generate 等长操作可以保留局部 busy indicator，但不要把页面数据加载表达成按钮 spinner 或居中 spinner。
+- 参考布局：
+
+```text
+┌──────────────────────────────┐
+│ Commit   Stash   Push        │
+├──────────────────────────────┤
+│ ▬▬▬▬▬░░░░                    │  top progress bar, shown only after delay
+│ Changes                      │
+│   modified file.ts           │
+├──────────────────────────────┤
+│ Commit message...            │
+└──────────────────────────────┘
+```
+
 ### Webview Selectable Lists
 - Webview 中任何 tree-like / list-like selectable rows，例如 worktree drawer、branch list、changelist tree、repository/workspace list，优先使用 `BasicTreeView` 承载 hover、selected、focused、keyboard focus、context menu focus 行为。
 - 不要为这类 row 另写 ad hoc button-row selection styles；内容组件只负责 label、icon、trailing metadata 的排版。

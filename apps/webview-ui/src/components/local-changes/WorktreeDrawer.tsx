@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import type { WorktreeInfo } from '@shared/messages';
 import type { WorktreeItemContext } from '@shared/webviewContext';
 import { BasicTreeView, type TreeNode } from '../common/BasicTreeView';
+import { LoadingProgressBar } from '../common/LoadingProgressBar';
 import { rpc, rpcEvents } from '../../lib/rpc_client';
 import styles from './WorktreeDrawer.module.css';
 
@@ -203,12 +204,11 @@ export function WorktreeDrawer({ open, worktrees, loading, onClose }: WorktreeDr
                 </div>
             </div>
 
+            <LoadingProgressBar active={loading} ariaLabel={t('Loading...')} />
+
             <div className={styles.list}>
                 {loading && worktrees.length === 0 ? (
-                    <div className={styles.empty}>
-                        <i className="codicon codicon-loading codicon-modifier-spin" aria-hidden="true"></i>
-                        <span>{t('Loading worktrees...')}</span>
-                    </div>
+                    <div className={styles.empty} />
                 ) : (
                     <BasicTreeView
                         nodes={nodes}

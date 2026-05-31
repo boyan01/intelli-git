@@ -4,6 +4,7 @@ import styles from './LogListPanel.module.css';
 import { computeGraph, LONG_DISTANCE_THRESHOLD } from './graphUtils';
 import { GraphColumn, CELL_WIDTH } from './GraphColumn';
 import { FilterToolbar } from './filter-toolbar/FilterToolbar';
+import { LoadingProgressBar } from '../common/LoadingProgressBar';
 import { RefLabels } from '../common/RefLabels';
 import { useLogCommitLoader } from './hooks/useLogCommitLoader';
 import { useCommitSelection } from './hooks/useCommitSelection';
@@ -51,7 +52,6 @@ const InlineCommitDetails: React.FC<InlineCommitDetailsProps> = ({ selectedHash,
     if (!isLoadedCommit) {
         return (
             <div className={styles.inlineLoading}>
-                <i className="codicon codicon-loading" aria-hidden="true" />
                 <span>{t('Loading...')}</span>
             </div>
         );
@@ -453,6 +453,7 @@ export const LogListPanel: React.FC<LogListPanelProps> = ({
                     externalBranch={externalBranchFilter}
                     repositoryPath={repositoryPath}
                 />
+                <LoadingProgressBar active={loading} ariaLabel={t('Loading...')} />
 
                 <div
                     ref={containerRef}
@@ -464,12 +465,7 @@ export const LogListPanel: React.FC<LogListPanelProps> = ({
                     onBlur={() => setListHasFocus(false)}
                     style={{ outline: 'none' }}
                 >
-                    {showLoadingFirstPage ? (
-                        <div className={styles.loadingState}>
-                            <i className="codicon codicon-loading" aria-hidden="true" />
-                            <span>{t('Loading...')}</span>
-                        </div>
-                    ) : showEmptyResult ? (
+                    {showLoadingFirstPage ? null : showEmptyResult ? (
                         <div className={styles.emptyState}>
                             <i
                                 className={`codicon ${hasFilters ? 'codicon-filter' : 'codicon-git-commit'} ${styles.emptyIcon}`}

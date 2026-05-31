@@ -5,6 +5,7 @@ import { rpc } from '../../lib/rpc_client';
 import { usePersistedState } from '../../hooks/usePersistedState';
 import { BasicTreeView, type TreeNode, type BasicTreeViewRef } from '../common/BasicTreeView';
 import { BranchStatus } from '../common/BranchStatus';
+import { LoadingProgressBar } from '../common/LoadingProgressBar';
 import styles from './BranchListPanel.module.css';
 import treeStyles from '../common/BasicTreeView.module.css';
 
@@ -361,12 +362,7 @@ export const BranchListPanel: React.FC<BranchListPanelProps> = ({ data, isLoadin
     }, [data]);
     const renderTreeContent = () => {
         if (isLoading && !hasBranchData) {
-            return (
-                <div className={styles.loadingState}>
-                    <i className="codicon codicon-loading" aria-hidden="true" />
-                    <span>{t('Loading...')}</span>
-                </div>
-            );
+            return null;
         }
         if (!hasBranchData) return <div className={styles.noData}>{t('No data')}</div>;
         return (
@@ -418,6 +414,8 @@ export const BranchListPanel: React.FC<BranchListPanelProps> = ({ data, isLoadin
                     />
                 </div>
             </div>
+
+            <LoadingProgressBar active={Boolean(isLoading)} ariaLabel={t('Loading...')} />
 
             <div
                 ref={treeContainerRef}

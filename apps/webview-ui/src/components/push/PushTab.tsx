@@ -4,6 +4,7 @@ import { logger } from '@/utils/logger';
 import { useRpcEvent } from '@/hooks/useRpcEvent';
 import { PushHeader } from './PushHeader';
 import { PushFooter } from './PushFooter';
+import { LoadingProgressBar } from '../common/LoadingProgressBar';
 import { useTranslation } from 'react-i18next';
 import { CommitAccordionItem } from './CommitAccordionItem';
 import { PushChangesView } from './PushChangesView';
@@ -98,7 +99,9 @@ export function PushTab({
         void rpc.focusGitLog();
     }, []);
 
+    const showInitialLoading = isLoading && commits.length === 0;
     const showEmptyState = !isLoading && totalCommits === 0 && Boolean(selectedRemote && selectedRemoteBranch);
+    const showTopLoading = isInitStateLoading || isRemoteBranchesLoading || isLoading || isLoadingMore;
 
     return (
         <div className={styles.container}>
@@ -118,15 +121,10 @@ export function PushTab({
                 onUseTargetForCommit={onUseTargetForCommit}
             />
 
+            <LoadingProgressBar active={showTopLoading} ariaLabel={t('Loading...')} />
+
             {/* Scroll Area */}
             <div className={styles.scrollArea} ref={scrollAreaRef} tabIndex={0}>
-                {isLoading && commits.length === 0 && (
-                    <div className={styles.emptyState}>
-                        <i className={`codicon codicon-loading codicon-modifier-spin ${styles.emptyIcon}`} />
-                        <div className={styles.emptyTitle}>{t('Loading...')}</div>
-                    </div>
-                )}
-
                 {showEmptyState && (
                     <div className={styles.emptyState}>
                         <i className={`codicon codicon-check ${styles.emptyIcon}`} />
@@ -147,7 +145,7 @@ export function PushTab({
                     </div>
                 )}
 
-                {!isLoading && !showEmptyState && viewMode === 'commits' && (
+                {!showInitialLoading && !showEmptyState && viewMode === 'commits' && (
                     <>
                         {commits.map((commit, index) => (
                             <CommitAccordionItem
@@ -169,7 +167,6 @@ export function PushTab({
                             >
                                 {isLoadingMore ? (
                                     <>
-                                        <i className="codicon codicon-sync codicon-modifier-spin" />
                                         <span>{t('Loading...')}</span>
                                     </>
                                 ) : (
@@ -183,7 +180,7 @@ export function PushTab({
                     </>
                 )}
 
-                {!isLoading && !showEmptyState && viewMode === 'changes' && (
+                {!showInitialLoading && !showEmptyState && viewMode === 'changes' && (
                     <PushChangesView
                         commits={commits}
                         changesViewMode={changesViewMode}

@@ -220,30 +220,3 @@
     white-space: nowrap;
     display: block;
 }
-
-.loadingWrapper {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    padding: 24px;
-    color: var(--vscode-descriptionForeground);
-    font-size: 13px;
-    background: var(--vscode-sideBar-background);
-    border-top: 1px solid var(--vscode-sideBarSectionHeader-border);
-}
-
-.loadingWrapper i {
-    font-size: 16px;
-    animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-    from {
-        transform: rotate(0deg);
-    }
-
-    to {
-        transform: rotate(360deg);
-    }
-}

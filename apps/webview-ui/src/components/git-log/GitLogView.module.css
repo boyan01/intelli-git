@@ -5,6 +5,13 @@
     flex-direction: column;
 }
 
+.loadingPlaceholder {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+}
+
 .statePanel {
     display: flex;
     min-height: 100%;
