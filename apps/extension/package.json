@@ -1297,6 +1297,12 @@
           ],
           "description": "%intelli-git.config.changelist.mode.description%"
         },
+        "intelli-git.push.confirmProtectedBranch": {
+          "type": "boolean",
+          "default": true,
+          "scope": "resource",
+          "description": "%intelli-git.config.push.confirmProtectedBranch.description%"
+        },
         "intelli-git.editor.changeBlockDecorations": {
           "type": "string",
           "default": "allEditors",

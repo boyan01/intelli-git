@@ -374,6 +374,7 @@ export interface PushInitState {
     localBranch: string;
     remotes: string[];
     upstream?: string;
+    protectedPushTargets?: string[];
 }
 
 export interface PushCommitsData {

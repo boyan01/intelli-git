@@ -1,4 +1,5 @@
 let changelistMode = 'staged';
+let confirmProtectedBranchPush = true;
 const executedCommands: Array<{ command: string; args: unknown[] }> = [];
 const warningMessages: Array<{ message: string; args: unknown[] }> = [];
 const informationMessages: Array<{ message: string; args: unknown[] }> = [];
@@ -52,11 +53,17 @@ export const workspace = {
                 if (section === 'intelli-git' && key === 'changelist.mode') {
                     return changelistMode as T;
                 }
+                if (section === 'intelli-git.push' && key === 'confirmProtectedBranch') {
+                    return confirmProtectedBranchPush as T;
+                }
                 return defaultValue;
             },
             async update(key: string, value: unknown): Promise<void> {
                 if (section === 'intelli-git' && key === 'changelist.mode') {
                     changelistMode = String(value);
+                }
+                if (section === 'intelli-git.push' && key === 'confirmProtectedBranch') {
+                    confirmProtectedBranchPush = Boolean(value);
                 }
             }
         };
@@ -233,6 +240,10 @@ export function __setChangelistMode(mode: string): void {
 
 export function __getChangelistMode(): string {
     return changelistMode;
+}
+
+export function __setConfirmProtectedBranchPush(value: boolean): void {
+    confirmProtectedBranchPush = value;
 }
 
 export function __getExecutedCommands(): Array<{ command: string; args: unknown[] }> {

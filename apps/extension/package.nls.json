@@ -66,6 +66,7 @@
   "intelli-git.config.changelist.mode.description": "Choose how the commit panel organizes local changes.",
   "intelli-git.config.changelist.mode.staged": "Separate staged and unstaged changes.",
   "intelli-git.config.changelist.mode.changes": "Use IntelliJ-style changelists with one active list.",
+  "intelli-git.config.push.confirmProtectedBranch.description": "Require confirmation before pushing directly to protected targets such as origin/main or origin/master.",
   "intelli-git.config.editor.changeBlockDecorations.description": "Controls Intelli Git change block labels in editors.",
   "intelli-git.config.editor.changeBlockDecorations.off": "Do not show change block labels in editors.",
   "intelli-git.config.editor.changeBlockDecorations.diffOnly": "Show change block labels only in diff-like editors.",

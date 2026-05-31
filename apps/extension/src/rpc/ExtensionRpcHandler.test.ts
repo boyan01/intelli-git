@@ -24,6 +24,7 @@ const vscodeTestMock = vscodeMock as unknown as {
     __getCreatedTerminals(): Array<{ options: unknown; sentText: string[]; shown: boolean }>;
     __resetCreatedTerminals(): void;
     __setWorkspaceFolders(paths: string[] | undefined): void;
+    __setConfirmProtectedBranchPush(value: boolean): void;
 };
 
 function createTextStream(text: string): AsyncIterable<string> {
@@ -37,6 +38,7 @@ function createTextStream(text: string): AsyncIterable<string> {
 afterEach(() => {
     vscodeTestMock.__resetLanguageModels();
     vscodeTestMock.__setWorkspaceFolders(undefined);
+    vscodeTestMock.__setConfirmProtectedBranchPush(true);
 });
 
 function createStagedChangelistState(): ChangelistState {
@@ -298,10 +300,100 @@ describe('ExtensionRpcHandler push', () => {
         expect(branchRemote.forcePush).not.toHaveBeenCalled();
     });
 
-    it('fetches and reports behind count when a normal push is rejected', async () => {
+    it('confirms normal pushes to protected branch targets', async () => {
+        vscodeTestMock.__resetWindowMessages();
+        vscodeTestMock.__setWarningMessageResponse('Push Anyway');
         const branchRemote = {
             getBranches: vi.fn().mockResolvedValue({ current: 'main', all: ['main'] }),
             getUpstreamBranch: vi.fn().mockResolvedValue('origin/main'),
+            push: vi.fn().mockResolvedValue(undefined)
+        };
+        const handler = createHandler({
+            branchRemote
+        } as unknown as Partial<GitService>);
+
+        await expect(handler.push({
+            force: false,
+            pushTags: false,
+            remote: 'origin',
+            branch: 'main',
+            commitCount: 3
+        })).resolves.toEqual({
+            ok: true,
+            remote: 'origin',
+            branch: 'main',
+            commitCount: 3
+        });
+
+        expect(vscodeTestMock.__getWarningMessages()[0].message).toBe('Push directly to origin/main? This target is a protected branch. Make sure these commits are intended for the main line.');
+        expect(branchRemote.push).toHaveBeenCalledWith('origin', 'main:main', {
+            noVerify: undefined,
+            setUpstream: false
+        });
+    });
+
+    it('cancels normal pushes to protected branch targets when confirmation is declined', async () => {
+        vscodeTestMock.__resetWindowMessages();
+        const branchRemote = {
+            getBranches: vi.fn().mockResolvedValue({ current: 'main', all: ['main'] }),
+            push: vi.fn().mockResolvedValue(undefined)
+        };
+        const handler = createHandler({
+            branchRemote
+        } as unknown as Partial<GitService>);
+
+        await expect(handler.push({
+            force: false,
+            pushTags: false,
+            remote: 'origin',
+            branch: 'main'
+        })).resolves.toEqual({
+            ok: false,
+            code: 'cancelled',
+            remote: 'origin',
+            branch: 'main',
+            message: 'Protected branch push cancelled.'
+        });
+
+        expect(branchRemote.push).not.toHaveBeenCalled();
+    });
+
+    it('does not confirm protected branch pushes when the workspace setting is disabled', async () => {
+        vscodeTestMock.__resetWindowMessages();
+        vscodeTestMock.__setConfirmProtectedBranchPush(false);
+        const branchRemote = {
+            getBranches: vi.fn().mockResolvedValue({ current: 'main', all: ['main'] }),
+            getUpstreamBranch: vi.fn().mockResolvedValue('origin/main'),
+            push: vi.fn().mockResolvedValue(undefined)
+        };
+        const handler = createHandler({
+            branchRemote
+        } as unknown as Partial<GitService>);
+
+        await expect(handler.push({
+            force: false,
+            pushTags: false,
+            remote: 'origin',
+            branch: 'main',
+            commitCount: 1
+        })).resolves.toEqual({
+            ok: true,
+            remote: 'origin',
+            branch: 'main',
+            commitCount: 1
+        });
+
+        expect(vscodeTestMock.__getWarningMessages()).toHaveLength(0);
+        expect(branchRemote.push).toHaveBeenCalledWith('origin', 'main:main', {
+            noVerify: undefined,
+            setUpstream: false
+        });
+    });
+
+    it('fetches and reports behind count when a normal push is rejected', async () => {
+        const branchRemote = {
+            getBranches: vi.fn().mockResolvedValue({ current: 'feature', all: ['feature'] }),
+            getUpstreamBranch: vi.fn().mockResolvedValue('origin/feature'),
             push: vi.fn().mockRejectedValue(new Error('non-fast-forward')),
             fetch: vi.fn().mockResolvedValue(undefined),
             getBranchStatus: vi.fn().mockResolvedValue({ ahead: 0, behind: 2 })
@@ -314,17 +406,17 @@ describe('ExtensionRpcHandler push', () => {
             force: false,
             pushTags: false,
             remote: 'origin',
-            branch: 'main'
+            branch: 'feature'
         })).resolves.toEqual({
             ok: false,
             code: 'behind',
             remote: 'origin',
-            branch: 'main',
+            branch: 'feature',
             message: 'Push rejected because the remote branch has new commits.',
             behindCount: 2
         });
 
-        expect(branchRemote.push).toHaveBeenCalledWith('origin', 'main:main', {
+        expect(branchRemote.push).toHaveBeenCalledWith('origin', 'feature:feature', {
             noVerify: undefined,
             setUpstream: false
         });
@@ -334,8 +426,8 @@ describe('ExtensionRpcHandler push', () => {
 
     it('returns structured auth failures instead of throwing raw push errors', async () => {
         const branchRemote = {
-            getBranches: vi.fn().mockResolvedValue({ current: 'main', all: ['main'] }),
-            getUpstreamBranch: vi.fn().mockResolvedValue('origin/main'),
+            getBranches: vi.fn().mockResolvedValue({ current: 'feature', all: ['feature'] }),
+            getUpstreamBranch: vi.fn().mockResolvedValue('origin/feature'),
             push: vi.fn().mockRejectedValue(new Error('Authentication failed for origin'))
         };
         const handler = createHandler({
@@ -346,20 +438,20 @@ describe('ExtensionRpcHandler push', () => {
             force: false,
             pushTags: false,
             remote: 'origin',
-            branch: 'main'
+            branch: 'feature'
         })).resolves.toEqual({
             ok: false,
             code: 'auth-failed',
             remote: 'origin',
-            branch: 'main',
+            branch: 'feature',
             message: 'Authentication failed for origin'
         });
     });
 
     it('does not classify remote hook rejections as behind results', async () => {
         const branchRemote = {
-            getBranches: vi.fn().mockResolvedValue({ current: 'main', all: ['main'] }),
-            getUpstreamBranch: vi.fn().mockResolvedValue('origin/main'),
+            getBranches: vi.fn().mockResolvedValue({ current: 'feature', all: ['feature'] }),
+            getUpstreamBranch: vi.fn().mockResolvedValue('origin/feature'),
             push: vi.fn().mockRejectedValue(new Error('! [remote rejected] main -> main (pre-receive hook declined)')),
             fetch: vi.fn().mockResolvedValue(undefined),
             getBranchStatus: vi.fn().mockResolvedValue({ ahead: 0, behind: 2 })
@@ -372,12 +464,12 @@ describe('ExtensionRpcHandler push', () => {
             force: false,
             pushTags: false,
             remote: 'origin',
-            branch: 'main'
+            branch: 'feature'
         })).resolves.toEqual({
             ok: false,
             code: 'rejected',
             remote: 'origin',
-            branch: 'main',
+            branch: 'feature',
             message: '! [remote rejected] main -> main (pre-receive hook declined)'
         });
         expect(branchRemote.fetch).not.toHaveBeenCalled();
@@ -386,8 +478,8 @@ describe('ExtensionRpcHandler push', () => {
 
     it('returns structured network failures', async () => {
         const branchRemote = {
-            getBranches: vi.fn().mockResolvedValue({ current: 'main', all: ['main'] }),
-            getUpstreamBranch: vi.fn().mockResolvedValue('origin/main'),
+            getBranches: vi.fn().mockResolvedValue({ current: 'feature', all: ['feature'] }),
+            getUpstreamBranch: vi.fn().mockResolvedValue('origin/feature'),
             push: vi.fn().mockRejectedValue(new Error('Could not resolve host: github.com'))
         };
         const handler = createHandler({
@@ -398,20 +490,20 @@ describe('ExtensionRpcHandler push', () => {
             force: false,
             pushTags: false,
             remote: 'origin',
-            branch: 'main'
+            branch: 'feature'
         })).resolves.toEqual({
             ok: false,
             code: 'network',
             remote: 'origin',
-            branch: 'main',
+            branch: 'feature',
             message: 'Could not resolve host: github.com'
         });
     });
 
     it('returns unknown for unclassified push errors', async () => {
         const branchRemote = {
-            getBranches: vi.fn().mockResolvedValue({ current: 'main', all: ['main'] }),
-            getUpstreamBranch: vi.fn().mockResolvedValue('origin/main'),
+            getBranches: vi.fn().mockResolvedValue({ current: 'feature', all: ['feature'] }),
+            getUpstreamBranch: vi.fn().mockResolvedValue('origin/feature'),
             push: vi.fn().mockRejectedValue(new Error('unexpected push failure'))
         };
         const handler = createHandler({
@@ -422,12 +514,12 @@ describe('ExtensionRpcHandler push', () => {
             force: false,
             pushTags: false,
             remote: 'origin',
-            branch: 'main'
+            branch: 'feature'
         })).resolves.toEqual({
             ok: false,
             code: 'unknown',
             remote: 'origin',
-            branch: 'main',
+            branch: 'feature',
             message: 'unexpected push failure'
         });
     });
@@ -454,6 +546,12 @@ describe('ExtensionRpcHandler no repository state', () => {
         });
         await expect(readHandler.getLog({})).resolves.toEqual([]);
         await expect(readHandler.getWorkspaceRoot()).resolves.toBe('');
+        await expect(readHandler.getPushInitState()).resolves.toEqual({
+            repositoryPath: undefined,
+            localBranch: '',
+            remotes: [],
+            protectedPushTargets: ['origin/main', 'origin/master']
+        });
     });
 
     it('marks branch list data as repository-backed when a repository is active', async () => {

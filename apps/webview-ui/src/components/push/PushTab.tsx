@@ -39,6 +39,7 @@ export function PushTab({
         selectedRemoteBranch,
         setSelectedRemoteBranch,
         confirmSelectedTarget,
+        isProtectedPushTarget,
         isRemoteBranchesLoading,
         isInitStateLoading
     } = pushBranches;
@@ -197,6 +198,7 @@ export function PushTab({
                 commitCount={totalCommits}
                 selectedRemote={selectedRemote}
                 selectedRemoteBranch={selectedRemoteBranch}
+                isProtectedTarget={isProtectedPushTarget}
                 onPushComplete={() => {
                     confirmSelectedTarget();
                     // The backend sends a refresh event on git push, which triggers data reload.

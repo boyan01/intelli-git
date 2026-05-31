@@ -10,6 +10,7 @@ import type {
     PushInitState
 } from '@shared/messages';
 import type { RepositoryManager } from '../services/RepositoryManager';
+import { getProtectedPushTargets } from '../utils/pushProtection';
 
 export class GitReadRpcHandler {
     constructor(
@@ -18,10 +19,16 @@ export class GitReadRpcHandler {
     ) { }
 
     getPushInitState = async (): Promise<PushInitState> => {
-        return this.repositoryManager.getActiveService()?.branchRemote.getPushInitState() ?? {
+        const protectedPushTargets = getProtectedPushTargets();
+        const initState = await this.repositoryManager.getActiveService()?.branchRemote.getPushInitState();
+        return initState ? {
+            ...initState,
+            protectedPushTargets
+        } : {
             repositoryPath: undefined,
             localBranch: '',
-            remotes: []
+            remotes: [],
+            protectedPushTargets
         };
     };
 

@@ -14,7 +14,7 @@ export function usePushBranches() {
     } = useRpcData(
         loadPushInitState,
         {
-            initialValue: { repositoryPath: '', localBranch: '', remotes: [] },
+            initialValue: { repositoryPath: '', localBranch: '', remotes: [], protectedPushTargets: [] },
             refreshOnEvent: true,
             cacheKey: 'push.initState'
         }
@@ -119,6 +119,14 @@ export function usePushBranches() {
         return true;
     }, [defaultSelection, selectedRemote, selectedRemoteBranch]);
 
+    const isProtectedPushTarget = useMemo(() => {
+        if (!selectedRemote || !selectedRemoteBranch) {
+            return false;
+        }
+
+        return (initState.protectedPushTargets ?? []).includes(`${selectedRemote}/${selectedRemoteBranch}`);
+    }, [initState.protectedPushTargets, selectedRemote, selectedRemoteBranch]);
+
     const persistSelection = useCallback((remote: string, remoteBranch: string, confirmed: boolean) => {
         if (initState.localBranch && remote && remoteBranch) {
             setSavedSelection({
@@ -169,6 +177,7 @@ export function usePushBranches() {
                 confirmation: defaultSelection.confirmation
             }
             : undefined,
+        isProtectedPushTarget,
         confirmSelectedTarget,
         isRemoteBranchesLoading,
         isInitStateLoading,

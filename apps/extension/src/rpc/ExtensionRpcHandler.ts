@@ -52,6 +52,7 @@ import { ChangelistOperations, createDefaultRefreshDecorations } from '../operat
 import { GitReadRpcHandler } from './GitReadRpcHandler';
 import { ChangelistRpcHandler } from './ChangelistRpcHandler';
 import { handleCheckoutWorktreeConflict } from '../ui/checkoutWorktreeConflict';
+import { isProtectedPushTarget } from '../utils/pushProtection';
 
 function normalizeExistingPath(filePath: string): string {
     try {
@@ -363,6 +364,14 @@ export class ExtensionRpcHandler {
             throw new Error(i18n.t('No current branch to push.'));
         }
 
+        if (!options.force && isProtectedPushTarget(target.remote, target.branch)) {
+            const confirmed = await this.confirmProtectedBranchPush(target);
+            if (!confirmed) {
+                const error = new Error(i18n.t('Protected branch push cancelled.'));
+                throw Object.assign(error, { code: 'cancelled' as const });
+            }
+        }
+
         const hadUpstream = await gitService.branchRemote.getUpstreamBranch();
         const setUpstreamWithPush = !hadUpstream && options.setUpstreamToTarget;
         const pushOptions = {
@@ -646,6 +655,17 @@ export class ExtensionRpcHandler {
         const action = i18n.t('Force Push');
         const selected = await vscode.window.showWarningMessage(
             i18n.t('Force push to {0}/{1}? This can overwrite remote commits. Intelli Git will use --force-with-lease to avoid overwriting newer remote updates.', params.remote, params.branch),
+            { modal: true },
+            action
+        );
+
+        return selected === action;
+    };
+
+    private confirmProtectedBranchPush = async (params: { remote: string; branch: string }): Promise<boolean> => {
+        const action = i18n.t('Push Anyway');
+        const selected = await vscode.window.showWarningMessage(
+            i18n.t('Push directly to {0}/{1}? This target is a protected branch. Make sure these commits are intended for the main line.', params.remote, params.branch),
             { modal: true },
             action
         );

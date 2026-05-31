@@ -24,6 +24,7 @@ export interface PushFooterProps {
     commitCount: number;
     selectedRemote: string;
     selectedRemoteBranch: string;
+    isProtectedTarget?: boolean;
     onPushComplete: () => void;
 }
 
@@ -31,6 +32,7 @@ export const PushFooter: React.FC<PushFooterProps> = ({
     commitCount,
     selectedRemote,
     selectedRemoteBranch,
+    isProtectedTarget = false,
     onPushComplete,
 }) => {
     const { t } = useTranslation();
@@ -211,6 +213,15 @@ export const PushFooter: React.FC<PushFooterProps> = ({
                 <div className={styles.forceWarning}>
                     <i className="codicon codicon-warning" />
                     <span>{t('Force Push uses --force-with-lease and can rewrite remote history. You will be asked to confirm before pushing.')}</span>
+                </div>
+            )}
+            {!options.force && isProtectedTarget && commitCount > 0 && pushStatus !== 'success' && (
+                <div className={styles.protectedWarning}>
+                    <i className="codicon codicon-warning" />
+                    <span>
+                        <strong>{t('Protected branch')}</strong>
+                        <span>{t('You are about to push {{count}} commits directly to {{target}}.', { count: commitCount, target: `${selectedRemote}/${selectedRemoteBranch}` })}</span>
+                    </span>
                 </div>
             )}
             <div
