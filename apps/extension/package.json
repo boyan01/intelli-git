@@ -5,11 +5,11 @@
   "version": "0.0.5",
   "publisher": "boyan01",
   "license": "SEE LICENSE IN LICENSE",
-  "homepage": "https://github.com/boyan01/intelli-git-feedback#readme",
+  "homepage": "https://github.com/boyan01/intelli-git#readme",
   "bugs": {
-    "url": "https://github.com/boyan01/intelli-git-feedback/issues"
+    "url": "https://github.com/boyan01/intelli-git/issues"
   },
-  "qna": "https://github.com/boyan01/intelli-git-feedback/issues/new/choose",
+  "qna": "https://github.com/boyan01/intelli-git/issues/new/choose",
   "icon": "resources/icon.png",
   "galleryBanner": {
     "color": "#1F6FEB",

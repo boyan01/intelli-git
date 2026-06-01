@@ -57,7 +57,7 @@ export function registerGlobalNavigationCommands(
             branchStatusBar.showBranchPicker();
         }),
         vscode.commands.registerCommand('intelli-git.openFeedback', async () => {
-            await vscode.env.openExternal(vscode.Uri.parse('https://github.com/boyan01/intelli-git-feedback/issues/new/choose'));
+            await vscode.env.openExternal(vscode.Uri.parse('https://github.com/boyan01/intelli-git/issues/new/choose'));
         }),
         vscode.commands.registerCommand('intelli-git.copyCommitHash', async (args: any) => {
             if (args && args.hash) {

@@ -71,7 +71,7 @@ API keys are stored with VS Code SecretStorage. Legacy settings-based API keys a
 
 ## Support
 
-For support and issue reporting, see [SUPPORT.md](SUPPORT.md) or open a report in the [Intelli Git feedback repository](https://github.com/boyan01/intelli-git-feedback/issues/new/choose).
+For support and issue reporting, see [SUPPORT.md](SUPPORT.md) or open a report in the [Intelli Git repository](https://github.com/boyan01/intelli-git/issues/new/choose).
 
 ## License
 
