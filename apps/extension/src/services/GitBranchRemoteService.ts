@@ -579,6 +579,16 @@ export class GitBranchRemoteService {
         this.options.notifyChanged();
     }
 
+    public async fetchRemoteTracking(remote: string): Promise<void> {
+        const remotes = await this.getRemotes();
+        if (!remotes.includes(remote)) {
+            return;
+        }
+
+        await this.options.git.fetch(['--no-tags', '--quiet', remote]);
+        this.options.notifyChanged();
+    }
+
     public async updateBranch(branch: string, force: boolean = false): Promise<'success' | 'diverged'> {
         const remotes = await this.getRemotes();
         const remote = remotes.length > 0 ? remotes[0] : 'origin';

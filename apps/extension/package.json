@@ -1303,6 +1303,26 @@
           "scope": "resource",
           "description": "%intelli-git.config.push.confirmProtectedBranch.description%"
         },
+        "intelli-git.backgroundFetch.enabled": {
+          "type": "boolean",
+          "default": true,
+          "scope": "resource",
+          "description": "%intelli-git.config.backgroundFetch.enabled.description%"
+        },
+        "intelli-git.backgroundFetch.onStartup": {
+          "type": "boolean",
+          "default": true,
+          "scope": "resource",
+          "description": "%intelli-git.config.backgroundFetch.onStartup.description%"
+        },
+        "intelli-git.backgroundFetch.intervalMinutes": {
+          "type": "number",
+          "default": 15,
+          "minimum": 1,
+          "maximum": 1440,
+          "scope": "resource",
+          "description": "%intelli-git.config.backgroundFetch.intervalMinutes.description%"
+        },
         "intelli-git.editor.changeBlockDecorations": {
           "type": "string",
           "default": "allEditors",
