@@ -222,6 +222,11 @@ intelli-git-extension-v0.0.3
 3. 写 changelog 前必须先阅读上一产品 tag 之后的 commit history，并按 `Commit Message Requirements` 提炼用户可见变化。
 4. changelog 只写产品相关、用户可感知或需要知道的内容；构建、CI、测试、依赖、内部重构、发布脚本等默认不写入 changelog。
 5. VSIX 必须从对应 tag 的 commit 重新构建并审计后再发布。
+6. Marketplace / Open VSX 发布完成后，必须在 public `boyan01/intelli-git` 仓库创建同步 GitHub Release。
+   - public release 使用同一个产品版本，但 tag 只保留简短版本号，例如 `v0.0.3`。
+   - release notes 只复制 product-facing changelog，并包含 Marketplace 安装链接。
+   - public release 必须附加已审计的同一份 VSIX，并同时保留 Marketplace 安装链接。
+   - public `intelli-git` 仓库只是 documentation、feedback 和 issue tracking 入口；不要把它描述为源码发布来源。VSIX 的构建 provenance 仍然是本仓库中对应的产品 tag。
 
 ### 添加 Context Menus
 参见 `.agent/workflows/add-context-menu.md`。
