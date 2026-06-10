@@ -228,6 +228,24 @@ intelli-git-extension-v0.0.3
    - public release 必须附加已审计的同一份 VSIX，并同时保留 Marketplace 安装链接。
    - public `intelli-git` 仓库只是 documentation、feedback 和 issue tracking 入口；不要把它描述为源码发布来源。VSIX 的构建 provenance 仍然是本仓库中对应的产品 tag。
 
+Open VSX token handling:
+- 本地发布时优先从 macOS Keychain 读取 `OVSX_PAT`，不要把 token 明文写入 repo、`.env`、shell history 或 `~/.zshrc`。
+- Keychain item 使用 service name `intelli-git-ovsx-pat`，存入命令：
+
+```bash
+read -s OVSX_TOKEN
+security add-generic-password -a "$USER" -s intelli-git-ovsx-pat -w "$OVSX_TOKEN" -U
+unset OVSX_TOKEN
+```
+
+- 本地 Open VSX 发布命令：
+
+```bash
+OVSX_PAT="$(security find-generic-password -a "$USER" -s intelli-git-ovsx-pat -w)" npm run publish:extension:open-vsx
+```
+
+- CI 中使用 secret `OVSX_PAT`，不要把 token 写进 workflow 文件。
+
 ### 添加 Context Menus
 参见 `.agent/workflows/add-context-menu.md`。
 

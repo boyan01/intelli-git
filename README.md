@@ -121,6 +121,23 @@ npm run publish:extension:marketplace
 npm run publish:extension:open-vsx
 ```
 
+For local Open VSX publishing on macOS, store the token in Keychain instead of
+exporting it manually for every release:
+
+```bash
+read -s OVSX_TOKEN
+security add-generic-password -a "$USER" -s intelli-git-ovsx-pat -w "$OVSX_TOKEN" -U
+unset OVSX_TOKEN
+```
+
+Then publish with:
+
+```bash
+OVSX_PAT="$(security find-generic-password -a "$USER" -s intelli-git-ovsx-pat -w)" npm run publish:extension:open-vsx
+```
+
+In CI, provide the same value through an `OVSX_PAT` secret.
+
 ### Development Workflow
 
 1. Run `npm run watch:extension`
