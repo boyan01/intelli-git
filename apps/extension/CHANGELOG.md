@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.0.6
+
+- Added worktree-aware repository switching and repository controls for multi-root and worktree-based projects.
+- Added multi-repository commit view support so commit operations stay scoped to the selected repository.
+- Added safer branch, checkout, rebase, and reset workflows that preview destructive operations and protect dirty worktrees.
+- Added protected-branch push warnings and a native review branch publish flow.
+- Added background origin fetches and clearer branch status indicators.
+- Improved Push tab target selection, empty states, danger states, refresh stability, and operation error reporting.
+- Improved Git Log loading performance for large repositories and refined narrow-layout commit details.
+- Improved AI commit message generation with provider status, scoped generation, and clearer configuration controls.
+- Improved webview loading feedback with delayed top progress bars instead of blocking spinners.
+- Added Open VSX packaging support alongside Marketplace release packaging.
+
 ## 0.0.5
 
 - Added Early Access messaging that clarifies Intelli Git is currently free.
