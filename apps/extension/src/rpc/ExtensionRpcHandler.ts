@@ -26,7 +26,10 @@ import type {
     CommitMessageGenerationResult,
     PushFailedResult,
     PushFailureCode,
-    PushRequest
+    PushRequest,
+    PublishReviewBranchResult,
+    CommitDetails,
+    PublishReviewBranchRequest
 } from '@shared/messages';
 import { GitService } from '../services/GitService';
 import { RepositoryManager } from '../services/RepositoryManager';
@@ -43,7 +46,9 @@ import {
     DEFAULT_CUSTOM_OPENAI_API_URL,
     DEFAULT_CUSTOM_OPENAI_MODEL,
     DEFAULT_GOOGLE_API_URL,
-    DEFAULT_GOOGLE_MODEL
+    DEFAULT_GOOGLE_MODEL,
+    DEFAULT_PULL_REQUEST_BODY_PROMPT,
+    DEFAULT_PULL_REQUEST_TITLE_PROMPT
 } from '../services/ai';
 import { logger } from '../utils/logger';
 import { getAiApiKey } from '../utils/aiSecrets';
@@ -73,6 +78,10 @@ function createRpcError(message: string, code: string, data?: unknown): Error {
     return error;
 }
 
+function isRpcCancellation(error: unknown): boolean {
+    return error instanceof Error && (error as Error & { code?: unknown }).code === 'cancelled';
+}
+
 function countDiffFiles(diff: string): number {
     return diff.match(/^diff --git /gm)?.length || 0;
 }
@@ -81,8 +90,90 @@ function countDiffHunks(diff: string): number {
     return diff.match(/^@@ /gm)?.length || 0;
 }
 
+function truncateValue(value: string, maxLength: number): string {
+    return value.length > maxLength ? `${value.substring(0, maxLength - 3)}...` : value;
+}
+
+function cleanAiText(value: string): string {
+    return value
+        .trim()
+        .replace(/^```(?:markdown|md|text)?\s*/i, '')
+        .replace(/```$/i, '')
+        .trim()
+        .replace(/^["']|["']$/g, '')
+        .trim();
+}
+
+function slugifyBranchSegment(value: string): string {
+    const slug = value
+        .toLowerCase()
+        .replace(/['"]/g, '')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .replace(/-{2,}/g, '-')
+        .substring(0, 56)
+        .replace(/-+$/g, '');
+
+    return slug || 'update';
+}
+
+function getBranchPrefixFromTitle(title: string): string {
+    const normalized = title.trim().toLowerCase();
+    if (normalized.startsWith('fix') || normalized.startsWith('resolve')) {
+        return 'fix';
+    }
+    if (normalized.startsWith('docs') || normalized.startsWith('document')) {
+        return 'docs';
+    }
+    if (normalized.startsWith('test') || normalized.startsWith('add test')) {
+        return 'test';
+    }
+    if (normalized.startsWith('refactor')) {
+        return 'refactor';
+    }
+    return 'feat';
+}
+
+function createBranchNameFromTitle(title: string): string {
+    const cleanedTitle = title.replace(/^(feat|fix|docs|test|refactor|chore)(\(.+\))?:\s*/i, '');
+    return `${getBranchPrefixFromTitle(title)}/${slugifyBranchSegment(cleanedTitle)}`;
+}
+
+function renderPromptTemplate(template: string, variables: Record<string, string | number>): string {
+    return template.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (match, key: string) => {
+        const value = variables[key];
+        return value === undefined ? match : String(value);
+    });
+}
+
 const MARKETPLACE_EXTENSION_URL = 'https://marketplace.visualstudio.com/items?itemName=boyan01.intelli-git';
 const DEV_BUILD_INSTRUCTIONS_URL = 'https://github.com/boyan01/intelli-git#package';
+
+interface PublishReviewBranchInternalRequest {
+    remote: string;
+    baseBranch: string;
+    branchName: string;
+    resetBaseBranch: boolean;
+    noVerify?: boolean;
+}
+
+interface ReviewBranchOptions {
+    resetBaseBranch: boolean;
+    generateAiNotes: boolean;
+}
+
+const DEFAULT_REVIEW_BRANCH_OPTIONS: ReviewBranchOptions = {
+    resetBaseBranch: true,
+    generateAiNotes: false
+};
+const REVIEW_BRANCH_OPTIONS_STORAGE_KEY = 'ideaCommitPanel.reviewBranchOptions.v1';
+
+function createRepoScopedStorageKey(baseKey: string, repoPath?: string): string {
+    if (!repoPath) {
+        return baseKey;
+    }
+    return `${baseKey}.${repoPath.replace(/[^a-zA-Z0-9]/g, '_')}`;
+}
 
 function isExtensionSourceRoot(candidate: string | undefined): candidate is string {
     if (!candidate) {
@@ -544,6 +635,7 @@ export class ExtensionRpcHandler {
                 getCommitFiles: this.gitReadRpcHandler.getCommitFiles,
                 getMultiCommitFiles: this.gitReadRpcHandler.getMultiCommitFiles,
                 push: this.push,
+                publishReviewBranch: this.publishReviewBranch,
                 confirmForcePush: this.confirmForcePush,
                 openDiff: this.openDiff,
                 closeWebView: this.closeWebView,
@@ -671,6 +763,353 @@ export class ExtensionRpcHandler {
         );
 
         return selected === action;
+    };
+
+    private getPullRequestTitlePrompt(): string {
+        return vscode.workspace
+            .getConfiguration('intelli-git.ai')
+            .get<string>('pullRequestTitlePrompt', DEFAULT_PULL_REQUEST_TITLE_PROMPT)
+            .trim() || DEFAULT_PULL_REQUEST_TITLE_PROMPT;
+    }
+
+    private getPullRequestBodyPrompt(): string {
+        return vscode.workspace
+            .getConfiguration('intelli-git.ai')
+            .get<string>('pullRequestBodyPrompt', DEFAULT_PULL_REQUEST_BODY_PROMPT)
+            .trim() || DEFAULT_PULL_REQUEST_BODY_PROMPT;
+    }
+
+    private async createPullRequestContext(
+        gitService: GitService,
+        remote: string,
+        baseBranch: string,
+        commitCount?: number
+    ): Promise<{
+        sourceBranch: string;
+        commits: CommitDetails[];
+        changedFiles: string[];
+        commitsText: string;
+        changedFilesText: string;
+        fallbackTitle: string;
+        fallbackBody: string;
+    }> {
+        const branches = await gitService.branchRemote.getBranches();
+        const sourceBranch = branches.current;
+        if (!sourceBranch) {
+            throw new Error(i18n.t('No current branch to publish.'));
+        }
+
+        const limit = Math.max(1, Math.min(commitCount || 50, 50));
+        const data = await gitService.branchRemote.getPushCommits({
+            remote,
+            branch: baseBranch,
+            limit
+        });
+        const commits = data.commits;
+        if (commits.length === 0) {
+            throw new Error(i18n.t('No outgoing commits found for {0}/{1}.', remote, baseBranch));
+        }
+
+        const changedFiles = Array.from(new Set(
+            commits.flatMap(commit => commit.files.map(file => file.displayPath || file.path))
+        )).sort();
+        const commitsText = commits
+            .map((commit, index) => {
+                const body = commit.body ? `\n${truncateValue(commit.body, 500)}` : '';
+                return `${index + 1}. ${commit.shortHash} ${commit.subject}${body}`;
+            })
+            .join('\n\n');
+        const changedFilesText = changedFiles.length > 0
+            ? changedFiles.map(file => `- ${file}`).join('\n')
+            : '- No file list available';
+        const fallbackTitle = commits[0]?.subject || i18n.t('Update project files');
+        const fallbackBody = [
+            '## Summary',
+            ...commits.map(commit => `- ${commit.subject}`),
+            '',
+            '## Testing',
+            '- Not run (not provided).'
+        ].join('\n');
+
+        return {
+            sourceBranch,
+            commits,
+            changedFiles,
+            commitsText,
+            changedFilesText,
+            fallbackTitle,
+            fallbackBody
+        };
+    }
+
+    private async generatePullRequestText(
+        prompt: string,
+        context: {
+            baseBranch: string;
+            headBranch: string;
+            commitCount: number;
+            commitsText: string;
+            changedFilesText: string;
+        },
+        token: vscode.CancellationToken
+    ): Promise<string> {
+        const renderedPrompt = renderPromptTemplate(prompt, {
+            baseBranch: context.baseBranch,
+            headBranch: context.headBranch,
+            commitCount: context.commitCount,
+            commits: context.commitsText,
+            changedFiles: context.changedFilesText
+        });
+        const model = await this.getAIModel();
+        const response = await model.sendRequest([
+            vscode.LanguageModelChatMessage.User(renderedPrompt),
+            vscode.LanguageModelChatMessage.User([
+                `Base branch: ${context.baseBranch}`,
+                `Head branch: ${context.headBranch}`,
+                `Commit count: ${context.commitCount}`,
+                '',
+                'Commits:',
+                context.commitsText,
+                '',
+                'Changed files:',
+                context.changedFilesText
+            ].join('\n'))
+        ], {}, token);
+
+        let text = '';
+        for await (const fragment of response.text) {
+            if (token.isCancellationRequested) {
+                throw createRpcError(i18n.t('Review branch workflow cancelled.'), 'cancelled');
+            }
+            text += fragment;
+        }
+        return cleanAiText(text);
+    }
+
+    private async getPullRequestCompareUrl(remote: string, baseBranch: string, headBranch: string): Promise<string | undefined> {
+        const compareUrl = await this.gitService.branchRemote.getRemoteCompareUrlForRemote(remote, baseBranch, headBranch);
+        return compareUrl ? `${compareUrl}?expand=1` : undefined;
+    }
+
+    private async copyPullRequestNotes(title: string, body: string, notify = true): Promise<void> {
+        await vscode.env.clipboard.writeText(`${title.trim()}\n\n${body.trim()}`.trim());
+        if (notify) {
+            vscode.window.showInformationMessage(i18n.t('PR notes copied to clipboard.'));
+        }
+    }
+
+    private getReviewBranchOptionsStorageKey(gitService: GitService): string {
+        return createRepoScopedStorageKey(REVIEW_BRANCH_OPTIONS_STORAGE_KEY, gitService.getWorkspaceRoot());
+    }
+
+    private getReviewBranchOptions(gitService: GitService): ReviewBranchOptions {
+        const saved = this.context.workspaceState.get<Partial<ReviewBranchOptions>>(
+            this.getReviewBranchOptionsStorageKey(gitService),
+            {}
+        );
+
+        return {
+            ...DEFAULT_REVIEW_BRANCH_OPTIONS,
+            ...saved
+        };
+    }
+
+    private async saveReviewBranchOptions(gitService: GitService, options: ReviewBranchOptions): Promise<void> {
+        await this.context.workspaceState.update(this.getReviewBranchOptionsStorageKey(gitService), options);
+    }
+
+    publishReviewBranch = async (params: PublishReviewBranchRequest): Promise<PublishReviewBranchResult | null> => {
+        try {
+            const gitService = this.gitService;
+            const context = await this.createPullRequestContext(
+                gitService,
+                params.remote,
+                params.baseBranch,
+                params.commitCount
+            );
+            const savedOptions = this.getReviewBranchOptions(gitService);
+            let title = context.fallbackTitle;
+            let body = context.fallbackBody;
+
+            const branchName = await vscode.window.showInputBox({
+                title: i18n.t('Create Review Branch'),
+                prompt: i18n.t('Enter the new branch name to push for review.'),
+                value: createBranchNameFromTitle(title),
+                ignoreFocusOut: true,
+                validateInput: value => value.trim() ? undefined : i18n.t('Branch name is required.')
+            });
+            if (!branchName) {
+                return null;
+            }
+
+            interface ReviewBranchOption extends vscode.QuickPickItem {
+                id: 'reset-base' | 'ai-notes';
+            }
+
+            const resetOption: ReviewBranchOption = {
+                id: 'reset-base',
+                label: i18n.t('Reset {0} to {1}/{2} after push', context.sourceBranch, params.remote, params.baseBranch),
+                picked: savedOptions.resetBaseBranch
+            };
+            const aiOption: ReviewBranchOption = {
+                id: 'ai-notes',
+                label: i18n.t('Generate PR notes with AI'),
+                description: i18n.t('Optional'),
+                picked: savedOptions.generateAiNotes
+            };
+            const selectedOptions = await vscode.window.showQuickPick<ReviewBranchOption>(
+                [resetOption, aiOption],
+                {
+                    title: i18n.t('Create Review Branch'),
+                    placeHolder: i18n.t('Select review branch options'),
+                    canPickMany: true,
+                    ignoreFocusOut: true
+                }
+            );
+            if (!selectedOptions) {
+                return null;
+            }
+
+            const resetBaseBranch = selectedOptions.some(option => option.id === 'reset-base');
+            const generateAiNotes = selectedOptions.some(option => option.id === 'ai-notes');
+            await this.saveReviewBranchOptions(gitService, { resetBaseBranch, generateAiNotes });
+
+            if (generateAiNotes) {
+                let aiCancelled = false;
+                try {
+                    await vscode.window.withProgress(
+                        {
+                            location: vscode.ProgressLocation.Notification,
+                            title: i18n.t('Generating PR notes...'),
+                            cancellable: true
+                        },
+                        async (_progress, token) => {
+                            token.onCancellationRequested(() => {
+                                aiCancelled = true;
+                            });
+                            const draftContext = {
+                                baseBranch: params.baseBranch,
+                                headBranch: context.sourceBranch,
+                                commitCount: context.commits.length,
+                                commitsText: context.commitsText,
+                                changedFilesText: context.changedFilesText
+                            };
+                            const [generatedTitle, generatedBody] = await Promise.all([
+                                this.generatePullRequestText(this.getPullRequestTitlePrompt(), draftContext, token),
+                                this.generatePullRequestText(this.getPullRequestBodyPrompt(), draftContext, token)
+                            ]);
+                            title = generatedTitle || title;
+                            body = generatedBody || body;
+                        }
+                    );
+                    if (aiCancelled) {
+                        return null;
+                    }
+                } catch (error) {
+                    if (aiCancelled || isRpcCancellation(error)) {
+                        return null;
+                    }
+                    logger.warn('Failed to generate pull request notes with AI:', error);
+                    vscode.window.showWarningMessage(i18n.t('AI draft generation failed. Intelli Git used a commit-based fallback.'));
+                }
+            }
+
+            const result = await vscode.window.withProgress(
+                {
+                    location: vscode.ProgressLocation.Notification,
+                    title: i18n.t('Creating review branch {0}...', branchName.trim()),
+                    cancellable: false
+                },
+                async () => this.publishReviewBranchInternal({
+                    remote: params.remote,
+                    baseBranch: params.baseBranch,
+                    branchName: branchName.trim(),
+                    resetBaseBranch,
+                    noVerify: params.noVerify
+                })
+            );
+
+            if (result.resetWarning) {
+                vscode.window.showWarningMessage(result.resetWarning);
+            }
+
+            const openAction = result.compareUrl ? i18n.t('Copy Notes & Open Page') : undefined;
+            const copyAction = i18n.t('Copy PR Notes');
+            const actions = openAction ? [openAction, copyAction] : [copyAction];
+            const selectedAction = await vscode.window.showInformationMessage(
+                i18n.t('Review branch {0} pushed to {1}.', result.branchName, result.remote),
+                ...actions
+            );
+            if (selectedAction === openAction && result.compareUrl) {
+                await this.copyPullRequestNotes(title, body, false);
+                await vscode.env.openExternal(vscode.Uri.parse(result.compareUrl));
+            } else if (selectedAction === copyAction) {
+                await this.copyPullRequestNotes(title, body);
+            }
+
+            return result;
+        } catch (error) {
+            if (isRpcCancellation(error)) {
+                return null;
+            }
+            const message = error instanceof Error ? error.message : String(error);
+            vscode.window.showErrorMessage(i18n.t('Failed to create review branch: {0}', message));
+            throw error;
+        }
+    };
+
+    private publishReviewBranchInternal = async (params: PublishReviewBranchInternalRequest): Promise<PublishReviewBranchResult> => {
+        const gitService = this.gitService;
+        const branchName = params.branchName.trim();
+        if (!branchName) {
+            throw new Error(i18n.t('Branch name is required.'));
+        }
+
+        await gitService.branchRemote.validateBranchName(branchName);
+        if (await gitService.branchRemote.localBranchExists(branchName)) {
+            throw new Error(i18n.t('Branch {0} already exists.', branchName));
+        }
+        if (await gitService.branchRemote.hasLocalChanges()) {
+            throw new Error(i18n.t('Commit or stash local changes before publishing a review branch.'));
+        }
+
+        const branches = await gitService.branchRemote.getBranches();
+        const sourceBranch = branches.current;
+        if (!sourceBranch) {
+            throw new Error(i18n.t('No current branch to publish.'));
+        }
+
+        await gitService.branchRemote.createBranch(branchName);
+        await this.pushCurrentBranchToTarget(
+            gitService,
+            { remote: params.remote, branch: branchName },
+            { noVerify: params.noVerify, setUpstreamToTarget: true }
+        );
+
+        let baseBranchReset = false;
+        let resetWarning: string | undefined;
+        if (params.resetBaseBranch && sourceBranch !== branchName) {
+            try {
+                await gitService.branchRemote.resetLocalBranchToRemote(sourceBranch, params.remote, params.baseBranch);
+                baseBranchReset = true;
+            } catch (error) {
+                logger.warn('Failed to reset source branch after PR branch publish:', error);
+                resetWarning = i18n.t('Branch was pushed, but {0} could not be reset to {1}/{2}.', sourceBranch, params.remote, params.baseBranch);
+            }
+        }
+
+        const compareUrl = await this.getPullRequestCompareUrl(params.remote, params.baseBranch, branchName);
+        const result: PublishReviewBranchResult = {
+            remote: params.remote,
+            baseBranch: params.baseBranch,
+            sourceBranch,
+            branchName,
+            compareUrl,
+            baseBranchReset,
+            resetWarning
+        };
+
+        return result;
     };
 
     private async getStatusWithState(): Promise<FileStatus[]> {

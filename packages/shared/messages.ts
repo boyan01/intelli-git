@@ -174,6 +174,23 @@ export interface PushRequest {
     commitCount?: number;
 }
 
+export interface PublishReviewBranchResult {
+    remote: string;
+    baseBranch: string;
+    sourceBranch: string;
+    branchName: string;
+    compareUrl?: string;
+    baseBranchReset: boolean;
+    resetWarning?: string;
+}
+
+export interface PublishReviewBranchRequest {
+    remote: string;
+    baseBranch: string;
+    commitCount?: number;
+    noVerify?: boolean;
+}
+
 export interface ChangelistFileSelection {
     repoPath?: string;
     path: string;
@@ -297,6 +314,7 @@ export interface ExtensionMethods {
     getCommitFiles: (hash: string) => Promise<CommitFile[]>;
     getMultiCommitFiles: (hashes: string[]) => Promise<CommitFile[]>;
     push: (params: PushRequest) => Promise<PushResult>;
+    publishReviewBranch: (params: PublishReviewBranchRequest) => Promise<PublishReviewBranchResult | null>;
     confirmForcePush: (params: { remote: string; branch: string }) => Promise<boolean>;
     openDiff: (path: string | { path: string; repoPath?: string; staged?: boolean }, staged?: boolean) => Promise<void>;
     closeWebView: () => Promise<void>;

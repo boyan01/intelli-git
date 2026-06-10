@@ -77,6 +77,8 @@
   "intelli-git.config.ai.provider.description": "用于生成提交信息的 AI 提供商",
   "intelli-git.config.ai.provider.markdownDescription": "用于生成提交信息的 AI 提供商。常规配置请使用 [配置 AI Provider](command:intelli-git.ai.configureProvider)，高级值可以在 [settings.json](command:workbench.action.openSettingsJson) 中手动修改。",
   "intelli-git.config.ai.commitPrompt.markdownDescription": "AI 生成提交信息时使用的 prompt。所选 diff 会作为独立消息追加在这个 prompt 后面。也可以从生成按钮右键菜单进入修改。",
+  "intelli-git.config.ai.pullRequestTitlePrompt.markdownDescription": "AI 生成 pull request title 时使用的 prompt。支持变量：`{{baseBranch}}`、`{{headBranch}}`、`{{commitCount}}`、`{{commits}}` 和 `{{changedFiles}}`。",
+  "intelli-git.config.ai.pullRequestBodyPrompt.markdownDescription": "AI 生成 pull request body 时使用的 prompt。支持变量：`{{baseBranch}}`、`{{headBranch}}`、`{{commitCount}}`、`{{commits}}` 和 `{{changedFiles}}`。",
   "intelli-git.config.ai.provider.copilot": "使用内置 GitHub Copilot（需安装 Copilot 扩展）",
   "intelli-git.config.ai.provider.anthropic": "使用 Anthropic Claude API（需配置 API Key）",
   "intelli-git.config.ai.anthropic.apiKey.description": "Anthropic API Key，请从 https://console.anthropic.com 获取",

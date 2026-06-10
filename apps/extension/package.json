@@ -1284,6 +1284,18 @@
           "editPresentation": "multilineText",
           "markdownDescription": "%intelli-git.config.ai.commitPrompt.markdownDescription%"
         },
+        "intelli-git.ai.pullRequestTitlePrompt": {
+          "type": "string",
+          "default": "Generate a concise pull request title from the provided local commits and changed files. Use imperative mood. Return only the title, no markdown and no quotes.",
+          "editPresentation": "multilineText",
+          "markdownDescription": "%intelli-git.config.ai.pullRequestTitlePrompt.markdownDescription%"
+        },
+        "intelli-git.ai.pullRequestBodyPrompt": {
+          "type": "string",
+          "default": "Generate a pull request body from the provided local commits and changed files. Use markdown with Summary and Testing sections. Keep it factual and do not claim tests were run unless the context says so.",
+          "editPresentation": "multilineText",
+          "markdownDescription": "%intelli-git.config.ai.pullRequestBodyPrompt.markdownDescription%"
+        },
         "intelli-git.changelist.mode": {
           "type": "string",
           "default": "staged",

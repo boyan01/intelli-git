@@ -40,6 +40,7 @@ export const PushFooter: React.FC<PushFooterProps> = ({
     const [pushStatus, setPushStatus] = useState<PushStatus>('idle');
     const [error, setError] = useState<PushErrorState | null>(null);
     const [isPulling, setIsPulling] = useState(false);
+    const [isPublishingReviewBranch, setIsPublishingReviewBranch] = useState(false);
     const [options, setOptions] = useState<PushOptions>({
         force: false,
         tags: false,
@@ -140,6 +141,31 @@ export const PushFooter: React.FC<PushFooterProps> = ({
         }
     };
 
+    const handleCreateReviewBranch = async () => {
+        if (!selectedRemote || !selectedRemoteBranch || commitCount === 0) return;
+
+        setError(null);
+        setIsPublishingReviewBranch(true);
+        try {
+            const result = await rpc.publishReviewBranch({
+                remote: selectedRemote,
+                baseBranch: selectedRemoteBranch,
+                commitCount,
+                noVerify: options.noVerify
+            });
+            if (result) {
+                setPushStatus('success');
+                onPushComplete();
+                setTimeout(() => setPushStatus('idle'), 2000);
+            }
+        } catch (e) {
+            setError(getPushErrorState(describeUnknownPushError(e)));
+            setPushStatus('error');
+        } finally {
+            setIsPublishingReviewBranch(false);
+        }
+    };
+
     const getButtonState = () => {
         if (pushStatus === 'success') {
             return {
@@ -178,7 +204,7 @@ export const PushFooter: React.FC<PushFooterProps> = ({
 
     const btnState = getButtonState();
     const isPushing = pushStatus === 'pushing';
-    const isDisabled = isPushing || isPulling || pushStatus === 'success' || commitCount === 0;
+    const isDisabled = isPushing || isPulling || isPublishingReviewBranch || pushStatus === 'success' || commitCount === 0;
 
     return (
         <div className={styles.footer}>
@@ -221,6 +247,14 @@ export const PushFooter: React.FC<PushFooterProps> = ({
                     <span>
                         <strong>{t('Protected branch')}</strong>
                         <span>{t('You are about to push {{count}} commits directly to {{target}}.', { count: commitCount, target: `${selectedRemote}/${selectedRemoteBranch}` })}</span>
+                        <button
+                            className={styles.inlineAction}
+                            onClick={() => void handleCreateReviewBranch()}
+                            disabled={commitCount === 0 || isPublishingReviewBranch}
+                        >
+                            <i className={`codicon ${isPublishingReviewBranch ? 'codicon-sync codicon-modifier-spin' : 'codicon-git-pull-request-create'}`} />
+                            <span>{t('Create Review Branch...')}</span>
+                        </button>
                     </span>
                 </div>
             )}
@@ -248,7 +282,7 @@ export const PushFooter: React.FC<PushFooterProps> = ({
                 <button
                     className={`${styles.optionsBtn} ${styles[btnState.variant]}`}
                     onClick={() => setIsOpen(!isOpen)}
-                    disabled={isPushing || isPulling}
+                    disabled={isPushing || isPulling || isPublishingReviewBranch}
                     aria-label={t('Push Options')}
                 >
                     <i className={`codicon codicon-chevron-up ${styles.chevron} ${isOpen ? styles.chevronOpen : ''}`} />

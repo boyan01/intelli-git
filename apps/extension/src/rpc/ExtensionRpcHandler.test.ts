@@ -15,6 +15,9 @@ const vscodeTestMock = vscodeMock as unknown as {
     __getExecutedCommands(): Array<{ command: string; args: unknown[] }>;
     __resetExecutedCommands(): void;
     __setWarningMessageResponse(value: unknown): void;
+    __setInputBoxResponse(value: unknown): void;
+    __setQuickPickResponse(value: unknown): void;
+    __getQuickPickCalls(): Array<{ items: unknown; options: unknown }>;
     __getWarningMessages(): Array<{ message: string; args: unknown[] }>;
     __resetWindowMessages(): void;
     __setLanguageModels(models: unknown[]): void;
@@ -35,10 +38,33 @@ function createTextStream(text: string): AsyncIterable<string> {
     };
 }
 
+class TestMemento {
+    public readonly values: Record<string, unknown>;
+
+    constructor(initial: Record<string, unknown> = {}) {
+        this.values = { ...initial };
+    }
+
+    get<T>(key: string, defaultValue?: T): T | undefined {
+        return Object.prototype.hasOwnProperty.call(this.values, key)
+            ? this.values[key] as T
+            : defaultValue;
+    }
+
+    async update(key: string, value: unknown): Promise<void> {
+        if (value === undefined) {
+            delete this.values[key];
+            return;
+        }
+        this.values[key] = value;
+    }
+}
+
 afterEach(() => {
     vscodeTestMock.__resetLanguageModels();
     vscodeTestMock.__setWorkspaceFolders(undefined);
     vscodeTestMock.__setConfirmProtectedBranchPush(true);
+    vscodeTestMock.__resetWindowMessages();
 });
 
 function createStagedChangelistState(): ChangelistState {
@@ -53,7 +79,7 @@ function createStagedChangelistState(): ChangelistState {
     };
 }
 
-function createHandler(gitService: Partial<GitService>): ExtensionRpcHandler {
+function createHandler(gitService: Partial<GitService>, context: Partial<vscode.ExtensionContext> = {}): ExtensionRpcHandler {
     // Add getActiveService to the gitService mock or wrap it
     const gitServiceMock = gitService as GitService;
     if (!gitServiceMock.getWorkspaceRoot) {
@@ -70,7 +96,7 @@ function createHandler(gitService: Partial<GitService>): ExtensionRpcHandler {
     });
 
     return new ExtensionRpcHandler({
-        context: {} as vscode.ExtensionContext,
+        context: context as vscode.ExtensionContext,
         repositoryManager: { getActiveService: () => gitServiceMock } as any,
     });
 }
@@ -522,6 +548,81 @@ describe('ExtensionRpcHandler push', () => {
             branch: 'feature',
             message: 'unexpected push failure'
         });
+    });
+});
+
+describe('ExtensionRpcHandler review branch', () => {
+    it('persists review branch options in workspace state scoped to the repository', async () => {
+        const storageKey = 'ideaCommitPanel.reviewBranchOptions.v1._workspace_repo';
+        const workspaceState = new TestMemento({
+            [storageKey]: {
+                resetBaseBranch: false,
+                generateAiNotes: true
+            }
+        });
+        const branchRemote = {
+            getBranches: vi.fn()
+                .mockResolvedValueOnce({ current: 'main', all: ['main'] })
+                .mockResolvedValueOnce({ current: 'main', all: ['main'] })
+                .mockResolvedValue({ current: 'feat/review', all: ['main', 'feat/review'] }),
+            getPushCommits: vi.fn().mockResolvedValue({
+                commits: [{
+                    hash: 'abcdef1234567890',
+                    shortHash: 'abcdef1',
+                    subject: 'Improve review branch flow',
+                    authorName: 'User',
+                    authorEmail: 'user@example.com',
+                    date: '2026-06-10T00:00:00Z',
+                    body: '',
+                    files: [{ path: 'src/file.ts', status: 'M' }],
+                    stats: { additions: 1, deletions: 0 },
+                    parentHashes: [],
+                    containingBranches: [],
+                    refs: [],
+                    filteredAncestors: []
+                }]
+            }),
+            validateBranchName: vi.fn().mockResolvedValue(undefined),
+            localBranchExists: vi.fn().mockResolvedValue(false),
+            hasLocalChanges: vi.fn().mockResolvedValue(false),
+            createBranch: vi.fn().mockResolvedValue(undefined),
+            getUpstreamBranch: vi.fn().mockResolvedValue(undefined),
+            push: vi.fn().mockResolvedValue(undefined),
+            resetLocalBranchToRemote: vi.fn().mockResolvedValue(undefined),
+            getRemoteCompareUrlForRemote: vi.fn().mockResolvedValue(undefined)
+        };
+        const handler = createHandler({
+            branchRemote,
+            getWorkspaceRoot: () => '/workspace/repo'
+        } as unknown as Partial<GitService>, {
+            workspaceState: workspaceState as unknown as vscode.Memento
+        });
+
+        vscodeTestMock.__setInputBoxResponse('feat/review');
+        vscodeTestMock.__setQuickPickResponse([{ id: 'reset-base' }]);
+
+        await expect(handler.publishReviewBranch({
+            remote: 'origin',
+            baseBranch: 'main',
+            commitCount: 1,
+            noVerify: true
+        })).resolves.toMatchObject({
+            branchName: 'feat/review',
+            baseBranchReset: true
+        });
+
+        const items = vscodeTestMock.__getQuickPickCalls()[0].items as Array<{ id: string; picked?: boolean }>;
+        expect(items.find(item => item.id === 'reset-base')?.picked).toBe(false);
+        expect(items.find(item => item.id === 'ai-notes')?.picked).toBe(true);
+        expect(workspaceState.values[storageKey]).toEqual({
+            resetBaseBranch: true,
+            generateAiNotes: false
+        });
+        expect(branchRemote.push).toHaveBeenCalledWith('origin', 'feat/review:feat/review', {
+            noVerify: true,
+            setUpstream: true
+        });
+        expect(branchRemote.resetLocalBranchToRemote).toHaveBeenCalledWith('main', 'origin', 'main');
     });
 });
 

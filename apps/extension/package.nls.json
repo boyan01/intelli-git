@@ -77,6 +77,8 @@
   "intelli-git.config.ai.provider.description": "AI provider for commit message generation",
   "intelli-git.config.ai.provider.markdownDescription": "AI provider for commit message generation. Use [Configure AI Provider](command:intelli-git.ai.configureProvider), or edit advanced values in [settings.json](command:workbench.action.openSettingsJson).",
   "intelli-git.config.ai.commitPrompt.markdownDescription": "Prompt used by AI commit message generation. The selected diff is sent as a separate message after this prompt. You can also edit it from the generate button context menu.",
+  "intelli-git.config.ai.pullRequestTitlePrompt.markdownDescription": "Prompt used by AI pull request title generation. Supported variables: `{{baseBranch}}`, `{{headBranch}}`, `{{commitCount}}`, `{{commits}}`, and `{{changedFiles}}`.",
+  "intelli-git.config.ai.pullRequestBodyPrompt.markdownDescription": "Prompt used by AI pull request body generation. Supported variables: `{{baseBranch}}`, `{{headBranch}}`, `{{commitCount}}`, `{{commits}}`, and `{{changedFiles}}`.",
   "intelli-git.config.ai.provider.copilot": "Use built-in GitHub Copilot (requires Copilot extension)",
   "intelli-git.config.ai.provider.anthropic": "Use Anthropic Claude API (requires API key)",
   "intelli-git.config.ai.anthropic.apiKey.description": "Anthropic API key for Claude. Get your key from https://console.anthropic.com",

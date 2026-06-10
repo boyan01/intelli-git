@@ -10,6 +10,11 @@ let languageModels: unknown[] = [];
 let language = 'en';
 let workspaceFoldersValue: Array<{ uri: MockUri; name: string; index: number }> | undefined;
 let warningMessageResponse: unknown;
+let informationMessageResponse: unknown;
+let inputBoxResponse: unknown;
+let quickPickResponse: unknown;
+const inputBoxCalls: unknown[] = [];
+const quickPickCalls: Array<{ items: unknown; options: unknown }> = [];
 
 export class EventEmitter<T> {
     private listeners = new Set<(event: T) => unknown>();
@@ -38,6 +43,10 @@ export const ConfigurationTarget = {
     Global: 1,
     Workspace: 2,
     WorkspaceFolder: 3
+} as const;
+
+export const ProgressLocation = {
+    Notification: 15
 } as const;
 
 export const workspace = {
@@ -145,11 +154,36 @@ export const window = {
     },
     async showInformationMessage(message: string, ...args: unknown[]): Promise<unknown> {
         informationMessages.push({ message, args });
-        return undefined;
+        return informationMessageResponse;
     },
     async showErrorMessage(message: string, ...args: unknown[]): Promise<unknown> {
         errorMessages.push({ message, args });
         return undefined;
+    },
+    async showInputBox(options: unknown): Promise<unknown> {
+        inputBoxCalls.push(options);
+        return inputBoxResponse;
+    },
+    async showQuickPick(items: unknown, options: unknown): Promise<unknown> {
+        quickPickCalls.push({ items, options });
+        return quickPickResponse;
+    },
+    async withProgress<T>(
+        _options: unknown,
+        task: (
+            progress: { report(value: unknown): void },
+            token: { isCancellationRequested: boolean; onCancellationRequested(listener: () => unknown): { dispose(): void } }
+        ) => Promise<T>
+    ): Promise<T> {
+        return task(
+            { report() { } },
+            {
+                isCancellationRequested: false,
+                onCancellationRequested() {
+                    return { dispose() { } };
+                }
+            }
+        );
     },
     createTerminal(options: unknown) {
         const terminal = {
@@ -258,6 +292,22 @@ export function __setWarningMessageResponse(value: unknown): void {
     warningMessageResponse = value;
 }
 
+export function __setInformationMessageResponse(value: unknown): void {
+    informationMessageResponse = value;
+}
+
+export function __setInputBoxResponse(value: unknown): void {
+    inputBoxResponse = value;
+}
+
+export function __setQuickPickResponse(value: unknown): void {
+    quickPickResponse = value;
+}
+
+export function __getQuickPickCalls(): Array<{ items: unknown; options: unknown }> {
+    return quickPickCalls;
+}
+
 export function __getWarningMessages(): Array<{ message: string; args: unknown[] }> {
     return warningMessages;
 }
@@ -266,7 +316,12 @@ export function __resetWindowMessages(): void {
     warningMessages.length = 0;
     informationMessages.length = 0;
     errorMessages.length = 0;
+    inputBoxCalls.length = 0;
+    quickPickCalls.length = 0;
     warningMessageResponse = undefined;
+    informationMessageResponse = undefined;
+    inputBoxResponse = undefined;
+    quickPickResponse = undefined;
 }
 
 export function __setLanguageModels(models: unknown[]): void {

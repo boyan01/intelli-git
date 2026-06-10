@@ -520,6 +520,18 @@ export class GitBranchRemoteService {
         }
     }
 
+    private async getRemoteUrl(remoteName: string): Promise<string | undefined> {
+        const remotes = await this.options.git.getRemotes(true);
+        const remote = remotes.find(item => item.name === remoteName);
+        const refs = remote?.refs as { fetch?: string; push?: string } | undefined;
+        return refs?.fetch || refs?.push;
+    }
+
+    public async getRemoteLinkInfoForRemote(remoteName: string): Promise<RemoteLinkInfo> {
+        const remoteUrl = await this.getRemoteUrl(remoteName);
+        return remoteUrl ? getRemoteLinkInfo(remoteUrl) : getUnknownRemoteLinkInfo();
+    }
+
     public async getRemoteLinkInfo(): Promise<RemoteLinkInfo> {
         const remotes = await this.options.git.getRemotes(true);
         for (const remote of remotes) {
@@ -562,6 +574,10 @@ export class GitBranchRemoteService {
 
     public async getRemoteCompareUrl(base: string, head: string): Promise<string | undefined> {
         return getRemoteCompareUrl(await this.getRemoteLinkInfo(), base, head);
+    }
+
+    public async getRemoteCompareUrlForRemote(remoteName: string, base: string, head: string): Promise<string | undefined> {
+        return getRemoteCompareUrl(await this.getRemoteLinkInfoForRemote(remoteName), base, head);
     }
 
     public async getRemoteBranches(): Promise<string[]> {
@@ -685,6 +701,25 @@ export class GitBranchRemoteService {
 
     public async createBranch(branchName: string): Promise<void> {
         await this.options.git.checkoutLocalBranch(branchName);
+        this.options.notifyChanged();
+    }
+
+    public async validateBranchName(branchName: string): Promise<void> {
+        await this.options.git.raw(['check-ref-format', '--branch', branchName]);
+    }
+
+    public async localBranchExists(branchName: string): Promise<boolean> {
+        const branches = await this.getBranches();
+        return branches.all.includes(branchName);
+    }
+
+    public async hasLocalChanges(): Promise<boolean> {
+        const status = await this.options.git.status();
+        return status.files.length > 0;
+    }
+
+    public async resetLocalBranchToRemote(localBranch: string, remote: string, remoteBranch: string): Promise<void> {
+        await this.options.git.raw(['branch', '-f', localBranch, `${remote}/${remoteBranch}`]);
         this.options.notifyChanged();
     }
 
