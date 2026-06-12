@@ -12,15 +12,15 @@ Intelli Git is currently free during Early Access.
 
 ### Commit View In Staged Mode
 
-![Intelli Git commit view in staged mode](https://raw.githubusercontent.com/boyan01/intelli-git/main/docs/assets/intelli-git-commit-staged.png)
+![Intelli Git commit view in staged mode](https://raw.githubusercontent.com/boyan01/intelli-git/main/assets/intelli-git-commit-staged.png)
 
 ### Commit View In Changes Mode
 
-![Intelli Git commit view in changes mode](https://raw.githubusercontent.com/boyan01/intelli-git/main/docs/assets/intelli-git-commit-changes.png)
+![Intelli Git commit view in changes mode](https://raw.githubusercontent.com/boyan01/intelli-git/main/assets/intelli-git-commit-changes.png)
 
 ### Git Log
 
-![Intelli Git Git Log panel](https://raw.githubusercontent.com/boyan01/intelli-git/main/docs/assets/intelli-git-log.png)
+![Intelli Git Git Log panel](https://raw.githubusercontent.com/boyan01/intelli-git/main/assets/intelli-git-log.png)
 
 ## Features
 
@@ -71,7 +71,7 @@ API keys are stored with VS Code SecretStorage. Legacy settings-based API keys a
 
 ## Support
 
-For support and issue reporting, see [SUPPORT.md](SUPPORT.md) or open a report in the [Intelli Git repository](https://github.com/boyan01/intelli-git/issues/new/choose).
+For support and issue reporting, open a report in the [Intelli Git repository](https://github.com/boyan01/intelli-git/issues/new/choose).
 
 ## License
 
