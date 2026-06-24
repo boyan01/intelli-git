@@ -49,6 +49,74 @@ Reference files:
 - `apps/extension/src/ui/BranchStatusBar.ts`
 - `apps/extension/src/ui/checkoutWorktreeConflict.ts`
 
+## Scenario: VS Code Git Parent Repository Alignment
+
+### 1. Scope / Trigger
+
+Use this pattern when Intelli Git detects a Git repository state that belongs to VS Code's built-in Git integration, such as an opened subdirectory whose actual `gitRoot` is a parent folder. This is an extension-host infrastructure integration, not a webview concern.
+
+### 2. Signatures
+
+- Built-in Git extension lookup: `vscode.extensions.getExtension<VSCodeGitExtension>('vscode.git')`
+- Git API access: `gitExtension.exports.getAPI(1)`
+- Repository roots: `api.repositories[*].rootUri.fsPath`
+- Parent repository command: `vscode.commands.executeCommand('git.openRepositoriesInParentFolders')`
+- Settings command: `vscode.commands.executeCommand('workbench.action.openSettings', 'git.openRepositoryInParentFolders')`
+
+### 3. Contracts
+
+- Intelli Git repository scopes come from `RepositoryManager.getRepositories()`.
+- `RepositoryScope.workspaceRoot` is the opened folder identity.
+- `RepositoryScope.gitRoot` is the real Git top-level path.
+- A split-brain candidate is `normalize(scope.gitRoot) !== normalize(scope.workspaceRoot)` and `scope.gitRoot` is absent from VS Code Git `rootUri.fsPath` values.
+- Intelli Git may prompt the user to invoke VS Code's parent-repository command, but must not silently change `git.openRepositoryInParentFolders` or implement duplicate Explorer/editor decorations.
+
+### 4. Validation & Error Matrix
+
+- VS Code Git extension unavailable -> do nothing; Intelli Git continues with its own repository model.
+- VS Code Git API activation fails -> log/debug only; do not block extension activation.
+- Parent root already opened by VS Code Git -> no warning.
+- Parent root missing from VS Code Git -> show one localized recovery prompt per session/root.
+- User chooses parent-repository action -> execute `git.openRepositoriesInParentFolders`.
+- User chooses settings action -> open `git.openRepositoryInParentFolders` settings.
+- Command execution fails -> warn/log and suppress repeated prompts for that root in the current session.
+
+### 5. Good/Base/Bad Cases
+
+- Good: opening `project-a/backend` shows backend-scoped Intelli Git changes and offers a VS Code Git alignment action if `project-a` is not open in Source Control.
+- Base: opening `project-a` at the repository root shows no parent-repository warning.
+- Bad: silently changing user settings, showing `frontend` changes in a backend-only window, or creating Intelli Git-owned file decorations to mask VS Code Git state.
+
+### 6. Tests Required
+
+- Unit-test pure detection of missing parent roots.
+- Assert root-opened repositories are skipped.
+- Assert parent roots already opened by VS Code Git do not prompt.
+- Assert multiple workspace scopes under the same parent root deduplicate to one prompt.
+- Assert the primary action calls `git.openRepositoriesInParentFolders`.
+- Assert the secondary action opens `git.openRepositoryInParentFolders` settings.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```typescript
+await vscode.workspace.getConfiguration('git').update('openRepositoryInParentFolders', 'always');
+```
+
+This silently changes the user's VS Code behavior.
+
+#### Correct
+
+```typescript
+const selected = await vscode.window.showWarningMessage(message, openAction, settingsAction);
+if (selected === openAction) {
+    await vscode.commands.executeCommand('git.openRepositoriesInParentFolders');
+}
+```
+
+This keeps VS Code Git as the owner of Source Control state and requires an explicit user action.
+
 ## Anti-Patterns
 
 - Do not add thin wrapper functions that only rename an existing function.

@@ -4,6 +4,7 @@ import { CommitViewProvider, GitLogViewProvider, StashContentProvider, RevisionC
 import { RepositoryManager, type RepositoryScope } from './services/RepositoryManager';
 import { createGitWatcher } from './services/GitRepositoryWatcher';
 import { BackgroundFetchService } from './services/BackgroundFetchService';
+import { ParentRepositoryScmIntegrationService } from './services/ParentRepositoryScmIntegrationService';
 import { BranchStatusBar, GitLogStatusBar } from './ui';
 import { registerStashCommands, registerGlobalNavigationCommands, registerWorktreeCommands, registerBranchCommands, registerLogCommands, registerLogFileCommands, registerChangelistCommands, registerAiCommands, registerEditorGitCommands } from './commands';
 import { logger } from './utils/logger';
@@ -218,7 +219,9 @@ export async function activate(context: vscode.ExtensionContext) {
     );
     await repositoryManager.initialize();
     const backgroundFetchService = new BackgroundFetchService(repositoryManager);
-    context.subscriptions.push(backgroundFetchService);
+    const parentRepositoryScmIntegration = new ParentRepositoryScmIntegrationService(repositoryManager);
+    context.subscriptions.push(backgroundFetchService, parentRepositoryScmIntegration);
+    parentRepositoryScmIntegration.scheduleCheck();
 
     if (!repositoryManager.getActiveService()) {
         logger.info('Intelli Git: No git repository found.');
