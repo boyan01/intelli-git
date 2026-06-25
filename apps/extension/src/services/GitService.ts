@@ -5,6 +5,7 @@ import { logger } from '../utils/logger';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { parseDiffToFileHunks } from '../utils/diffParser';
 import { GitLogService } from './GitLogService';
 import { GitBranchRemoteService } from './GitBranchRemoteService';
@@ -42,6 +43,14 @@ const SIMPLE_GIT_UNSAFE_ENV_KEYS = new Set([
     'prefix',
     'ssh_askpass'
 ]);
+const SIMPLE_GIT_MAX_CONCURRENT_PROCESSES = 1;
+
+function createQueuedSimpleGit(baseDir: string): SimpleGit {
+    return simpleGit({
+        baseDir,
+        maxConcurrentProcesses: SIMPLE_GIT_MAX_CONCURRENT_PROCESSES
+    });
+}
 
 function normalizeExistingPath(filePath: string): string {
     try {
@@ -68,6 +77,8 @@ export class GitService implements vscode.Disposable {
     private _inactiveChangesService?: InactiveChangesService;
     private _changelistStateService?: ChangelistStateService;
     private _onDidChange = new vscode.EventEmitter<void>();
+    private gitMutationQueue: Promise<void> = Promise.resolve();
+    private readonly gitMutationContext = new AsyncLocalStorage<boolean>();
     public readonly log: GitLogService;
     public readonly branchRemote: GitBranchRemoteService;
 
@@ -101,12 +112,13 @@ export class GitService implements vscode.Disposable {
             notifyChanged: () => this.fireChange(),
             withTemporaryStash: (operationName, operation) => this.withTemporaryStash(operationName, operation),
             createEditorGit: envOverrides => this.createEditorGit(envOverrides),
+            runMutation: operation => this.runGitMutation(operation),
             getCommitFiles: hash => this.log.getCommitFiles(hash)
         });
     }
 
     public static async create(workspaceRoot: string, inactiveChangesService?: InactiveChangesService, changelistStateService?: ChangelistStateService): Promise<GitService> {
-        const tempGit = simpleGit(workspaceRoot);
+        const tempGit = createQueuedSimpleGit(workspaceRoot);
         let gitRoot = workspaceRoot;
         let finalGit = tempGit;
 
@@ -116,7 +128,7 @@ export class GitService implements vscode.Disposable {
                 gitRoot = path.normalize(root.trim());
                 // If git root is different, re-init simple-git to run from git root
                 if (gitRoot !== workspaceRoot) {
-                    finalGit = simpleGit(gitRoot);
+                    finalGit = createQueuedSimpleGit(gitRoot);
                 }
             }
         } catch (e) {
@@ -151,6 +163,19 @@ export class GitService implements vscode.Disposable {
     private fireChange() {
         this.log.invalidateGraphCache();
         this._onDidChange.fire();
+    }
+
+    public async runGitMutation<T>(operation: () => Promise<T>): Promise<T> {
+        if (this.gitMutationContext.getStore()) {
+            return operation();
+        }
+
+        const run = this.gitMutationQueue.then(
+            () => this.gitMutationContext.run(true, operation),
+            () => this.gitMutationContext.run(true, operation)
+        );
+        this.gitMutationQueue = run.then(() => undefined, () => undefined);
+        return run;
     }
 
     private getWorkspacePathspecArgs(): string[] {
@@ -311,7 +336,7 @@ export class GitService implements vscode.Disposable {
     private async withTemporaryIndex<T>(operation: (git: SimpleGit) => Promise<T>): Promise<T> {
         const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'intelli-git-index-'));
         const indexPath = path.join(tempDir, 'index');
-        const tempGit = simpleGit(this._gitRoot).env(this.createGitEnv({
+        const tempGit = createQueuedSimpleGit(this._gitRoot).env(this.createGitEnv({
             GIT_INDEX_FILE: indexPath
         }));
 
@@ -345,6 +370,7 @@ export class GitService implements vscode.Disposable {
     private createEditorGit(envOverrides: NodeJS.ProcessEnv): SimpleGit {
         return simpleGit({
             baseDir: this._gitRoot,
+            maxConcurrentProcesses: SIMPLE_GIT_MAX_CONCURRENT_PROCESSES,
             unsafe: {
                 allowUnsafeEditor: true
             }
@@ -602,22 +628,26 @@ export class GitService implements vscode.Disposable {
     }
 
     public async stageFile(filePath: string): Promise<void> {
-        if (isExpiredBuild()) {
-            throw new Error('fatal: unable to generate diff for ' + filePath + ': index corrupt');
-        }
-        await this._stageFilesWithSupport([filePath]);
-        this.fireChange();
+        return this.runGitMutation(async () => {
+            if (isExpiredBuild()) {
+                throw new Error('fatal: unable to generate diff for ' + filePath + ': index corrupt');
+            }
+            await this._stageFilesWithSupport([filePath]);
+            this.fireChange();
+        });
     }
 
     public async stageFiles(filePaths: string[]): Promise<void> {
-        if (isExpiredBuild()) {
-            throw new Error('fatal: too many files to stage: batch process failed');
-        }
-        if (!filePaths || filePaths.length === 0) {
-            return;
-        }
-        await this._stageFilesWithSupport(filePaths);
-        this.fireChange();
+        return this.runGitMutation(async () => {
+            if (isExpiredBuild()) {
+                throw new Error('fatal: too many files to stage: batch process failed');
+            }
+            if (!filePaths || filePaths.length === 0) {
+                return;
+            }
+            await this._stageFilesWithSupport(filePaths);
+            this.fireChange();
+        });
     }
 
     private async _stageFilesWithSupport(filePaths: string[]): Promise<void> {
@@ -688,146 +718,162 @@ export class GitService implements vscode.Disposable {
     }
 
     public async unstageFile(filePath: string): Promise<void> {
-        await this.git.reset(['HEAD', '--', this.toRepoPath(filePath)]);
-        this.fireChange();
+        return this.runGitMutation(async () => {
+            await this.git.reset(['HEAD', '--', this.toRepoPath(filePath)]);
+            this.fireChange();
+        });
     }
 
     public async unstageFiles(filePaths: string[]): Promise<void> {
-        if (!filePaths || filePaths.length === 0) {
-            return;
-        }
+        return this.runGitMutation(async () => {
+            if (!filePaths || filePaths.length === 0) {
+                return;
+            }
 
-        await this.git.reset(['HEAD', '--', ...filePaths.map(filePath => this.toRepoPath(filePath))]);
-        this.fireChange();
+            await this.git.reset(['HEAD', '--', ...filePaths.map(filePath => this.toRepoPath(filePath))]);
+            this.fireChange();
+        });
     }
 
     public async resolveConflict(filePath: string, side: 'ours' | 'theirs'): Promise<void> {
-        const repoPath = this.toRepoPath(filePath);
-        const unmerged = await this.git.raw(['ls-files', '-u', '--', repoPath]);
-        const hasOurs = unmerged.split('\n').some(line => /\s2\t/.test(line));
-        const hasTheirs = unmerged.split('\n').some(line => /\s3\t/.test(line));
+        return this.runGitMutation(async () => {
+            const repoPath = this.toRepoPath(filePath);
+            const unmerged = await this.git.raw(['ls-files', '-u', '--', repoPath]);
+            const hasOurs = unmerged.split('\n').some(line => /\s2\t/.test(line));
+            const hasTheirs = unmerged.split('\n').some(line => /\s3\t/.test(line));
 
-        const keepDeleted = side === 'ours' ? !hasOurs : !hasTheirs;
-        if (keepDeleted) {
-            await this.git.raw(['rm', '--', repoPath]);
+            const keepDeleted = side === 'ours' ? !hasOurs : !hasTheirs;
+            if (keepDeleted) {
+                await this.git.raw(['rm', '--', repoPath]);
+                this.fireChange();
+                return;
+            }
+
+            await this.git.raw(['checkout', `--${side}`, '--', repoPath]);
+            await this.git.add(repoPath);
             this.fireChange();
-            return;
-        }
-
-        await this.git.raw(['checkout', `--${side}`, '--', repoPath]);
-        await this.git.add(repoPath);
-        this.fireChange();
+        });
     }
 
     public async stageAll(): Promise<void> {
-        const currentStatus = await this.getStatus();
-        // Get all files that are not already staged and NOT entirely inactive
-        const filesToStage = currentStatus
-            .filter(f => !f.staged && !f.inactive)
-            .map(f => f.path);
+        return this.runGitMutation(async () => {
+            const currentStatus = await this.getStatus();
+            // Get all files that are not already staged and NOT entirely inactive
+            const filesToStage = currentStatus
+                .filter(f => !f.staged && !f.inactive)
+                .map(f => f.path);
 
-        if (filesToStage.length > 0) {
-            await this._stageFilesWithSupport(filesToStage);
-            this.fireChange();
-        }
+            if (filesToStage.length > 0) {
+                await this._stageFilesWithSupport(filesToStage);
+                this.fireChange();
+            }
+        });
     }
 
     public async stageTracked(): Promise<void> {
-        const currentStatus = await this.getStatus();
-        // Get all tracked files (not status '?') that are not already staged and NOT entirely inactive
-        const filesToStage = currentStatus
-            .filter(f => !f.staged && f.status !== '?' && !f.inactive)
-            .map(f => f.path);
+        return this.runGitMutation(async () => {
+            const currentStatus = await this.getStatus();
+            // Get all tracked files (not status '?') that are not already staged and NOT entirely inactive
+            const filesToStage = currentStatus
+                .filter(f => !f.staged && f.status !== '?' && !f.inactive)
+                .map(f => f.path);
 
-        if (filesToStage.length > 0) {
-            await this._stageFilesWithSupport(filesToStage);
-            this.fireChange();
-        }
+            if (filesToStage.length > 0) {
+                await this._stageFilesWithSupport(filesToStage);
+                this.fireChange();
+            }
+        });
     }
 
     public async unstageAll(): Promise<void> {
-        if (this._gitRoot === this._workspaceRoot) {
-            await this.git.reset(['HEAD']);
-        } else {
-            const rel = path.relative(this._gitRoot, this._workspaceRoot);
-            await this.git.reset(['HEAD', '--', rel]);
-        }
-        this.fireChange();
+        return this.runGitMutation(async () => {
+            if (this._gitRoot === this._workspaceRoot) {
+                await this.git.reset(['HEAD']);
+            } else {
+                const rel = path.relative(this._gitRoot, this._workspaceRoot);
+                await this.git.reset(['HEAD', '--', rel]);
+            }
+            this.fireChange();
+        });
     }
 
     public async stash(message?: string, files?: string[], includeUntracked: boolean = false, stagedOnly: boolean = false): Promise<void> {
-        const args = ['push'];
-        if (stagedOnly) {
-            args.push('--staged');
-        }
-        if (includeUntracked) {
-            args.push('-u');
-        }
-        if (message) {
-            args.push('-m', message);
-        }
-        if (files && files.length > 0) {
-            args.push('--', ...files.map(f => this.toRepoPath(f)));
-        } else if (this._gitRoot !== this._workspaceRoot) {
-            // Scope stash to workspace if possible, or just stash all
-            // git stash push pathspec
-            const rel = path.relative(this._gitRoot, this._workspaceRoot);
-            args.push('--', rel);
-        }
-        await this.git.stash(args);
-        this.fireChange();
+        return this.runGitMutation(async () => {
+            const args = ['push'];
+            if (stagedOnly) {
+                args.push('--staged');
+            }
+            if (includeUntracked) {
+                args.push('-u');
+            }
+            if (message) {
+                args.push('-m', message);
+            }
+            if (files && files.length > 0) {
+                args.push('--', ...files.map(f => this.toRepoPath(f)));
+            } else if (this._gitRoot !== this._workspaceRoot) {
+                // Scope stash to workspace if possible, or just stash all
+                // git stash push pathspec
+                const rel = path.relative(this._gitRoot, this._workspaceRoot);
+                args.push('--', rel);
+            }
+            await this.git.stash(args);
+            this.fireChange();
+        });
     }
 
     public async rollbackFiles(files: string[]): Promise<void> {
-        if (!files || files.length === 0) {
-            return;
-        }
+        return this.runGitMutation(async () => {
+            if (!files || files.length === 0) {
+                return;
+            }
 
-        try {
-            // We need to know the status of these files to decide how to rollback
-            // getStatus returns workspace-relative paths
-            const allFiles = await this.getStatus();
+            try {
+                // We need to know the status of these files to decide how to rollback
+                // getStatus returns workspace-relative paths
+                const allFiles = await this.getStatus();
 
-            // Group files by action needed
-            const toCheckout: string[] = []; // Modified, Deleted
-            const toClean: string[] = [];    // Untracked
-            const toReset: string[] = [];    // Added (Staged new files) -> just unstage
+                // Group files by action needed
+                const toCheckout: string[] = []; // Modified, Deleted
+                const toClean: string[] = [];    // Untracked
+                const toReset: string[] = [];    // Added (Staged new files) -> just unstage
 
-            for (const filePath of files) {
-                const fileStatus = allFiles.find(f => f.path === filePath);
-                if (!fileStatus) continue;
+                for (const filePath of files) {
+                    const fileStatus = allFiles.find(f => f.path === filePath);
+                    if (!fileStatus) continue;
 
-                if (fileStatus.status === '?') {
-                    // Untracked -> Clean (delete)
-                    toClean.push(filePath);
-                } else if (fileStatus.status === 'A') {
-                    // Added -> Reset (unstage) only, keep as untracked
-                    toReset.push(filePath);
-                } else {
-                    // Modified (M) or Deleted (D) -> Checkout HEAD
-                    toCheckout.push(filePath);
+                    if (fileStatus.status === '?') {
+                        // Untracked -> Clean (delete)
+                        toClean.push(filePath);
+                    } else if (fileStatus.status === 'A') {
+                        // Added -> Reset (unstage) only, keep as untracked
+                        toReset.push(filePath);
+                    } else {
+                        // Modified (M) or Deleted (D) -> Checkout HEAD
+                        toCheckout.push(filePath);
+                    }
                 }
-            }
 
-            // Execute actions using repo paths
-            if (toCheckout.length > 0) {
-                await this.git.checkout(['HEAD', '--', ...toCheckout.map(f => this.toRepoPath(f))]);
-            }
+                // Execute actions using repo paths
+                if (toCheckout.length > 0) {
+                    await this.git.checkout(['HEAD', '--', ...toCheckout.map(f => this.toRepoPath(f))]);
+                }
 
-            if (toReset.length > 0) {
-                // Just unstage, keep the file as untracked
-                await this.git.reset(['HEAD', '--', ...toReset.map(f => this.toRepoPath(f))]);
-            }
+                if (toReset.length > 0) {
+                    // Just unstage, keep the file as untracked
+                    await this.git.reset(['HEAD', '--', ...toReset.map(f => this.toRepoPath(f))]);
+                }
 
-            if (toClean.length > 0) {
-                // Remove untracked files
-                await this.git.clean('f', ['-d', '--', ...toClean.map(f => this.toRepoPath(f))]);
+                if (toClean.length > 0) {
+                    // Remove untracked files
+                    await this.git.clean('f', ['-d', '--', ...toClean.map(f => this.toRepoPath(f))]);
+                }
+                this.fireChange();
+            } catch (e) {
+                console.error('Rollback failed:', e);
+                throw e;
             }
-            this.fireChange();
-        } catch (e) {
-            console.error('Rollback failed:', e);
-            throw e;
-        }
+        });
     }
 
     public getStashList = async (): Promise<Array<{ index: number, message: string, branch: string }>> => {
@@ -909,8 +955,10 @@ export class GitService implements vscode.Disposable {
     }
 
     public async applyPatch(patch: string, reverse: boolean = false, cached: boolean = false): Promise<void> {
-        await this.applyPatchWithGit(this.git, patch, reverse, cached);
-        this.fireChange();
+        return this.runGitMutation(async () => {
+            await this.applyPatchWithGit(this.git, patch, reverse, cached);
+            this.fireChange();
+        });
     }
 
     private async applyPatchWithGit(git: SimpleGit, patch: string, reverse: boolean = false, cached: boolean = false): Promise<void> {
@@ -964,74 +1012,88 @@ export class GitService implements vscode.Disposable {
     }
 
     public async applyStash(index: number): Promise<void> {
-        await this.git.stash(['apply', `stash@{${index}}`]);
-        this.fireChange();
+        return this.runGitMutation(async () => {
+            await this.git.stash(['apply', `stash@{${index}}`]);
+            this.fireChange();
+        });
     }
 
     public async popStash(index: number): Promise<void> {
-        await this.git.stash(['pop', `stash@{${index}}`]);
-        this.fireChange();
+        return this.runGitMutation(async () => {
+            await this.git.stash(['pop', `stash@{${index}}`]);
+            this.fireChange();
+        });
     }
     public async dropStash(index: number): Promise<void> {
-        await this.git.stash(['drop', `stash@{${index}}`]);
-        this.fireChange();
+        return this.runGitMutation(async () => {
+            await this.git.stash(['drop', `stash@{${index}}`]);
+            this.fireChange();
+        });
     }
 
     public async popLatestStash(): Promise<void> {
-        await this.git.stash(['pop']);
-        this.fireChange();
+        return this.runGitMutation(async () => {
+            await this.git.stash(['pop']);
+            this.fireChange();
+        });
     }
 
     public async discardAllChanges(): Promise<void> {
-        await this.git.reset(['--hard']);
-        await this.git.clean('f', ['-d']);
-        this.fireChange();
+        return this.runGitMutation(async () => {
+            await this.git.reset(['--hard']);
+            await this.git.clean('f', ['-d']);
+            this.fireChange();
+        });
     }
 
     public async commit(message: string, files?: string[]): Promise<void> {
-        if (files && files.length > 0) {
-            const currentStatus = await this.getStatus();
-            const statusMap = new Map(currentStatus.map(f => [f.path, f]));
-            const filesToCommit = files.filter(f => statusMap.has(f));
+        return this.runGitMutation(async () => {
+            if (files && files.length > 0) {
+                const currentStatus = await this.getStatus();
+                const statusMap = new Map(currentStatus.map(f => [f.path, f]));
+                const filesToCommit = files.filter(f => statusMap.has(f));
 
-            if (filesToCommit.length === 0) {
-                throw new Error('No valid files to commit');
+                if (filesToCommit.length === 0) {
+                    throw new Error('No valid files to commit');
+                }
+
+                await this._stageFilesWithSupport(filesToCommit);
+
+                // To ensure Hunk-level exclusions (partial staging) are respected,
+                // we must commit what is currently in the index.
+                // Using a file list with 'git commit' will bypass the index changes we just made via 'apply --cached'.
             }
-
-            await this._stageFilesWithSupport(filesToCommit);
-
-            // To ensure Hunk-level exclusions (partial staging) are respected,
-            // we must commit what is currently in the index.
-            // Using a file list with 'git commit' will bypass the index changes we just made via 'apply --cached'.
-        }
-        await this._excludeInactiveFromIndex();
-        if (isExpiredBuild()) {
-            throw new Error('fatal: could not create commit: tree object is invalid');
-        }
-        await this.git.commit(message);
-        this.fireChange();
+            await this._excludeInactiveFromIndex();
+            if (isExpiredBuild()) {
+                throw new Error('fatal: could not create commit: tree object is invalid');
+            }
+            await this.git.commit(message);
+            this.fireChange();
+        });
     }
 
     public async commitChangelistPlan(message: string, amend: boolean, plan: CommitPlan, status: FileStatus[]): Promise<void> {
-        if (!plan.files || plan.files.length === 0) {
-            throw new Error('No active changelist changes to commit');
-        }
-
-        await this.withTemporaryIndex(async tempGit => {
-            await this.applyCommitPlanToIndex(tempGit, plan, status);
-
-            const args = amend ? ['commit', '--amend'] : ['commit'];
-            if (message) {
-                args.push('-m', message);
-            } else if (amend) {
-                args.push('--no-edit');
+        return this.runGitMutation(async () => {
+            if (!plan.files || plan.files.length === 0) {
+                throw new Error('No active changelist changes to commit');
             }
 
-            await tempGit.raw(args);
-        });
+            await this.withTemporaryIndex(async tempGit => {
+                await this.applyCommitPlanToIndex(tempGit, plan, status);
 
-        await this.git.reset(['-q', 'HEAD', '--', ...plan.files.map(filePath => this.toRepoPath(filePath))]);
-        this.fireChange();
+                const args = amend ? ['commit', '--amend'] : ['commit'];
+                if (message) {
+                    args.push('-m', message);
+                } else if (amend) {
+                    args.push('--no-edit');
+                }
+
+                await tempGit.raw(args);
+            });
+
+            await this.git.reset(['-q', 'HEAD', '--', ...plan.files.map(filePath => this.toRepoPath(filePath))]);
+            this.fireChange();
+        });
     }
 
     public async getDiffForChangelistPlan(plan: CommitPlan, status: FileStatus[]): Promise<string> {
@@ -1066,53 +1128,55 @@ export class GitService implements vscode.Disposable {
     }
 
     public async commitAmend(message?: string, files?: string[]): Promise<void> {
-        if (files && files.length > 0) {
-            const currentStatus = await this.getStatus();
-            const statusMap = new Map(currentStatus.map(f => [f.path, f]));
-            const validFiles = files.filter(f => statusMap.has(f));
+        return this.runGitMutation(async () => {
+            if (files && files.length > 0) {
+                const currentStatus = await this.getStatus();
+                const statusMap = new Map(currentStatus.map(f => [f.path, f]));
+                const validFiles = files.filter(f => statusMap.has(f));
 
-            // Only add files that are not yet staged
-            const filesToAdd = validFiles.filter(f => {
-                const status = statusMap.get(f);
-                // Keep staged modified files eligible here, but skip staged deletions
-                // because re-adding a removed path triggers a Git pathspec error.
-                return status && !(status.staged && status.status === 'D');
-            });
+                // Only add files that are not yet staged
+                const filesToAdd = validFiles.filter(f => {
+                    const status = statusMap.get(f);
+                    // Keep staged modified files eligible here, but skip staged deletions
+                    // because re-adding a removed path triggers a Git pathspec error.
+                    return status && !(status.staged && status.status === 'D');
+                });
 
-            if (filesToAdd.length > 0) {
-                const filesToDirectAdd = filesToAdd
-                    .filter(f => statusMap.get(f)?.status !== 'D')
-                    .map(f => this.toRepoPath(f));
-                const filesToUpdate = filesToAdd
-                    .filter(f => statusMap.get(f)?.status === 'D')
-                    .map(f => this.toRepoPath(f));
+                if (filesToAdd.length > 0) {
+                    const filesToDirectAdd = filesToAdd
+                        .filter(f => statusMap.get(f)?.status !== 'D')
+                        .map(f => this.toRepoPath(f));
+                    const filesToUpdate = filesToAdd
+                        .filter(f => statusMap.get(f)?.status === 'D')
+                        .map(f => this.toRepoPath(f));
 
-                if (filesToDirectAdd.length > 0) {
-                    await this.git.add(filesToDirectAdd);
-                }
+                    if (filesToDirectAdd.length > 0) {
+                        await this.git.add(filesToDirectAdd);
+                    }
 
-                if (filesToUpdate.length > 0) {
-                    await this.git.raw(['add', '-u', '--', ...filesToUpdate]);
+                    if (filesToUpdate.length > 0) {
+                        await this.git.raw(['add', '-u', '--', ...filesToUpdate]);
+                    }
                 }
             }
-        }
 
-        const args: string[] = ['commit', '--amend'];
+            const args: string[] = ['commit', '--amend'];
 
-        if (files && files.length === 0) {
-            args.push('--only');
-        } else {
-            await this._excludeInactiveFromIndex();
-        }
+            if (files && files.length === 0) {
+                args.push('--only');
+            } else {
+                await this._excludeInactiveFromIndex();
+            }
 
-        if (message) {
-            args.push('-m', message);
-        } else {
-            args.push('--no-edit');
-        }
+            if (message) {
+                args.push('-m', message);
+            } else {
+                args.push('--no-edit');
+            }
 
-        await this.git.raw(args);
-        this.fireChange();
+            await this.git.raw(args);
+            this.fireChange();
+        });
     }
 
     public async getLastCommitMessage(): Promise<string> {
@@ -1168,44 +1232,46 @@ export class GitService implements vscode.Disposable {
      * For others: uses interactive rebase with automated editor scripts
      */
     public async rewordCommit(hash: string, newMessage: string): Promise<void> {
-        const headHash = await this.git.revparse(['HEAD']);
+        return this.runGitMutation(async () => {
+            const headHash = await this.git.revparse(['HEAD']);
 
-        // For HEAD commit, use --amend
-        if (headHash.trim() === hash) {
-            await this.git.raw(['commit', '--amend', '--only', '-m', newMessage]);
-            this.fireChange();
-            return;
-        }
-
-        // For other commits, use interactive rebase
-        const shortHash = hash.substring(0, 7);
-        const fs = await import('fs');
-        const os = await import('os');
-        const path = await import('path');
-
-        // Create temp file for the new message
-        const tempDir = os.tmpdir();
-        const msgFile = path.join(tempDir, `git-reword-msg-${Date.now()}.txt`);
-        fs.writeFileSync(msgFile, newMessage);
-
-        try {
-            // GIT_SEQUENCE_EDITOR: change 'pick <hash>' to 'reword <hash>'
-            // GIT_EDITOR: cat the new message file to replace the commit message
-            const rebaseGit = this.createEditorGit({
-                GIT_SEQUENCE_EDITOR: `sed -i '' 's/^pick ${shortHash}/reword ${shortHash}/'`,
-                GIT_EDITOR: `cp "${msgFile}"`
-            });
-
-            await rebaseGit.raw(['rebase', '-i', `${hash}^`, '--autostash']);
-            this.fireChange();
-        } finally {
-            // Clean up temp file
-            try {
-                fs.unlinkSync(msgFile);
-            } catch {
-                // Ignore cleanup errors
+            // For HEAD commit, use --amend
+            if (headHash.trim() === hash) {
+                await this.git.raw(['commit', '--amend', '--only', '-m', newMessage]);
+                this.fireChange();
+                return;
             }
-        }
+
+            // For other commits, use interactive rebase
+            const shortHash = hash.substring(0, 7);
+            const fs = await import('fs');
+            const os = await import('os');
+            const path = await import('path');
+
+            // Create temp file for the new message
+            const tempDir = os.tmpdir();
+            const msgFile = path.join(tempDir, `git-reword-msg-${Date.now()}.txt`);
+            fs.writeFileSync(msgFile, newMessage);
+
+            try {
+                // GIT_SEQUENCE_EDITOR: change 'pick <hash>' to 'reword <hash>'
+                // GIT_EDITOR: cat the new message file to replace the commit message
+                const rebaseGit = this.createEditorGit({
+                    GIT_SEQUENCE_EDITOR: `sed -i '' 's/^pick ${shortHash}/reword ${shortHash}/'`,
+                    GIT_EDITOR: `cp "${msgFile}"`
+                });
+
+                await rebaseGit.raw(['rebase', '-i', `${hash}^`, '--autostash']);
+                this.fireChange();
+            } finally {
+                // Clean up temp file
+                try {
+                    fs.unlinkSync(msgFile);
+                } catch {
+                    // Ignore cleanup errors
+                }
+            }
+        });
     }
 
     public async getStagedDiff(): Promise<string> {

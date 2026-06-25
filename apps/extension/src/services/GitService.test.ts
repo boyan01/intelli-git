@@ -55,6 +55,50 @@ describe('GitService git environment handling', () => {
     });
 });
 
+describe('GitService mutation queue', () => {
+    let tempDir: string;
+    let git: SimpleGit;
+
+    beforeEach(async () => {
+        tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'intelli-git-mutation-queue-test-'));
+        git = simpleGit(tempDir);
+        await git.init();
+    });
+
+    afterEach(() => {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+    });
+
+    it('serializes concurrent mutations while allowing nested mutation calls', async () => {
+        const service = new GitService(tempDir, tempDir, git);
+        const events: string[] = [];
+        let releaseFirst: (() => void) | undefined;
+        const firstCanFinish = new Promise<void>(resolve => {
+            releaseFirst = resolve;
+        });
+
+        const first = service.runGitMutation(async () => {
+            events.push('first:start');
+            await service.runGitMutation(async () => {
+                events.push('first:nested');
+            });
+            await firstCanFinish;
+            events.push('first:end');
+        });
+        const second = service.runGitMutation(async () => {
+            events.push('second:start');
+        });
+
+        await new Promise(resolve => setTimeout(resolve, 0));
+        expect(events).toEqual(['first:start', 'first:nested']);
+
+        releaseFirst?.();
+        await Promise.all([first, second]);
+
+        expect(events).toEqual(['first:start', 'first:nested', 'first:end', 'second:start']);
+    });
+});
+
 describe('GitService repository scope', () => {
     let tempDir: string;
     let git: SimpleGit;
@@ -835,6 +879,7 @@ describe('GitService branch remote workflows', () => {
             createEditorGit: () => {
                 throw new Error('Not used');
             },
+            runMutation: async operation => operation(),
             getCommitFiles: async () => []
         });
 
@@ -847,6 +892,11 @@ describe('GitService branch remote workflows', () => {
     it('pulls with merge through temporary stash protection', async () => {
         const pull = vi.fn().mockResolvedValue(undefined);
         const notifyChanged = vi.fn();
+        let runMutationCalls = 0;
+        const runMutation = async <T>(operation: () => Promise<T>): Promise<T> => {
+            runMutationCalls++;
+            return operation();
+        };
         const withTemporaryStash = vi.fn(async (_operationName: string, operation: () => Promise<void>) => {
             await operation();
         });
@@ -858,11 +908,13 @@ describe('GitService branch remote workflows', () => {
             createEditorGit: () => {
                 throw new Error('Not used');
             },
+            runMutation,
             getCommitFiles: async () => []
         });
 
         await service.pullWithMerge('origin', 'main');
 
+        expect(runMutationCalls).toBe(1);
         expect(withTemporaryStash).toHaveBeenCalledTimes(1);
         expect(withTemporaryStash.mock.calls[0][0]).toBe('pull origin/main');
         expect(pull).toHaveBeenCalledWith('origin', 'main');

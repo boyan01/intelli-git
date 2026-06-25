@@ -232,6 +232,15 @@ scenario_merge_conflict() {
     run_git "$WORKTREE_DIR" merge "$LOCAL_BRANCH" || true
 }
 
+scenario_rebase_conflict() {
+    create_local_tracking_branch
+    run_git "$WORKTREE_DIR" checkout "$MAIN_BRANCH" >/dev/null
+    write_file "$WORKTREE_DIR/src/conflict.txt" "main-rebase-conflict-change"
+    run_git "$WORKTREE_DIR" add src/conflict.txt
+    run_git "$WORKTREE_DIR" commit -m "Main side rebase conflict" >/dev/null
+    run_git "$WORKTREE_DIR" checkout "$LOCAL_BRANCH" >/dev/null
+}
+
 scenario_stash_pop_conflict() {
     write_file "$WORKTREE_DIR/src/conflict.txt" "local-stash-change"
     run_git "$WORKTREE_DIR" stash push -m "Test stash pop conflict" >/dev/null
@@ -260,6 +269,7 @@ Scenarios:
   ahead-conflict       Local branch ahead, while current branch also has checkout conflict
   behind-conflict      Local branch behind, while current branch also has checkout conflict
   merge-conflict       Create a real merge conflict state in git status
+  rebase-conflict      Prepare current branch so rebasing onto main creates a conflict
   stash-pop-conflict   Simulate Smart Checkout stash pop restoring into conflict
 EOF
 }
@@ -303,6 +313,12 @@ EOF
             cat <<EOF
   2. Inspect the stash-pop result on branch "$LOCAL_BRANCH"
   3. Verify the conflict markers and unresolved state below
+EOF
+            ;;
+        rebase-conflict)
+            cat <<EOF
+  2. Trigger rebase of current branch "$LOCAL_BRANCH" onto "$MAIN_BRANCH"
+  3. Abort from the rebase indicator, then immediately switch branch
 EOF
             ;;
         merge-conflict)
@@ -365,6 +381,10 @@ EOF
             echo "Expectation: repository enters multiple real conflict states: UU, UD, DU, and AA."
             echo "Expectation: delete-related conflicts may require git rm or removing the file to resolve."
             ;;
+        rebase-conflict)
+            echo "Expectation: rebasing current branch onto $MAIN_BRANCH creates a real conflict in src/conflict.txt."
+            echo "Expectation: aborting the rebase and immediately switching branches should not hit index.lock."
+            ;;
         stash-pop-conflict)
             echo "Expectation: stash pop creates a real conflict on top of the checked out feature branch."
             ;;
@@ -374,6 +394,10 @@ EOF
         merge-conflict|stash-pop-conflict)
             echo "Note: this scenario should produce a real conflict state in git status."
             echo "Probe: git -C $(repo_root "$WORKTREE_DIR") status"
+            ;;
+        rebase-conflict)
+            echo "Note: this scenario starts clean on $LOCAL_BRANCH; trigger the rebase from Intelli Git."
+            echo "Probe: git -C $(repo_root "$WORKTREE_DIR") rebase $MAIN_BRANCH"
             ;;
         *)
             echo "Note: this is a checkout overwrite conflict, not a merge conflict."
@@ -418,6 +442,7 @@ main() {
         ahead-conflict) scenario_ahead_with_conflict ;;
         behind-conflict) scenario_behind_with_conflict ;;
         merge-conflict) scenario_merge_conflict ;;
+        rebase-conflict) scenario_rebase_conflict ;;
         stash-pop-conflict) scenario_stash_pop_conflict ;;
         *) print_usage; exit 1 ;;
     esac

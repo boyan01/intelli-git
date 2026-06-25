@@ -24,8 +24,33 @@ const defaultBranchInfo: BranchInfo = {
     rebaseStatus: 'none'
 };
 
-function RebaseIndicator({ status }: { status: 'interactive' | 'merging' }) {
+type RebaseAction = 'continue' | 'abort';
+
+function RebaseIndicator({
+    status,
+    pendingAction,
+    onPendingActionChange
+}: {
+    status: 'interactive' | 'merging';
+    pendingAction: RebaseAction | null;
+    onPendingActionChange: (action: RebaseAction | null) => void;
+}) {
     const { t } = useTranslation();
+    const disabled = pendingAction !== null;
+    const runAction = async (action: RebaseAction, execute: () => Promise<void>) => {
+        if (disabled) {
+            return;
+        }
+
+        onPendingActionChange(action);
+        try {
+            await execute();
+        } catch (error) {
+            rpc.showErrorMessage(String(error));
+        } finally {
+            onPendingActionChange(null);
+        }
+    };
 
     return (
         <>
@@ -33,26 +58,30 @@ function RebaseIndicator({ status }: { status: 'interactive' | 'merging' }) {
             <span style={{ fontWeight: 'bold', fontSize: '11px', marginRight: '4px' }}>
                 {status === 'interactive' ? t('Rebasing') : t('Merging')}
             </span>
-            <div
+            <button
+                type="button"
                 className={styles.continueBtn}
                 onClick={(e) => {
                     e.stopPropagation();
-                    rpc.continueRebase({});
+                    void runAction('continue', () => rpc.continueRebase({}));
                 }}
+                disabled={disabled}
                 title={status === 'interactive' ? t('Continue Rebase') : t('Continue Merge')}
             >
-                <span className="codicon codicon-play"></span>
-            </div>
-            <div
+                <span className={`codicon ${pendingAction === 'continue' ? 'codicon-loading codicon-modifier-spin' : 'codicon-play'}`}></span>
+            </button>
+            <button
+                type="button"
                 className={styles.abortBtn}
                 onClick={(e) => {
                     e.stopPropagation();
-                    rpc.abortRebase();
+                    void runAction('abort', () => rpc.abortRebase());
                 }}
+                disabled={disabled}
                 title={status === 'interactive' ? t('Abort Rebase') : t('Abort Merge')}
             >
-                <span className="codicon codicon-close"></span>
-            </div>
+                <span className={`codicon ${pendingAction === 'abort' ? 'codicon-loading codicon-modifier-spin' : 'codicon-close'}`}></span>
+            </button>
         </>
     );
 }
@@ -74,6 +103,7 @@ export function LocalChangesView() {
     });
     const [worktreeDrawerOpen, setWorktreeDrawerOpen] = useState(false);
     const [reviewingCommitPushTarget, setReviewingCommitPushTarget] = useState(false);
+    const [rebaseActionPending, setRebaseActionPending] = useState<RebaseAction | null>(null);
     const [commitOptions, setCommitOptions] = useState<CommitOptions>({
         push: false,
         signOff: false
@@ -181,6 +211,12 @@ export function LocalChangesView() {
     const isRebasing = branches.rebaseStatus && branches.rebaseStatus !== 'none';
     const { isExpired } = useVersionCheck();
 
+    useEffect(() => {
+        if (!isRebasing && rebaseActionPending) {
+            setRebaseActionPending(null);
+        }
+    }, [isRebasing, rebaseActionPending]);
+
     if (isExpired) {
         return (
             <div className={styles.container}>
@@ -242,10 +278,13 @@ export function LocalChangesView() {
                     {isRebasing ? (
                         <div
                             className={`${styles.branchIndicator} ${styles.rebaseActive}`}
-                            onClick={() => rpc.pickBranch()}
                             title={t('Rebase in progress ({{status}})', { status: branches.rebaseStatus })}
                         >
-                            <RebaseIndicator status={branches.rebaseStatus as 'interactive' | 'merging'} />
+                            <RebaseIndicator
+                                status={branches.rebaseStatus as 'interactive' | 'merging'}
+                                pendingAction={rebaseActionPending}
+                                onPendingActionChange={setRebaseActionPending}
+                            />
                         </div>
                     ) : (
                         branches?.current && (
