@@ -1295,6 +1295,45 @@ export class GitService implements vscode.Disposable {
         }
     }
 
+    public async getUnstagedDiffForFiles(files: string[]): Promise<string> {
+        if (!files || files.length === 0) {
+            return '';
+        }
+
+        try {
+            const status = await this.getStatus();
+            const trackedFiles: string[] = [];
+            const untrackedFiles: string[] = [];
+
+            for (const file of files) {
+                const fileStatus = status.find(f => f.path === file);
+                if (fileStatus && fileStatus.status === '?') {
+                    untrackedFiles.push(file);
+                } else {
+                    trackedFiles.push(file);
+                }
+            }
+
+            let diffOutput = '';
+
+            if (trackedFiles.length > 0) {
+                try {
+                    const repoFiles = trackedFiles.map(f => this.toRepoPath(f));
+                    diffOutput += await this.git.diff(['--', ...repoFiles]);
+                } catch (e) {
+                    console.error('Error getting unstaged diff for tracked files:', e);
+                }
+            }
+
+            diffOutput += await this.getUntrackedFilesDiff(untrackedFiles);
+
+            return diffOutput;
+        } catch (e) {
+            console.error('Error getting unstaged diff for files:', e);
+            return '';
+        }
+    }
+
     /**
      * Get diff for specific files.
      * Uses `git diff HEAD -- <files>` to get changes relative to HEAD for modified/deleted files.
@@ -1336,20 +1375,7 @@ export class GitService implements vscode.Disposable {
             }
 
             // 2. Read content for untracked files (simulate "new file" diff)
-            if (untrackedFiles.length > 0) {
-                for (const file of untrackedFiles) {
-                    try {
-                        // Use workspace root to read file
-                        const fullPath = path.join(this._workspaceRoot, file);
-                        if (fs.existsSync(fullPath)) {
-                            const content = await fs.promises.readFile(fullPath, 'utf8');
-                            diffOutput += `\ndiff --git a/${file} b/${file}\nnew file mode 100644\n--- /dev/null\n+++ b/${file}\n@@ -0,0 +1,${content.split('\n').length} @@\n+${content.replace(/\n/g, '\n+')}\n`;
-                        }
-                    } catch (e) {
-                        console.error(`Error reading untracked file ${file}:`, e);
-                    }
-                }
-            }
+            diffOutput += await this.getUntrackedFilesDiff(untrackedFiles);
 
             return diffOutput;
 
@@ -1357,6 +1383,27 @@ export class GitService implements vscode.Disposable {
             console.error('Error getting diff for files:', e);
             return '';
         }
+    }
+
+    private async getUntrackedFilesDiff(files: string[]): Promise<string> {
+        if (files.length === 0) {
+            return '';
+        }
+
+        let diffOutput = '';
+        for (const file of files) {
+            try {
+                const fullPath = path.join(this._workspaceRoot, file);
+                if (fs.existsSync(fullPath)) {
+                    const content = await fs.promises.readFile(fullPath, 'utf8');
+                    diffOutput += `\ndiff --git a/${file} b/${file}\nnew file mode 100644\n--- /dev/null\n+++ b/${file}\n@@ -0,0 +1,${content.split('\n').length} @@\n+${content.replace(/\n/g, '\n+')}\n`;
+                }
+            } catch (e) {
+                console.error(`Error reading untracked file ${file}:`, e);
+            }
+        }
+
+        return diffOutput;
     }
 
     public getStashFilesAsCommitFiles = async (index: number): Promise<CommitFile[]> => {

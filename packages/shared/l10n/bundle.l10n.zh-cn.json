@@ -425,7 +425,6 @@
     "No changes to create patch from.": "没有可用于创建补丁的更改。",
     "Copy to Clipboard": "复制到剪贴板",
     "Save to File...": "保存到文件...",
-    "Choose how to create the patch": "选择补丁创建方式",
     "Patch copied to clipboard.": "补丁已复制到剪贴板。",
     "Save Patch": "保存补丁",
     "Patch saved to {0}": "补丁已保存到 {0}",

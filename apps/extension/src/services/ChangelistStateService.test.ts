@@ -277,6 +277,48 @@ describe('ChangelistStateService', () => {
         });
     });
 
+    it('builds a commit plan for a non-active changelist without changing the active list', async () => {
+        const service = createService();
+        const review = await service.createList('Review');
+        await service.moveHunks('src/file.ts', ['h2'], review.id);
+        await service.moveFiles(['src/review-only.ts'], review.id);
+
+        const plan = service.buildCommitPlan([
+            status('src/file.ts', [hunk('h1'), hunk('h2')]),
+            status('src/review-only.ts'),
+            status('src/active-only.ts')
+        ], undefined, review.id);
+
+        expect(plan).toEqual({
+            files: ['src/file.ts', 'src/review-only.ts'],
+            excludedFiles: ['src/active-only.ts'],
+            excludedHunkIdsByPath: {
+                'src/file.ts': ['h1']
+            }
+        });
+        expect(service.getState().activeListId).toBe('changes');
+    });
+
+    it('scopes a non-active changelist commit plan to requested files', async () => {
+        const service = createService();
+        const review = await service.createList('Review');
+        await service.moveHunks('src/file.ts', ['h2'], review.id);
+        await service.moveFiles(['src/other.ts'], review.id);
+
+        const plan = service.buildCommitPlan([
+            status('src/file.ts', [hunk('h1'), hunk('h2')]),
+            status('src/other.ts')
+        ], ['src/file.ts'], review.id);
+
+        expect(plan).toEqual({
+            files: ['src/file.ts'],
+            excludedFiles: [],
+            excludedHunkIdsByPath: {
+                'src/file.ts': ['h1']
+            }
+        });
+    });
+
     it('includes requested untracked files in the active changelist commit plan', async () => {
         const service = createService();
 

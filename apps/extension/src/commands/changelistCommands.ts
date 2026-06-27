@@ -10,6 +10,7 @@ import { logger } from '../utils/logger';
 import { EditorHunkResolver, findBestHunkMatch, type EditorHunkMatchTarget } from '../editor/EditorHunkResolver';
 import { createRevisionContentUri } from '../utils/repositoryContentUri';
 import { ChangelistOperations, createDefaultRefreshDecorations } from '../operations/ChangelistOperations';
+import { copyPatchToClipboard, savePatchToFile } from '../utils/patchExport';
 
 interface ChangelistFileContext {
     webviewSection: 'changelistFile';
@@ -261,6 +262,97 @@ async function showDiffForChangelistFile(gitService: GitService, args: Changelis
     }
 }
 
+function decorateStatusForInactive(status: FileStatus[], inactiveChangesService: InactiveChangesService): FileStatus[] {
+    return status.map(file => {
+        const isFileInactive = inactiveChangesService.isInactive(file.path);
+        const inactiveHunkIds = inactiveChangesService.getInactiveHunkIds(file.path);
+        const inactiveHunkIdSet = new Set(inactiveHunkIds);
+        const hasStagedInactive = file.staged && (
+            isFileInactive ||
+            file.hunks?.some(hunk =>
+                inactiveHunkIdSet.has(hunk.id) ||
+                inactiveHunkIdSet.has(hunk.id.replace(':index:', ':worktree:')) ||
+                inactiveHunkIdSet.has(hunk.id.replace(':worktree:', ':index:'))
+            )
+        );
+
+        return {
+            ...file,
+            inactive: isFileInactive,
+            inactiveHunkIds,
+            hasStagedInactive
+        };
+    });
+}
+
+function getChangelistPatchBaseName(args: ChangelistTargetContext, changelistStateService: ChangelistStateService): string {
+    const stagedModeNames: Record<string, string> = {
+        'staged-changes': 'staged-changes',
+        'untracked-changes': 'untracked-changes',
+        'changes': 'changes'
+    };
+    const listName = args.changelistMode === 'staged' && args.changelistId
+        ? stagedModeNames[args.changelistId] || 'changes'
+        : changelistStateService.getState().lists.find(list => list.id === args.changelistId)?.name || 'changes';
+
+    if (args.webviewSection === 'changelistFile' && args.path) {
+        return `${path.basename(args.path)}-${listName}`;
+    }
+
+    return listName;
+}
+
+async function getChangelistPatch(
+    gitService: GitService,
+    inactiveChangesService: InactiveChangesService,
+    changelistStateService: ChangelistStateService,
+    args?: ChangelistTargetContext
+): Promise<{ patch: string; defaultBaseName: string }> {
+    if (!args?.changelistId || args.changelistId === 'inactive-changes') {
+        return { patch: '', defaultBaseName: 'changes' };
+    }
+
+    const paths = getTargetPaths(args);
+    if (args.changelistMode === 'staged') {
+        const defaultBaseName = getChangelistPatchBaseName(args, changelistStateService);
+        if (args.changelistId === 'staged-changes') {
+            return {
+                patch: await gitService.getStagedDiffForFiles(paths),
+                defaultBaseName
+            };
+        }
+
+        if (args.changelistId === 'changes' || args.changelistId === 'untracked-changes') {
+            return {
+                patch: await gitService.getUnstagedDiffForFiles(paths),
+                defaultBaseName
+            };
+        }
+
+        return { patch: '', defaultBaseName };
+    }
+
+    if (args.changelistMode !== 'changes') {
+        return { patch: '', defaultBaseName: 'changes' };
+    }
+
+    const status = await gitService.getStatus();
+    inactiveChangesService.syncWithStatus(status);
+    changelistStateService.syncWithStatus(status);
+
+    const decoratedStatus = decorateStatusForInactive(status, inactiveChangesService);
+    const plan = changelistStateService.buildCommitPlan(
+        decoratedStatus,
+        paths.length > 0 ? paths : undefined,
+        args.changelistId
+    );
+
+    return {
+        patch: await gitService.getDiffForChangelistPlan(plan, decoratedStatus),
+        defaultBaseName: getChangelistPatchBaseName(args, changelistStateService)
+    };
+}
+
 /**
  * Register changelist file-related context menu commands.
  */
@@ -448,6 +540,23 @@ export function registerChangelistCommands(
                 return;
             }
             await showDiffForChangelistFile(gitService, target);
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand('intelli-git.changelist.createPatch.copy', async (args: ChangelistTargetContext) => {
+            const { patch } = await getChangelistPatch(gitService, inactiveChangesService, changelistStateService, args);
+            await copyPatchToClipboard(patch);
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand('intelli-git.changelist.createPatch.save', async (args: ChangelistTargetContext) => {
+            const { patch, defaultBaseName } = await getChangelistPatch(gitService, inactiveChangesService, changelistStateService, args);
+            await savePatchToFile(patch, {
+                workspaceRoot: gitService.getWorkspaceRoot(),
+                defaultBaseName
+            });
         })
     );
 

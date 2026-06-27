@@ -316,6 +316,14 @@
         "title": "%intelli-git.commands.changelist.showDiff.title%"
       },
       {
+        "command": "intelli-git.changelist.createPatch.copy",
+        "title": "%intelli-git.commands.createPatch.copy.title%"
+      },
+      {
+        "command": "intelli-git.changelist.createPatch.save",
+        "title": "%intelli-git.commands.createPatch.save.title%"
+      },
+      {
         "command": "intelli-git.changelist.rollback",
         "title": "%intelli-git.commands.changelist.rollback.title%"
       },
@@ -428,8 +436,12 @@
         "title": "%intelli-git.commands.log.file.cherryPickChanges.title%"
       },
       {
-        "command": "intelli-git.log.file.createPatch",
-        "title": "%intelli-git.commands.log.file.createPatch.title%"
+        "command": "intelli-git.log.file.createPatch.copy",
+        "title": "%intelli-git.commands.createPatch.copy.title%"
+      },
+      {
+        "command": "intelli-git.log.file.createPatch.save",
+        "title": "%intelli-git.commands.createPatch.save.title%"
       },
       {
         "command": "intelli-git.moveHunkToInactive",
@@ -485,6 +497,10 @@
       {
         "id": "intelli-git.changelistMode",
         "label": "%intelli-git.submenus.changelistMode.label%"
+      },
+      {
+        "id": "intelli-git.createPatch",
+        "label": "%intelli-git.submenus.createPatch.label%"
       }
     ],
     "menus": {
@@ -630,6 +646,14 @@
           "when": "false"
         },
         {
+          "command": "intelli-git.changelist.createPatch.copy",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.changelist.createPatch.save",
+          "when": "false"
+        },
+        {
           "command": "intelli-git.changelist.rollback",
           "when": "false"
         },
@@ -694,7 +718,11 @@
           "when": "false"
         },
         {
-          "command": "intelli-git.log.file.createPatch",
+          "command": "intelli-git.log.file.createPatch.copy",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.log.file.createPatch.save",
           "when": "false"
         },
         {
@@ -1034,6 +1062,11 @@
           "group": "navigation@2"
         },
         {
+          "submenu": "intelli-git.createPatch",
+          "when": "(webviewSection == 'changelistFile' || webviewSection == 'changelistFolder' || webviewSection == 'changelistRoot') && (changelistMode == 'changes' || changelistMode == 'staged') && changelistId != 'inactive-changes' && hasConflict != true",
+          "group": "1_modification@3"
+        },
+        {
           "command": "intelli-git.changelist.rollback",
           "when": "(webviewSection == 'changelistFile' || webviewSection == 'changelistFolder' || webviewSection == 'changelistRoot') && hasConflict != true",
           "group": "1_modification@1"
@@ -1184,7 +1217,7 @@
           "group": "1_modification@2"
         },
         {
-          "command": "intelli-git.log.file.createPatch",
+          "submenu": "intelli-git.createPatch",
           "when": "webviewSection == 'gitLogCommitFile'",
           "group": "1_modification@3"
         }
@@ -1248,6 +1281,28 @@
           "command": "intelli-git.changelistMode.changes",
           "when": "changelistMode == 'staged' || intelli-git.changelistMode == 'staged'",
           "group": "1_mode@2"
+        }
+      ],
+      "intelli-git.createPatch": [
+        {
+          "command": "intelli-git.changelist.createPatch.copy",
+          "when": "(webviewSection == 'changelistFile' || webviewSection == 'changelistFolder' || webviewSection == 'changelistRoot') && (changelistMode == 'changes' || changelistMode == 'staged') && changelistId != 'inactive-changes' && hasConflict != true",
+          "group": "1_export@1"
+        },
+        {
+          "command": "intelli-git.changelist.createPatch.save",
+          "when": "(webviewSection == 'changelistFile' || webviewSection == 'changelistFolder' || webviewSection == 'changelistRoot') && (changelistMode == 'changes' || changelistMode == 'staged') && changelistId != 'inactive-changes' && hasConflict != true",
+          "group": "1_export@2"
+        },
+        {
+          "command": "intelli-git.log.file.createPatch.copy",
+          "when": "webviewSection == 'gitLogCommitFile'",
+          "group": "1_export@1"
+        },
+        {
+          "command": "intelli-git.log.file.createPatch.save",
+          "when": "webviewSection == 'gitLogCommitFile'",
+          "group": "1_export@2"
         }
       ],
       "scm/change/title": [

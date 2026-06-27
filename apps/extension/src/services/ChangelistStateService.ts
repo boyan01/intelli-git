@@ -364,8 +364,9 @@ export class ChangelistStateService {
         return count;
     }
 
-    public buildCommitPlan(status: FileStatus[], requestedFiles?: Iterable<string>): CommitPlan {
-        const requestedFileSet = requestedFiles ? new Set(requestedFiles) : undefined;
+    public buildCommitPlan(status: FileStatus[], requestedFiles?: Iterable<string>, targetListId = this.state.activeListId): CommitPlan {
+        const requestedFileValues = requestedFiles ? Array.from(requestedFiles) : [];
+        const requestedFileSet = requestedFileValues.length > 0 ? new Set(requestedFileValues) : undefined;
         const grouped = new Map<string, FileStatus[]>();
         for (const file of status) {
             const list = grouped.get(file.path) || [];
@@ -378,10 +379,14 @@ export class ChangelistStateService {
         const excludedHunkIdsByPath: Record<string, string[]> = {};
 
         for (const [path, entries] of grouped.entries()) {
+            if (requestedFileSet && !requestedFileSet.has(path)) {
+                continue;
+            }
+
             const assignment = this.state.assignments[path];
             if (entries.some(entry => entry.status === '?')) {
-                const listId = assignment?.fileListId || (requestedFileSet?.has(path) ? this.state.activeListId : undefined);
-                if (listId === this.state.activeListId) {
+                const listId = assignment?.fileListId || (requestedFileSet?.has(path) ? targetListId : undefined);
+                if (listId === targetListId) {
                     files.add(path);
                 } else if (listId) {
                     excludedFiles.add(path);
@@ -402,7 +407,7 @@ export class ChangelistStateService {
 
             if (hunks.length > 0) {
                 const excludedHunks = hunks
-                    .filter(hunk => hasEquivalentHunkId(hunk.id, inactiveHunkIds) || (getEquivalentHunkAssignment(hunk.id, assignment?.hunkListIds) || this.state.activeListId) !== this.state.activeListId)
+                    .filter(hunk => hasEquivalentHunkId(hunk.id, inactiveHunkIds) || (getEquivalentHunkAssignment(hunk.id, assignment?.hunkListIds) || this.state.activeListId) !== targetListId)
                     .map(hunk => hunk.id);
 
                 if (excludedHunks.length < hunks.length) {
@@ -418,7 +423,7 @@ export class ChangelistStateService {
                 continue;
             }
 
-            if ((assignment?.fileListId || this.state.activeListId) === this.state.activeListId) {
+            if ((assignment?.fileListId || this.state.activeListId) === targetListId) {
                 files.add(path);
             } else {
                 excludedFiles.add(path);

@@ -353,7 +353,7 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
         }
 
         return result;
-    }, [groups, changelistState.lists, viewMode, amendCommit, splitInfoByPath, showRepositoryRoots]);
+    }, [groups, viewMode, amendCommit, splitInfoByPath, showRepositoryRoots]);
 
     const handleNodeClick = useCallback((node: TreeNode<FileNodeData>) => {
         if (node.data?.isFile) {

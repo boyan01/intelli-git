@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { GitService } from '../services/GitService';
 import * as path from 'path';
 import { createRevisionContentUri } from '../utils/repositoryContentUri';
+import { copyPatchToClipboard, savePatchToFile } from '../utils/patchExport';
 
 export function registerLogFileCommands(
     context: vscode.ExtensionContext,
@@ -15,6 +16,20 @@ export function registerLogFileCommands(
             isFile: !!arg.isFile,
             commitHash: arg.commitHash,
             parentHash: arg.parentHash
+        };
+    };
+
+    const getPatch = async (arg: any) => {
+        const data = getCommandArgs(arg);
+        if (!data) return null;
+
+        const patch = await gitService.getFileDiff(data.commitHash, data.path);
+        const fileName = path.basename(data.path);
+        const shortHash = data.commitHash.substring(0, 7);
+
+        return {
+            patch,
+            defaultBaseName: `${fileName}-${shortHash}`
         };
     };
 
@@ -115,51 +130,24 @@ export function registerLogFileCommands(
         })
     );
 
-    // 6. Create Patch
     context.subscriptions.push(
-        vscode.commands.registerCommand('intelli-git.log.file.createPatch', async (arg) => {
-            const data = getCommandArgs(arg);
-            if (!data) return;
+        vscode.commands.registerCommand('intelli-git.log.file.createPatch.copy', async (arg) => {
+            const result = await getPatch(arg);
+            if (!result) return;
 
-            const repoPath = data.path;
-            const patch = await gitService.getFileDiff(data.commitHash, repoPath);
+            await copyPatchToClipboard(result.patch);
+        })
+    );
 
-            if (!patch) {
-                vscode.window.showInformationMessage(vscode.l10n.t('No changes to create patch from.'));
-                return;
-            }
+    context.subscriptions.push(
+        vscode.commands.registerCommand('intelli-git.log.file.createPatch.save', async (arg) => {
+            const result = await getPatch(arg);
+            if (!result) return;
 
-            const options = [
-                { label: vscode.l10n.t('Copy to Clipboard'), id: 'clipboard' },
-                { label: vscode.l10n.t('Save to File...'), id: 'file' }
-            ];
-
-            const selected = await vscode.window.showQuickPick(options, {
-                placeHolder: vscode.l10n.t('Choose how to create the patch')
+            await savePatchToFile(result.patch, {
+                workspaceRoot: gitService.getWorkspaceRoot(),
+                defaultBaseName: result.defaultBaseName
             });
-
-            if (!selected) return;
-
-            if (selected.id === 'clipboard') {
-                await vscode.env.clipboard.writeText(patch);
-                vscode.window.showInformationMessage(vscode.l10n.t('Patch copied to clipboard.'));
-            } else {
-                const fileName = path.basename(data.path);
-                const shortHash = data.commitHash.substring(0, 7);
-                const defaultUri = vscode.Uri.file(path.join(gitService.getWorkspaceRoot(), `${fileName}-${shortHash}.patch`));
-
-                const fileUri = await vscode.window.showSaveDialog({
-                    defaultUri,
-                    filters: { 'Patch Files': ['patch', 'diff'] },
-                    title: vscode.l10n.t('Save Patch')
-                });
-
-                if (fileUri) {
-                    const fs = await import('fs');
-                    fs.writeFileSync(fileUri.fsPath, patch);
-                    vscode.window.showInformationMessage(vscode.l10n.t('Patch saved to {0}', fileUri.fsPath));
-                }
-            }
         })
     );
 }
