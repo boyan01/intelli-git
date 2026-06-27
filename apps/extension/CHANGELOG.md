@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.0.7
+
+- Added Create Patch submenu actions for changelist, staged, unstaged, and untracked tree nodes.
+- Improved Git operation safety by serializing repository-scoped write actions such as commit, stash, checkout, rebase, merge, and reset.
+- Improved parent repository handling for subdirectory workspaces by detecting unopened parent Git roots and offering explicit setup actions.
+
 ## 0.0.6
 
 - Added worktree-aware repository switching and repository controls for multi-root and worktree-based projects.
