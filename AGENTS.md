@@ -1,25 +1,3 @@
-<!-- TRELLIS:START -->
-# Trellis Instructions
-
-These instructions are for AI assistants working in this project.
-
-This project is managed by Trellis. The working knowledge you need lives under `.trellis/`:
-
-- `.trellis/workflow.md` — development phases, when to create tasks, skill routing
-- `.trellis/spec/` — package- and layer-scoped coding guidelines (read before writing code in a given layer)
-- `.trellis/workspace/` — per-developer journals and session traces
-- `.trellis/tasks/` — active and archived tasks (PRDs, research, jsonl context)
-
-If a Trellis command is available on your platform (e.g. `/trellis:finish-work`, `/trellis:continue`), prefer it over manual steps. Not every platform exposes every command.
-
-If you're using Codex or another agent-capable tool, additional project-scoped helpers may live in:
-- `.agents/skills/` — reusable Trellis skills
-- `.codex/agents/` — optional custom subagents
-
-Managed by Trellis. Edits outside this block are preserved; edits inside may be overwritten by a future `trellis update`.
-
-<!-- TRELLIS:END -->
-
 # Project Context: Intelli Git
 
 ## 文档说明
@@ -276,6 +254,7 @@ intelli-git-extension-v0.0.3
 - 当前 mode 由配置项 `intelli-git.changelist.mode` 控制。
 - 两种 mode 下的用户交互都必须在 refresh、watcher updates、重新打开 webview 后保持稳定。
 - Commit view tree 在 UI 上必须保持 file-oriented。tree UI 中 file items 不得渲染 hunk children nodes。
+- `Conflicting Changes` 必须保持为独立 functional root，不能并入 staged、unstaged、普通 changelist、inactive、untracked 分组。
 - `Untracked Changes` 必须保持为独立分组，不能并入普通 changelists。
 - `Inactive Changes` 在 `staged` mode 语义下必须保持为独立分组，不能被悄悄移除。
 
@@ -284,6 +263,7 @@ intelli-git-extension-v0.0.3
 - Tracked changes 必须分为 staged 和 non-staged groups。
 - 与 staging 相关的 toolbar actions 只能在 `staged` mode 中可用。
 - `staged` mode 下的 file context menu 可按场景暴露 `Stage`、`Unstage`、`Mark as Inactive Changes`、`Move to Active Changes`。
+- `staged` mode 下的 conflict files 必须显示在 `Conflicting Changes` root 下，不能同时出现在 staged/non-staged groups。
 - `staged` mode 下的 commit selection 由 staged files 决定。
 - `staged` mode 下的 commit execution 必须保持现有基于 git index 的行为。
 
@@ -295,15 +275,24 @@ intelli-git-extension-v0.0.3
 - 用户可以创建、重命名、删除、切换 active changelist。
 - 删除 changelist 时，绝不能让状态变成没有有效 changelist；受影响项必须移动到其他剩余列表。
 - 同一文件的不同 hunks 在 state 中可以属于不同 changelists，即使 tree UI 仍然保持 file-only。
+- Conflict files 不能分配到用户 changelist，也不能进入 active changelist commit selection，直到冲突被解决并由 Git 状态变成普通 staged/unstaged change。
 - `changes` mode 下的 commit execution 必须只提交 active changelist，其他 changelists 必须从最终 commit 结果中排除。
 
 ### Changes Mode Tree Behavior
-- Tree 必须展示 changelist roots，以及 `Untracked Changes` 这类专用 functional roots。
+- Tree 必须展示 changelist roots，以及 `Conflicting Changes`、`Untracked Changes` 这类专用 functional roots。
 - Active changelist root 只能通过更强的文字权重表现。
 - Active changelist root 不得显示单独的 badge，例如 `Active`。
 - Hover changelist root 时，不得显示 rename、delete、set active 等 inline action icons。
 - File items 不得显示 hunk child nodes。
 - 如果已支持，changelist roots 之间的 drag and drop 文件重分配行为应继续可用。
+
+### Conflict Resolver Behavior
+- 点击或双击 conflict file 时，必须在 VS Code editor 区域打开 Intelli Git 自己的 conflict resolver webview，不应走普通 open file 路径，也不得把 merge editor 嵌在 commit view 侧边栏里。
+- Conflict resolver 通过 shared RPC 从 Git index stages 读取 base/current/incoming，通过 worktree 读取 result；webview 不得直接推断 Git stages。
+- `Accept Current Change` / `Accept Incoming Change` 必须保留 `repoPath` 并路由到对应 repository 的 Git service。
+- `Mark as Resolved` 必须写入 result content、执行 `git add`、刷新 commit view；失败时 resolver 不能关闭。
+- 二进制 conflict files 可以显示在 `Conflicting Changes` root 下，但 inline editing 可以禁用并给出明确反馈。
+- Rebase continue 只能在没有 unresolved conflict files 时可用；只有存在、非二进制、无 conflict markers 的文本文件才能作为 `resolvedCandidate` 自动放行。
 
 ### Changes Mode Context Menu Rules
 - 右键 changelist root 时，必须打开原生 VS Code webview context menu。
@@ -317,17 +306,22 @@ intelli-git-extension-v0.0.3
 - Changelist state logic 属于 extension-side state/service code，不应只存在于 webview local state。
 - Webview 负责 rendering 和 interaction dispatch，但 extension-side services 持有 durable changelist state 和相关 invariants。
 - Changelist mode、changelist state、changelist operations 的 shared contracts 必须保留在 `packages/shared/messages.ts`。
+- Conflict resolver 的 shared RPC contract 必须保留在 `packages/shared/messages.ts`，Git stage 读取和保存必须在 extension-side `GitService` 内完成；editor-area panel 生命周期由 extension provider 管理。
 - 任何新增的 commit view 用户可见文本都必须遵守仓库的 l10n 规则。
 - 如果 commit view context menu 行为发生变化，必须同时更新 webview 的 `data-vscode-context` shape 和 `apps/extension/package.json` 中的 menu contributions。
 
 ### Regression Checklist
 - 在 `staged` 和 `changes` mode 之间切换时，toolbar 和 context menu 行为必须正确。
 - `changes` mode 绝不能显示 staged/unstaged split groups。
+- Conflict files 必须只出现在 `Conflicting Changes` root 下。
+- 点击 conflict file 必须在 editor 区域打开 Intelli Git conflict resolver。
 - `changes` mode 绝不能在 changelist root 上显示 active badge。
 - `changes` mode 下 root hover 绝不能显示 inline operation icons。
 - File items 绝不能显示 child hunk nodes。
 - 在 `changes` mode 中右键空白区域可以创建 changelist。
 - 在 `changes` mode 中右键 file item 提供的是 move-to-changelist，而不是 inactive actions。
+- 在 `changes` mode 中 conflict file 不得提供 move-to-changelist。
+- Rebase continue 不得因已手动编辑且无 markers 的 resolved candidate 被继续禁用，也不得因缺失/二进制 unresolved file 被误放行。
 - 在 create、rename、delete、refresh、reopen 等流程之后，始终且仅存在一个 active changelist。
 
 ## Project Structure Summary
