@@ -1,0 +1,4 @@
+interface:
+  display_name: "Intelli Git Test"
+  short_description: "Launch Intelli Git fixture repos"
+  default_prompt: "Use $intelli-git-test to open a rebase conflict fixture in a dev extension window."
