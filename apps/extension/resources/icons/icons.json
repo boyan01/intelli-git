@@ -16,5 +16,11 @@
     "id": "intelli-git-logo",
     "codepoint": "E003",
     "description": "Intelli Git logo icon"
+  },
+  {
+    "name": "merge",
+    "id": "intelli-git-merge",
+    "codepoint": "E004",
+    "description": "Intelli Git merge conflict resolver icon"
   }
 ]

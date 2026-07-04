@@ -1,0 +1,26 @@
+.editorHost {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    border-top: 1px solid var(--vscode-panel-border);
+    overflow: hidden;
+    background: var(--vscode-editor-background);
+}
+
+.fillHost {
+    height: 100%;
+    min-height: 0;
+    flex: 1;
+}
+
+.emptyHost {
+    min-height: 30px;
+    padding: 6px 8px;
+    box-sizing: border-box;
+    border-top: 1px solid var(--vscode-panel-border);
+    color: var(--vscode-descriptionForeground);
+    font-family: var(--vscode-editor-font-family);
+    font-size: var(--vscode-editor-font-size);
+    font-style: italic;
+    line-height: 18px;
+}

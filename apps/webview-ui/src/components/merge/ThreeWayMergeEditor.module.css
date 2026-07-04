@@ -1,0 +1,87 @@
+.mergeDocument {
+    display: grid;
+    min-height: 0;
+    flex: 1;
+    grid-template-columns: minmax(220px, 1fr) 44px minmax(280px, 1.25fr) 44px minmax(220px, 1fr);
+    overflow: hidden;
+    background: var(--vscode-editor-background);
+}
+
+.mergePane {
+    display: flex;
+    min-width: 0;
+    min-height: 0;
+    flex-direction: column;
+    border-right: 1px solid var(--vscode-panel-border);
+}
+
+.fullHeightEditor {
+    flex: 1;
+    min-height: 0;
+}
+
+.resultPane {
+    background: color-mix(in srgb, var(--vscode-editor-lineHighlightBackground, transparent) 45%, var(--vscode-editor-background));
+}
+
+.editorGutter {
+    position: relative;
+    min-width: 44px;
+    box-sizing: border-box;
+    border-right: 1px solid var(--vscode-panel-border);
+    background: color-mix(in srgb, var(--vscode-editorGutter-background, var(--vscode-editor-background)) 82%, var(--vscode-editor-background));
+}
+
+.leftGutterActionGroup,
+.rightGutterActionGroup {
+    display: inline-flex;
+    position: absolute;
+    gap: 2px;
+}
+
+.leftGutterActionGroup {
+    left: 3px;
+}
+
+.rightGutterActionGroup {
+    left: 13px;
+}
+
+.gutterActionButton {
+    display: inline-flex;
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--vscode-button-border, var(--vscode-panel-border));
+    border-radius: 3px;
+    background: var(--vscode-button-secondaryBackground);
+    color: var(--vscode-button-secondaryForeground);
+    cursor: pointer;
+}
+
+.gutterActionButton:hover:not(:disabled) {
+    background: var(--vscode-button-secondaryHoverBackground);
+}
+
+.gutterActionButton:focus-visible {
+    outline: 1px solid var(--vscode-focusBorder);
+    outline-offset: 1px;
+}
+
+.gutterActionButton:disabled {
+    opacity: 0.55;
+    cursor: default;
+}
+
+.deletedSideHint {
+    min-height: 22px;
+    padding: 4px 8px;
+    box-sizing: border-box;
+    border-bottom: 1px solid var(--vscode-panel-border);
+    color: var(--vscode-descriptionForeground);
+    font-size: 11px;
+    line-height: 16px;
+}
+

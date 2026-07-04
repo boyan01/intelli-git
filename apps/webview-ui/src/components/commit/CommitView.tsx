@@ -245,6 +245,14 @@ export function CommitView({
         void rpc.configureAIProvider();
     }, []);
 
+    const handleOpenConflict = useCallback((file: RepositoryFileReference) => {
+        void rpc.openConflictResolver(file);
+    }, []);
+
+    const hasUnresolvedConflicts = useMemo(() => changelists.some(group => (
+        group.items.some(file => (file.status === 'C' || file.status === 'U') && !file.resolvedCandidate)
+    )), [changelists]);
+
     const isInitialCommitViewLoading = loading && hasRepository && files.length === 0 && !workspaceRoot && !error;
     const loadingIndicator = <LoadingProgressBar active={loading} ariaLabel={t('Loading...')} />;
 
@@ -369,6 +377,7 @@ export function CommitView({
                         workspaceRoot={workspaceRoot}
                         showRepositoryRoots={changedRepositoryCount > 1}
                         amendCommit={lastCommitInfo}
+                        onOpenConflict={handleOpenConflict}
                     />
                 )}
             </div>
@@ -380,7 +389,7 @@ export function CommitView({
                     addedCount={fileStats.added}
                     modifiedCount={fileStats.modified}
                     deletedCount={fileStats.deleted}
-                    disableContinue={changelists.some(group => group.items.some(file => file.status === 'C' || file.status === 'U'))}
+                    disableContinue={hasUnresolvedConflicts}
                     onMessageChange={setCommitMessage}
                     onContinue={() => rpc.continueRebase({
                         message: commitMessage,

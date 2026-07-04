@@ -31,3 +31,7 @@
 .intelli-git-icon-logo::before {
     content: "\E003";
 }
+
+.intelli-git-icon-merge::before {
+    content: "\E004";
+}

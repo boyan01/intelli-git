@@ -1,6 +1,6 @@
 import simpleGit, { SimpleGit, StatusResult } from 'simple-git';
 import * as vscode from 'vscode';
-import type { FileStatus, CommitFile, GitStatusCode, GitHunk } from '@shared/messages';
+import type { ConflictFileContent, ConflictSideContent, FileStatus, CommitFile, GitStatusCode, GitHunk } from '@shared/messages';
 import { logger } from '../utils/logger';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -68,6 +68,10 @@ function formatGitError(error: unknown): string {
 function isExpiredBuild(): boolean {
     return typeof __IS_EXPIRED__ !== 'undefined'
         && __IS_EXPIRED__;
+}
+
+function containsConflictMarkers(text: string): boolean {
+    return text.includes('<<<<<<<') && text.includes('=======') && text.includes('>>>>>>>');
 }
 
 export class GitService implements vscode.Disposable {
@@ -473,18 +477,183 @@ export class GitService implements vscode.Disposable {
         return hash;
     };
 
-    private hasConflictMarkers(filePath: string): boolean {
+    private isResolvedConflictCandidate(filePath: string, stages: Set<number> | undefined): boolean {
         try {
-            const absPath = path.join(this._workspaceRoot, filePath);
-            if (!fs.existsSync(absPath)) {
+            if (!stages?.has(2) || !stages.has(3)) {
                 return false;
             }
 
-            const content = fs.readFileSync(absPath, 'utf8');
-            return content.includes('<<<<<<<') && content.includes('=======') && content.includes('>>>>>>>');
+            const absPath = path.join(this._workspaceRoot, filePath);
+            if (!fs.existsSync(absPath) || !fs.statSync(absPath).isFile()) {
+                return false;
+            }
+
+            const content = fs.readFileSync(absPath);
+            if (content.includes(0)) {
+                return false;
+            }
+
+            const text = content.toString('utf8');
+            return !containsConflictMarkers(text);
         } catch {
-            return true;
+            return false;
         }
+    }
+
+    private async getUnmergedStageNumbers(filePaths: string[]): Promise<Map<string, Set<number>>> {
+        if (filePaths.length === 0) {
+            return new Map();
+        }
+
+        const repoPaths = filePaths.map(filePath => this.toRepoPath(filePath));
+        const output = await this.git.raw(['ls-files', '-u', '--', ...repoPaths]);
+        const stagesByPath = new Map<string, Set<number>>();
+
+        output.split('\n').forEach(line => {
+            const match = line.match(/^\d+\s+[0-9a-f]+\s+([123])\t(.+)$/);
+            if (!match) {
+                return;
+            }
+
+            const workspacePath = this.toWorkspacePath(match[2]);
+            if (!workspacePath) {
+                return;
+            }
+
+            const stages = stagesByPath.get(workspacePath) ?? new Set<number>();
+            stages.add(Number(match[1]));
+            stagesByPath.set(workspacePath, stages);
+        });
+
+        return stagesByPath;
+    }
+
+    private parseUnmergedStageObjectIds(output: string): Map<number, string> {
+        const stages = new Map<number, string>();
+        output.split('\n').forEach(line => {
+            const match = line.match(/^\d+\s+([0-9a-f]+)\s+([123])\t/);
+            if (!match) {
+                return;
+            }
+
+            stages.set(Number(match[2]), match[1]);
+        });
+        return stages;
+    }
+
+    private async readConflictSide(objectId: string | undefined): Promise<ConflictSideContent> {
+        if (!objectId) {
+            return { exists: false, content: '' };
+        }
+
+        return {
+            exists: true,
+            content: await this.git.raw(['cat-file', '-p', objectId])
+        };
+    }
+
+    private async getAbsoluteGitDir(): Promise<string> {
+        const gitDir = (await this.git.revparse(['--git-dir'])).trim();
+        return path.isAbsolute(gitDir)
+            ? gitDir
+            : path.join(this._gitRoot, gitDir);
+    }
+
+    private readGitStateFile(gitDir: string, name: string): string {
+        try {
+            const filePath = path.join(gitDir, name);
+            return fs.existsSync(filePath) ? fs.readFileSync(filePath, 'utf8').trim() : '';
+        } catch {
+            return '';
+        }
+    }
+
+    private getMergeIncomingLabelFromMessage(message: string): string | undefined {
+        const quoted = message.match(/^Merge (?:remote-tracking )?branch ['"]([^'"]+)['"]/i);
+        if (quoted?.[1]) {
+            return quoted[1];
+        }
+
+        const unquoted = message.match(/^Merge (?:remote-tracking )?branch ([^\s]+)(?:\s|$)/i);
+        if (unquoted?.[1]) {
+            return unquoted[1];
+        }
+
+        const pull = message.match(/^Merge branch ['"]([^'"]+)['"] of /i);
+        if (pull?.[1]) {
+            return pull[1];
+        }
+
+        return undefined;
+    }
+
+    private async getConflictLabels(): Promise<{ baseLabel: string; currentLabel: string; incomingLabel: string }> {
+        let currentLabel = 'ours';
+        let incomingLabel = 'theirs';
+
+        try {
+            currentLabel = (await this.git.revparse(['--abbrev-ref', 'HEAD'])).trim() || currentLabel;
+        } catch {
+            // Keep the stable fallback.
+        }
+
+        try {
+            const gitDir = await this.getAbsoluteGitDir();
+            const mergeMessage = this.readGitStateFile(gitDir, 'MERGE_MSG');
+            incomingLabel = this.getMergeIncomingLabelFromMessage(mergeMessage) ?? incomingLabel;
+
+            if (incomingLabel === 'theirs') {
+                const mergeHead = this.readGitStateFile(gitDir, 'MERGE_HEAD').split(/\s+/)[0];
+                if (mergeHead) {
+                    incomingLabel = (await this.git.raw(['name-rev', '--name-only', '--exclude=tags/*', mergeHead])).trim() || incomingLabel;
+                }
+            }
+        } catch {
+            // Keep the stable fallback.
+        }
+
+        return {
+            baseLabel: 'base',
+            currentLabel,
+            incomingLabel
+        };
+    }
+
+    public async getConflictFileContent(filePath: string): Promise<ConflictFileContent> {
+        const repoPath = this.toRepoPath(filePath);
+        const unmerged = await this.git.raw(['ls-files', '-u', '--', repoPath]);
+        const stages = this.parseUnmergedStageObjectIds(unmerged);
+
+        if (stages.size === 0) {
+            throw new Error(`No unresolved conflict found for ${filePath}`);
+        }
+
+        const [base, current, incoming] = await Promise.all([
+            this.readConflictSide(stages.get(1)),
+            this.readConflictSide(stages.get(2)),
+            this.readConflictSide(stages.get(3))
+        ]);
+
+        const absPath = path.join(this._workspaceRoot, filePath);
+        const resultBuffer = fs.existsSync(absPath) && fs.statSync(absPath).isFile()
+            ? fs.readFileSync(absPath)
+            : Buffer.from('');
+        const result = resultBuffer.toString('utf8');
+        const isBinary = resultBuffer.includes(0) ||
+            base.content.includes('\0') ||
+            current.content.includes('\0') ||
+            incoming.content.includes('\0');
+        const labels = await this.getConflictLabels();
+
+        return {
+            path: filePath,
+            ...labels,
+            base,
+            current,
+            incoming,
+            result,
+            isBinary
+        };
     }
 
     public getStatus = async (): Promise<FileStatus[]> => {
@@ -595,10 +764,14 @@ export class GitService implements vscode.Disposable {
 
         // Check for diagnostics errors
         const diagnosticsStartedAt = Date.now();
+        const conflictFilePaths = files
+            .filter(file => file.status === 'C' || file.status === 'U')
+            .map(file => file.path);
+        const unmergedStagesByPath = await this.getUnmergedStageNumbers(conflictFilePaths);
         files.forEach(file => {
             try {
                 if (file.status === 'C' || file.status === 'U') {
-                    file.resolvedCandidate = !this.hasConflictMarkers(file.path);
+                    file.resolvedCandidate = this.isResolvedConflictCandidate(file.path, unmergedStagesByPath.get(file.path));
                 }
 
                 // file.path is workspace relative
@@ -751,6 +924,20 @@ export class GitService implements vscode.Disposable {
 
             await this.git.raw(['checkout', `--${side}`, '--', repoPath]);
             await this.git.add(repoPath);
+            this.fireChange();
+        });
+    }
+
+    public async saveConflictResolution(filePath: string, content: string): Promise<void> {
+        return this.runGitMutation(async () => {
+            if (containsConflictMarkers(content)) {
+                throw new Error('The final result still contains conflict markers.');
+            }
+
+            const absPath = path.join(this._workspaceRoot, filePath);
+            fs.mkdirSync(path.dirname(absPath), { recursive: true });
+            fs.writeFileSync(absPath, content, 'utf8');
+            await this.git.add(this.toRepoPath(filePath));
             this.fireChange();
         });
     }

@@ -95,6 +95,8 @@ export interface RepositoryFileReference {
     path: string;
 }
 
+export type ConflictResolverOpenRequest = RepositoryFileReference;
+
 export type FileReferenceInput = string | RepositoryFileReference;
 
 export interface ChangelistGroup {
@@ -198,6 +200,24 @@ export interface ChangelistFileSelection {
     staged?: boolean;
     inactive?: boolean;
     isConflict?: boolean;
+}
+
+export interface ConflictSideContent {
+    exists: boolean;
+    content: string;
+}
+
+export interface ConflictFileContent {
+    repoPath?: string;
+    path: string;
+    baseLabel?: string;
+    currentLabel?: string;
+    incomingLabel?: string;
+    base: ConflictSideContent;
+    current: ConflictSideContent;
+    incoming: ConflictSideContent;
+    result: string;
+    isBinary: boolean;
 }
 
 export interface BranchInfo {
@@ -355,7 +375,11 @@ export interface ExtensionMethods {
     pickBranch: () => Promise<void>;
     continueRebase: (params: { message?: string; files?: string[] }) => Promise<void>;
     abortRebase: () => Promise<void>;
-    resolveConflict: (params: { path: string; side: 'ours' | 'theirs' }) => Promise<void>;
+    openConflictResolver: (params: ConflictResolverOpenRequest) => Promise<void>;
+    updateConflictResolverTitle: (params: { path: string; repoPath?: string }) => Promise<void>;
+    getConflictFileContent: (params: { path: string; repoPath?: string }) => Promise<ConflictFileContent>;
+    saveConflictResolution: (params: { path: string; repoPath?: string; content: string }) => Promise<void>;
+    resolveConflict: (params: { path: string; repoPath?: string; side: 'ours' | 'theirs' }) => Promise<void>;
     openFile: (params: { path: string; repoPath?: string; preserveFocus?: boolean }) => Promise<void>;
     openStashDiff: (params: { index: number; path: string }) => Promise<void>;
     getBranchListData: () => Promise<BranchListData>;
@@ -421,6 +445,7 @@ export interface PushFailedResult {
 
 export interface WebviewMethods {
     activeFileChange: (params: { path: string; commitHash?: string }) => void;
+    revealConflictResolverFile: (params: ConflictResolverOpenRequest) => void;
     revealLog: (params: GitLogRevealRequest) => void;
     filterLogByBranch: (params: { branch: string }) => void;
     refresh: () => void;

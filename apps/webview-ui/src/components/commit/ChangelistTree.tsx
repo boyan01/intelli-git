@@ -1,5 +1,5 @@
 import React, { useMemo, useCallback, useRef } from 'react';
-import type { ChangelistGroup, ChangelistState, FileStatus, LastCommitInfo, RepositoryInfo } from '@shared/messages';
+import type { ChangelistGroup, ChangelistState, FileStatus, LastCommitInfo, RepositoryFileReference, RepositoryInfo } from '@shared/messages';
 import type { ChangelistBackgroundContext, ChangelistFileContext, ChangelistFolderContext, ChangelistRepositoryContext, ChangelistRootContext } from '@shared/webviewContext';
 import { useTranslation } from 'react-i18next';
 import { BasicTreeView } from '../common/BasicTreeView';
@@ -9,7 +9,7 @@ import { rpc, rpcEvents } from '@/lib/rpc_client';
 import { logger } from '@/utils/logger';
 import styles from '../file-tree/BaseFileTree.module.css';
 import { compactSingleChildFolders } from '../file-tree/treeUtils';
-import { buildSplitInfoByPath, getSelectionKey, type SplitFileInfo, type WorkspaceChangelistGroup } from './changelistModel';
+import { buildSplitInfoByPath, CONFLICTING_CHANGES_ID, getSelectionKey, type SplitFileInfo, type WorkspaceChangelistGroup } from './changelistModel';
 
 export interface ChangelistTreeProps {
     groups: WorkspaceChangelistGroup[];
@@ -23,6 +23,7 @@ export interface ChangelistTreeProps {
     workspaceRoot?: string;
     showRepositoryRoots?: boolean;
     amendCommit?: LastCommitInfo | null;
+    onOpenConflict?: (file: RepositoryFileReference) => void;
 }
 
 export interface ChangelistTreeRef {
@@ -41,6 +42,7 @@ interface FileNodeData {
     isRoot?: boolean;
     isInactiveGroup?: boolean;
     isStagedGroup?: boolean;
+    isConflictGroup?: boolean;
     status?: string;
     staged?: boolean;
     inactive?: boolean;
@@ -218,7 +220,8 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
     onToggle,
     workspaceRoot,
     showRepositoryRoots = true,
-    amendCommit
+    amendCommit,
+    onOpenConflict
 }, ref) => {
     const { t } = useTranslation();
     const treeRef = useRef<BasicTreeViewRef>(null);
@@ -312,11 +315,12 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
                     isRoot: true,
                     isInactiveGroup: group.id === 'inactive-changes',
                     isStagedGroup: group.id === 'staged-changes',
+                    isConflictGroup: group.id === CONFLICTING_CHANGES_ID,
                     fileCount: group.repositories.reduce((sum, repoGroup) => sum + repoGroup.group.items.length, 0),
                     hasWarning: group.hasWarning,
                     changelistId,
                     isActiveChangelist: group.isActive,
-                    isChangelistGroup: group.id !== 'staged-changes' && group.id !== 'untracked-changes',
+                    isChangelistGroup: group.id !== 'staged-changes' && group.id !== 'untracked-changes' && group.id !== CONFLICTING_CHANGES_ID,
                     showInDragMode: group.items.length === 0 && (
                         group.id === 'staged-changes' ||
                         group.id === 'changes' ||
@@ -357,23 +361,31 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
 
     const handleNodeClick = useCallback((node: TreeNode<FileNodeData>) => {
         if (node.data?.isFile) {
+            if (node.data.status === 'C' || node.data.status === 'U') {
+                onOpenConflict?.({ path: node.data.path, repoPath: node.data.repoPath });
+                return;
+            }
             if (node.data.status === 'D') {
                 rpc.openDiff({ path: node.data.path, repoPath: node.data.repoPath, staged: node.data.staged });
             } else {
                 rpc.openFile({ path: node.data.path, repoPath: node.data.repoPath, preserveFocus: true });
             }
         }
-    }, []);
+    }, [onOpenConflict]);
 
     const handleNodeDoubleClick = useCallback((node: TreeNode<FileNodeData>) => {
         if (node.data?.isFile) {
+            if (node.data.status === 'C' || node.data.status === 'U') {
+                onOpenConflict?.({ path: node.data.path, repoPath: node.data.repoPath });
+                return;
+            }
             if (node.data.status === 'D') {
                 rpc.openDiff({ path: node.data.path, repoPath: node.data.repoPath, staged: node.data.staged });
             } else {
                 rpc.openFile({ path: node.data.path, repoPath: node.data.repoPath, preserveFocus: false });
             }
         }
-    }, []);
+    }, [onOpenConflict]);
 
     const handleFocusNodeChange = useCallback((node: TreeNode<FileNodeData>) => {
         if (!node.data?.isFile) {
@@ -405,7 +417,10 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
         }
 
         const fileNodes = getDescendantFiles(node);
-        const actionableFileNodes = fileNodes.filter(file => !file.inactive);
+        const actionableFileNodes = fileNodes.filter(file => (
+            !file.inactive &&
+            (file.status !== 'C' && file.status !== 'U' || Boolean(file.resolvedCandidate))
+        ));
         if (actionableFileNodes.length === 0) {
             return null;
         }
@@ -468,6 +483,13 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
                     <span
                         className={styles.fileCount}
                     >{node.data.fileCount}</span>
+                    {node.data.isConflictGroup && (
+                        <span
+                            className={`codicon codicon-warning ${styles.icon}`}
+                            style={{ color: 'var(--vscode-gitDecoration-conflictingResourceForeground)', marginLeft: '4px' }}
+                            aria-hidden="true"
+                        ></span>
+                    )}
                     {node.data.hasWarning && (
                         <span
                             className={`codicon codicon-warning ${styles.icon}`}
@@ -519,6 +541,14 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
                             {t('Split')}
                         </span>
                     )}
+                    {node.data.resolvedCandidate && (
+                        <span
+                            className={styles.splitBadge}
+                            title={t('No conflict markers remain. Mark this file as resolved to stage it.')}
+                        >
+                            {t('Resolved')}
+                        </span>
+                    )}
                     {showPath && <span className={styles.fileDirPath}>{getDirPath(node.data.path)}</span>}
                 </div>
             );
@@ -541,6 +571,7 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
         const hasStaged = descendantFiles.some(file => Boolean(file.staged));
         const allStaged = descendantFiles.length > 0 && descendantFiles.every(file => Boolean(file.staged));
         const hasUntracked = descendantFiles.some(file => file.status === '?');
+        const hasResolvedCandidate = descendantFiles.some(file => Boolean(file.resolvedCandidate));
         const repoPath = getCommonRepoPath(descendantFiles);
 
         if (!node.data?.isFile) {
@@ -555,6 +586,7 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
                     hasStaged,
                     allStaged,
                     hasUntracked,
+                    hasResolvedCandidate,
                     changelistId: node.data.changelistId,
                     changelistMode: changelistState.mode,
                     preventDefaultContextMenuItems: true
@@ -577,6 +609,7 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
                     hasStaged,
                     allStaged,
                     hasUntracked,
+                    hasResolvedCandidate,
                     changelistMode: changelistState.mode,
                     preventDefaultContextMenuItems: true
                 } satisfies ChangelistRootContext;
@@ -593,6 +626,7 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
                 hasStaged,
                 allStaged,
                 hasUntracked,
+                hasResolvedCandidate,
                 changelistId: node.data?.changelistId,
                 changelistMode: changelistState.mode,
                 preventDefaultContextMenuItems: true
@@ -607,6 +641,7 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
             status: node.data.status,
             isStaged: Boolean(node.data.staged),
             isConflict: node.data.status === 'C' || node.data.status === 'U',
+            resolvedCandidate: node.data.resolvedCandidate,
             isInactive: changelistState.mode === 'staged'
                 ? Boolean(node.data.inactive || node.id.startsWith('inactive-changes/'))
                 : false,
@@ -617,6 +652,7 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
             hasStaged,
             allStaged,
             hasUntracked,
+            hasResolvedCandidate: Boolean(node.data.resolvedCandidate),
             changelistId: node.data.changelistId,
             changelistMode: changelistState.mode,
             preventDefaultContextMenuItems: true
@@ -625,6 +661,7 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
 
     const isDraggable = useCallback((node: TreeNode<FileNodeData>) => {
         if (node.id.startsWith('amend/')) return false;
+        if (node.data?.changelistId === CONFLICTING_CHANGES_ID) return false;
 
         if (changelistState.mode === 'changes') {
             return Boolean(node.data?.isFile || (!node.data?.isRoot && node.children));

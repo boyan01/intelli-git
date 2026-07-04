@@ -52,6 +52,7 @@
   "intelli-git.commands.changelist.unstage.title": "Unstage",
   "intelli-git.commands.changelist.acceptCurrent.title": "Accept Current Change",
   "intelli-git.commands.changelist.acceptIncoming.title": "Accept Incoming Change",
+  "intelli-git.commands.changelist.markResolved.title": "Mark as Resolved",
   "intelli-git.commands.log.resetSoft.title": "Reset Current Branch to Here (Soft)",
   "intelli-git.commands.log.resetMixed.title": "Reset Current Branch to Here (Mixed)",
   "intelli-git.commands.log.resetHard.title": "Reset Current Branch to Here (Hard)",

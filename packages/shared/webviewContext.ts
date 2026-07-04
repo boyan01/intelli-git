@@ -84,6 +84,7 @@ export interface ChangelistRootContext extends BaseWebviewContext {
     hasStaged: boolean;
     allStaged: boolean;
     hasUntracked: boolean;
+    hasResolvedCandidate?: boolean;
     changelistMode: 'staged' | 'changes';
     preventDefaultContextMenuItems: true;
 }
@@ -98,6 +99,7 @@ export interface ChangelistRepositoryContext extends BaseWebviewContext {
     hasStaged: boolean;
     allStaged: boolean;
     hasUntracked: boolean;
+    hasResolvedCandidate?: boolean;
     changelistId?: string;
     changelistMode: 'staged' | 'changes';
     preventDefaultContextMenuItems: true;
@@ -114,6 +116,7 @@ export interface ChangelistFolderContext extends BaseWebviewContext {
     hasStaged: boolean;
     allStaged: boolean;
     hasUntracked: boolean;
+    hasResolvedCandidate?: boolean;
     changelistId?: string;
     changelistMode: 'staged' | 'changes';
     preventDefaultContextMenuItems: true;
@@ -128,6 +131,8 @@ export interface ChangelistFileContext extends BaseWebviewContext {
     status?: string;
     isStaged: boolean;
     isConflict: boolean;
+    resolvedCandidate?: boolean;
+    hasResolvedCandidate?: boolean;
     isInactive: boolean;
     isUntracked: boolean;
     hasConflict: boolean;

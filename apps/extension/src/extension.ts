@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { CommitViewProvider, GitLogViewProvider, StashContentProvider, RevisionContentProvider } from './providers';
+import { CommitViewProvider, ConflictResolverPanel, GitLogViewProvider, StashContentProvider, RevisionContentProvider } from './providers';
 import { RepositoryManager, type RepositoryScope } from './services/RepositoryManager';
 import { createGitWatcher } from './services/GitRepositoryWatcher';
 import { BackgroundFetchService } from './services/BackgroundFetchService';
@@ -360,7 +360,14 @@ export async function activate(context: vscode.ExtensionContext) {
         registerBranchCommands(repoContext, gitService, gitLogProvider);
         registerLogCommands(repoContext, gitService);
         registerLogFileCommands(repoContext, gitService);
-        registerChangelistCommands(repoContext, gitService, inactiveChangesService, changelistStateService, provider);
+        registerChangelistCommands(
+            repoContext,
+            gitService,
+            inactiveChangesService,
+            changelistStateService,
+            provider,
+            repoPath => repoPath ? repositoryManager.getService(repoPath) : repositoryManager.getActiveService()
+        );
         registerEditorGitCommands(repoContext, gitService, gitLogProvider);
 
         repoBoundDisposables.push(
@@ -390,6 +397,19 @@ export async function activate(context: vscode.ExtensionContext) {
     );
     context.subscriptions.push(
         vscode.window.registerWebviewViewProvider(GitLogViewProvider.viewType, gitLogProvider)
+    );
+    context.subscriptions.push(
+        vscode.commands.registerCommand('intelli-git.openConflictResolver', (file?: { path?: string; repoPath?: string }) => {
+            if (!file?.path) {
+                return;
+            }
+
+            ConflictResolverPanel.createOrShow({
+                extensionUri: context.extensionUri,
+                context,
+                repositoryManager
+            }, { path: file.path, repoPath: file.repoPath });
+        })
     );
 
     registerAiCommands(context, provider);

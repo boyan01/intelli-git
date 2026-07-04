@@ -51,7 +51,8 @@ export abstract class BaseWebviewProvider {
             webview,
             extensionUri: this.options.extensionUri,
             title: this.getTitle(),
-            initialRoute: this.getInitialRoute()
+            initialRoute: this.getInitialRoute(),
+            initialState: this.getInitialState()
         });
     }
 
@@ -65,6 +66,10 @@ export abstract class BaseWebviewProvider {
 
     protected abstract getTitle(): string;
     protected abstract getInitialRoute(): string | undefined;
+
+    protected getInitialState(): unknown | undefined {
+        return undefined;
+    }
 
     public get rpc() {
         return this._rpc?.proxy;

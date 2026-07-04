@@ -1,6 +1,6 @@
 import { RpcPeer } from '@shared/rpc';
 import { vscode } from './vscode';
-import type { CommitAiAction, ExtensionMethods, GitLogRevealRequest, WebviewMethods } from '@shared/messages';
+import type { CommitAiAction, ConflictResolverOpenRequest, ExtensionMethods, GitLogRevealRequest, WebviewMethods } from '@shared/messages';
 
 type Listener<T> = (data: T) => void;
 
@@ -19,6 +19,7 @@ export class EventStream<T> {
 
 export const rpcEvents = {
     activeFileChange: new EventStream<{ path: string; commitHash?: string }>(),
+    revealConflictResolverFile: new EventStream<ConflictResolverOpenRequest>(),
     revealLog: new EventStream<GitLogRevealRequest>(),
     filterLogByBranch: new EventStream<{ branch: string }>(),
     refresh: new EventStream<void>(),
@@ -48,6 +49,7 @@ export const rpc = _rpc.proxy;
 
 _rpc.registerAll({
     activeFileChange: (params) => rpcEvents.activeFileChange.emit(params),
+    revealConflictResolverFile: (params) => rpcEvents.revealConflictResolverFile.emit(params),
     revealLog: (params) => rpcEvents.revealLog.emit(params),
     filterLogByBranch: (params) => rpcEvents.filterLogByBranch.emit(params),
     refresh: () => rpcEvents.refresh.emit(),

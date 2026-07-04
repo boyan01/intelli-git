@@ -24,11 +24,13 @@ import type {
     CommitMessageGenerationMode,
     CommitMessageGenerationRequest,
     CommitMessageGenerationResult,
+    ConflictResolverOpenRequest,
     PushFailedResult,
     PushFailureCode,
     PushRequest,
     PublishReviewBranchResult,
     CommitDetails,
+    ConflictFileContent,
     PublishReviewBranchRequest
 } from '@shared/messages';
 import { GitService } from '../services/GitService';
@@ -221,6 +223,8 @@ export interface ExtensionRpcHandlerOptions {
     onChangelistSelectionChange?: (selection: ChangelistFileSelection | null) => void;
     onChangelistFocusChange?: (focused: boolean) => void;
     consumePendingGitLogReveal?: () => GitLogRevealRequest | undefined;
+    openConflictResolver?: (file: ConflictResolverOpenRequest) => void;
+    updateConflictResolverTitle?: (file: RepositoryFileReference) => void;
 }
 
 /**
@@ -233,6 +237,8 @@ export class ExtensionRpcHandler {
     private onDispose: () => void;
     private onChangelistSelectionChange?: (selection: ChangelistFileSelection | null) => void;
     private onChangelistFocusChange?: (focused: boolean) => void;
+    private openConflictResolverPanel?: (file: ConflictResolverOpenRequest) => void;
+    private updateConflictResolverPanelTitle?: (file: RepositoryFileReference) => void;
     private gitReadRpcHandler: GitReadRpcHandler;
     private changelistRpcHandler: ChangelistRpcHandler;
     private _lastRebaseStatus?: string;
@@ -243,6 +249,8 @@ export class ExtensionRpcHandler {
         this.onDispose = options.onDispose || (() => { });
         this.onChangelistSelectionChange = options.onChangelistSelectionChange;
         this.onChangelistFocusChange = options.onChangelistFocusChange;
+        this.openConflictResolverPanel = options.openConflictResolver;
+        this.updateConflictResolverPanelTitle = options.updateConflictResolverTitle;
         this.gitReadRpcHandler = new GitReadRpcHandler(this.repositoryManager, options.consumePendingGitLogReveal);
         this.changelistRpcHandler = new ChangelistRpcHandler(
             repoPath => this.getChangelistOperationsForRepo(repoPath),
@@ -676,6 +684,10 @@ export class ExtensionRpcHandler {
                 pickBranch: this.pickBranch,
                 continueRebase: this.continueRebase,
                 abortRebase: this.abortRebase,
+                openConflictResolver: this.openConflictResolver,
+                updateConflictResolverTitle: this.updateConflictResolverTitle,
+                getConflictFileContent: this.getConflictFileContent,
+                saveConflictResolution: this.saveConflictResolution,
                 resolveConflict: this.resolveConflict,
                 openFile: this.openFile,
                 openStashDiff: this.openStashDiff,
@@ -1786,11 +1798,47 @@ export class ExtensionRpcHandler {
         }
     };
 
-    resolveConflict = async (params: { path: string; side: 'ours' | 'theirs' }): Promise<void> => {
+    openConflictResolver = async (params: ConflictResolverOpenRequest): Promise<void> => {
+        if (this.openConflictResolverPanel) {
+            this.openConflictResolverPanel(params);
+            return;
+        }
+
+        await vscode.commands.executeCommand('intelli-git.openConflictResolver', params);
+    };
+
+    updateConflictResolverTitle = async (params: { path: string; repoPath?: string }): Promise<void> => {
+        this.updateConflictResolverPanelTitle?.({
+            path: params.path,
+            repoPath: params.repoPath
+        });
+    };
+
+    getConflictFileContent = async (params: { path: string; repoPath?: string }): Promise<ConflictFileContent> => {
+        const content = await this.getServiceForRepo(params.repoPath).getConflictFileContent(params.path);
+        return {
+            ...content,
+            repoPath: params.repoPath
+        };
+    };
+
+    saveConflictResolution = async (params: { path: string; repoPath?: string; content: string }): Promise<void> => {
         try {
-            await this.gitService.resolveConflict(params.path, params.side);
+            await this.getServiceForRepo(params.repoPath).saveConflictResolution(params.path, params.content);
+            await vscode.commands.executeCommand('intelli-git.refresh');
         } catch (e) {
             vscode.window.showErrorMessage(i18n.t('extension.resolveConflictFailed', `${e}`));
+            throw e;
+        }
+    };
+
+    resolveConflict = async (params: { path: string; repoPath?: string; side: 'ours' | 'theirs' }): Promise<void> => {
+        try {
+            await this.getServiceForRepo(params.repoPath).resolveConflict(params.path, params.side);
+            await vscode.commands.executeCommand('intelli-git.refresh');
+        } catch (e) {
+            vscode.window.showErrorMessage(i18n.t('extension.resolveConflictFailed', `${e}`));
+            throw e;
         }
     };
 

@@ -72,6 +72,15 @@ init_seed_repo() {
     write_file "$SEED_DIR/README.md" "# Checkout test repository"
     write_file "$SEED_DIR/docs/shared.txt" "shared-on-main"
     write_file "$SEED_DIR/src/conflict.txt" "main-base"
+    write_file "$SEED_DIR/src/multiple-conflicts.txt" "header
+base-first
+context-a
+context-b
+context-c
+context-d
+context-e
+base-second
+footer"
     write_file "$SEED_DIR/src/delete-on-feature.txt" "base-delete-on-feature"
     write_file "$SEED_DIR/src/delete-on-main.txt" "base-delete-on-main"
     write_file "$SEED_DIR/src/safe.txt" "same-on-main-and-feature"
@@ -86,6 +95,15 @@ init_seed_repo() {
 
     run_git "$SEED_DIR" checkout -b "$LOCAL_BRANCH" >/dev/null
     write_file "$SEED_DIR/src/conflict.txt" "feature-branch-version"
+    write_file "$SEED_DIR/src/multiple-conflicts.txt" "header
+feature-first
+context-a
+context-b
+context-c
+context-d
+context-e
+feature-second
+footer"
     rm -f "$SEED_DIR/src/delete-on-feature.txt"
     write_file "$SEED_DIR/src/delete-on-main.txt" "feature-modified-delete-on-main"
     write_file "$SEED_DIR/src/both-added.txt" "feature-added-version"
@@ -223,10 +241,19 @@ scenario_behind_with_conflict() {
 scenario_merge_conflict() {
     create_local_tracking_branch
     write_file "$WORKTREE_DIR/src/conflict.txt" "main-merge-conflict-change"
+    write_file "$WORKTREE_DIR/src/multiple-conflicts.txt" "header
+main-first
+context-a
+context-b
+context-c
+context-d
+context-e
+main-second
+footer"
     write_file "$WORKTREE_DIR/src/delete-on-feature.txt" "main-modified-delete-on-feature"
     rm -f "$WORKTREE_DIR/src/delete-on-main.txt"
     write_file "$WORKTREE_DIR/src/both-added.txt" "main-added-version"
-    run_git "$WORKTREE_DIR" add -A src/conflict.txt src/delete-on-feature.txt src/delete-on-main.txt src/both-added.txt
+    run_git "$WORKTREE_DIR" add -A src/conflict.txt src/multiple-conflicts.txt src/delete-on-feature.txt src/delete-on-main.txt src/both-added.txt
     run_git "$WORKTREE_DIR" commit -m "Main side conflict commit" >/dev/null
 
     run_git "$WORKTREE_DIR" merge "$LOCAL_BRANCH" || true
@@ -379,6 +406,7 @@ EOF
             ;;
         merge-conflict)
             echo "Expectation: repository enters multiple real conflict states: UU, UD, DU, and AA."
+            echo "Expectation: src/multiple-conflicts.txt has more than one conflict block for resolver navigation."
             echo "Expectation: delete-related conflicts may require git rm or removing the file to resolve."
             ;;
         rebase-conflict)

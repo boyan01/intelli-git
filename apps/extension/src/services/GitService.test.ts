@@ -174,6 +174,238 @@ describe('GitService blame lookup', () => {
     });
 });
 
+describe('GitService conflict resolution', () => {
+    let tempDir: string;
+    let git: SimpleGit;
+
+    beforeEach(async () => {
+        tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'intelli-git-conflict-test-'));
+        git = simpleGit(tempDir);
+        await git.init();
+        await git.addConfig('user.name', 'Test User');
+        await git.addConfig('user.email', 'test@example.com');
+    });
+
+    afterEach(() => {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+    });
+
+    it('reads conflict stage contents and stages a saved resolution', async () => {
+        fs.writeFileSync(path.join(tempDir, 'conflict.txt'), 'base\n');
+        await git.add('conflict.txt');
+        await git.commit('Initial commit');
+
+        const baseBranch = (await git.branch()).current;
+        await git.checkoutLocalBranch('feature');
+        fs.writeFileSync(path.join(tempDir, 'conflict.txt'), 'incoming\n');
+        await git.add('conflict.txt');
+        await git.commit('Incoming change');
+
+        await git.checkout(baseBranch);
+        fs.writeFileSync(path.join(tempDir, 'conflict.txt'), 'current\n');
+        await git.add('conflict.txt');
+        await git.commit('Current change');
+
+        try {
+            await git.merge(['feature']);
+        } catch {
+            // The conflict state is the scenario under test.
+        }
+
+        const service = new GitService(tempDir, tempDir, git);
+        const conflict = await service.getConflictFileContent('conflict.txt');
+
+        expect(conflict.base).toEqual({ exists: true, content: 'base\n' });
+        expect(conflict.current).toEqual({ exists: true, content: 'current\n' });
+        expect(conflict.incoming).toEqual({ exists: true, content: 'incoming\n' });
+        expect(conflict.baseLabel).toBe('base');
+        expect(conflict.currentLabel).toBe(baseBranch);
+        expect(conflict.incomingLabel).toBe('feature');
+        expect(conflict.result).toContain('<<<<<<<');
+        expect(conflict.isBinary).toBe(false);
+
+        await service.saveConflictResolution('conflict.txt', 'resolved\n');
+
+        const status = await git.status();
+        expect(status.conflicted).toEqual([]);
+        expect(status.staged).toEqual(['conflict.txt']);
+        expect(fs.readFileSync(path.join(tempDir, 'conflict.txt'), 'utf8')).toBe('resolved\n');
+    });
+
+    it('rejects saved resolutions that still contain conflict markers', async () => {
+        fs.writeFileSync(path.join(tempDir, 'conflict.txt'), 'base\n');
+        await git.add('conflict.txt');
+        await git.commit('Initial commit');
+
+        const baseBranch = (await git.branch()).current;
+        await git.checkoutLocalBranch('feature');
+        fs.writeFileSync(path.join(tempDir, 'conflict.txt'), 'incoming\n');
+        await git.add('conflict.txt');
+        await git.commit('Incoming change');
+
+        await git.checkout(baseBranch);
+        fs.writeFileSync(path.join(tempDir, 'conflict.txt'), 'current\n');
+        await git.add('conflict.txt');
+        await git.commit('Current change');
+
+        try {
+            await git.merge(['feature']);
+        } catch {
+            // The conflict state is the scenario under test.
+        }
+
+        const service = new GitService(tempDir, tempDir, git);
+        const markerContent = [
+            '<<<<<<< HEAD\n',
+            'current\n',
+            '=======\n',
+            'incoming\n',
+            '>>>>>>> feature\n'
+        ].join('');
+
+        await expect(service.saveConflictResolution('conflict.txt', markerContent)).rejects.toThrow('conflict markers');
+
+        expect(await git.raw(['ls-files', '-u', '--', 'conflict.txt'])).toContain('\tconflict.txt');
+        expect(fs.readFileSync(path.join(tempDir, 'conflict.txt'), 'utf8')).toContain('<<<<<<<');
+    });
+
+    it('resolves modify/delete conflicts by staging the deleted side instead of writing an empty file', async () => {
+        fs.writeFileSync(path.join(tempDir, 'delete-on-incoming.txt'), 'base\n');
+        await git.add('delete-on-incoming.txt');
+        await git.commit('Initial commit');
+
+        const baseBranch = (await git.branch()).current;
+        await git.checkoutLocalBranch('feature');
+        fs.unlinkSync(path.join(tempDir, 'delete-on-incoming.txt'));
+        await git.rm('delete-on-incoming.txt');
+        await git.commit('Incoming delete');
+
+        await git.checkout(baseBranch);
+        fs.writeFileSync(path.join(tempDir, 'delete-on-incoming.txt'), 'current edit\n');
+        await git.add('delete-on-incoming.txt');
+        await git.commit('Current edit');
+
+        try {
+            await git.merge(['feature']);
+        } catch {
+            // The modify/delete conflict state is the scenario under test.
+        }
+
+        const service = new GitService(tempDir, tempDir, git);
+        const conflict = await service.getConflictFileContent('delete-on-incoming.txt');
+
+        expect(conflict.base).toEqual({ exists: true, content: 'base\n' });
+        expect(conflict.current).toEqual({ exists: true, content: 'current edit\n' });
+        expect(conflict.incoming).toEqual({ exists: false, content: '' });
+
+        await service.resolveConflict('delete-on-incoming.txt', 'theirs');
+
+        expect(fs.existsSync(path.join(tempDir, 'delete-on-incoming.txt'))).toBe(false);
+        expect((await git.raw(['ls-files', '-u', '--', 'delete-on-incoming.txt'])).trim()).toBe('');
+        expect(await git.raw(['diff', '--cached', '--name-status', '--', 'delete-on-incoming.txt'])).toContain('D\tdelete-on-incoming.txt');
+    });
+
+    it('marks binary conflict content as unsupported for inline editing', async () => {
+        fs.writeFileSync(path.join(tempDir, 'binary.dat'), Buffer.from([0, 1, 2, 3]));
+        await git.add('binary.dat');
+        await git.commit('Initial commit');
+
+        const baseBranch = (await git.branch()).current;
+        await git.checkoutLocalBranch('feature');
+        fs.writeFileSync(path.join(tempDir, 'binary.dat'), Buffer.from([0, 2, 2, 3]));
+        await git.add('binary.dat');
+        await git.commit('Incoming binary change');
+
+        await git.checkout(baseBranch);
+        fs.writeFileSync(path.join(tempDir, 'binary.dat'), Buffer.from([0, 1, 3, 3]));
+        await git.add('binary.dat');
+        await git.commit('Current binary change');
+
+        try {
+            await git.merge(['feature']);
+        } catch {
+            // The binary conflict state is the scenario under test.
+        }
+
+        const service = new GitService(tempDir, tempDir, git);
+        const conflict = await service.getConflictFileContent('binary.dat');
+
+        expect(conflict.base.exists).toBe(true);
+        expect(conflict.current.exists).toBe(true);
+        expect(conflict.incoming.exists).toBe(true);
+        expect(conflict.isBinary).toBe(true);
+    });
+
+    it('marks only existing text conflict files without markers as resolved candidates', async () => {
+        fs.writeFileSync(path.join(tempDir, 'conflict.txt'), 'base\n');
+        await git.add('conflict.txt');
+        await git.commit('Initial commit');
+
+        const baseBranch = (await git.branch()).current;
+        await git.checkoutLocalBranch('feature');
+        fs.writeFileSync(path.join(tempDir, 'conflict.txt'), 'incoming\n');
+        await git.add('conflict.txt');
+        await git.commit('Incoming change');
+
+        await git.checkout(baseBranch);
+        fs.writeFileSync(path.join(tempDir, 'conflict.txt'), 'current\n');
+        await git.add('conflict.txt');
+        await git.commit('Current change');
+
+        try {
+            await git.merge(['feature']);
+        } catch {
+            // The conflict state is the scenario under test.
+        }
+
+        const service = new GitService(tempDir, tempDir, git);
+
+        let conflict = (await service.getStatus()).find(file => file.path === 'conflict.txt');
+        expect(conflict?.resolvedCandidate).toBe(false);
+
+        fs.writeFileSync(path.join(tempDir, 'conflict.txt'), 'manual resolution\n');
+        conflict = (await service.getStatus()).find(file => file.path === 'conflict.txt');
+        expect(conflict?.resolvedCandidate).toBe(true);
+
+        fs.writeFileSync(path.join(tempDir, 'conflict.txt'), Buffer.from([0, 1, 2]));
+        conflict = (await service.getStatus()).find(file => file.path === 'conflict.txt');
+        expect(conflict?.resolvedCandidate).toBe(false);
+
+        fs.unlinkSync(path.join(tempDir, 'conflict.txt'));
+        conflict = (await service.getStatus()).find(file => file.path === 'conflict.txt');
+        expect(conflict?.resolvedCandidate).toBe(false);
+    });
+
+    it('does not mark unresolved modify/delete conflicts as resolved candidates', async () => {
+        fs.writeFileSync(path.join(tempDir, 'delete-on-incoming.txt'), 'base\n');
+        await git.add('delete-on-incoming.txt');
+        await git.commit('Initial commit');
+
+        const baseBranch = (await git.branch()).current;
+        await git.checkoutLocalBranch('feature');
+        fs.unlinkSync(path.join(tempDir, 'delete-on-incoming.txt'));
+        await git.rm('delete-on-incoming.txt');
+        await git.commit('Incoming delete');
+
+        await git.checkout(baseBranch);
+        fs.writeFileSync(path.join(tempDir, 'delete-on-incoming.txt'), 'current edit without markers\n');
+        await git.add('delete-on-incoming.txt');
+        await git.commit('Current edit');
+
+        try {
+            await git.merge(['feature']);
+        } catch {
+            // The modify/delete conflict state is the scenario under test.
+        }
+
+        const service = new GitService(tempDir, tempDir, git);
+        const conflict = (await service.getStatus()).find(file => file.path === 'delete-on-incoming.txt');
+
+        expect(conflict?.status).toBe('C');
+        expect(conflict?.resolvedCandidate).toBe(false);
+    });
+});
+
 describe('GitService staging inactive changes', () => {
     let tempDir: string;
     let git: SimpleGit;

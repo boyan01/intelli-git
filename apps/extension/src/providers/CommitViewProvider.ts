@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import type { ChangelistFileSelection, CommitAiAction } from '@shared/messages';
 import { BaseWebviewProvider, WebviewProviderOptions } from './BaseWebviewProvider';
+import { ConflictResolverPanel } from './ConflictResolverPanel';
 import type { ExtensionRpcHandlerOptions } from '../rpc';
 
 export class CommitViewProvider extends BaseWebviewProvider implements vscode.WebviewViewProvider {
@@ -52,6 +53,9 @@ export class CommitViewProvider extends BaseWebviewProvider implements vscode.We
             onChangelistFocusChange: (focused) => {
                 this._isChangelistTreeFocused = focused;
                 void vscode.commands.executeCommand('setContext', 'intelli-git.changelistTreeFocus', focused);
+            },
+            openConflictResolver: file => {
+                ConflictResolverPanel.createOrShow(this.options, file);
             }
         };
     }

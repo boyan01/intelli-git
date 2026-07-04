@@ -45,6 +45,7 @@ const CONTEXT_ONLY_COMMANDS = [
     'intelli-git.changelist.unstage',
     'intelli-git.changelist.acceptCurrent',
     'intelli-git.changelist.acceptIncoming',
+    'intelli-git.changelist.markResolved',
     'intelli-git.copyAuthorEmail',
     'intelli-git.sendAuthorEmail',
     'intelli-git.log.file.showDiff',
@@ -155,4 +156,18 @@ test('remote commit link commands are scoped by detected provider', () => {
         );
         assert.equal(item.group, '9_external@1');
     }
+});
+
+test('mark resolved is available for resolved conflict groups only', () => {
+    const packageJson = readPackageJson();
+    const webviewContext = packageJson.contributes.menus['webview/context'] ?? [];
+    const item = webviewContext.find((entry: { command?: string }) => entry.command === 'intelli-git.changelist.markResolved');
+
+    assert.ok(item, 'mark resolved should be registered in the changelist context menu');
+    assert.match(item.when, /webviewSection == 'changelistFile'/);
+    assert.match(item.when, /webviewSection == 'changelistFolder'/);
+    assert.match(item.when, /webviewSection == 'changelistRoot'/);
+    assert.match(item.when, /webviewSection == 'changelistRepository'/);
+    assert.match(item.when, /hasConflict == true/);
+    assert.match(item.when, /hasResolvedCandidate == true/);
 });

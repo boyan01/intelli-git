@@ -1,0 +1,343 @@
+.resolver {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100vh;
+    min-height: 0;
+    background: var(--vscode-editor-background);
+    color: var(--vscode-foreground);
+}
+
+.resolver:focus {
+    outline: none;
+}
+
+.header {
+    display: flex;
+    min-height: 34px;
+    padding: 4px 8px;
+    box-sizing: border-box;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.actions {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 5px;
+    flex: 1;
+    flex-wrap: nowrap;
+    overflow: hidden;
+}
+
+.button,
+.iconButton,
+.compactButton,
+.footerButton,
+.inlineActionButton,
+.inlineIconActionButton,
+.segmentButton {
+    display: inline-flex;
+    min-height: 24px;
+    box-sizing: border-box;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    border: 1px solid var(--vscode-button-border, transparent);
+    border-radius: 3px;
+    background: var(--vscode-button-secondaryBackground);
+    color: var(--vscode-button-secondaryForeground);
+    cursor: pointer;
+    font: inherit;
+    font-size: 11px;
+    line-height: 16px;
+    white-space: nowrap;
+}
+
+.button {
+    padding: 2px 8px;
+}
+
+.iconButton {
+    width: 24px;
+    padding: 2px;
+}
+
+.compactButton {
+    min-height: 24px;
+    padding: 2px 8px;
+}
+
+.inlineActionButton {
+    min-height: 22px;
+    padding: 2px 7px;
+}
+
+.inlineIconActionButton {
+    width: 22px;
+    min-height: 22px;
+    padding: 0;
+}
+
+.nonConflictControls {
+    display: inline-flex;
+    min-width: 0;
+    align-items: center;
+    gap: 0;
+}
+
+.toolbarLabel {
+    flex: 0 1 auto;
+    margin-right: 6px;
+    overflow: hidden;
+    color: var(--vscode-descriptionForeground);
+    font-size: 11px;
+    line-height: 16px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.segmentButton {
+    min-height: 24px;
+    padding: 2px 7px;
+    border-radius: 0;
+    border-right-width: 0;
+}
+
+.segmentButton:first-of-type {
+    border-top-left-radius: 3px;
+    border-bottom-left-radius: 3px;
+}
+
+.segmentButton:last-of-type {
+    border-right-width: 1px;
+    border-top-right-radius: 3px;
+    border-bottom-right-radius: 3px;
+}
+
+.activeSegmentButton {
+    background: var(--vscode-button-background);
+    color: var(--vscode-button-foreground);
+}
+
+.activeToggleButton {
+    background: var(--vscode-button-background);
+    color: var(--vscode-button-foreground);
+}
+
+.button:hover:not(:disabled),
+.iconButton:hover:not(:disabled),
+.compactButton:hover:not(:disabled),
+.footerButton:hover:not(:disabled),
+.inlineActionButton:hover:not(:disabled),
+.inlineIconActionButton:hover:not(:disabled),
+.segmentButton:hover:not(:disabled) {
+    background: var(--vscode-button-secondaryHoverBackground);
+}
+
+.activeSegmentButton:hover:not(:disabled) {
+    background: var(--vscode-button-hoverBackground);
+}
+
+.activeToggleButton:hover:not(:disabled) {
+    background: var(--vscode-button-hoverBackground);
+}
+
+.button:focus-visible,
+.iconButton:focus-visible,
+.compactButton:focus-visible,
+.footerButton:focus-visible,
+.inlineActionButton:focus-visible,
+.inlineIconActionButton:focus-visible,
+.segmentButton:focus-visible {
+    outline: 1px solid var(--vscode-focusBorder);
+    outline-offset: 1px;
+}
+
+.button:disabled,
+.iconButton:disabled,
+.compactButton:disabled,
+.footerButton:disabled,
+.inlineActionButton:disabled,
+.inlineIconActionButton:disabled,
+.segmentButton:disabled {
+    opacity: 0.55;
+    cursor: default;
+}
+
+.toolbarSeparator {
+    display: inline-block;
+    width: 1px;
+    height: 18px;
+    margin: 0 3px;
+    background: var(--vscode-panel-border);
+}
+
+.statusText {
+    flex: 0 0 auto;
+    margin-left: 8px;
+    overflow: hidden;
+    color: var(--vscode-foreground);
+    font-size: 11px;
+    line-height: 16px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.paneHeaderGrid {
+    display: grid;
+    min-height: 28px;
+    grid-template-columns: minmax(220px, 1fr) 44px minmax(280px, 1.25fr) 44px minmax(220px, 1fr);
+    border-bottom: 1px solid var(--vscode-panel-border);
+    background: var(--vscode-sideBar-background);
+}
+
+.integratedPaneHeader {
+    display: flex;
+    min-width: 0;
+    padding: 4px 8px;
+    box-sizing: border-box;
+    align-items: center;
+    gap: 5px;
+    border-right: 1px solid var(--vscode-panel-border);
+    color: var(--vscode-foreground);
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 18px;
+}
+
+.resultHeader {
+    grid-column: 3;
+    justify-content: center;
+}
+
+.rightHeader {
+    grid-column: 5;
+    justify-content: flex-end;
+    border-right: 0;
+}
+
+.resultPath {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--vscode-descriptionForeground);
+    font-weight: 400;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.content {
+    display: flex;
+    min-height: 0;
+    padding: 0;
+    box-sizing: border-box;
+    flex: 1;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+:global(.monaco-editor .view-overlays .cdr.intelli-git-merge-conflict-unresolved),
+:global(.monaco-editor .view-overlays .current-line.intelli-git-merge-conflict-unresolved),
+:global(.intelli-git-merge-conflict-unresolved) {
+    width: 100% !important;
+    background: rgba(244, 76, 76, 0.2) !important;
+}
+
+:global(.monaco-editor .view-overlays .cdr.intelli-git-merge-conflict-resolved),
+:global(.monaco-editor .view-overlays .current-line.intelli-git-merge-conflict-resolved),
+:global(.intelli-git-merge-conflict-resolved) {
+    width: 100% !important;
+    background: rgba(115, 201, 145, 0.18) !important;
+}
+
+:global(.monaco-editor .view-overlays .cdr.intelli-git-merge-conflict-active),
+:global(.monaco-editor .view-overlays .current-line.intelli-git-merge-conflict-active),
+:global(.intelli-git-merge-conflict-active) {
+    width: 100% !important;
+    background: rgba(55, 148, 255, 0.26) !important;
+    box-shadow: inset 0 0 0 1px rgba(55, 148, 255, 0.72);
+}
+
+:global(.intelli-git-merge-conflict-unresolved-gutter) {
+    background: var(--vscode-errorForeground, #f14c4c);
+}
+
+:global(.intelli-git-merge-conflict-resolved-gutter) {
+    background: var(--vscode-testing-iconPassed, #73c991);
+}
+
+:global(.intelli-git-merge-conflict-active-gutter) {
+    background: var(--vscode-focusBorder, #007fd4);
+}
+
+:global(.monaco-editor .margin-view-overlays .line-numbers.intelli-git-merge-conflict-active-line-number),
+:global(.monaco-editor .margin-view-overlays .active-line-number.intelli-git-merge-conflict-active-line-number),
+:global(.intelli-git-merge-conflict-active-line-number) {
+    color: var(--vscode-focusBorder, #007fd4) !important;
+    font-weight: 700;
+}
+
+.message {
+    padding: 10px 12px;
+    color: var(--vscode-descriptionForeground);
+    font-size: 12px;
+    line-height: 18px;
+}
+
+.error {
+    color: var(--vscode-errorForeground);
+}
+
+.binaryState {
+    display: flex;
+    min-height: 0;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.binaryActions {
+    display: flex;
+    padding: 0 12px;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.footer {
+    display: flex;
+    min-height: 44px;
+    padding: 6px 12px;
+    box-sizing: border-box;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    border-top: 1px solid var(--vscode-panel-border);
+    background: var(--vscode-editor-background);
+}
+
+.footerLeft,
+.footerRight {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 8px;
+}
+
+.footerButton {
+    min-height: 30px;
+    padding: 4px 14px;
+    font-size: 12px;
+}
+
+.applyButton {
+    min-width: 86px;
+    background: var(--vscode-button-background);
+    color: var(--vscode-button-foreground);
+}
+
+.applyButton:hover:not(:disabled) {
+    background: var(--vscode-button-hoverBackground);
+}

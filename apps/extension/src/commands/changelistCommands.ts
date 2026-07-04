@@ -22,6 +22,7 @@ interface ChangelistFileContext {
     isStaged?: boolean;
     isInactive?: boolean;
     isConflict?: boolean;
+    resolvedCandidate?: boolean;
     isUntracked?: boolean;
     hasStaged?: boolean;
     allStaged?: boolean;
@@ -29,6 +30,7 @@ interface ChangelistFileContext {
     allInactive?: boolean;
     hasConflict?: boolean;
     hasUntracked?: boolean;
+    hasResolvedCandidate?: boolean;
     changelistMode?: 'staged' | 'changes';
     changelistId?: string;
 }
@@ -46,6 +48,7 @@ interface ChangelistRootContext {
     allInactive?: boolean;
     hasConflict?: boolean;
     hasUntracked?: boolean;
+    hasResolvedCandidate?: boolean;
     changelistMode?: 'staged' | 'changes';
 }
 
@@ -60,6 +63,22 @@ interface ChangelistFolderContext {
     allInactive?: boolean;
     hasConflict?: boolean;
     hasUntracked?: boolean;
+    hasResolvedCandidate?: boolean;
+    changelistMode?: 'staged' | 'changes';
+    changelistId?: string;
+}
+
+interface ChangelistRepositoryContext {
+    webviewSection: 'changelistRepository';
+    repoPath?: string;
+    paths?: string[];
+    hasConflict?: boolean;
+    hasStaged?: boolean;
+    allStaged?: boolean;
+    hasInactive?: boolean;
+    allInactive?: boolean;
+    hasUntracked?: boolean;
+    hasResolvedCandidate?: boolean;
     changelistMode?: 'staged' | 'changes';
     changelistId?: string;
 }
@@ -71,7 +90,7 @@ interface ChangelistHunkContext {
     changelistId?: string;
 }
 
-type ChangelistTargetContext = ChangelistFileContext | ChangelistFolderContext | ChangelistRootContext;
+type ChangelistTargetContext = ChangelistFileContext | ChangelistFolderContext | ChangelistRootContext | ChangelistRepositoryContext;
 
 interface LineChangeLike {
     originalStartLineNumber: number;
@@ -361,7 +380,8 @@ export function registerChangelistCommands(
     gitService: GitService,
     inactiveChangesService: InactiveChangesService,
     changelistStateService: ChangelistStateService,
-    provider: CommitViewProvider
+    provider: CommitViewProvider,
+    resolveGitService: (repoPath?: string) => GitService | undefined = () => gitService
 ): void {
     const editorHunkResolver = new EditorHunkResolver(gitService, inactiveChangesService, changelistStateService);
     const changelistOperations = new ChangelistOperations({
@@ -697,7 +717,7 @@ export function registerChangelistCommands(
             }
 
             try {
-                await gitService.resolveConflict(args.path, 'ours');
+                await (resolveGitService(args.repoPath) || gitService).resolveConflict(args.path, 'ours');
                 provider.rpc?.refresh();
             } catch (e) {
                 vscode.window.showErrorMessage(i18n.t('extension.resolveConflictFailed', `${e}`));
@@ -712,10 +732,42 @@ export function registerChangelistCommands(
             }
 
             try {
-                await gitService.resolveConflict(args.path, 'theirs');
+                await (resolveGitService(args.repoPath) || gitService).resolveConflict(args.path, 'theirs');
                 provider.rpc?.refresh();
             } catch (e) {
                 vscode.window.showErrorMessage(i18n.t('extension.resolveConflictFailed', `${e}`));
+            }
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand('intelli-git.changelist.markResolved', async (args: ChangelistTargetContext) => {
+            const requestedPaths = getTargetPaths(args);
+            const hasResolvedCandidate = Boolean(args && 'resolvedCandidate' in args && args.resolvedCandidate) ||
+                Boolean(args?.hasResolvedCandidate);
+            if (requestedPaths.length === 0 || !args?.hasConflict || !hasResolvedCandidate) {
+                return;
+            }
+
+            try {
+                const service = resolveGitService(args.repoPath) || gitService;
+                const requestedPathSet = new Set(requestedPaths);
+                const resolvedPaths = (await service.getStatus())
+                    .filter(file => requestedPathSet.has(file.path))
+                    .filter(file => (file.status === 'C' || file.status === 'U') && file.resolvedCandidate)
+                    .map(file => file.path);
+                if (resolvedPaths.length === 0) {
+                    return;
+                }
+
+                if (resolvedPaths.length === 1) {
+                    await service.stageFile(resolvedPaths[0]);
+                } else {
+                    await service.stageFiles(resolvedPaths);
+                }
+                provider.rpc?.refresh();
+            } catch (e) {
+                vscode.window.showErrorMessage(i18n.t('extension.stageFailed', `${e}`));
             }
         })
     );

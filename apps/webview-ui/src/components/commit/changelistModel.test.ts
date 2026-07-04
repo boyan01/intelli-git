@@ -44,6 +44,7 @@ describe('changelistModel', () => {
         const inactive = hunk('src/partial.ts:worktree:inactive');
         const active = hunk('src/partial.ts:worktree:active');
         const groups = buildChangelists([
+            file('src/conflict.ts', { status: 'C', staged: true }),
             file('src/staged.ts', { staged: true }),
             file('src/worktree.ts'),
             file('src/new.ts', { status: '?' }),
@@ -56,6 +57,7 @@ describe('changelistModel', () => {
         ], changelistState('staged'), t);
 
         expect(groups.map(group => [group.id, group.items.map(item => item.path)])).toEqual([
+            ['conflicting-changes', ['src/conflict.ts']],
             ['staged-changes', ['src/staged.ts']],
             ['changes', ['src/worktree.ts', 'src/partial.ts']],
             ['untracked-changes', ['src/new.ts']],
@@ -63,6 +65,22 @@ describe('changelistModel', () => {
         ]);
         expect(groups.find(group => group.id === 'changes')?.items.find(item => item.path === 'src/partial.ts')?.hunks).toEqual([active]);
         expect(groups.find(group => group.id === 'inactive-changes')?.hasWarning).toBe(true);
+    });
+
+    it('keeps conflicts out of changes mode changelists and commit selection', () => {
+        const state = changelistState('changes');
+        const groups = buildChangelists([
+            file('src/conflict.ts', { status: 'C', staged: true }),
+            file('src/active.ts')
+        ], state, t);
+
+        expect(groups.map(group => [group.id, group.items.map(item => item.path)])).toEqual([
+            ['conflicting-changes', ['src/conflict.ts']],
+            ['changes', ['src/active.ts']],
+            ['review', []],
+            ['inactive-changes', []]
+        ]);
+        expect(Array.from(getSelectedFiles([], groups, state))).toEqual(['src/active.ts']);
     });
 
     it('uses active changelist files plus untracked files as the changes mode commit selection', () => {
@@ -196,4 +214,5 @@ describe('changelistModel', () => {
             { repoPath: '/workspace/flutter-app', path: 'lib/main.dart', status: 'M', staged: true, inactive: undefined }
         ]);
     });
+
 });

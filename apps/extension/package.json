@@ -62,6 +62,13 @@
           "fontPath": "resources/intelli-git-icons.woff",
           "fontCharacter": "\\E003"
         }
+      },
+      "intelli-git-merge": {
+        "description": "Intelli Git merge conflict resolver icon",
+        "default": {
+          "fontPath": "resources/intelli-git-icons.woff",
+          "fontCharacter": "\\E004"
+        }
       }
     },
     "viewsContainers": {
@@ -358,6 +365,10 @@
       {
         "command": "intelli-git.changelist.acceptIncoming",
         "title": "%intelli-git.commands.changelist.acceptIncoming.title%"
+      },
+      {
+        "command": "intelli-git.changelist.markResolved",
+        "title": "%intelli-git.commands.changelist.markResolved.title%"
       },
       {
         "command": "intelli-git.copyAuthorEmail",
@@ -687,6 +698,10 @@
         },
         {
           "command": "intelli-git.changelist.acceptIncoming",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.changelist.markResolved",
           "when": "false"
         },
         {
@@ -1063,7 +1078,7 @@
         },
         {
           "submenu": "intelli-git.createPatch",
-          "when": "(webviewSection == 'changelistFile' || webviewSection == 'changelistFolder' || webviewSection == 'changelistRoot') && (changelistMode == 'changes' || changelistMode == 'staged') && changelistId != 'inactive-changes' && hasConflict != true",
+          "when": "((webviewSection == 'changelistFile' || webviewSection == 'changelistFolder' || webviewSection == 'changelistRoot') && (changelistMode == 'changes' || changelistMode == 'staged') && changelistId != 'inactive-changes' && hasConflict != true) || webviewSection == 'gitLogCommitFile'",
           "group": "1_modification@3"
         },
         {
@@ -1100,6 +1115,11 @@
           "command": "intelli-git.changelist.acceptIncoming",
           "when": "webviewSection == 'changelistFile' && isConflict == true",
           "group": "1_modification@1"
+        },
+        {
+          "command": "intelli-git.changelist.markResolved",
+          "when": "(webviewSection == 'changelistFile' || webviewSection == 'changelistFolder' || webviewSection == 'changelistRoot' || webviewSection == 'changelistRepository') && hasConflict == true && hasResolvedCandidate == true",
+          "group": "1_modification@2"
         },
         {
           "command": "intelli-git.changelist.markInactive",
@@ -1215,11 +1235,6 @@
           "command": "intelli-git.log.file.cherryPickChanges",
           "when": "webviewSection == 'gitLogCommitFile'",
           "group": "1_modification@2"
-        },
-        {
-          "submenu": "intelli-git.createPatch",
-          "when": "webviewSection == 'gitLogCommitFile'",
-          "group": "1_modification@3"
         }
       ],
       "editor/context": [

@@ -10,6 +10,7 @@ import type {
 } from '@shared/messages';
 
 export const INACTIVE_CHANGELIST_ID = 'inactive-changes';
+export const CONFLICTING_CHANGES_ID = 'conflicting-changes';
 
 type Translate = (key: string) => string;
 
@@ -186,10 +187,16 @@ export function buildChangelists(files: FileStatus[], changelistState: Changelis
     const changelistGroups = new Map<string, FileStatus[]>();
     changelistState.lists.forEach(list => changelistGroups.set(list.id, []));
 
+    const conflictFiles: FileStatus[] = [];
     const inactiveFiles: FileStatus[] = [];
     const untrackedFiles: FileStatus[] = [];
 
     logicalFiles.forEach(file => {
+        if (file.status === 'C' || file.status === 'U') {
+            conflictFiles.push(toDisplayFile(file));
+            return;
+        }
+
         if (file.inactive) {
             if (changelistState.mode === 'changes') {
                 const group = changelistGroups.get(INACTIVE_CHANGELIST_ID);
@@ -261,13 +268,23 @@ export function buildChangelists(files: FileStatus[], changelistState: Changelis
 
     const result: ChangelistGroup[] = [];
 
+    if (conflictFiles.length > 0) {
+        result.push({
+            id: CONFLICTING_CHANGES_ID,
+            name: t('Conflicting Changes'),
+            isDefault: false,
+            isActive: false,
+            items: conflictFiles
+        });
+    }
+
     if (changelistState.mode === 'staged') {
         const stagedFiles = files
-            .filter(file => file.staged && file.status !== '?')
+            .filter(file => file.staged && file.status !== '?' && file.status !== 'C' && file.status !== 'U')
             .map(toActiveFileStatus)
             .filter((file): file is FileStatus => Boolean(file));
         const changesFiles = files
-            .filter(file => !file.staged && file.status !== '?')
+            .filter(file => !file.staged && file.status !== '?' && file.status !== 'C' && file.status !== 'U')
             .map(toActiveFileStatus)
             .filter((file): file is FileStatus => Boolean(file));
 
@@ -393,6 +410,7 @@ function getWorkspaceGroupKey(group: ChangelistGroup): string {
     if (
         group.id === 'staged-changes' ||
         group.id === 'changes' ||
+        group.id === CONFLICTING_CHANGES_ID ||
         group.id === 'untracked-changes' ||
         group.id === INACTIVE_CHANGELIST_ID
     ) {
