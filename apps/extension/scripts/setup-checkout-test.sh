@@ -34,7 +34,7 @@ repo_root() {
 run_git() {
     local repo_dir="$1"
     shift
-    git -C "$repo_dir" "$@"
+    git --no-pager -C "$repo_dir" "$@"
 }
 
 write_file() {

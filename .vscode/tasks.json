@@ -38,6 +38,36 @@
 			}
 		},
 		{
+			"label": "Setup Checkout Test Fixture",
+			"type": "process",
+			"command": "bash",
+			"args": [
+				"${workspaceFolder}/apps/extension/scripts/setup-checkout-test.sh",
+				"${input:checkoutScenario}"
+			],
+			"options": {
+				"cwd": "${workspaceFolder}",
+				"env": {
+					"BASE_DIR": "${workspaceFolder}/.test/intelli-git-test/debug"
+				}
+			},
+			"problemMatcher": [],
+			"presentation": {
+				"reveal": "always",
+				"panel": "dedicated",
+				"clear": true
+			}
+		},
+		{
+			"label": "Prepare Checkout Test and Watch",
+			"dependsOrder": "sequence",
+			"dependsOn": [
+				"Setup Checkout Test Fixture",
+				"Watch All (Run Extension)"
+			],
+			"problemMatcher": []
+		},
+		{
 			"label": "Watch All",
 			"dependsOn": [
 				"Watch All (Run Extension)"
@@ -47,6 +77,32 @@
 				"isDefault": true
 			},
 			"problemMatcher": []
+		}
+	],
+	"inputs": [
+		{
+			"id": "checkoutScenario",
+			"type": "pickString",
+			"description": "Select a checkout test scenario",
+			// Keep these options in sync with apps/extension/scripts/setup-checkout-test.sh.
+			"options": [
+				"clean-remote",
+				"safe",
+				"conflict",
+				"untracked",
+				"staged",
+				"mixed",
+				"local-clean",
+				"ahead",
+				"behind",
+				"diverged",
+				"ahead-conflict",
+				"behind-conflict",
+				"merge-conflict",
+				"rebase-conflict",
+				"stash-pop-conflict"
+			],
+			"default": "merge-conflict"
 		}
 	]
 }
