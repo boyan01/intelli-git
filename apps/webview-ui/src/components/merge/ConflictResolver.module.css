@@ -72,6 +72,55 @@
     padding: 2px 8px;
 }
 
+.toolbarSelectControl {
+    position: relative;
+    display: inline-flex;
+    min-width: 0;
+    flex: 0 1 auto;
+    align-items: center;
+}
+
+.toolbarSelect {
+    height: 24px;
+    min-width: 112px;
+    max-width: 172px;
+    padding: 2px 24px 2px 8px;
+    box-sizing: border-box;
+    appearance: none;
+    overflow: hidden;
+    border: 1px solid var(--vscode-dropdown-border, var(--vscode-button-border, transparent));
+    border-radius: 3px;
+    background: var(--vscode-dropdown-background);
+    color: var(--vscode-dropdown-foreground);
+    cursor: pointer;
+    font: inherit;
+    font-size: 11px;
+    line-height: 18px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.toolbarSelect:hover:not(:disabled) {
+    border-color: var(--vscode-focusBorder);
+}
+
+.toolbarSelect:focus-visible {
+    outline: 1px solid var(--vscode-focusBorder);
+    outline-offset: 1px;
+}
+
+.toolbarSelect:disabled {
+    cursor: default;
+    opacity: 0.55;
+}
+
+.toolbarSelectChevron {
+    position: absolute;
+    right: 6px;
+    color: var(--vscode-dropdown-foreground);
+    pointer-events: none;
+}
+
 .inlineActionButton {
     min-height: 22px;
     padding: 2px 7px;
@@ -124,11 +173,6 @@
     color: var(--vscode-button-foreground);
 }
 
-.activeToggleButton {
-    background: var(--vscode-button-background);
-    color: var(--vscode-button-foreground);
-}
-
 .button:hover:not(:disabled),
 .iconButton:hover:not(:disabled),
 .compactButton:hover:not(:disabled),
@@ -140,10 +184,6 @@
 }
 
 .activeSegmentButton:hover:not(:disabled) {
-    background: var(--vscode-button-hoverBackground);
-}
-
-.activeToggleButton:hover:not(:disabled) {
     background: var(--vscode-button-hoverBackground);
 }
 
@@ -191,7 +231,7 @@
 .paneHeaderGrid {
     display: grid;
     min-height: 28px;
-    grid-template-columns: minmax(220px, 1fr) 44px minmax(280px, 1.25fr) 44px minmax(220px, 1fr);
+    grid-template-columns: minmax(0, 1fr) 44px minmax(0, 1fr) 44px minmax(0, 1fr);
     border-bottom: 1px solid var(--vscode-panel-border);
     background: var(--vscode-sideBar-background);
 }
@@ -240,45 +280,79 @@
     overflow: hidden;
 }
 
-:global(.monaco-editor .view-overlays .cdr.intelli-git-merge-conflict-unresolved),
-:global(.monaco-editor .view-overlays .current-line.intelli-git-merge-conflict-unresolved),
-:global(.intelli-git-merge-conflict-unresolved) {
+:global(.intelli-git-merge-inserted) {
+    --intelli-git-merge-line-background: var(--vscode-diffEditor-insertedLineBackground, rgba(52, 125, 57, 0.15));
+    --intelli-git-merge-word-background: var(--vscode-diffEditor-insertedTextBackground, rgba(87, 171, 90, 0.3));
+    --intelli-git-merge-marker: var(--vscode-editorGutter-addedBackground, #72c892);
+}
+
+:global(.intelli-git-merge-deleted) {
+    --intelli-git-merge-line-background: var(--vscode-diffEditor-unchangedCodeBackground, rgba(128, 128, 128, 0.16));
+    --intelli-git-merge-word-background: color-mix(in srgb, var(--vscode-diffEditor-move-border, #8b8b8b) 34%, transparent);
+    --intelli-git-merge-marker: var(--vscode-diffEditor-move-border, #8b8b8b);
+}
+
+:global(.intelli-git-merge-modified) {
+    --intelli-git-merge-line-background: color-mix(in srgb, var(--vscode-editorGutter-modifiedBackground, #0078d4) 18%, transparent);
+    --intelli-git-merge-word-background: color-mix(in srgb, var(--vscode-editorGutter-modifiedBackground, #0078d4) 34%, transparent);
+    --intelli-git-merge-marker: var(--vscode-editorGutter-modifiedBackground, #0078d4);
+}
+
+:global(.intelli-git-merge-conflict) {
+    --intelli-git-merge-line-background: var(--vscode-diffEditor-removedLineBackground, rgba(201, 60, 55, 0.15));
+    --intelli-git-merge-word-background: var(--vscode-diffEditor-removedTextBackground, rgba(244, 112, 103, 0.3));
+    --intelli-git-merge-marker: var(--vscode-editorGutter-deletedBackground, #f28772);
+}
+
+:global(.monaco-editor .view-overlays .cdr.intelli-git-merge-pending),
+:global(.monaco-editor .view-overlays .current-line.intelli-git-merge-pending),
+:global(.intelli-git-merge-pending) {
     width: 100% !important;
-    background: rgba(244, 76, 76, 0.2) !important;
+    background: var(--intelli-git-merge-line-background) !important;
+    box-shadow: none !important;
 }
 
-:global(.monaco-editor .view-overlays .cdr.intelli-git-merge-conflict-resolved),
-:global(.monaco-editor .view-overlays .current-line.intelli-git-merge-conflict-resolved),
-:global(.intelli-git-merge-conflict-resolved) {
+:global(.monaco-editor .intelli-git-merge-word) {
+    border-radius: 0;
+    background: var(--intelli-git-merge-word-background) !important;
+}
+
+:global(.monaco-editor .view-overlays .cdr.intelli-git-merge-resolved-boundary) {
     width: 100% !important;
-    background: rgba(115, 201, 145, 0.18) !important;
 }
 
-:global(.monaco-editor .view-overlays .cdr.intelli-git-merge-conflict-active),
-:global(.monaco-editor .view-overlays .current-line.intelli-git-merge-conflict-active),
-:global(.intelli-git-merge-conflict-active) {
-    width: 100% !important;
-    background: rgba(55, 148, 255, 0.26) !important;
-    box-shadow: inset 0 0 0 1px rgba(55, 148, 255, 0.72);
+:global(.intelli-git-merge-resolved-boundary) {
+    box-sizing: border-box;
+    background: transparent !important;
+    box-shadow: none !important;
 }
 
-:global(.intelli-git-merge-conflict-unresolved-gutter) {
-    background: var(--vscode-errorForeground, #f14c4c);
+:global(.intelli-git-merge-resolved-top) {
+    border-top: 1px dotted color-mix(in srgb, var(--intelli-git-merge-marker) 72%, transparent);
 }
 
-:global(.intelli-git-merge-conflict-resolved-gutter) {
-    background: var(--vscode-testing-iconPassed, #73c991);
+:global(.intelli-git-merge-resolved-bottom) {
+    border-bottom: 1px dotted color-mix(in srgb, var(--intelli-git-merge-marker) 72%, transparent);
 }
 
-:global(.intelli-git-merge-conflict-active-gutter) {
-    background: var(--vscode-focusBorder, #007fd4);
+:global(.intelli-git-merge-padding-zone),
+:global(.intelli-git-merge-empty-pending),
+:global(.intelli-git-merge-empty-resolved) {
+    box-sizing: border-box;
+    background-color: var(--vscode-editor-background);
+    background-image: repeating-linear-gradient(
+        -45deg,
+        transparent 0 4px,
+        color-mix(in srgb, var(--vscode-diffEditor-diagonalFill, var(--vscode-panel-border)) 38%, transparent) 4px 5px
+    );
 }
 
-:global(.monaco-editor .margin-view-overlays .line-numbers.intelli-git-merge-conflict-active-line-number),
-:global(.monaco-editor .margin-view-overlays .active-line-number.intelli-git-merge-conflict-active-line-number),
-:global(.intelli-git-merge-conflict-active-line-number) {
-    color: var(--vscode-focusBorder, #007fd4) !important;
-    font-weight: 700;
+:global(.intelli-git-merge-empty-pending) {
+    border-top: 2px solid color-mix(in srgb, var(--intelli-git-merge-marker) 82%, transparent);
+}
+
+:global(.intelli-git-merge-empty-resolved) {
+    border-top: 1px dotted color-mix(in srgb, var(--intelli-git-merge-marker) 72%, transparent);
 }
 
 .message {

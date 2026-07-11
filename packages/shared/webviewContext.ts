@@ -16,7 +16,10 @@ export const WEBVIEW_CONTEXT_SECTIONS = [
     'changelistFile',
     'changelistHunk',
     'changelistBackground',
-    'worktreeItem'
+    'worktreeItem',
+    'mergeEditorLeft',
+    'mergeEditorResult',
+    'mergeEditorRight'
 ] as const;
 
 export type WebviewContextSection = typeof WEBVIEW_CONTEXT_SECTIONS[number];
@@ -164,6 +167,17 @@ export interface WorktreeItemContext extends BaseWebviewContext {
     preventDefaultContextMenuItems: true;
 }
 
+export interface MergeEditorContext extends BaseWebviewContext {
+    webviewSection: 'mergeEditorLeft' | 'mergeEditorResult' | 'mergeEditorRight';
+    repoPath?: string;
+    path: string;
+    changeGroupId?: string;
+    canReviewLeft: boolean;
+    canReviewRight: boolean;
+    canMarkReviewed: boolean;
+    preventDefaultContextMenuItems: true;
+}
+
 export type WebviewContextPayload =
     | CommitAiContext
     | StashItemContext
@@ -177,4 +191,5 @@ export type WebviewContextPayload =
     | ChangelistFileContext
     | ChangelistBackgroundContext
     | WorktreeItemContext
+    | MergeEditorContext
     | BaseWebviewContext;

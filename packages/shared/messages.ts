@@ -97,6 +97,18 @@ export interface RepositoryFileReference {
 
 export type ConflictResolverOpenRequest = RepositoryFileReference;
 
+export type ConflictResolverContextAction =
+    | 'acceptLeft'
+    | 'cancelLeft'
+    | 'acceptRight'
+    | 'cancelRight'
+    | 'markReviewed';
+
+export interface ConflictResolverContextActionRequest extends RepositoryFileReference {
+    groupId: string;
+    action: ConflictResolverContextAction;
+}
+
 export type FileReferenceInput = string | RepositoryFileReference;
 
 export interface ChangelistGroup {
@@ -207,6 +219,14 @@ export interface ConflictSideContent {
     content: string;
 }
 
+export interface ConflictChange {
+    id: string;
+    baseStart: number;
+    baseLineCount: number;
+    sideStart: number;
+    sideLineCount: number;
+}
+
 export interface ConflictFileContent {
     repoPath?: string;
     path: string;
@@ -216,8 +236,26 @@ export interface ConflictFileContent {
     base: ConflictSideContent;
     current: ConflictSideContent;
     incoming: ConflictSideContent;
+    currentChanges: ConflictChange[];
+    incomingChanges: ConflictChange[];
     result: string;
+    stageSignature: string;
+    resultFingerprint: string;
     isBinary: boolean;
+}
+
+export interface ConflictResolutionSnapshot {
+    stageSignature: string;
+    resultFingerprint: string;
+}
+
+export interface SaveConflictResolutionRequest extends RepositoryFileReference, ConflictResolutionSnapshot {
+    content: string;
+    resultExists: boolean;
+}
+
+export interface ResolveConflictRequest extends RepositoryFileReference, Partial<ConflictResolutionSnapshot> {
+    side: 'ours' | 'theirs';
 }
 
 export interface BranchInfo {
@@ -378,8 +416,9 @@ export interface ExtensionMethods {
     openConflictResolver: (params: ConflictResolverOpenRequest) => Promise<void>;
     updateConflictResolverTitle: (params: { path: string; repoPath?: string }) => Promise<void>;
     getConflictFileContent: (params: { path: string; repoPath?: string }) => Promise<ConflictFileContent>;
-    saveConflictResolution: (params: { path: string; repoPath?: string; content: string }) => Promise<void>;
-    resolveConflict: (params: { path: string; repoPath?: string; side: 'ours' | 'theirs' }) => Promise<void>;
+    confirmConflictResolverRestart: () => Promise<boolean>;
+    saveConflictResolution: (params: SaveConflictResolutionRequest) => Promise<void>;
+    resolveConflict: (params: ResolveConflictRequest) => Promise<void>;
     openFile: (params: { path: string; repoPath?: string; preserveFocus?: boolean }) => Promise<void>;
     openStashDiff: (params: { index: number; path: string }) => Promise<void>;
     getBranchListData: () => Promise<BranchListData>;
@@ -446,6 +485,7 @@ export interface PushFailedResult {
 export interface WebviewMethods {
     activeFileChange: (params: { path: string; commitHash?: string }) => void;
     revealConflictResolverFile: (params: ConflictResolverOpenRequest) => void;
+    triggerConflictResolverAction: (params: ConflictResolverContextActionRequest) => void;
     revealLog: (params: GitLogRevealRequest) => void;
     filterLogByBranch: (params: { branch: string }) => void;
     refresh: () => void;

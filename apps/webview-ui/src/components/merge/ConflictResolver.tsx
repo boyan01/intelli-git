@@ -1,22 +1,33 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ConflictFileContent, RepositoryFileReference } from '@shared/messages';
+import type { MergeEditorContext } from '@shared/webviewContext';
 import { rpc, rpcEvents } from '../../lib/rpc_client';
-import type { CodeLineDecoration } from './MonacoCodeEditor';
 import {
-    buildThreeWayMergeDocumentFromSides,
-    buildThreeWayMergePaneDocument,
-    getUnresolvedThreeWayConflictIds,
-    parseConflictBlocks,
-    type ConflictResolutionChoice,
-    type ConflictResolutionMap,
-    type ConflictResolutionState,
-    type MergePaneRange,
-    type NonConflictingChangeMode,
-    type ThreeWayMergePart,
+    applyMergeContentChanges,
+    applyMergeGroupDecision,
+    buildLineAlignmentBlocks,
+    buildMergeSessionDocument,
+    buildMergeSideInlineDiffRanges,
+    getContentLineCount,
+    getMergeGroupApplyMode,
+    getMergeTextRange,
+    hasConflictBlocks,
+    isMergeReviewRangePending,
+    splitContentLines,
+    type ConflictInlineDiffRange,
+    type MergeChangeGroup,
+    type MergeReviewDecision,
+    type MergeReviewRange,
+    type MergeReviewSide,
     type WhitespaceCompareMode
 } from './conflictModel';
-import { ThreeWayMergeEditor } from './ThreeWayMergeEditor';
+import type { CodeDecoration, CodeEditorContentChange, CodeViewZone } from './MonacoCodeEditor';
+import {
+    ThreeWayMergeEditor,
+    type MergeBlockAction,
+    type MergeDecorationType
+} from './ThreeWayMergeEditor';
 import styles from './ConflictResolver.module.css';
 
 interface ConflictResolverProps {
@@ -32,6 +43,35 @@ interface ConflictResolverInitialSession {
     file: RepositoryFileReference;
 }
 
+type MergeHighlightMode = 'words' | 'lines';
+
+interface MergePaneLayout {
+    leftViewZones: CodeViewZone[];
+    resultViewZones: CodeViewZone[];
+    rightViewZones: CodeViewZone[];
+    displayRows: Map<string, number>;
+    resultLineCounts: Map<string, number>;
+    resultTextRanges: Map<string, ReturnType<typeof getMergeTextRange>>;
+}
+
+interface MergeGapLayout {
+    visualLineCount: number;
+    leftViewZones: CodeViewZone[];
+    resultViewZones: CodeViewZone[];
+    rightViewZones: CodeViewZone[];
+}
+
+interface MergeHistoryEntry {
+    resultDraft: string | null;
+    resultExists: boolean;
+    groups: MergeChangeGroup[];
+    reviewRanges: MergeReviewRange[];
+    activeGroupId: string | null;
+    whitespaceMode: WhitespaceCompareMode;
+}
+
+const MAX_MERGE_HISTORY_ENTRIES = 50;
+
 function isSameFileReference(left: RepositoryFileReference, right: RepositoryFileReference): boolean {
     return left.path === right.path && (left.repoPath || '') === (right.repoPath || '');
 }
@@ -40,19 +80,14 @@ function getFileReferenceKey(file: RepositoryFileReference): string {
     return `${file.repoPath || ''}\u0000${file.path}`;
 }
 
-function findUnresolvedConflictIndex(
-    conflictParts: Array<Extract<ThreeWayMergePart, { type: 'conflict' }>>,
-    activeIndex: number,
-    direction: 1 | -1,
-    resolvedConflicts: ConflictResolutionState
-): number {
-    for (let index = activeIndex + direction; index >= 0 && index < conflictParts.length; index += direction) {
-        if (!Object.prototype.hasOwnProperty.call(resolvedConflicts, conflictParts[index].id)) {
-            return index;
-        }
+function isEditableKeyboardTarget(target: EventTarget | null): boolean {
+    if (!(target instanceof HTMLElement)) {
+        return false;
     }
-
-    return -1;
+    return target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLInputElement ||
+        target.isContentEditable ||
+        Boolean(target.closest('.monaco-editor'));
 }
 
 function getInitialConflictSession(): ConflictResolverInitialSession | null {
@@ -61,82 +96,382 @@ function getInitialConflictSession(): ConflictResolverInitialSession | null {
     if (!file?.path) {
         return null;
     }
-
-    const conflictFile = {
-        path: file.path,
-        repoPath: file.repoPath
-    };
-
     return {
-        file: conflictFile
+        file: {
+            path: file.path,
+            repoPath: file.repoPath
+        }
     };
 }
 
-function isEditableKeyboardTarget(target: EventTarget | null): boolean {
-    if (!(target instanceof HTMLElement)) {
-        return false;
-    }
-
-    return target instanceof HTMLTextAreaElement ||
-        target instanceof HTMLInputElement ||
-        target.isContentEditable ||
-        Boolean(target.closest('.monaco-editor'));
+function buildMergeEditorContext(
+    file: RepositoryFileReference,
+    section: MergeEditorContext['webviewSection'],
+    group: MergeChangeGroup | undefined,
+    range: MergeReviewRange | undefined,
+    disabled: boolean
+): MergeEditorContext {
+    return {
+        webviewSection: section,
+        path: file.path,
+        repoPath: file.repoPath,
+        changeGroupId: group?.id,
+        canReviewLeft: Boolean(group?.hasLeftChange && range?.leftDecision === 'pending' && !disabled),
+        canReviewRight: Boolean(group?.hasRightChange && range?.rightDecision === 'pending' && !disabled),
+        canMarkReviewed: Boolean(range && isMergeReviewRangePending(range) && !disabled),
+        preventDefaultContextMenuItems: true
+    };
 }
 
-function buildConflictDecorations(
-    ranges: MergePaneRange[],
-    activeConflictId: string | undefined,
-    resolvedConflicts: ConflictResolutionState
-): CodeLineDecoration[] {
-    return ranges.map(range => {
-        const resolved = Object.prototype.hasOwnProperty.call(resolvedConflicts, range.id);
-        const state = range.id === activeConflictId ? 'active' : resolved ? 'resolved' : 'unresolved';
-        const className = `intelli-git-merge-conflict-${state}`;
-        const overviewRulerColor = state === 'active'
-            ? 'rgba(55, 148, 255, 0.9)'
-            : state === 'resolved'
-                ? 'rgba(115, 201, 145, 0.7)'
-                : 'rgba(244, 76, 76, 0.8)';
-        return {
+function getMergeDecorationType(group: MergeChangeGroup): MergeDecorationType {
+    if (group.kind === 'conflict') {
+        return 'conflict';
+    }
+    if (group.baseLineCount === 0) {
+        return 'inserted';
+    }
+    const changedLineCount = group.hasLeftChange ? group.leftLineCount : group.rightLineCount;
+    return changedLineCount === 0 ? 'deleted' : 'modified';
+}
+
+function buildResolvedDecorations(
+    startLine: number,
+    endLine: number,
+    decorationType: MergeDecorationType
+): CodeDecoration[] {
+    const typeClass = `intelli-git-merge-${decorationType}`;
+    const topClasses = `${typeClass} intelli-git-merge-resolved-boundary intelli-git-merge-resolved-top${
+        startLine === endLine ? ' intelli-git-merge-resolved-bottom' : ''
+    }`;
+    const topDecoration = {
+        startLine,
+        endLine: startLine,
+        isWholeLine: true,
+        className: topClasses,
+        marginClassName: topClasses
+    } satisfies CodeDecoration;
+    if (startLine === endLine) {
+        return [topDecoration];
+    }
+    const bottomClasses = `${typeClass} intelli-git-merge-resolved-boundary intelli-git-merge-resolved-bottom`;
+    return [
+        topDecoration,
+        {
+            startLine: endLine,
+            endLine,
+            isWholeLine: true,
+            className: bottomClasses,
+            marginClassName: bottomClasses
+        }
+    ];
+}
+
+function buildSideDecorations(
+    groups: MergeChangeGroup[],
+    ranges: MergeReviewRange[],
+    side: 'current' | 'incoming',
+    inlineRanges: ConflictInlineDiffRange[]
+): CodeDecoration[] {
+    const rangeById = new Map(ranges.map(range => [range.groupId, range]));
+    const groupById = new Map(groups.map(group => [group.id, group]));
+    const pendingGroupIds = new Set<string>();
+    const wholeLineDecorations = groups.flatMap(group => {
+        const hasChange = side === 'current' ? group.hasLeftChange : group.hasRightChange;
+        const start = side === 'current' ? group.leftStart : group.rightStart;
+        const lineCount = side === 'current' ? group.leftLineCount : group.rightLineCount;
+        if (!hasChange || lineCount === 0) {
+            return [];
+        }
+        const range = rangeById.get(group.id);
+        const decision = side === 'current' ? range?.leftDecision : range?.rightDecision;
+        const decorationType = getMergeDecorationType(group);
+        if (decision !== 'pending') {
+            return buildResolvedDecorations(start + 1, start + lineCount, decorationType);
+        }
+        pendingGroupIds.add(group.id);
+        const typeClass = `intelli-git-merge-${decorationType}`;
+        return [{
+            startLine: start + 1,
+            endLine: start + lineCount,
+            isWholeLine: true,
+            className: `${typeClass} intelli-git-merge-pending`,
+            marginClassName: `${typeClass} intelli-git-merge-pending`,
+            overviewRulerType: decorationType
+        } satisfies CodeDecoration];
+    });
+    const inlineDecorations = inlineRanges.flatMap(range => {
+        const group = groupById.get(range.conflictId);
+        if (!group || !pendingGroupIds.has(group.id)) {
+            return [];
+        }
+        return [{
             startLine: range.startLine,
+            startColumn: range.startColumn,
             endLine: range.endLine,
-            className,
-            linesDecorationsClassName: `${className}-gutter`,
-            lineNumberClassName: state === 'active' ? `${className}-line-number` : undefined,
-            overviewRulerColor
-        };
+            endColumn: range.endColumn,
+            inlineClassName: `intelli-git-merge-${getMergeDecorationType(group)} intelli-git-merge-word`
+        } satisfies CodeDecoration];
+    });
+    return [...wholeLineDecorations, ...inlineDecorations];
+}
+
+function buildResultDecorations(
+    resultText: string,
+    groups: MergeChangeGroup[],
+    ranges: MergeReviewRange[]
+): CodeDecoration[] {
+    const groupById = new Map(groups.map(group => [group.id, group]));
+    return ranges.flatMap(range => {
+        const group = groupById.get(range.groupId);
+        if (!group) {
+            return [];
+        }
+        const textRange = getMergeTextRange(resultText, range.startOffset, range.endOffset);
+        const decorationType = getMergeDecorationType(group);
+        if (range.startOffset === range.endOffset) {
+            return [];
+        }
+        if (!isMergeReviewRangePending(range)) {
+            return buildResolvedDecorations(textRange.startLine, textRange.endLine, decorationType);
+        }
+        const typeClass = `intelli-git-merge-${decorationType}`;
+        return [{
+            ...textRange,
+            isWholeLine: true,
+            className: `${typeClass} intelli-git-merge-pending`,
+            marginClassName: `${typeClass} intelli-git-merge-pending`
+        } satisfies CodeDecoration];
     });
 }
 
-function findConflictIndexByLine(
-    conflictParts: Array<Extract<ThreeWayMergePart, { type: 'conflict' }>>,
-    ranges: MergePaneRange[],
-    lineNumber: number
-): number {
-    const range = ranges.find(candidate => lineNumber >= candidate.startLine && lineNumber <= candidate.endLine);
-    if (!range) {
-        return -1;
+function getZoneClass(
+    pane: 'left' | 'result' | 'right',
+    group: MergeChangeGroup,
+    range: MergeReviewRange
+): string {
+    const typeClass = `intelli-git-merge-${getMergeDecorationType(group)}`;
+    if (pane === 'left' && group.hasLeftChange && group.leftLineCount === 0) {
+        return `${typeClass} ${range.leftDecision === 'pending'
+            ? 'intelli-git-merge-empty-pending'
+            : 'intelli-git-merge-empty-resolved'}`;
     }
-    return conflictParts.findIndex(part => part.id === range.id);
+    if (pane === 'right' && group.hasRightChange && group.rightLineCount === 0) {
+        return `${typeClass} ${range.rightDecision === 'pending'
+            ? 'intelli-git-merge-empty-pending'
+            : 'intelli-git-merge-empty-resolved'}`;
+    }
+    if (pane === 'result' && range.startOffset === range.endOffset) {
+        return `${typeClass} ${isMergeReviewRangePending(range)
+            ? 'intelli-git-merge-empty-pending'
+            : 'intelli-git-merge-empty-resolved'}`;
+    }
+    return 'intelli-git-merge-padding-zone';
 }
 
-export function ConflictResolver({
-    file,
-    onClose
-}: ConflictResolverProps) {
+function buildMergeGapLayout(
+    id: string,
+    referenceLines: string[],
+    resultLines: string[],
+    panes: {
+        leftStart: number;
+        leftLineCount: number;
+        resultStart: number;
+        rightStart: number;
+        rightLineCount: number;
+    }
+): MergeGapLayout {
+    const leftViewZones: CodeViewZone[] = [];
+    const resultViewZones: CodeViewZone[] = [];
+    const rightViewZones: CodeViewZone[] = [];
+    let sideExtraLineCount = 0;
+    let resultExtraLineCount = 0;
+
+    for (const [index, block] of buildLineAlignmentBlocks(referenceLines, resultLines).entries()) {
+        const lineCountDelta = block.resultLineCount - block.referenceLineCount;
+        if (lineCountDelta > 0) {
+            const referenceEnd = block.referenceStart + block.referenceLineCount;
+            const leftAfterLineNumber = panes.leftStart + Math.min(panes.leftLineCount, referenceEnd);
+            const rightAfterLineNumber = panes.rightStart + Math.min(panes.rightLineCount, referenceEnd);
+            leftViewZones.push({
+                id: `${id}:alignment:${index}:left`,
+                afterLineNumber: leftAfterLineNumber,
+                heightInLines: lineCountDelta,
+                className: 'intelli-git-merge-padding-zone'
+            });
+            rightViewZones.push({
+                id: `${id}:alignment:${index}:right`,
+                afterLineNumber: rightAfterLineNumber,
+                heightInLines: lineCountDelta,
+                className: 'intelli-git-merge-padding-zone'
+            });
+            sideExtraLineCount += lineCountDelta;
+        } else if (lineCountDelta < 0) {
+            const resultEnd = block.resultStart + block.resultLineCount;
+            resultViewZones.push({
+                id: `${id}:alignment:${index}:result`,
+                afterLineNumber: panes.resultStart + Math.min(resultLines.length, resultEnd),
+                heightInLines: -lineCountDelta,
+                className: 'intelli-git-merge-padding-zone'
+            });
+            resultExtraLineCount -= lineCountDelta;
+        }
+    }
+
+    const leftVisualLineCount = panes.leftLineCount + sideExtraLineCount;
+    const resultVisualLineCount = resultLines.length + resultExtraLineCount;
+    const rightVisualLineCount = panes.rightLineCount + sideExtraLineCount;
+    const visualLineCount = Math.max(leftVisualLineCount, resultVisualLineCount, rightVisualLineCount);
+
+    if (leftVisualLineCount < visualLineCount) {
+        leftViewZones.push({
+            id: `${id}:alignment:tail:left`,
+            afterLineNumber: panes.leftStart + panes.leftLineCount,
+            heightInLines: visualLineCount - leftVisualLineCount,
+            className: 'intelli-git-merge-padding-zone'
+        });
+    }
+    if (resultVisualLineCount < visualLineCount) {
+        resultViewZones.push({
+            id: `${id}:alignment:tail:result`,
+            afterLineNumber: panes.resultStart + resultLines.length,
+            heightInLines: visualLineCount - resultVisualLineCount,
+            className: 'intelli-git-merge-padding-zone'
+        });
+    }
+    if (rightVisualLineCount < visualLineCount) {
+        rightViewZones.push({
+            id: `${id}:alignment:tail:right`,
+            afterLineNumber: panes.rightStart + panes.rightLineCount,
+            heightInLines: visualLineCount - rightVisualLineCount,
+            className: 'intelli-git-merge-padding-zone'
+        });
+    }
+
+    return { visualLineCount, leftViewZones, resultViewZones, rightViewZones };
+}
+
+function buildMergePaneLayout(
+    groups: MergeChangeGroup[],
+    ranges: MergeReviewRange[],
+    baseText: string,
+    leftText: string,
+    resultText: string,
+    rightText: string
+): MergePaneLayout {
+    const leftViewZones: CodeViewZone[] = [];
+    const resultViewZones: CodeViewZone[] = [];
+    const rightViewZones: CodeViewZone[] = [];
+    const displayRows = new Map<string, number>();
+    const resultLineCounts = new Map<string, number>();
+    const resultTextRanges = new Map<string, ReturnType<typeof getMergeTextRange>>();
+    const rangeById = new Map(ranges.map(range => [range.groupId, range]));
+    const baseLines = splitContentLines(baseText);
+    const leftLines = splitContentLines(leftText);
+    const resultLines = splitContentLines(resultText);
+    const rightLines = splitContentLines(rightText);
+    let previousBaseEnd = 0;
+    let previousLeftEnd = 0;
+    let previousResultEnd = 0;
+    let previousRightEnd = 0;
+    let displayRow = 0;
+
+    for (const group of groups) {
+        const range = rangeById.get(group.id);
+        if (!range) {
+            continue;
+        }
+        const resultRange = getMergeTextRange(resultText, range.startOffset, range.endOffset);
+        resultTextRanges.set(group.id, resultRange);
+        const resultLineCount = getContentLineCount(resultText.slice(range.startOffset, range.endOffset));
+        resultLineCounts.set(group.id, resultLineCount);
+        const resultStart = resultRange.startLine - 1;
+        const gapLayout = buildMergeGapLayout(
+            `${group.id}:before`,
+            baseLines.slice(previousBaseEnd, group.baseStart),
+            resultLines.slice(previousResultEnd, resultStart),
+            {
+                leftStart: previousLeftEnd,
+                leftLineCount: Math.max(0, group.leftStart - previousLeftEnd),
+                resultStart: previousResultEnd,
+                rightStart: previousRightEnd,
+                rightLineCount: Math.max(0, group.rightStart - previousRightEnd)
+            }
+        );
+        leftViewZones.push(...gapLayout.leftViewZones);
+        resultViewZones.push(...gapLayout.resultViewZones);
+        rightViewZones.push(...gapLayout.rightViewZones);
+        displayRow += gapLayout.visualLineCount;
+        displayRows.set(group.id, displayRow);
+
+        const maxLineCount = Math.max(1, group.leftLineCount, resultLineCount, group.rightLineCount);
+
+        if (group.leftLineCount < maxLineCount) {
+            leftViewZones.push({
+                id: `${group.id}:left`,
+                afterLineNumber: group.leftStart + group.leftLineCount,
+                heightInLines: maxLineCount - group.leftLineCount,
+                className: getZoneClass('left', group, range)
+            });
+        }
+        if (resultLineCount < maxLineCount) {
+            resultViewZones.push({
+                id: `${group.id}:result`,
+                afterLineNumber: resultStart + resultLineCount,
+                heightInLines: maxLineCount - resultLineCount,
+                className: getZoneClass('result', group, range)
+            });
+        }
+        if (group.rightLineCount < maxLineCount) {
+            rightViewZones.push({
+                id: `${group.id}:right`,
+                afterLineNumber: group.rightStart + group.rightLineCount,
+                heightInLines: maxLineCount - group.rightLineCount,
+                className: getZoneClass('right', group, range)
+            });
+        }
+
+        displayRow += maxLineCount;
+        previousBaseEnd = Math.max(previousBaseEnd, group.baseStart + group.baseLineCount);
+        previousLeftEnd = Math.max(previousLeftEnd, group.leftStart + group.leftLineCount);
+        previousResultEnd = Math.max(previousResultEnd, resultStart + resultLineCount);
+        previousRightEnd = Math.max(previousRightEnd, group.rightStart + group.rightLineCount);
+    }
+
+    const trailingLayout = buildMergeGapLayout(
+        'trailing',
+        baseLines.slice(previousBaseEnd),
+        resultLines.slice(previousResultEnd),
+        {
+            leftStart: previousLeftEnd,
+            leftLineCount: Math.max(0, leftLines.length - previousLeftEnd),
+            resultStart: previousResultEnd,
+            rightStart: previousRightEnd,
+            rightLineCount: Math.max(0, rightLines.length - previousRightEnd)
+        }
+    );
+    leftViewZones.push(...trailingLayout.leftViewZones);
+    resultViewZones.push(...trailingLayout.resultViewZones);
+    rightViewZones.push(...trailingLayout.rightViewZones);
+
+    return { leftViewZones, resultViewZones, rightViewZones, displayRows, resultLineCounts, resultTextRanges };
+}
+
+export function ConflictResolver({ file, onClose }: ConflictResolverProps) {
     const { t } = useTranslation();
-    const autoFullResultFileKey = useRef<string | null>(null);
     const [content, setContent] = useState<ConflictFileContent | null>(null);
-    const [drafts, setDrafts] = useState<ConflictResolutionMap>({});
-    const [resolvedConflicts, setResolvedConflicts] = useState<ConflictResolutionState>({});
+    const [groups, setGroups] = useState<MergeChangeGroup[]>([]);
+    const [reviewRanges, setReviewRanges] = useState<MergeReviewRange[]>([]);
+    const [resultDraft, setResultDraft] = useState<string | null>(null);
+    const [resultExists, setResultExists] = useState(false);
+    const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
+    const [whitespaceMode, setWhitespaceMode] = useState<WhitespaceCompareMode>('none');
+    const [highlightMode, setHighlightMode] = useState<MergeHighlightMode>('words');
+    const [changingWhitespaceMode, setChangingWhitespaceMode] = useState(false);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<Error | null>(null);
-    const [activeConflictIndex, setActiveConflictIndex] = useState(0);
-    const [fullResultDraft, setFullResultDraft] = useState<string | null>(null);
-    const [nonConflictingMode, setNonConflictingMode] = useState<NonConflictingChangeMode>('all');
-    const [whitespaceMode, setWhitespaceMode] = useState<WhitespaceCompareMode>('strict');
-    const [highlightWords, setHighlightWords] = useState(true);
+    const undoHistoryRef = useRef<MergeHistoryEntry[]>([]);
+    const redoHistoryRef = useRef<MergeHistoryEntry[]>([]);
     const visibleContent = content && isSameFileReference(content, file) ? content : null;
     const isContentLoading = loading || Boolean(content && !visibleContent);
 
@@ -145,21 +480,35 @@ export function ConflictResolver({
         setLoading(true);
         setError(null);
         setContent(null);
-        setDrafts({});
-        setResolvedConflicts({});
-        setFullResultDraft(null);
-        autoFullResultFileKey.current = null;
-        setNonConflictingMode('all');
-        setWhitespaceMode('strict');
-        setHighlightWords(true);
+        setGroups([]);
+        setReviewRanges([]);
+        setResultDraft(null);
+        setResultExists(false);
+        setActiveGroupId(null);
+        setWhitespaceMode('none');
+        setHighlightMode('words');
+        setChangingWhitespaceMode(false);
+        undoHistoryRef.current = [];
+        redoHistoryRef.current = [];
 
         rpc.getConflictFileContent(file)
             .then(next => {
                 if (cancelled) {
                     return;
                 }
+                const session = buildMergeSessionDocument(
+                    next.base.content,
+                    next.current.content,
+                    next.incoming.content,
+                    next.currentChanges,
+                    next.incomingChanges
+                );
                 setContent(next);
-                setActiveConflictIndex(0);
+                setGroups(session.groups);
+                setReviewRanges(session.reviewRanges);
+                setResultDraft(session.resultText);
+                setResultExists(next.base.exists);
+                setActiveGroupId(session.groups[0]?.id ?? null);
             })
             .catch(e => {
                 if (!cancelled) {
@@ -177,363 +526,467 @@ export function ConflictResolver({
         };
     }, [file]);
 
-    const documentParts = useMemo(
-        () => visibleContent && !visibleContent.isBinary
-            ? buildThreeWayMergeDocumentFromSides(visibleContent.base, visibleContent.current, visibleContent.incoming, whitespaceMode)
+    const resultText = resultDraft ?? '';
+    const rangeById = useMemo(
+        () => new Map(reviewRanges.map(range => [range.groupId, range])),
+        [reviewRanges]
+    );
+    const pendingGroups = useMemo(
+        () => groups.filter(group => {
+            const range = rangeById.get(group.id);
+            return range ? isMergeReviewRangePending(range) : false;
+        }),
+        [groups, rangeById]
+    );
+    const pendingChangeCount = useMemo(
+        () => reviewRanges.reduce((count, range) => (
+            count + Number(range.leftDecision === 'pending') + Number(range.rightDecision === 'pending')
+        ), 0),
+        [reviewRanges]
+    );
+    const activeGroup = groups.find(group => group.id === activeGroupId) ?? pendingGroups[0];
+    const activeRange = activeGroup ? rangeById.get(activeGroup.id) : undefined;
+    const activeGroupIndex = activeGroup ? groups.findIndex(group => group.id === activeGroup.id) : -1;
+    const previousPendingGroup = activeGroupIndex > 0
+        ? [...groups.slice(0, activeGroupIndex)].reverse().find(group => {
+            const range = rangeById.get(group.id);
+            return range ? isMergeReviewRangePending(range) : false;
+        })
+        : undefined;
+    const nextPendingGroup = activeGroupIndex >= 0
+        ? groups.slice(activeGroupIndex + 1).find(group => {
+            const range = rangeById.get(group.id);
+            return range ? isMergeReviewRangePending(range) : false;
+        })
+        : pendingGroups[0];
+    const layout = useMemo(
+        () => buildMergePaneLayout(
+            groups,
+            reviewRanges,
+            visibleContent?.base.content ?? '',
+            visibleContent?.current.content ?? '',
+            resultText,
+            visibleContent?.incoming.content ?? ''
+        ),
+        [groups, reviewRanges, resultText, visibleContent]
+    );
+    const leftInlineRanges = useMemo(
+        () => highlightMode === 'words'
+            ? buildMergeSideInlineDiffRanges(groups, 'current', whitespaceMode)
             : [],
-        [visibleContent, whitespaceMode]
+        [groups, highlightMode, whitespaceMode]
     );
-    const conflictParts = useMemo(
-        () => documentParts.filter((part): part is Extract<ThreeWayMergePart, { type: 'conflict' }> => part.type === 'conflict'),
-        [documentParts]
+    const rightInlineRanges = useMemo(
+        () => highlightMode === 'words'
+            ? buildMergeSideInlineDiffRanges(groups, 'incoming', whitespaceMode)
+            : [],
+        [groups, highlightMode, whitespaceMode]
     );
-    const unresolvedIds = useMemo(
-        () => getUnresolvedThreeWayConflictIds(documentParts, resolvedConflicts),
-        [documentParts, resolvedConflicts]
+    const leftDecorations = useMemo(
+        () => buildSideDecorations(groups, reviewRanges, 'current', leftInlineRanges),
+        [groups, leftInlineRanges, reviewRanges]
     );
-    const activeConflict = conflictParts[activeConflictIndex];
-    const activeConflictId = activeConflict?.id;
-    const paneDocument = useMemo(
-        () => buildThreeWayMergePaneDocument(documentParts, drafts, nonConflictingMode),
-        [documentParts, drafts, nonConflictingMode]
+    const rightDecorations = useMemo(
+        () => buildSideDecorations(groups, reviewRanges, 'incoming', rightInlineRanges),
+        [groups, reviewRanges, rightInlineRanges]
     );
-    const resultText = fullResultDraft ?? paneDocument.resultText;
-    const activeLeftConflictLine = paneDocument.leftConflictRanges.find(range => range.id === activeConflictId)?.startLine;
-    const activeResultConflictLine = paneDocument.resultConflictRanges.find(range => range.id === activeConflictId)?.startLine;
-    const activeRightConflictLine = paneDocument.rightConflictRanges.find(range => range.id === activeConflictId)?.startLine;
-    const leftConflictDecorations = useMemo(
-        () => buildConflictDecorations(paneDocument.leftConflictRanges, activeConflictId, resolvedConflicts),
-        [activeConflictId, paneDocument.leftConflictRanges, resolvedConflicts]
+    const resultDecorations = useMemo(
+        () => buildResultDecorations(resultText, groups, reviewRanges),
+        [groups, resultText, reviewRanges]
     );
-    const resultConflictDecorations = useMemo(
-        () => buildConflictDecorations(paneDocument.resultConflictRanges, activeConflictId, resolvedConflicts),
-        [activeConflictId, paneDocument.resultConflictRanges, resolvedConflicts]
-    );
-    const rightConflictDecorations = useMemo(
-        () => buildConflictDecorations(paneDocument.rightConflictRanges, activeConflictId, resolvedConflicts),
-        [activeConflictId, paneDocument.rightConflictRanges, resolvedConflicts]
-    );
-    const hasSelectableNonConflictingChanges = useMemo(() => documentParts.some(part => (
-        part.type === 'text' && (part.kind === 'current' || part.kind === 'incoming')
-    )), [documentParts]);
     const currentBranchLabel = visibleContent?.currentLabel || t('Left');
     const incomingBranchLabel = visibleContent?.incomingLabel || t('Right');
-    const previousUnresolvedConflictIndex = findUnresolvedConflictIndex(conflictParts, activeConflictIndex, -1, resolvedConflicts);
-    const nextUnresolvedConflictIndex = findUnresolvedConflictIndex(conflictParts, activeConflictIndex, 1, resolvedConflicts);
-    const fullResultMarkerCount = fullResultDraft === null ? 0 : parseConflictBlocks(fullResultDraft).length;
-    const fullResultHasMarkers = fullResultMarkerCount > 0;
     const acceptLeftFileLabel = visibleContent && !visibleContent.current.exists
         ? t('Accept Left (delete file)')
         : t('Accept Left');
     const acceptRightFileLabel = visibleContent && !visibleContent.incoming.exists
         ? t('Accept Right (delete file)')
         : t('Accept Right');
-    const completeDisabled = saving || isContentLoading || !visibleContent || visibleContent.isBinary || (
-        fullResultDraft === null
-            ? unresolvedIds.length > 0
-            : fullResultHasMarkers
-    );
-    const unresolvedLabel = fullResultDraft === null
-        ? (unresolvedIds.length > 0
-            ? t('{{count}} unresolved', { count: unresolvedIds.length })
-            : t('No conflicts remaining'))
-        : (fullResultMarkerCount > 0
-            ? t('{{count}} unresolved', { count: fullResultMarkerCount })
-            : t('No conflicts remaining'));
-
-    const selectConflictByLine = useCallback((ranges: MergePaneRange[], lineNumber: number) => {
-        const nextIndex = findConflictIndexByLine(conflictParts, ranges, lineNumber);
-        if (nextIndex !== -1) {
-            setActiveConflictIndex(nextIndex);
-        }
-    }, [conflictParts]);
-
-    useEffect(() => {
-        setActiveConflictIndex(current => {
-            if (conflictParts.length === 0) {
-                return 0;
-            }
-            return Math.min(current, conflictParts.length - 1);
-        });
-    }, [conflictParts.length]);
-
-    useEffect(() => {
-        const nextDrafts: ConflictResolutionMap = {};
-        for (const part of conflictParts) {
-            nextDrafts[part.id] = part.baseText;
-        }
-        setDrafts(nextDrafts);
-        setResolvedConflicts({});
-    }, [conflictParts]);
-
-    useEffect(() => {
-        const fileKey = getFileReferenceKey(file);
-        if (!visibleContent || visibleContent.isBinary || conflictParts.length === 0 || autoFullResultFileKey.current === fileKey) {
-            return;
-        }
-
-        autoFullResultFileKey.current = fileKey;
-
-        if (!visibleContent.current.exists || !visibleContent.incoming.exists) {
-            return;
-        }
-
-        if (parseConflictBlocks(visibleContent.result).length === 0) {
-            setFullResultDraft(visibleContent.result);
-        }
-    }, [conflictParts.length, file, visibleContent]);
+    const controlsDisabled = saving || isContentLoading || changingWhitespaceMode;
+    const completeDisabled = controlsDisabled || !visibleContent || visibleContent.isBinary ||
+        resultDraft === null || pendingChangeCount > 0 || hasConflictBlocks(resultText);
+    const statusLabel = pendingChangeCount > 0
+        ? t('{{count}} unresolved', { count: pendingChangeCount })
+        : t('No conflicts remaining');
 
     const completeAction = useCallback(() => {
         rpcEvents.refresh.emit();
         onClose();
     }, [onClose]);
 
+    const createMergeHistoryEntry = useCallback((): MergeHistoryEntry => ({
+        resultDraft,
+        resultExists,
+        groups,
+        reviewRanges,
+        activeGroupId,
+        whitespaceMode
+    }), [activeGroupId, groups, resultDraft, resultExists, reviewRanges, whitespaceMode]);
+
+    const restoreMergeHistoryEntry = useCallback((entry: MergeHistoryEntry) => {
+        setResultDraft(entry.resultDraft);
+        setResultExists(entry.resultExists);
+        setGroups(entry.groups);
+        setReviewRanges(entry.reviewRanges);
+        setActiveGroupId(entry.activeGroupId);
+        setWhitespaceMode(entry.whitespaceMode);
+        setError(null);
+    }, []);
+
+    const pushMergeHistory = useCallback(() => {
+        undoHistoryRef.current.push(createMergeHistoryEntry());
+        if (undoHistoryRef.current.length > MAX_MERGE_HISTORY_ENTRIES) {
+            undoHistoryRef.current.shift();
+        }
+        redoHistoryRef.current = [];
+    }, [createMergeHistoryEntry]);
+
+    const undoMergeOperation = useCallback((): boolean => {
+        const previous = undoHistoryRef.current.pop();
+        if (!previous) {
+            return false;
+        }
+        redoHistoryRef.current.push(createMergeHistoryEntry());
+        if (redoHistoryRef.current.length > MAX_MERGE_HISTORY_ENTRIES) {
+            redoHistoryRef.current.shift();
+        }
+        restoreMergeHistoryEntry(previous);
+        return true;
+    }, [createMergeHistoryEntry, restoreMergeHistoryEntry]);
+
+    const redoMergeOperation = useCallback((): boolean => {
+        const next = redoHistoryRef.current.pop();
+        if (!next) {
+            return false;
+        }
+        undoHistoryRef.current.push(createMergeHistoryEntry());
+        if (undoHistoryRef.current.length > MAX_MERGE_HISTORY_ENTRIES) {
+            undoHistoryRef.current.shift();
+        }
+        restoreMergeHistoryEntry(next);
+        return true;
+    }, [createMergeHistoryEntry, restoreMergeHistoryEntry]);
+
+    const changeWhitespaceMode = useCallback(async (nextMode: WhitespaceCompareMode) => {
+        if (!visibleContent || nextMode === whitespaceMode) {
+            return;
+        }
+
+        const hasReviewedChanges = reviewRanges.some(range => (
+            (range.leftDecision !== null && range.leftDecision !== 'pending') ||
+            (range.rightDecision !== null && range.rightDecision !== 'pending')
+        ));
+        const hasResultEdits = resultDraft !== visibleContent.base.content;
+        setChangingWhitespaceMode(true);
+        try {
+            if ((hasReviewedChanges || hasResultEdits) && !await rpc.confirmConflictResolverRestart()) {
+                return;
+            }
+
+            const session = buildMergeSessionDocument(
+                visibleContent.base.content,
+                visibleContent.current.content,
+                visibleContent.incoming.content,
+                visibleContent.currentChanges,
+                visibleContent.incomingChanges,
+                nextMode
+            );
+            pushMergeHistory();
+            setWhitespaceMode(nextMode);
+            setGroups(session.groups);
+            setReviewRanges(session.reviewRanges);
+            setResultDraft(session.resultText);
+            setResultExists(visibleContent.base.exists);
+            setActiveGroupId(session.groups[0]?.id ?? null);
+            setError(null);
+        } catch (e) {
+            setError(e instanceof Error ? e : new Error(String(e)));
+        } finally {
+            setChangingWhitespaceMode(false);
+        }
+    }, [pushMergeHistory, resultDraft, reviewRanges, visibleContent, whitespaceMode]);
+
     const acceptFileSide = useCallback(async (side: 'ours' | 'theirs') => {
+        if (!visibleContent) {
+            return;
+        }
         setSaving(true);
         try {
-            await rpc.resolveConflict({ ...file, side });
+            await rpc.resolveConflict({
+                ...file,
+                side,
+                stageSignature: visibleContent.stageSignature,
+                resultFingerprint: visibleContent.resultFingerprint
+            });
             completeAction();
         } catch (e) {
             setError(e instanceof Error ? e : new Error(String(e)));
         } finally {
             setSaving(false);
         }
-    }, [completeAction, file]);
+    }, [completeAction, file, visibleContent]);
 
-    const setConflictResolution = useCallback((id: string, value: string) => {
-        setDrafts(current => ({
-            ...current,
-            [id]: value
-        }));
-        setResolvedConflicts(current => ({
-            ...current,
-            [id]: true
-        }));
-        setError(null);
-    }, []);
-
-    const getBlockResolutionText = useCallback((part: Extract<ThreeWayMergePart, { type: 'conflict' }>, choice: ConflictResolutionChoice) => {
-        if (choice === 'base') {
-            return part.baseText;
+    const applyGroupDecision = useCallback((
+        group: MergeChangeGroup,
+        side: MergeReviewSide | 'both',
+        decision: Exclude<MergeReviewDecision, 'pending'>
+    ) => {
+        const range = reviewRanges.find(candidate => candidate.groupId === group.id);
+        if (!range) {
+            return;
         }
-        if (choice === 'current') {
-            return part.currentText;
+        const pendingDecision = side === 'both'
+            ? isMergeReviewRangePending(range)
+            : side === 'left'
+                ? range.leftDecision === 'pending'
+                : range.rightDecision === 'pending';
+        if (!pendingDecision) {
+            return;
         }
-        if (choice === 'incoming') {
-            return part.incomingText;
-        }
-        return part.currentText + part.incomingText;
-    }, []);
-
-    const acceptBlockResolution = useCallback((part: Extract<ThreeWayMergePart, { type: 'conflict' }>, choice: ConflictResolutionChoice) => {
-        setConflictResolution(part.id, getBlockResolutionText(part, choice));
-
-        const currentIndex = conflictParts.findIndex(candidate => candidate.id === part.id);
-        const nextIndex = conflictParts.findIndex((candidate, index) => (
-            index > currentIndex &&
-            candidate.id !== part.id &&
-            !Object.prototype.hasOwnProperty.call(resolvedConflicts, candidate.id)
-        ));
-        const wrappedIndex = conflictParts.findIndex((candidate, index) => (
-            index < currentIndex &&
-            candidate.id !== part.id &&
-            !Object.prototype.hasOwnProperty.call(resolvedConflicts, candidate.id)
-        ));
-        const targetIndex = nextIndex !== -1 ? nextIndex : wrappedIndex;
-        if (targetIndex !== -1) {
-            setActiveConflictIndex(targetIndex);
-        }
-    }, [conflictParts, getBlockResolutionText, resolvedConflicts, setConflictResolution]);
-
-    const goToConflict = useCallback((index: number) => {
-        const boundedIndex = Math.max(0, Math.min(index, conflictParts.length - 1));
-        setActiveConflictIndex(boundedIndex);
-    }, [conflictParts]);
-
-    const goToPreviousConflict = useCallback(() => {
-        if (previousUnresolvedConflictIndex !== -1) {
-            goToConflict(previousUnresolvedConflictIndex);
-        }
-    }, [goToConflict, previousUnresolvedConflictIndex]);
-
-    const goToNextConflict = useCallback(() => {
-        if (nextUnresolvedConflictIndex !== -1) {
-            goToConflict(nextUnresolvedConflictIndex);
-        }
-    }, [goToConflict, nextUnresolvedConflictIndex]);
-
-    const stopFullResultEdit = useCallback(() => {
-        setFullResultDraft(null);
-        setError(null);
-    }, []);
-
-    const saveResolution = useCallback(async () => {
-        let result = fullResultDraft ?? paneDocument.resultText;
-        if (fullResultDraft === null) {
-            const missingIds = getUnresolvedThreeWayConflictIds(documentParts, resolvedConflicts);
-            if (missingIds.length > 0) {
-                setError(new Error(t('Resolve all conflict blocks before completing the merge.')));
-                return;
+        pushMergeHistory();
+        const next = applyMergeGroupDecision(resultText, reviewRanges, group, side, decision);
+        setResultDraft(next.content);
+        setReviewRanges(next.ranges);
+        if (visibleContent && side !== 'both') {
+            const sideDecision = side === 'left' ? range.leftDecision : range.rightDecision;
+            const otherDecision = side === 'left' ? range.rightDecision : range.leftDecision;
+            if (decision === 'applied') {
+                const sideExists = side === 'left'
+                    ? visibleContent.current.exists
+                    : visibleContent.incoming.exists;
+                setResultExists(group.kind === 'conflict' && otherDecision === 'applied'
+                    ? resultExists || sideExists
+                    : sideExists);
+            } else if (sideDecision === 'applied') {
+                setResultExists(otherDecision === 'applied'
+                    ? side === 'left'
+                        ? visibleContent.incoming.exists
+                        : visibleContent.current.exists
+                    : visibleContent.base.exists);
             }
         }
+        setError(null);
+    }, [pushMergeHistory, resultExists, resultText, reviewRanges, visibleContent]);
 
-        // Clean out all the virtual alignment zero-width lines
-        result = result.replace(/\u200B\r?\n?/g, '');
+    useEffect(() => rpcEvents.conflictResolverAction.subscribe(request => {
+        if (!isSameFileReference(request, file)) {
+            return;
+        }
+        const group = groups.find(candidate => candidate.id === request.groupId);
+        if (!group) {
+            return;
+        }
+        switch (request.action) {
+            case 'acceptLeft':
+                applyGroupDecision(group, 'left', 'applied');
+                break;
+            case 'cancelLeft':
+                applyGroupDecision(group, 'left', 'cancelled');
+                break;
+            case 'acceptRight':
+                applyGroupDecision(group, 'right', 'applied');
+                break;
+            case 'cancelRight':
+                applyGroupDecision(group, 'right', 'cancelled');
+                break;
+            case 'markReviewed':
+                applyGroupDecision(group, 'both', 'manual');
+                break;
+        }
+    }), [applyGroupDecision, file, groups]);
 
-        if (parseConflictBlocks(result).length > 0) {
+    const handleResultChange = useCallback((value: string, changes: CodeEditorContentChange[]) => {
+        if (resultDraft === null || (value === resultDraft && changes.length === 0)) {
+            return;
+        }
+        pushMergeHistory();
+        const next = applyMergeContentChanges(reviewRanges, changes);
+        setResultDraft(value);
+        setResultExists(true);
+        setReviewRanges(next.ranges);
+        if (next.touchedGroupIds[0]) {
+            setActiveGroupId(next.touchedGroupIds[0]);
+        }
+        setError(null);
+    }, [pushMergeHistory, resultDraft, reviewRanges]);
+
+    useEffect(() => {
+        const handleUndoRedo = (event: KeyboardEvent) => {
+            if (event.isComposing || event.altKey || (!event.metaKey && !event.ctrlKey) || event.key.toLowerCase() !== 'z') {
+                return;
+            }
+            const changed = event.shiftKey ? redoMergeOperation() : undoMergeOperation();
+            if (!changed) {
+                return;
+            }
+            event.preventDefault();
+            event.stopPropagation();
+        };
+        window.addEventListener('keydown', handleUndoRedo, true);
+        return () => window.removeEventListener('keydown', handleUndoRedo, true);
+    }, [redoMergeOperation, undoMergeOperation]);
+
+    const goToPreviousConflict = useCallback(() => {
+        if (previousPendingGroup) {
+            setActiveGroupId(previousPendingGroup.id);
+        }
+    }, [previousPendingGroup]);
+
+    const goToNextConflict = useCallback(() => {
+        if (nextPendingGroup) {
+            setActiveGroupId(nextPendingGroup.id);
+        }
+    }, [nextPendingGroup]);
+
+    const selectConflictByResultLine = useCallback((lineNumber: number) => {
+        const group = groups.find(candidate => {
+            const range = layout.resultTextRanges.get(candidate.id);
+            return range && lineNumber >= range.startLine && lineNumber <= range.endLine;
+        });
+        if (group) {
+            setActiveGroupId(group.id);
+        }
+    }, [groups, layout.resultTextRanges]);
+
+    const selectConflictBySideLine = useCallback((side: MergeReviewSide, lineNumber: number) => {
+        const group = groups.find(candidate => {
+            const start = side === 'left' ? candidate.leftStart : candidate.rightStart;
+            const lineCount = side === 'left' ? candidate.leftLineCount : candidate.rightLineCount;
+            return lineCount > 0 && lineNumber >= start + 1 && lineNumber <= start + lineCount;
+        });
+        if (group) {
+            setActiveGroupId(group.id);
+        }
+    }, [groups]);
+
+    const saveResolution = useCallback(async () => {
+        if (!visibleContent || resultDraft === null) {
+            return;
+        }
+        if (pendingChangeCount > 0) {
+            setError(new Error(t('Resolve all conflict blocks before completing the merge.')));
+            return;
+        }
+        if (hasConflictBlocks(resultDraft)) {
             setError(new Error(t('The final result still contains conflict markers.')));
             return;
         }
 
         setSaving(true);
         try {
-            await rpc.saveConflictResolution({ ...file, content: result });
+            await rpc.saveConflictResolution({
+                ...file,
+                content: resultDraft,
+                resultExists,
+                stageSignature: visibleContent.stageSignature,
+                resultFingerprint: visibleContent.resultFingerprint
+            });
             completeAction();
         } catch (e) {
             setError(e instanceof Error ? e : new Error(String(e)));
         } finally {
             setSaving(false);
         }
-    }, [completeAction, documentParts, file, fullResultDraft, paneDocument.resultText, resolvedConflicts, t]);
+    }, [completeAction, file, pendingChangeCount, resultDraft, resultExists, t, visibleContent]);
 
     const handleKeyDown = useCallback((event: ReactKeyboardEvent<HTMLElement>) => {
-        const editableTarget = isEditableKeyboardTarget(event.target);
-
-        if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
-            if (!completeDisabled) {
-                event.preventDefault();
-                event.stopPropagation();
-                void saveResolution();
-            }
-            return;
-        }
-
-        if (editableTarget || !event.altKey || event.metaKey || event.ctrlKey || event.shiftKey) {
-            return;
-        }
-
-        let handled = true;
-        if (event.key === 'ArrowUp') {
-            if (!saving && !isContentLoading && fullResultDraft === null && previousUnresolvedConflictIndex !== -1) {
-                goToPreviousConflict();
-            }
-        } else if (event.key === 'ArrowDown') {
-            if (!saving && !isContentLoading && fullResultDraft === null && nextUnresolvedConflictIndex !== -1) {
-                goToNextConflict();
-            }
-        } else {
-            handled = false;
-        }
-
-        if (handled) {
+        if ((event.metaKey || event.ctrlKey) && event.key === 'Enter' && !completeDisabled) {
             event.preventDefault();
             event.stopPropagation();
+            void saveResolution();
+            return;
         }
-    }, [
-        completeDisabled,
-        fullResultDraft,
-        goToNextConflict,
-        goToPreviousConflict,
-        isContentLoading,
-        nextUnresolvedConflictIndex,
-        previousUnresolvedConflictIndex,
-        saveResolution,
-        saving
-    ]);
+        if (isEditableKeyboardTarget(event.target) || !event.altKey || event.metaKey || event.ctrlKey || event.shiftKey) {
+            return;
+        }
+        if (event.key === 'ArrowUp' && previousPendingGroup) {
+            event.preventDefault();
+            goToPreviousConflict();
+        } else if (event.key === 'ArrowDown' && nextPendingGroup) {
+            event.preventDefault();
+            goToNextConflict();
+        }
+    }, [completeDisabled, goToNextConflict, goToPreviousConflict, nextPendingGroup, previousPendingGroup, saveResolution]);
 
-    const blockActionDisabled = saving || isContentLoading || fullResultDraft !== null;
-    const blockActions = fullResultDraft === null && visibleContent && !visibleContent.isBinary
-        ? conflictParts.flatMap(part => {
-            const range = paneDocument.resultConflictRanges.find(candidate => candidate.id === part.id);
-            if (!range) {
-                return [];
-            }
-
-            return [{
-                id: part.id,
-                resultLine: range.startLine,
-                acceptBaseDisabled: blockActionDisabled,
-                acceptLeftDisabled: blockActionDisabled || !visibleContent.current.exists,
-                acceptRightDisabled: blockActionDisabled || !visibleContent.incoming.exists,
-                onAcceptBase: () => acceptBlockResolution(part, 'base'),
-                onAcceptLeft: () => acceptBlockResolution(part, 'current'),
-                onAcceptRight: () => acceptBlockResolution(part, 'incoming')
-            }];
-        })
-        : [];
+    const reviewActionsDisabled = controlsDisabled;
+    const blockActions: MergeBlockAction[] = groups.map(group => {
+        const range = rangeById.get(group.id);
+        return {
+            id: group.id,
+            displayRow: layout.displayRows.get(group.id) ?? group.baseStart,
+            leftLineCount: group.leftLineCount,
+            resultLineCount: layout.resultLineCounts.get(group.id) ?? 0,
+            rightLineCount: group.rightLineCount,
+            decorationType: getMergeDecorationType(group),
+            hasLeftChange: group.hasLeftChange,
+            hasRightChange: group.hasRightChange,
+            leftDecision: range?.leftDecision ?? null,
+            rightDecision: range?.rightDecision ?? null,
+            leftApplyAppends: Boolean(range && getMergeGroupApplyMode(resultText, range, group, 'left') === 'append'),
+            rightApplyAppends: Boolean(range && getMergeGroupApplyMode(resultText, range, group, 'right') === 'append'),
+            leftContextData: buildMergeEditorContext(file, 'mergeEditorLeft', group, range, reviewActionsDisabled),
+            resultContextData: buildMergeEditorContext(file, 'mergeEditorResult', group, range, reviewActionsDisabled),
+            rightContextData: buildMergeEditorContext(file, 'mergeEditorRight', group, range, reviewActionsDisabled),
+            disabled: reviewActionsDisabled,
+            onCancelLeft: () => applyGroupDecision(group, 'left', 'cancelled'),
+            onAcceptLeft: () => applyGroupDecision(group, 'left', 'applied'),
+            onAcceptRight: () => applyGroupDecision(group, 'right', 'applied'),
+            onCancelRight: () => applyGroupDecision(group, 'right', 'cancelled')
+        };
+    });
+    const leftContextData = buildMergeEditorContext(file, 'mergeEditorLeft', activeGroup, activeRange, reviewActionsDisabled);
+    const resultContextData = buildMergeEditorContext(file, 'mergeEditorResult', activeGroup, activeRange, reviewActionsDisabled);
+    const rightContextData = buildMergeEditorContext(file, 'mergeEditorRight', activeGroup, activeRange, reviewActionsDisabled);
+    const activeResultRange = activeGroup ? layout.resultTextRanges.get(activeGroup.id) : undefined;
 
     return (
         <section className={styles.resolver} aria-label={t('Conflict Resolver')} tabIndex={0} onKeyDown={handleKeyDown}>
             <div className={styles.header}>
                 <div className={styles.actions}>
-                    <button className={styles.iconButton} type="button" onClick={goToPreviousConflict} disabled={saving || isContentLoading || fullResultDraft !== null || previousUnresolvedConflictIndex === -1} title={t('Previous Conflict')} aria-label={t('Previous Conflict')}>
+                    <button className={styles.iconButton} type="button" onClick={goToPreviousConflict} disabled={controlsDisabled || !previousPendingGroup} title={t('Previous Conflict')} aria-label={t('Previous Conflict')}>
                         <span className="codicon codicon-arrow-up" aria-hidden="true"></span>
                     </button>
-                    <button className={styles.iconButton} type="button" onClick={goToNextConflict} disabled={saving || isContentLoading || fullResultDraft !== null || nextUnresolvedConflictIndex === -1} title={t('Next Conflict')} aria-label={t('Next Conflict')}>
+                    <button className={styles.iconButton} type="button" onClick={goToNextConflict} disabled={controlsDisabled || !nextPendingGroup} title={t('Next Conflict')} aria-label={t('Next Conflict')}>
                         <span className="codicon codicon-arrow-down" aria-hidden="true"></span>
                     </button>
                     <span className={styles.toolbarSeparator}></span>
-                    {hasSelectableNonConflictingChanges && fullResultDraft === null && (
+                    <div className={styles.toolbarSelectControl}>
+                        <select
+                            className={styles.toolbarSelect}
+                            value={whitespaceMode}
+                            onChange={event => void changeWhitespaceMode(event.currentTarget.value as WhitespaceCompareMode)}
+                            disabled={controlsDisabled || !visibleContent || visibleContent.isBinary}
+                            aria-label={t('Whitespace comparison')}
+                        >
+                            <option value="none">{t('Do not ignore')}</option>
+                            <option value="ignore">{t('Ignore whitespaces')}</option>
+                            <option value="trim">{t('Trim whitespaces')}</option>
+                        </select>
+                        <span className={`codicon codicon-chevron-down ${styles.toolbarSelectChevron}`} aria-hidden="true"></span>
+                    </div>
+                    <div className={styles.toolbarSelectControl}>
+                        <select
+                            className={styles.toolbarSelect}
+                            value={highlightMode}
+                            onChange={event => setHighlightMode(event.currentTarget.value as MergeHighlightMode)}
+                            disabled={controlsDisabled || !visibleContent || visibleContent.isBinary}
+                            aria-label={t('Highlighting mode')}
+                        >
+                            <option value="words">{t('Highlight words')}</option>
+                            <option value="lines">{t('Highlight lines')}</option>
+                        </select>
+                        <span className={`codicon codicon-chevron-down ${styles.toolbarSelectChevron}`} aria-hidden="true"></span>
+                    </div>
+                    {activeGroup && activeRange && isMergeReviewRangePending(activeRange) && (
                         <>
-                            <div className={styles.nonConflictControls} role="group" aria-label={t('Apply non-conflicting changes:')}>
-                                <span className={styles.toolbarLabel}>{t('Apply non-conflicting changes:')}</span>
-                                <button
-                                    className={`${styles.segmentButton} ${nonConflictingMode === 'current' ? styles.activeSegmentButton : ''}`}
-                                    type="button"
-                                    onClick={() => setNonConflictingMode('current')}
-                                    disabled={saving || isContentLoading}
-                                    aria-pressed={nonConflictingMode === 'current'}
-                                >
-                                    {t('Left')}
-                                </button>
-                                <button
-                                    className={`${styles.segmentButton} ${nonConflictingMode === 'all' ? styles.activeSegmentButton : ''}`}
-                                    type="button"
-                                    onClick={() => setNonConflictingMode('all')}
-                                    disabled={saving || isContentLoading}
-                                    aria-pressed={nonConflictingMode === 'all'}
-                                >
-                                    {t('All')}
-                                </button>
-                                <button
-                                    className={`${styles.segmentButton} ${nonConflictingMode === 'incoming' ? styles.activeSegmentButton : ''}`}
-                                    type="button"
-                                    onClick={() => setNonConflictingMode('incoming')}
-                                    disabled={saving || isContentLoading}
-                                    aria-pressed={nonConflictingMode === 'incoming'}
-                                >
-                                    {t('Right')}
-                                </button>
-                            </div>
                             <span className={styles.toolbarSeparator}></span>
+                            <button className={styles.compactButton} type="button" onClick={() => applyGroupDecision(activeGroup, 'both', 'manual')} disabled={controlsDisabled}>
+                                {t('Mark as Reviewed')}
+                            </button>
                         </>
                     )}
-                    <button
-                        className={`${styles.compactButton} ${whitespaceMode === 'ignore' ? styles.activeToggleButton : ''}`}
-                        type="button"
-                        onClick={() => setWhitespaceMode(current => current === 'ignore' ? 'strict' : 'ignore')}
-                        disabled={!visibleContent || visibleContent.isBinary || fullResultDraft !== null}
-                        aria-pressed={whitespaceMode === 'ignore'}
-                    >
-                        {t('Ignore')}
-                    </button>
-                    <button
-                        className={`${styles.compactButton} ${highlightWords ? styles.activeToggleButton : ''}`}
-                        type="button"
-                        onClick={() => setHighlightWords(current => !current)}
-                        disabled={!visibleContent || visibleContent.isBinary || fullResultDraft !== null}
-                        aria-pressed={highlightWords}
-                    >
-                        {t('Highlight words')}
-                    </button>
-                    <span className={styles.toolbarSeparator}></span>
-                    {fullResultDraft !== null && (
-                        <button className={styles.compactButton} type="button" onClick={stopFullResultEdit} disabled={!visibleContent || visibleContent.isBinary}>
-                            {t('Show Merge Blocks')}
-                        </button>
-                    )}
                 </div>
-                <div className={styles.statusText}>{unresolvedLabel}</div>
+                <div className={styles.statusText}>{statusLabel}</div>
             </div>
 
             <div className={styles.paneHeaderGrid}>
@@ -567,31 +1020,31 @@ export function ConflictResolver({
                         </div>
                     </div>
                 )}
-                {visibleContent && !visibleContent.isBinary && (
-                    <>
-                        <ThreeWayMergeEditor
-                            leftText={paneDocument.leftText}
-                            resultText={resultText}
-                            rightText={paneDocument.rightText}
-                            leftExists={visibleContent.current.exists}
-                            rightExists={visibleContent.incoming.exists}
-                            activeLeftConflictLine={activeLeftConflictLine}
-                            activeResultConflictLine={activeResultConflictLine}
-                            activeRightConflictLine={activeRightConflictLine}
-                            leftLineDecorations={leftConflictDecorations}
-                            resultLineDecorations={fullResultDraft === null ? resultConflictDecorations : undefined}
-                            rightLineDecorations={rightConflictDecorations}
-                            blockActions={blockActions}
-                            resultDisabled={saving || isContentLoading}
-                            onLeftLineClick={lineNumber => selectConflictByLine(paneDocument.leftConflictRanges, lineNumber)}
-                            onResultLineClick={lineNumber => selectConflictByLine(paneDocument.resultConflictRanges, lineNumber)}
-                            onRightLineClick={lineNumber => selectConflictByLine(paneDocument.rightConflictRanges, lineNumber)}
-                            onResultChange={value => {
-                                setFullResultDraft(value);
-                                setError(null);
-                            }}
-                        />
-                    </>
+                {visibleContent && !visibleContent.isBinary && resultDraft !== null && (
+                    <ThreeWayMergeEditor
+                        filePath={file.path}
+                        leftText={visibleContent.current.content}
+                        resultText={resultText}
+                        rightText={visibleContent.incoming.content}
+                        leftDecorations={leftDecorations}
+                        resultDecorations={resultDecorations}
+                        rightDecorations={rightDecorations}
+                        leftViewZones={layout.leftViewZones}
+                        resultViewZones={layout.resultViewZones}
+                        rightViewZones={layout.rightViewZones}
+                        leftRevealLine={activeGroup ? Math.max(1, activeGroup.leftStart + 1) : undefined}
+                        resultRevealLine={activeResultRange?.startLine}
+                        rightRevealLine={activeGroup ? Math.max(1, activeGroup.rightStart + 1) : undefined}
+                        blockActions={blockActions}
+                        leftContextData={leftContextData}
+                        resultContextData={resultContextData}
+                        rightContextData={rightContextData}
+                        resultDisabled={saving || isContentLoading}
+                        onResultChange={handleResultChange}
+                        onLeftLineClick={lineNumber => selectConflictBySideLine('left', lineNumber)}
+                        onResultLineClick={selectConflictByResultLine}
+                        onRightLineClick={lineNumber => selectConflictBySideLine('right', lineNumber)}
+                    />
                 )}
             </div>
             <div className={styles.footer}>
@@ -627,22 +1080,12 @@ export function ConflictResolverPage() {
         }
     }, [file]);
 
-    useEffect(() => {
-        return rpcEvents.revealConflictResolverFile.subscribe(next => {
-            const conflictFile = {
-                path: next.path,
-                repoPath: next.repoPath
-            };
-            setFile(conflictFile);
-        });
-    }, []);
+    useEffect(() => rpcEvents.revealConflictResolverFile.subscribe(next => {
+        setFile({ path: next.path, repoPath: next.repoPath });
+    }), []);
 
     if (!file) {
-        return (
-            <div className={styles.message}>
-                {t('No conflict file selected.')}
-            </div>
-        );
+        return <div className={styles.message}>{t('No conflict file selected.')}</div>;
     }
 
     return (

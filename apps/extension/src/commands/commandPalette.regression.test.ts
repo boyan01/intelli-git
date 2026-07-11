@@ -46,6 +46,11 @@ const CONTEXT_ONLY_COMMANDS = [
     'intelli-git.changelist.acceptCurrent',
     'intelli-git.changelist.acceptIncoming',
     'intelli-git.changelist.markResolved',
+    'intelli-git.merge.acceptLeft',
+    'intelli-git.merge.cancelLeft',
+    'intelli-git.merge.acceptRight',
+    'intelli-git.merge.cancelRight',
+    'intelli-git.merge.markReviewed',
     'intelli-git.copyAuthorEmail',
     'intelli-git.sendAuthorEmail',
     'intelli-git.log.file.showDiff',
@@ -170,4 +175,22 @@ test('mark resolved is available for resolved conflict groups only', () => {
     assert.match(item.when, /webviewSection == 'changelistRepository'/);
     assert.match(item.when, /hasConflict == true/);
     assert.match(item.when, /hasResolvedCandidate == true/);
+});
+
+test('merge resolver commands are scoped to native webview context sections', () => {
+    const packageJson = readPackageJson();
+    const webviewContext = packageJson.contributes.menus['webview/context'] ?? [];
+    const expected = new Map([
+        ['intelli-git.merge.acceptLeft', "(webviewSection == 'mergeEditorLeft' || webviewSection == 'mergeEditorResult') && canReviewLeft == true"],
+        ['intelli-git.merge.cancelLeft', "(webviewSection == 'mergeEditorLeft' || webviewSection == 'mergeEditorResult') && canReviewLeft == true"],
+        ['intelli-git.merge.acceptRight', "(webviewSection == 'mergeEditorRight' || webviewSection == 'mergeEditorResult') && canReviewRight == true"],
+        ['intelli-git.merge.cancelRight', "(webviewSection == 'mergeEditorRight' || webviewSection == 'mergeEditorResult') && canReviewRight == true"],
+        ['intelli-git.merge.markReviewed', "webviewSection == 'mergeEditorResult' && canMarkReviewed == true"]
+    ]);
+
+    for (const [command, when] of expected) {
+        const item = webviewContext.find((entry: { command?: string }) => entry.command === command);
+        assert.ok(item, `${command} should be registered in the merge resolver context menu`);
+        assert.equal(item.when, when);
+    }
 });

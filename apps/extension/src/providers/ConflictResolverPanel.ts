@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
-import type { ConflictResolverOpenRequest, RepositoryFileReference } from '@shared/messages';
+import type { ConflictResolverContextActionRequest, ConflictResolverOpenRequest, RepositoryFileReference } from '@shared/messages';
 import { BaseWebviewProvider, WebviewProviderOptions } from './BaseWebviewProvider';
 
 function getPanelKey(file: RepositoryFileReference): string {
@@ -81,6 +81,14 @@ export class ConflictResolverPanel extends BaseWebviewProvider {
 
         this.key = nextKey;
         ConflictResolverPanel.panels.set(nextKey, this);
+    }
+
+    public static dispatchContextAction(request: ConflictResolverContextActionRequest): void {
+        const panel = ConflictResolverPanel.panels.get(getPanelKey(request));
+        if (!panel || panel.disposed) {
+            return;
+        }
+        void panel.rpc?.triggerConflictResolverAction(request);
     }
 
     public static createOrShow(options: WebviewProviderOptions, file: ConflictResolverOpenRequest): void {

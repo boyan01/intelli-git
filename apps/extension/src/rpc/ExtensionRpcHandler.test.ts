@@ -551,6 +551,21 @@ describe('ExtensionRpcHandler push', () => {
     });
 });
 
+describe('ExtensionRpcHandler conflict resolver', () => {
+    it('confirms discarding merge edits before restarting whitespace comparison', async () => {
+        vscodeTestMock.__resetWindowMessages();
+        vscodeTestMock.__setWarningMessageResponse('Discard Changes and Restart');
+        const handler = createHandler({});
+
+        await expect(handler.confirmConflictResolverRestart()).resolves.toBe(true);
+
+        expect(vscodeTestMock.__getWarningMessages()).toEqual([{
+            message: 'Changing whitespace comparison requires restarting the merge. Reviewed changes and result edits will be discarded.',
+            args: [{ modal: true }, 'Discard Changes and Restart']
+        }]);
+    });
+});
+
 describe('ExtensionRpcHandler review branch', () => {
     it('persists review branch options in workspace state scoped to the repository', async () => {
         const storageKey = 'ideaCommitPanel.reviewBranchOptions.v1._workspace_repo';

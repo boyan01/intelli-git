@@ -9,6 +9,8 @@ import { BranchStatusBar, GitLogStatusBar } from './ui';
 import { registerStashCommands, registerGlobalNavigationCommands, registerWorktreeCommands, registerBranchCommands, registerLogCommands, registerLogFileCommands, registerChangelistCommands, registerAiCommands, registerEditorGitCommands } from './commands';
 import { logger } from './utils/logger';
 import { ChangeBlockEditorController } from './editor/ChangeBlockEditorController';
+import type { ConflictResolverContextAction } from '@shared/messages';
+import type { MergeEditorContext } from '@shared/webviewContext';
 
 interface RepositoryQuickPickItem extends vscode.QuickPickItem {
     repo: RepositoryScope;
@@ -411,6 +413,26 @@ export async function activate(context: vscode.ExtensionContext) {
             }, { path: file.path, repoPath: file.repoPath });
         })
     );
+    const conflictResolverContextCommands: ReadonlyArray<[string, ConflictResolverContextAction]> = [
+        ['intelli-git.merge.acceptLeft', 'acceptLeft'],
+        ['intelli-git.merge.cancelLeft', 'cancelLeft'],
+        ['intelli-git.merge.acceptRight', 'acceptRight'],
+        ['intelli-git.merge.cancelRight', 'cancelRight'],
+        ['intelli-git.merge.markReviewed', 'markReviewed']
+    ];
+    context.subscriptions.push(...conflictResolverContextCommands.map(([command, action]) => (
+        vscode.commands.registerCommand(command, (args?: MergeEditorContext) => {
+            if (!args?.path || !args.changeGroupId) {
+                return;
+            }
+            ConflictResolverPanel.dispatchContextAction({
+                path: args.path,
+                repoPath: args.repoPath,
+                groupId: args.changeGroupId,
+                action
+            });
+        })
+    )));
 
     registerAiCommands(context, provider);
     registerGlobalNavigationCommands(context, {

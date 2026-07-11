@@ -1,24 +1,24 @@
+import { parseConflictMarkerBlocks, type ConflictMarkerBlock } from '@shared/conflictMarkers';
+import type { ConflictChange } from '@shared/messages';
+
 export type ConflictResolutionChoice = 'base' | 'current' | 'incoming' | 'both';
 
-export interface ConflictBlock {
-    id: string;
-    startOffset: number;
-    endOffset: number;
-    startLine: number;
-    endLine: number;
-    currentLabel: string;
-    baseLabel: string;
-    incomingLabel: string;
-    currentText: string;
-    baseText: string;
-    incomingText: string;
-    markerText: string;
+export interface ConflictBlock extends ConflictMarkerBlock {
     inferredBaseText?: string;
 }
 
 export interface InlineDiffSegment {
     text: string;
     changed: boolean;
+}
+
+export interface ConflictInlineDiffRange {
+    conflictId: string;
+    side: 'current' | 'incoming';
+    startLine: number;
+    startColumn: number;
+    endLine: number;
+    endColumn: number;
 }
 
 export type ConflictDocumentPart =
@@ -36,181 +36,105 @@ export type ConflictDocumentPart =
 export type ConflictResolutionMap = Record<string, string>;
 export type ConflictResolutionState = Record<string, unknown>;
 
-export type MergeTextKind = 'unchanged' | 'current' | 'incoming' | 'both';
-export type NonConflictingChangeMode = 'all' | 'current' | 'incoming';
-export type WhitespaceCompareMode = 'strict' | 'ignore';
-
-export interface MergeSideContent {
-    exists: boolean;
-    content: string;
+export interface MergeResultReviewState {
+    conflictMarkerCount: number;
+    isResolutionConfirmed: boolean;
 }
 
-export interface MergePaneRange {
+export type MergeReviewDecision = 'pending' | 'applied' | 'cancelled' | 'manual';
+export type MergeReviewSide = 'left' | 'right';
+export type WhitespaceCompareMode = 'none' | 'ignore' | 'trim';
+
+export interface MergeChangeGroup {
     id: string;
-    startLine: number;
-    endLine: number;
-}
-
-export interface ThreeWayMergePaneDocument {
+    baseStart: number;
+    baseLineCount: number;
+    leftStart: number;
+    leftLineCount: number;
+    rightStart: number;
+    rightLineCount: number;
+    baseText: string;
     leftText: string;
-    resultText: string;
     rightText: string;
-    leftConflictRanges: MergePaneRange[];
-    resultConflictRanges: MergePaneRange[];
-    rightConflictRanges: MergePaneRange[];
+    hasLeftChange: boolean;
+    hasRightChange: boolean;
+    kind: 'left-only' | 'right-only' | 'identical' | 'conflict';
 }
 
-export type ThreeWayMergePart =
-    | {
-        type: 'text';
-        id: string;
-        baseText: string;
-        currentText: string;
-        incomingText: string;
-        resultText: string;
-        kind: MergeTextKind;
-    }
-    | {
-        type: 'conflict';
-        id: string;
-        baseText: string;
-        currentText: string;
-        incomingText: string;
-    };
+export interface MergeReviewRange {
+    groupId: string;
+    startOffset: number;
+    endOffset: number;
+    leftDecision: MergeReviewDecision | null;
+    rightDecision: MergeReviewDecision | null;
+    lastAppliedSide: MergeReviewSide | null;
+}
 
-interface LineSlice {
+export interface MergeSessionDocument {
+    resultText: string;
+    groups: MergeChangeGroup[];
+    reviewRanges: MergeReviewRange[];
+}
+
+export interface MergeTextRange {
+    startLine: number;
+    startColumn: number;
+    endLine: number;
+    endColumn: number;
+}
+
+export interface LineAlignmentBlock {
+    referenceStart: number;
+    referenceLineCount: number;
+    resultStart: number;
+    resultLineCount: number;
+}
+
+interface ContentLineSlice {
     startOffset: number;
     endOffset: number;
     text: string;
 }
 
-interface LineEdit {
-    start: number;
-    end: number;
-    replacementStart: number;
-    replacementEnd: number;
+interface TaggedConflictChange {
+    side: 'left' | 'right';
+    change: ConflictChange;
+    index: number;
 }
-
-interface ContentLine {
-    lineNumber: number;
-    startOffset: number;
-    endOffset: number;
-    body: string;
-    text: string;
-}
-
-interface PaneTextBuilder {
-    chunks: string[];
-    length: number;
-    lineCount: number;
-}
-
-const CURRENT_MARKER = '<<<<<<<';
-const BASE_MARKER = '|||||||';
-const SEPARATOR_MARKER = '=======';
-const INCOMING_MARKER = '>>>>>>>';
 
 function tokenizeInlineDiffText(text: string): string[] {
-    return text.match(/\s+|[A-Za-z0-9_]+|[^\sA-Za-z0-9_]+/g) ?? [];
+    return text.match(/\r\n|\r|\n|[^\S\r\n]+|[A-Za-z0-9_]+|[^\sA-Za-z0-9_]+/g) ?? [];
 }
 
-export function buildInlineDiffSegments(text: string, baseText: string): InlineDiffSegment[] {
-    if (!text) {
-        return [];
-    }
-
-    if (text === baseText) {
-        return [{ text, changed: false }];
-    }
-
-    const tokens = tokenizeInlineDiffText(text);
-    const baseTokens = tokenizeInlineDiffText(baseText);
-    if (tokens.length === 0) {
-        return [{ text, changed: true }];
-    }
-
-    const unchangedTokenIndexes = new Set<number>();
-    for (const [, tokenIndex] of computeLcsPairs(baseTokens, tokens)) {
-        unchangedTokenIndexes.add(tokenIndex);
-    }
-
-    const segments: InlineDiffSegment[] = [];
-    for (let index = 0; index < tokens.length; index++) {
-        const changed = !unchangedTokenIndexes.has(index);
-        const previous = segments[segments.length - 1];
-        if (previous?.changed === changed) {
-            previous.text += tokens[index];
-        } else {
-            segments.push({ text: tokens[index], changed });
-        }
-    }
-
-    return segments;
+function isWhitespaceToken(token: string): boolean {
+    return /^\s+$/.test(token);
 }
 
-function splitContentLines(content: string): ContentLine[] {
-    const lines: ContentLine[] = [];
-    let offset = 0;
-    let lineNumber = 1;
-
-    while (offset < content.length) {
-        const startOffset = offset;
-        while (offset < content.length && content[offset] !== '\n' && content[offset] !== '\r') {
-            offset++;
-        }
-
-        const body = content.slice(startOffset, offset);
-        let eol = '';
-        if (offset < content.length) {
-            if (content[offset] === '\r' && content[offset + 1] === '\n') {
-                eol = '\r\n';
-                offset += 2;
-            } else {
-                eol = content[offset];
-                offset++;
-            }
-        }
-
-        const text = body + eol;
-        lines.push({
-            lineNumber,
-            startOffset,
-            endOffset: startOffset + text.length,
-            body,
-            text
-        });
-        lineNumber++;
-    }
-
-    return lines;
+function isHorizontalWhitespaceToken(token: string): boolean {
+    return /^[^\S\r\n]+$/.test(token);
 }
 
-function splitLineSlices(content: string): LineSlice[] {
-    const lines = splitContentLines(content);
-    if (lines.length === 0) {
-        return [];
-    }
-
-    return lines.map(line => ({
-        startOffset: line.startOffset,
-        endOffset: line.endOffset,
-        text: line.text
-    }));
+function isLineBreak(value: string | undefined): boolean {
+    return value === '\r' || value === '\n';
 }
 
-function sliceLines(lines: LineSlice[], start: number, end: number): string {
-    return lines.slice(start, end).map(line => line.text).join('');
-}
-
-function offsetAtLine(lines: LineSlice[], lineIndex: number, contentLength: number): number {
-    if (lineIndex <= 0) {
-        return 0;
+function shouldIgnoreInlineToken(
+    tokens: string[],
+    index: number,
+    whitespaceMode: WhitespaceCompareMode
+): boolean {
+    const token = tokens[index];
+    if (whitespaceMode === 'ignore') {
+        return isWhitespaceToken(token);
     }
-    if (lineIndex >= lines.length) {
-        return contentLength;
+    if (whitespaceMode !== 'trim' || !isHorizontalWhitespaceToken(token)) {
+        return false;
     }
 
-    return lines[lineIndex].startOffset;
+    const previousCharacter = tokens[index - 1]?.at(-1);
+    const nextCharacter = tokens[index + 1]?.[0];
+    return previousCharacter === undefined || nextCharacter === undefined ||
+        isLineBreak(previousCharacter) || isLineBreak(nextCharacter);
 }
 
 function computeLcsPairs(left: string[], right: string[]): Array<[number, number]> {
@@ -244,528 +168,774 @@ function computeLcsPairs(left: string[], right: string[]): Array<[number, number
     return pairs;
 }
 
-function normalizeLineForWhitespaceCompare(text: string, whitespaceMode: WhitespaceCompareMode): string {
-    if (whitespaceMode === 'ignore') {
-        return text.replace(/\s+/g, '');
+export function buildInlineDiffSegments(
+    text: string,
+    baseText: string,
+    whitespaceMode: WhitespaceCompareMode = 'none'
+): InlineDiffSegment[] {
+    if (!text) {
+        return [];
     }
-    return text;
-}
 
-function textMatchesForWhitespaceCompare(left: string, right: string, whitespaceMode: WhitespaceCompareMode): boolean {
-    if (whitespaceMode === 'ignore') {
-        return left.replace(/\s+/g, '') === right.replace(/\s+/g, '');
+    if (text === baseText) {
+        return [{ text, changed: false }];
     }
-    return left === right;
-}
 
-function diffLineEdits(baseLines: LineSlice[], sideLines: LineSlice[], whitespaceMode: WhitespaceCompareMode): LineEdit[] {
-    const pairs = computeLcsPairs(
-        baseLines.map(line => normalizeLineForWhitespaceCompare(line.text, whitespaceMode)),
-        sideLines.map(line => normalizeLineForWhitespaceCompare(line.text, whitespaceMode))
-    );
-    const edits: LineEdit[] = [];
-    let baseCursor = 0;
-    let sideCursor = 0;
+    const tokens = tokenizeInlineDiffText(text);
+    const baseTokens = tokenizeInlineDiffText(baseText);
+    if (tokens.length === 0) {
+        return [{ text, changed: true }];
+    }
 
-    for (const [baseIndex, sideIndex] of pairs) {
-        if (baseCursor !== baseIndex || sideCursor !== sideIndex) {
-            edits.push({
-                start: baseCursor,
-                end: baseIndex,
-                replacementStart: sideCursor,
-                replacementEnd: sideIndex
-            });
+    const indexedTokens = tokens.map((token, index) => ({ token, index }));
+    const indexedBaseTokens = baseTokens.map((token, index) => ({ token, index }));
+    const comparableTokens = indexedTokens.filter(({ index }) => (
+        !shouldIgnoreInlineToken(tokens, index, whitespaceMode)
+    ));
+    const comparableBaseTokens = indexedBaseTokens.filter(({ index }) => (
+        !shouldIgnoreInlineToken(baseTokens, index, whitespaceMode)
+    ));
+
+    if (comparableTokens.length * comparableBaseTokens.length > 50_000) {
+        return [{ text, changed: false }];
+    }
+
+    const unchangedTokenIndexes = new Set<number>();
+    for (const [, comparableIndex] of computeLcsPairs(
+        comparableBaseTokens.map(({ token }) => token),
+        comparableTokens.map(({ token }) => token)
+    )) {
+        unchangedTokenIndexes.add(comparableTokens[comparableIndex].index);
+    }
+
+    const segments: InlineDiffSegment[] = [];
+    for (let index = 0; index < tokens.length; index++) {
+        const changed = !shouldIgnoreInlineToken(tokens, index, whitespaceMode) &&
+            !unchangedTokenIndexes.has(index);
+        const previous = segments[segments.length - 1];
+        if (previous?.changed === changed) {
+            previous.text += tokens[index];
+        } else {
+            segments.push({ text: tokens[index], changed });
         }
-        baseCursor = baseIndex + 1;
-        sideCursor = sideIndex + 1;
     }
 
-    if (baseCursor !== baseLines.length || sideCursor !== sideLines.length) {
-        edits.push({
-            start: baseCursor,
-            end: baseLines.length,
-            replacementStart: sideCursor,
-            replacementEnd: sideLines.length
+    return segments;
+}
+
+function getLineStartOffsets(content: string): number[] {
+    const offsets = [0];
+    for (let index = 0; index < content.length; index++) {
+        if (content[index] === '\r' && content[index + 1] === '\n') {
+            index++;
+            offsets.push(index + 1);
+        } else if (content[index] === '\r' || content[index] === '\n') {
+            offsets.push(index + 1);
+        }
+    }
+    return offsets;
+}
+
+function getPositionAtOffset(lineStarts: number[], offset: number): { line: number; column: number } {
+    let low = 0;
+    let high = lineStarts.length - 1;
+    while (low <= high) {
+        const middle = Math.floor((low + high) / 2);
+        if (lineStarts[middle] <= offset) {
+            low = middle + 1;
+        } else {
+            high = middle - 1;
+        }
+    }
+
+    const lineIndex = Math.max(0, high);
+    return {
+        line: lineIndex + 1,
+        column: offset - lineStarts[lineIndex] + 1
+    };
+}
+
+function splitContentLineSlices(content: string): ContentLineSlice[] {
+    const lines: ContentLineSlice[] = [];
+    let offset = 0;
+    while (offset < content.length) {
+        const startOffset = offset;
+        while (offset < content.length && content[offset] !== '\r' && content[offset] !== '\n') {
+            offset++;
+        }
+        if (content[offset] === '\r' && content[offset + 1] === '\n') {
+            offset += 2;
+        } else if (offset < content.length) {
+            offset++;
+        }
+        lines.push({
+            startOffset,
+            endOffset: offset,
+            text: content.slice(startOffset, offset)
         });
     }
-
-    return edits.filter(edit => edit.start !== edit.end || edit.replacementStart !== edit.replacementEnd);
+    return lines;
 }
 
-function editBaseStart(edit: LineEdit | undefined): number {
-    if (!edit) {
-        return Number.POSITIVE_INFINITY;
-    }
-    return edit.start;
+export function splitContentLines(content: string): string[] {
+    return splitContentLineSlices(content).map(line => line.text.replace(/\r\n$|\r$|\n$/, ''));
 }
 
-function editsOverlap(left: LineEdit, right: LineEdit): boolean {
-    if (left.start === left.end && right.start === right.end) {
-        return left.start === right.start;
-    }
-    return left.start < right.end && right.start < left.end;
-}
-
-function editIntersectsRange(edit: LineEdit, start: number, end: number): boolean {
-    if (edit.start === edit.end) {
-        return edit.start >= start && edit.start <= end;
-    }
-
-    return edit.start < end && edit.end > start;
-}
-
-function buildSideTextForBaseRange(
-    baseLines: LineSlice[],
-    sideLines: LineSlice[],
-    edits: LineEdit[],
-    start: number,
-    end: number
-): string {
-    let cursor = start;
-    const chunks: string[] = [];
-
-    for (const edit of edits) {
-        if (!editIntersectsRange(edit, start, end)) {
-            continue;
-        }
-
-        const editStart = Math.max(edit.start, start);
-        const editEnd = Math.min(edit.end, end);
-        if (cursor < editStart) {
-            chunks.push(sliceLines(baseLines, cursor, editStart));
-        }
-        chunks.push(sliceLines(sideLines, edit.replacementStart, edit.replacementEnd));
-        cursor = Math.max(cursor, editEnd);
+export function buildLineAlignmentBlocks(
+    referenceLines: string[],
+    resultLines: string[]
+): LineAlignmentBlock[] {
+    let commonPrefixLineCount = 0;
+    while (
+        commonPrefixLineCount < referenceLines.length &&
+        commonPrefixLineCount < resultLines.length &&
+        referenceLines[commonPrefixLineCount] === resultLines[commonPrefixLineCount]
+    ) {
+        commonPrefixLineCount++;
     }
 
-    if (cursor < end) {
-        chunks.push(sliceLines(baseLines, cursor, end));
+    let referenceEnd = referenceLines.length;
+    let resultEnd = resultLines.length;
+    while (
+        referenceEnd > commonPrefixLineCount &&
+        resultEnd > commonPrefixLineCount &&
+        referenceLines[referenceEnd - 1] === resultLines[resultEnd - 1]
+    ) {
+        referenceEnd--;
+        resultEnd--;
     }
 
-    return chunks.join('');
-}
-
-function collectConflictGroup(
-    currentEdits: LineEdit[],
-    incomingEdits: LineEdit[],
-    currentEditIndex: number,
-    incomingEditIndex: number
-): { start: number; end: number; nextCurrentEditIndex: number; nextIncomingEditIndex: number } {
-    let start = Math.min(currentEdits[currentEditIndex].start, incomingEdits[incomingEditIndex].start);
-    let end = Math.max(currentEdits[currentEditIndex].end, incomingEdits[incomingEditIndex].end);
-    let changed = true;
-
-    while (changed) {
-        changed = false;
-
-        for (let index = currentEditIndex; index < currentEdits.length; index++) {
-            const edit = currentEdits[index];
-            if (edit.start > end) {
-                break;
-            }
-            if (editIntersectsRange(edit, start, end)) {
-                const nextStart = Math.min(start, edit.start);
-                const nextEnd = Math.max(end, edit.end);
-                if (nextStart !== start || nextEnd !== end) {
-                    start = nextStart;
-                    end = nextEnd;
-                    changed = true;
-                }
-            }
-        }
-
-        for (let index = incomingEditIndex; index < incomingEdits.length; index++) {
-            const edit = incomingEdits[index];
-            if (edit.start > end) {
-                break;
-            }
-            if (editIntersectsRange(edit, start, end)) {
-                const nextStart = Math.min(start, edit.start);
-                const nextEnd = Math.max(end, edit.end);
-                if (nextStart !== start || nextEnd !== end) {
-                    start = nextStart;
-                    end = nextEnd;
-                    changed = true;
-                }
-            }
-        }
+    const referenceMiddle = referenceLines.slice(commonPrefixLineCount, referenceEnd);
+    const resultMiddle = resultLines.slice(commonPrefixLineCount, resultEnd);
+    if (referenceMiddle.length === 0 && resultMiddle.length === 0) {
+        return [];
     }
 
-    let nextCurrentEditIndex = currentEditIndex;
-    while (nextCurrentEditIndex < currentEdits.length && editIntersectsRange(currentEdits[nextCurrentEditIndex], start, end)) {
-        nextCurrentEditIndex++;
-    }
-
-    let nextIncomingEditIndex = incomingEditIndex;
-    while (nextIncomingEditIndex < incomingEdits.length && editIntersectsRange(incomingEdits[nextIncomingEditIndex], start, end)) {
-        nextIncomingEditIndex++;
-    }
-
-    return { start, end, nextCurrentEditIndex, nextIncomingEditIndex };
-}
-
-function buildTextPart(
-    id: string,
-    kind: MergeTextKind,
-    baseText: string,
-    currentText: string,
-    incomingText: string,
-    resultText: string
-): ThreeWayMergePart {
-    return {
-        type: 'text',
-        id,
-        kind,
-        baseText,
-        currentText,
-        incomingText,
-        resultText
-    };
-}
-
-
-
-function createPaneTextBuilder(): PaneTextBuilder {
-    return {
-        chunks: [],
-        length: 0,
-        lineCount: 1
-    };
-}
-
-
-
-export function buildThreeWayMergeDocument(
-    baseContent: string,
-    currentContent: string,
-    incomingContent: string,
-    whitespaceMode: WhitespaceCompareMode = 'strict'
-): ThreeWayMergePart[] {
-    const baseLines = splitLineSlices(baseContent);
-    const currentLines = splitLineSlices(currentContent);
-    const incomingLines = splitLineSlices(incomingContent);
-    const currentEdits = diffLineEdits(baseLines, currentLines, whitespaceMode);
-    const incomingEdits = diffLineEdits(baseLines, incomingLines, whitespaceMode);
-    const parts: ThreeWayMergePart[] = [];
-    let baseCursor = 0;
-    let currentEditIndex = 0;
-    let incomingEditIndex = 0;
-    let textIndex = 0;
-    let conflictIndex = 0;
-
-    function pushUnchanged(end: number) {
-        if (end <= baseCursor) {
-            return;
-        }
-        const text = sliceLines(baseLines, baseCursor, end);
-        parts.push(buildTextPart(`text-${textIndex++}`, 'unchanged', text, text, text, text));
-        baseCursor = end;
-    }
-
-    while (baseCursor < baseLines.length || currentEditIndex < currentEdits.length || incomingEditIndex < incomingEdits.length) {
-        const currentEdit = currentEdits[currentEditIndex];
-        const incomingEdit = incomingEdits[incomingEditIndex];
-        const nextEditStart = Math.min(editBaseStart(currentEdit), editBaseStart(incomingEdit));
-
-        if (baseCursor < nextEditStart && nextEditStart !== Number.POSITIVE_INFINITY) {
-            pushUnchanged(nextEditStart);
-            continue;
-        }
-
-        if (!currentEdit && !incomingEdit) {
-            pushUnchanged(baseLines.length);
-            break;
-        }
-
-        if (currentEdit && !incomingEdit) {
-            const baseText = sliceLines(baseLines, currentEdit.start, currentEdit.end);
-            const currentText = sliceLines(currentLines, currentEdit.replacementStart, currentEdit.replacementEnd);
-            parts.push(buildTextPart(`text-${textIndex++}`, 'current', baseText, currentText, baseText, currentText));
-            baseCursor = currentEdit.end;
-            currentEditIndex++;
-            continue;
-        }
-
-        if (!currentEdit && incomingEdit) {
-            const baseText = sliceLines(baseLines, incomingEdit.start, incomingEdit.end);
-            const incomingText = sliceLines(incomingLines, incomingEdit.replacementStart, incomingEdit.replacementEnd);
-            parts.push(buildTextPart(`text-${textIndex++}`, 'incoming', baseText, baseText, incomingText, incomingText));
-            baseCursor = incomingEdit.end;
-            incomingEditIndex++;
-            continue;
-        }
-
-        if (!currentEdit || !incomingEdit) {
-            break;
-        }
-
-        if (!editsOverlap(currentEdit, incomingEdit)) {
-            if (currentEdit.start <= incomingEdit.start) {
-                const baseText = sliceLines(baseLines, currentEdit.start, currentEdit.end);
-                const currentText = sliceLines(currentLines, currentEdit.replacementStart, currentEdit.replacementEnd);
-                parts.push(buildTextPart(`text-${textIndex++}`, 'current', baseText, currentText, baseText, currentText));
-                baseCursor = currentEdit.end;
-                currentEditIndex++;
-            } else {
-                const baseText = sliceLines(baseLines, incomingEdit.start, incomingEdit.end);
-                const incomingText = sliceLines(incomingLines, incomingEdit.replacementStart, incomingEdit.replacementEnd);
-                parts.push(buildTextPart(`text-${textIndex++}`, 'incoming', baseText, baseText, incomingText, incomingText));
-                baseCursor = incomingEdit.end;
-                incomingEditIndex++;
-            }
-            continue;
-        }
-
-        const conflictGroup = collectConflictGroup(currentEdits, incomingEdits, currentEditIndex, incomingEditIndex);
-        const currentStartOffset = offsetAtLine(baseLines, conflictGroup.start, baseContent.length);
-        const currentEndOffset = offsetAtLine(baseLines, conflictGroup.end, baseContent.length);
-        const baseText = baseContent.slice(currentStartOffset, currentEndOffset);
-        const currentText = buildSideTextForBaseRange(baseLines, currentLines, currentEdits, conflictGroup.start, conflictGroup.end);
-        const incomingText = buildSideTextForBaseRange(baseLines, incomingLines, incomingEdits, conflictGroup.start, conflictGroup.end);
-
-        if (textMatchesForWhitespaceCompare(currentText, incomingText, whitespaceMode)) {
-            parts.push(buildTextPart(`text-${textIndex++}`, 'both', baseText, currentText, incomingText, currentText));
-        } else {
-            parts.push({
-                type: 'conflict',
-                id: `conflict-${conflictIndex++}`,
-                baseText,
-                currentText,
-                incomingText
-            });
-        }
-
-        baseCursor = conflictGroup.end;
-        currentEditIndex = conflictGroup.nextCurrentEditIndex;
-        incomingEditIndex = conflictGroup.nextIncomingEditIndex;
-    }
-
-    return parts;
-}
-
-export function buildThreeWayMergeDocumentFromSides(
-    base: MergeSideContent,
-    current: MergeSideContent,
-    incoming: MergeSideContent,
-    whitespaceMode: WhitespaceCompareMode = 'strict'
-): ThreeWayMergePart[] {
-    if (base.exists && current.exists !== incoming.exists) {
+    if (referenceMiddle.length * resultMiddle.length > 250_000) {
         return [{
-            type: 'conflict',
-            id: 'conflict-0',
-            baseText: base.content,
-            currentText: current.exists ? current.content : '',
-            incomingText: incoming.exists ? incoming.content : ''
+            referenceStart: commonPrefixLineCount,
+            referenceLineCount: referenceMiddle.length,
+            resultStart: commonPrefixLineCount,
+            resultLineCount: resultMiddle.length
         }];
     }
 
-    return buildThreeWayMergeDocument(
-        base.exists ? base.content : '',
-        current.exists ? current.content : '',
-        incoming.exists ? incoming.content : '',
-        whitespaceMode
-    );
-}
+    const matchingLines = computeLcsPairs(referenceMiddle, resultMiddle);
+    const blocks: LineAlignmentBlock[] = [];
+    let referenceCursor = 0;
+    let resultCursor = 0;
 
-export function buildThreeWayMergeResult(
-    parts: ThreeWayMergePart[],
-    resolutions: ConflictResolutionMap,
-    nonConflictingMode: NonConflictingChangeMode = 'all'
-): string {
-    return parts.map(part => {
-        if (part.type === 'text') {
-            if (part.kind === 'current' && nonConflictingMode === 'incoming') {
-                return part.baseText;
-            }
-            if (part.kind === 'incoming' && nonConflictingMode === 'current') {
-                return part.baseText;
-            }
-            return part.resultText;
-        }
-        if (Object.prototype.hasOwnProperty.call(resolutions, part.id)) {
-            return resolutions[part.id];
-        }
-        return part.baseText;
-    }).join('');
-}
-
-function getOriginalLineCount(text: string): number {
-    if (!text) {
-        return 0;
-    }
-    const lines = text.split(/\r\n|\r|\n/);
-    if (lines.length > 0 && lines[lines.length - 1] === '') {
-        return lines.length - 1;
-    }
-    return lines.length;
-}
-
-function alignTextToLines(text: string, targetLineCount: number): string {
-    const lines = text.split(/\r\n|\r|\n/);
-    if (lines.length > 0 && lines[lines.length - 1] === '') {
-        lines.pop();
-    }
-    while (lines.length < targetLineCount) {
-        lines.push('\u200B');
-    }
-    if (targetLineCount === 0) {
-        return '';
-    }
-    return lines.join('\n') + '\n';
-}
-
-function appendAlignedPaneText(builder: PaneTextBuilder, text: string, lineCount: number): MergePaneRange {
-    const startLine = builder.lineCount;
-    builder.chunks.push(text);
-    builder.length += text.length;
-    builder.lineCount += lineCount;
-    const endLine = Math.max(startLine, startLine + lineCount - 1);
-    return {
-        id: '',
-        startLine,
-        endLine
-    };
-}
-
-export function buildThreeWayMergePaneDocument(
-    parts: ThreeWayMergePart[],
-    resolutions: ConflictResolutionMap,
-    nonConflictingMode: NonConflictingChangeMode = 'all'
-): ThreeWayMergePaneDocument {
-    const leftPane = createPaneTextBuilder();
-    const resultPane = createPaneTextBuilder();
-    const rightPane = createPaneTextBuilder();
-    const leftConflictRanges: MergePaneRange[] = [];
-    const resultConflictRanges: MergePaneRange[] = [];
-    const rightConflictRanges: MergePaneRange[] = [];
-
-    for (const part of parts) {
-        const resultText = buildThreeWayMergeResult([part], part.type === 'conflict' ? resolutions : {}, nonConflictingMode);
-        const leftCount = getOriginalLineCount(part.currentText);
-        const resultCount = getOriginalLineCount(resultText);
-        const rightCount = getOriginalLineCount(part.incomingText);
-        const maxLines = Math.max(leftCount, resultCount, rightCount);
-
-        const alignedLeftText = alignTextToLines(part.currentText, maxLines);
-        const alignedResultText = alignTextToLines(resultText, maxLines);
-        const alignedRightText = alignTextToLines(part.incomingText, maxLines);
-
-        const leftRange = appendAlignedPaneText(leftPane, alignedLeftText, maxLines);
-        const resultRange = appendAlignedPaneText(resultPane, alignedResultText, maxLines);
-        const rightRange = appendAlignedPaneText(rightPane, alignedRightText, maxLines);
-
-        if (part.type === 'conflict') {
-            leftConflictRanges.push({
-                ...leftRange,
-                id: part.id
-            });
-            resultConflictRanges.push({
-                ...resultRange,
-                id: part.id
-            });
-            rightConflictRanges.push({
-                ...rightRange,
-                id: part.id
+    for (let index = 0; index <= matchingLines.length; index++) {
+        const [referenceMatch, resultMatch] = index < matchingLines.length
+            ? matchingLines[index]
+            : [referenceMiddle.length, resultMiddle.length];
+        const referenceLineCount = referenceMatch - referenceCursor;
+        const resultLineCount = resultMatch - resultCursor;
+        if (referenceLineCount > 0 || resultLineCount > 0) {
+            blocks.push({
+                referenceStart: commonPrefixLineCount + referenceCursor,
+                referenceLineCount,
+                resultStart: commonPrefixLineCount + resultCursor,
+                resultLineCount
             });
         }
-    }
-
-    return {
-        leftText: leftPane.chunks.join(''),
-        resultText: resultPane.chunks.join(''),
-        rightText: rightPane.chunks.join(''),
-        leftConflictRanges,
-        resultConflictRanges,
-        rightConflictRanges
-    };
-}
-
-export function getUnresolvedThreeWayConflictIds(
-    parts: ThreeWayMergePart[],
-    resolutions: ConflictResolutionState
-): string[] {
-    return parts
-        .filter((part): part is Extract<ThreeWayMergePart, { type: 'conflict' }> => part.type === 'conflict')
-        .filter(part => !Object.prototype.hasOwnProperty.call(resolutions, part.id))
-        .map(part => part.id);
-}
-
-function markerLabel(line: ContentLine, marker: string): string {
-    return line.body.slice(marker.length).trim();
-}
-
-export function parseConflictBlocks(content: string): ConflictBlock[] {
-    const lines = splitContentLines(content);
-    const blocks: ConflictBlock[] = [];
-
-    for (let index = 0; index < lines.length; index++) {
-        const startLine = lines[index];
-        if (!startLine.body.startsWith(CURRENT_MARKER)) {
-            continue;
+        if (index < matchingLines.length) {
+            referenceCursor = referenceMatch + 1;
+            resultCursor = resultMatch + 1;
         }
-
-        const currentLines: string[] = [];
-        const baseLines: string[] = [];
-        const incomingLines: string[] = [];
-        let baseLabel = '';
-        let incomingLabel = '';
-        let section: 'current' | 'base' | 'incoming' = 'current';
-        let endLine: ContentLine | undefined;
-
-        for (index = index + 1; index < lines.length; index++) {
-            const line = lines[index];
-
-            if (section === 'current' && line.body.startsWith(BASE_MARKER)) {
-                baseLabel = markerLabel(line, BASE_MARKER);
-                section = 'base';
-                continue;
-            }
-
-            if ((section === 'current' || section === 'base') && line.body.startsWith(SEPARATOR_MARKER)) {
-                section = 'incoming';
-                continue;
-            }
-
-            if (section === 'incoming' && line.body.startsWith(INCOMING_MARKER)) {
-                incomingLabel = markerLabel(line, INCOMING_MARKER);
-                endLine = line;
-                break;
-            }
-
-            if (section === 'current') {
-                currentLines.push(line.text);
-            } else if (section === 'base') {
-                baseLines.push(line.text);
-            } else {
-                incomingLines.push(line.text);
-            }
-        }
-
-        if (!endLine) {
-            break;
-        }
-
-        blocks.push({
-            id: `conflict-${blocks.length}`,
-            startOffset: startLine.startOffset,
-            endOffset: endLine.endOffset,
-            startLine: startLine.lineNumber,
-            endLine: endLine.lineNumber,
-            currentLabel: markerLabel(startLine, CURRENT_MARKER),
-            baseLabel,
-            incomingLabel,
-            currentText: currentLines.join(''),
-            baseText: baseLines.join(''),
-            incomingText: incomingLines.join(''),
-            markerText: content.slice(startLine.startOffset, endLine.endOffset)
-        });
     }
 
     return blocks;
 }
 
+function getLineBoundaryOffset(lines: ContentLineSlice[], contentLength: number, lineIndex: number): number {
+    if (lineIndex <= 0) {
+        return 0;
+    }
+    if (lineIndex >= lines.length) {
+        return contentLength;
+    }
+    return lines[lineIndex].startOffset;
+}
+
+function sliceLineRange(content: string, lines: ContentLineSlice[], start: number, lineCount: number): string {
+    const startOffset = getLineBoundaryOffset(lines, content.length, start);
+    const endOffset = getLineBoundaryOffset(lines, content.length, start + lineCount);
+    return content.slice(startOffset, endOffset);
+}
+
+function changesOverlap(left: ConflictChange, right: ConflictChange): boolean {
+    const leftEnd = left.baseStart + left.baseLineCount;
+    const rightEnd = right.baseStart + right.baseLineCount;
+    if (left.baseLineCount === 0 && right.baseLineCount === 0) {
+        return left.baseStart === right.baseStart;
+    }
+    if (left.baseLineCount === 0) {
+        return left.baseStart >= right.baseStart && left.baseStart <= rightEnd;
+    }
+    if (right.baseLineCount === 0) {
+        return right.baseStart >= left.baseStart && right.baseStart <= leftEnd;
+    }
+    return left.baseStart < rightEnd && right.baseStart < leftEnd;
+}
+
+function buildChangeComponents(leftChanges: ConflictChange[], rightChanges: ConflictChange[]): TaggedConflictChange[][] {
+    const tagged: TaggedConflictChange[] = [
+        ...leftChanges.map((change, index) => ({ side: 'left' as const, change, index })),
+        ...rightChanges.map((change, index) => ({ side: 'right' as const, change, index: leftChanges.length + index }))
+    ];
+    const parents = tagged.map((_, index) => index);
+    const find = (index: number): number => {
+        while (parents[index] !== index) {
+            parents[index] = parents[parents[index]];
+            index = parents[index];
+        }
+        return index;
+    };
+    const union = (left: number, right: number) => {
+        const leftRoot = find(left);
+        const rightRoot = find(right);
+        if (leftRoot !== rightRoot) {
+            parents[rightRoot] = leftRoot;
+        }
+    };
+
+    for (let leftIndex = 0; leftIndex < leftChanges.length; leftIndex++) {
+        for (let rightIndex = 0; rightIndex < rightChanges.length; rightIndex++) {
+            if (changesOverlap(leftChanges[leftIndex], rightChanges[rightIndex])) {
+                union(leftIndex, leftChanges.length + rightIndex);
+            }
+        }
+    }
+
+    const components = new Map<number, TaggedConflictChange[]>();
+    for (const item of tagged) {
+        const root = find(item.index);
+        const component = components.get(root) ?? [];
+        component.push(item);
+        components.set(root, component);
+    }
+    return [...components.values()].sort((left, right) => {
+        const leftStart = Math.min(...left.map(item => item.change.baseStart));
+        const rightStart = Math.min(...right.map(item => item.change.baseStart));
+        return leftStart - rightStart;
+    });
+}
+
+function applySideChanges(
+    baseContent: string,
+    baseLines: ContentLineSlice[],
+    sideContent: string,
+    sideLines: ContentLineSlice[],
+    groupStart: number,
+    groupEnd: number,
+    changes: ConflictChange[]
+): string {
+    if (changes.length === 0) {
+        return sliceLineRange(baseContent, baseLines, groupStart, groupEnd - groupStart);
+    }
+
+    let cursor = groupStart;
+    let result = '';
+    for (const change of [...changes].sort((left, right) => left.baseStart - right.baseStart)) {
+        result += sliceLineRange(baseContent, baseLines, cursor, change.baseStart - cursor);
+        result += sliceLineRange(sideContent, sideLines, change.sideStart, change.sideLineCount);
+        cursor = Math.max(cursor, change.baseStart + change.baseLineCount);
+    }
+    result += sliceLineRange(baseContent, baseLines, cursor, groupEnd - cursor);
+    return result;
+}
+
+function normalizeWhitespaceForComparison(content: string, whitespaceMode: WhitespaceCompareMode): string {
+    const normalized = content.replace(/\r\n?|\n/g, '\n');
+    if (whitespaceMode === 'none') {
+        return normalized;
+    }
+
+    return normalized
+        .split('\n')
+        .map(line => whitespaceMode === 'ignore'
+            ? line.replace(/[^\S\r\n]+/g, '')
+            : line.replace(/^[^\S\r\n]+|[^\S\r\n]+$/g, ''))
+        .join('\n');
+}
+
+function filterChangesByWhitespaceMode(
+    baseLines: ContentLineSlice[],
+    sideLines: ContentLineSlice[],
+    changes: ConflictChange[],
+    whitespaceMode: WhitespaceCompareMode
+): ConflictChange[] {
+    if (whitespaceMode === 'none') {
+        return changes;
+    }
+
+    return changes.flatMap(change => {
+        const comparableBaseLines = baseLines
+            .slice(change.baseStart, change.baseStart + change.baseLineCount)
+            .map(line => normalizeWhitespaceForComparison(line.text, whitespaceMode));
+        const comparableSideLines = sideLines
+            .slice(change.sideStart, change.sideStart + change.sideLineCount)
+            .map(line => normalizeWhitespaceForComparison(line.text, whitespaceMode));
+
+        if (comparableBaseLines.length * comparableSideLines.length > 250_000) {
+            return [change];
+        }
+
+        const matchingLines = computeLcsPairs(comparableBaseLines, comparableSideLines);
+        const refined: ConflictChange[] = [];
+        let baseCursor = 0;
+        let sideCursor = 0;
+        let partIndex = 0;
+
+        for (let index = 0; index <= matchingLines.length; index++) {
+            const [baseMatch, sideMatch] = index < matchingLines.length
+                ? matchingLines[index]
+                : [comparableBaseLines.length, comparableSideLines.length];
+            const baseLineCount = baseMatch - baseCursor;
+            const sideLineCount = sideMatch - sideCursor;
+            if (baseLineCount > 0 || sideLineCount > 0) {
+                refined.push({
+                    id: `${change.id}:${partIndex++}`,
+                    baseStart: change.baseStart + baseCursor,
+                    baseLineCount,
+                    sideStart: change.sideStart + sideCursor,
+                    sideLineCount
+                });
+            }
+            if (index < matchingLines.length) {
+                baseCursor = baseMatch + 1;
+                sideCursor = sideMatch + 1;
+            }
+        }
+
+        return refined;
+    });
+}
+
+export function buildMergeSessionDocument(
+    baseContent: string,
+    leftContent: string,
+    rightContent: string,
+    leftChanges: ConflictChange[],
+    rightChanges: ConflictChange[],
+    whitespaceMode: WhitespaceCompareMode = 'none'
+): MergeSessionDocument {
+    const baseLines = splitContentLineSlices(baseContent);
+    const leftLines = splitContentLineSlices(leftContent);
+    const rightLines = splitContentLineSlices(rightContent);
+    const visibleLeftChanges = filterChangesByWhitespaceMode(
+        baseLines,
+        leftLines,
+        leftChanges,
+        whitespaceMode
+    );
+    const visibleRightChanges = filterChangesByWhitespaceMode(
+        baseLines,
+        rightLines,
+        rightChanges,
+        whitespaceMode
+    );
+    const components = buildChangeComponents(visibleLeftChanges, visibleRightChanges);
+    const groups: MergeChangeGroup[] = [];
+    const reviewRanges: MergeReviewRange[] = [];
+    let previousBaseEnd = 0;
+    let previousLeftEnd = 0;
+    let previousRightEnd = 0;
+
+    for (let index = 0; index < components.length; index++) {
+        const component = components[index];
+        const componentLeftChanges = component
+            .filter(item => item.side === 'left')
+            .map(item => item.change);
+        const componentRightChanges = component
+            .filter(item => item.side === 'right')
+            .map(item => item.change);
+        const allChanges = component.map(item => item.change);
+        const baseStart = Math.min(...allChanges.map(change => change.baseStart));
+        const baseEnd = Math.max(...allChanges.map(change => change.baseStart + change.baseLineCount));
+        const baseLineCount = baseEnd - baseStart;
+        const contextLineCount = Math.max(0, baseStart - previousBaseEnd);
+        const leftStart = previousLeftEnd + contextLineCount;
+        const rightStart = previousRightEnd + contextLineCount;
+        const leftLineCount = baseLineCount + componentLeftChanges.reduce(
+            (total, change) => total + change.sideLineCount - change.baseLineCount,
+            0
+        );
+        const rightLineCount = baseLineCount + componentRightChanges.reduce(
+            (total, change) => total + change.sideLineCount - change.baseLineCount,
+            0
+        );
+        const baseText = sliceLineRange(baseContent, baseLines, baseStart, baseLineCount);
+        const leftText = applySideChanges(
+            baseContent,
+            baseLines,
+            leftContent,
+            leftLines,
+            baseStart,
+            baseEnd,
+            componentLeftChanges
+        );
+        const rightText = applySideChanges(
+            baseContent,
+            baseLines,
+            rightContent,
+            rightLines,
+            baseStart,
+            baseEnd,
+            componentRightChanges
+        );
+        const hasLeftChange = componentLeftChanges.length > 0;
+        const hasRightChange = componentRightChanges.length > 0;
+        const kind = hasLeftChange && hasRightChange
+            ? leftText === rightText ? 'identical' : 'conflict'
+            : hasLeftChange ? 'left-only' : 'right-only';
+        const id = `change-${index}`;
+        groups.push({
+            id,
+            baseStart,
+            baseLineCount,
+            leftStart,
+            leftLineCount,
+            rightStart,
+            rightLineCount,
+            baseText,
+            leftText,
+            rightText,
+            hasLeftChange,
+            hasRightChange,
+            kind
+        });
+        reviewRanges.push({
+            groupId: id,
+            startOffset: getLineBoundaryOffset(baseLines, baseContent.length, baseStart),
+            endOffset: getLineBoundaryOffset(baseLines, baseContent.length, baseEnd),
+            leftDecision: hasLeftChange ? 'pending' : null,
+            rightDecision: hasRightChange ? 'pending' : null,
+            lastAppliedSide: null
+        });
+        previousBaseEnd = baseEnd;
+        previousLeftEnd = leftStart + leftLineCount;
+        previousRightEnd = rightStart + rightLineCount;
+    }
+
+    return {
+        resultText: baseContent,
+        groups,
+        reviewRanges
+    };
+}
+
+export function getMergeGroupApplyMode(
+    content: string,
+    range: MergeReviewRange,
+    group: MergeChangeGroup,
+    side: MergeReviewSide
+): 'replace' | 'append' | 'preserve' {
+    const otherDecision = side === 'left' ? range.rightDecision : range.leftDecision;
+    if (group.kind !== 'conflict' || otherDecision !== 'applied') {
+        return 'replace';
+    }
+
+    const sideText = side === 'left' ? group.leftText : group.rightText;
+    if (!sideText) {
+        return 'preserve';
+    }
+    return content.slice(range.startOffset, range.endOffset) ? 'append' : 'replace';
+}
+
+export function applyMergeGroupDecision(
+    content: string,
+    ranges: MergeReviewRange[],
+    group: MergeChangeGroup,
+    side: MergeReviewSide | 'both',
+    decision: Exclude<MergeReviewDecision, 'pending'>
+): { content: string; ranges: MergeReviewRange[] } {
+    const target = ranges.find(range => range.groupId === group.id);
+    if (!target) {
+        return { content, ranges };
+    }
+
+    if (side === 'both') {
+        if (decision !== 'manual') {
+            return { content, ranges };
+        }
+        return {
+            content,
+            ranges: ranges.map(range => range.groupId === group.id
+                ? {
+                    ...range,
+                    leftDecision: range.leftDecision === 'pending' ? 'manual' : range.leftDecision,
+                    rightDecision: range.rightDecision === 'pending' ? 'manual' : range.rightDecision
+                }
+                : range)
+        };
+    }
+
+    const sideDecision = side === 'left' ? target.leftDecision : target.rightDecision;
+    if (sideDecision === null || decision === 'manual') {
+        return { content, ranges };
+    }
+
+    const otherSide: MergeReviewSide = side === 'left' ? 'right' : 'left';
+    const otherDecision = otherSide === 'left' ? target.leftDecision : target.rightDecision;
+    const sideText = side === 'left' ? group.leftText : group.rightText;
+    const otherText = otherSide === 'left' ? group.leftText : group.rightText;
+    const applyMode = getMergeGroupApplyMode(content, target, group, side);
+    let replacement: string | undefined;
+    let lastAppliedSide = target.lastAppliedSide;
+
+    if (decision === 'applied') {
+        const currentText = content.slice(target.startOffset, target.endOffset);
+        if (applyMode === 'append') {
+            const lineSeparator = [currentText, sideText, group.baseText]
+                .map(text => text.match(/\r\n|\n|\r/)?.[0])
+                .find((separator): separator is string => Boolean(separator)) ?? '\n';
+            replacement = /[\r\n]$/.test(currentText) || /^[\r\n]/.test(sideText)
+                ? currentText + sideText
+                : currentText + lineSeparator + sideText;
+        } else if (applyMode === 'preserve') {
+            replacement = currentText;
+        } else {
+            replacement = sideText;
+        }
+        lastAppliedSide = side;
+    } else if (sideDecision === 'applied') {
+        if (otherDecision === 'applied') {
+            replacement = otherText;
+            lastAppliedSide = otherSide;
+        } else {
+            replacement = group.baseText;
+            lastAppliedSide = null;
+        }
+    }
+
+    const nextContent = replacement === undefined
+        ? content
+        : content.slice(0, target.startOffset) + replacement + content.slice(target.endOffset);
+    const delta = replacement === undefined
+        ? 0
+        : replacement.length - (target.endOffset - target.startOffset);
+    return {
+        content: nextContent,
+        ranges: ranges.map(range => {
+            if (range.groupId === group.id) {
+                return {
+                    ...range,
+                    endOffset: replacement === undefined ? range.endOffset : range.startOffset + replacement.length,
+                    leftDecision: side === 'left' ? decision : range.leftDecision,
+                    rightDecision: side === 'right' ? decision : range.rightDecision,
+                    lastAppliedSide
+                };
+            }
+            if (delta !== 0 && range.startOffset >= target.endOffset) {
+                return {
+                    ...range,
+                    startOffset: range.startOffset + delta,
+                    endOffset: range.endOffset + delta
+                };
+            }
+            return range;
+        })
+    };
+}
+
+export function isMergeReviewRangePending(range: MergeReviewRange): boolean {
+    return range.leftDecision === 'pending' || range.rightDecision === 'pending';
+}
+
+function changeTouchesRange(
+    change: { rangeOffset: number; rangeLength: number },
+    range: MergeReviewRange
+): boolean {
+    const changeEnd = change.rangeOffset + change.rangeLength;
+    if (change.rangeLength === 0) {
+        return change.rangeOffset >= range.startOffset && change.rangeOffset <= range.endOffset;
+    }
+    if (range.startOffset === range.endOffset) {
+        return change.rangeOffset <= range.startOffset && changeEnd >= range.endOffset;
+    }
+    return change.rangeOffset < range.endOffset && changeEnd > range.startOffset;
+}
+
+function transformOffset(
+    offset: number,
+    affinity: 'start' | 'end',
+    changes: Array<{ rangeOffset: number; rangeLength: number; text: string }>
+): number {
+    let delta = 0;
+    for (const change of changes) {
+        const changeStart = change.rangeOffset;
+        const changeEnd = change.rangeOffset + change.rangeLength;
+        if (offset < changeStart) {
+            break;
+        }
+        if (offset > changeEnd) {
+            delta += change.text.length - change.rangeLength;
+            continue;
+        }
+        if (offset === changeEnd && change.rangeLength > 0) {
+            return changeStart + delta + change.text.length;
+        }
+        return changeStart + delta + (affinity === 'end' ? change.text.length : 0);
+    }
+    return offset + delta;
+}
+
+export function applyMergeContentChanges(
+    ranges: MergeReviewRange[],
+    rawChanges: Array<{ rangeOffset: number; rangeLength: number; text: string }>
+): { ranges: MergeReviewRange[]; touchedGroupIds: string[] } {
+    const changes = [...rawChanges].sort((left, right) => left.rangeOffset - right.rangeOffset);
+    const touchedGroupIds = ranges
+        .filter(range => changes.some(change => changeTouchesRange(change, range)))
+        .map(range => range.groupId);
+    const touched = new Set(touchedGroupIds);
+    return {
+        ranges: ranges.map(range => ({
+            ...range,
+            startOffset: transformOffset(range.startOffset, 'start', changes),
+            endOffset: transformOffset(range.endOffset, 'end', changes),
+            leftDecision: touched.has(range.groupId) && range.leftDecision !== null
+                ? 'pending'
+                : range.leftDecision,
+            rightDecision: touched.has(range.groupId) && range.rightDecision !== null
+                ? 'pending'
+                : range.rightDecision,
+            lastAppliedSide: touched.has(range.groupId) ? null : range.lastAppliedSide
+        })),
+        touchedGroupIds
+    };
+}
+
+export function getMergeTextRange(content: string, startOffset: number, endOffset: number): MergeTextRange {
+    const lineStarts = getLineStartOffsets(content);
+    const visualEndOffset = endOffset > startOffset && /[\r\n]/.test(content[endOffset - 1])
+        ? endOffset - (content[endOffset - 1] === '\n' && content[endOffset - 2] === '\r' ? 2 : 1)
+        : endOffset;
+    const start = getPositionAtOffset(lineStarts, startOffset);
+    const end = getPositionAtOffset(lineStarts, Math.max(startOffset, visualEndOffset));
+    return {
+        startLine: start.line,
+        startColumn: start.column,
+        endLine: end.line,
+        endColumn: end.column
+    };
+}
+
+export function getContentLineCount(content: string): number {
+    return splitContentLineSlices(content).length;
+}
+
+export function buildMergeSideInlineDiffRanges(
+    groups: MergeChangeGroup[],
+    side: 'current' | 'incoming',
+    whitespaceMode: WhitespaceCompareMode = 'none'
+): ConflictInlineDiffRange[] {
+    const ranges: ConflictInlineDiffRange[] = [];
+    for (const group of groups) {
+        const hasChange = side === 'current' ? group.hasLeftChange : group.hasRightChange;
+        if (!hasChange) {
+            continue;
+        }
+        const text = side === 'current' ? group.leftText : group.rightText;
+        const startLine = side === 'current' ? group.leftStart : group.rightStart;
+        const lineStarts = getLineStartOffsets(text);
+        let localOffset = 0;
+        for (const segment of buildInlineDiffSegments(text, group.baseText, whitespaceMode)) {
+            const segmentStart = localOffset;
+            localOffset += segment.text.length;
+            if (!segment.changed || !segment.text) {
+                continue;
+            }
+            const start = getPositionAtOffset(lineStarts, segmentStart);
+            const end = getPositionAtOffset(lineStarts, localOffset);
+            ranges.push({
+                conflictId: group.id,
+                side,
+                startLine: startLine + start.line,
+                startColumn: start.column,
+                endLine: startLine + end.line,
+                endColumn: end.column
+            });
+        }
+    }
+    return ranges;
+}
+
+export function buildConflictInlineDiffRanges(
+    content: string,
+    baseContent: string,
+    whitespaceMode: WhitespaceCompareMode = 'none'
+): ConflictInlineDiffRange[] {
+    const lineStarts = getLineStartOffsets(content);
+    const parts = parseConflictDocument(content, baseContent);
+    const ranges: ConflictInlineDiffRange[] = [];
+
+    for (const part of parts) {
+        if (part.type !== 'conflict') {
+            continue;
+        }
+
+        const baseText = getConflictBaseText(part.block);
+        const sides = [
+            {
+                side: 'current' as const,
+                text: part.block.currentText,
+                startOffset: part.block.currentStartOffset
+            },
+            {
+                side: 'incoming' as const,
+                text: part.block.incomingText,
+                startOffset: part.block.incomingStartOffset
+            }
+        ];
+
+        for (const side of sides) {
+            let localOffset = 0;
+            for (const segment of buildInlineDiffSegments(side.text, baseText, whitespaceMode)) {
+                const startOffset = side.startOffset + localOffset;
+                localOffset += segment.text.length;
+                if (!segment.changed || !segment.text) {
+                    continue;
+                }
+
+                const start = getPositionAtOffset(lineStarts, startOffset);
+                const end = getPositionAtOffset(lineStarts, side.startOffset + localOffset);
+                ranges.push({
+                    conflictId: part.id,
+                    side: side.side,
+                    startLine: start.line,
+                    startColumn: start.column,
+                    endLine: end.line,
+                    endColumn: end.column
+                });
+            }
+        }
+    }
+
+    return ranges;
+}
+
+export function parseConflictBlocks(content: string): ConflictBlock[] {
+    return parseConflictMarkerBlocks(content);
+}
+
 export function hasConflictBlocks(content: string): boolean {
     return parseConflictBlocks(content).length > 0;
+}
+
+export function getMergeResultReviewState(
+    originalResult: string,
+    result: string,
+    resolutionAcknowledged: boolean
+): MergeResultReviewState {
+    const conflictMarkerCount = parseConflictBlocks(result).length;
+    return {
+        conflictMarkerCount,
+        isResolutionConfirmed: conflictMarkerCount === 0 &&
+            (resolutionAcknowledged || result !== originalResult)
+    };
 }
 
 export function getConflictResolutionText(block: ConflictBlock, choice: ConflictResolutionChoice): string {

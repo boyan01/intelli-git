@@ -2,7 +2,7 @@
     display: grid;
     min-height: 0;
     flex: 1;
-    grid-template-columns: minmax(220px, 1fr) 44px minmax(280px, 1.25fr) 44px minmax(220px, 1fr);
+    grid-template-columns: minmax(0, 1fr) 44px minmax(0, 1fr) 44px minmax(0, 1fr);
     overflow: hidden;
     background: var(--vscode-editor-background);
 }
@@ -12,7 +12,6 @@
     min-width: 0;
     min-height: 0;
     flex-direction: column;
-    border-right: 1px solid var(--vscode-panel-border);
 }
 
 .fullHeightEditor {
@@ -26,25 +25,86 @@
 
 .editorGutter {
     position: relative;
-    min-width: 44px;
-    box-sizing: border-box;
-    border-right: 1px solid var(--vscode-panel-border);
-    background: color-mix(in srgb, var(--vscode-editorGutter-background, var(--vscode-editor-background)) 82%, var(--vscode-editor-background));
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    background: var(--vscode-editorGutter-background, var(--vscode-editor-background));
+}
+
+.editorGutter::before,
+.editorGutter::after {
+    position: absolute;
+    z-index: 0;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: var(--vscode-panel-border);
+    content: '';
+    pointer-events: none;
+}
+
+.editorGutter::before {
+    left: 0;
+}
+
+.editorGutter::after {
+    right: 0;
+}
+
+.gutterConnector {
+    position: absolute;
+    z-index: 1;
+    left: 0;
+    width: 100%;
+    overflow: visible;
+    pointer-events: none;
+    shape-rendering: geometricPrecision;
+}
+
+.gutterConnector[data-decoration-type='inserted'] {
+    --intelli-git-merge-line-background: var(--vscode-diffEditor-insertedLineBackground, rgba(52, 125, 57, 0.15));
+    --intelli-git-merge-marker: var(--vscode-editorGutter-addedBackground, #72c892);
+}
+
+.gutterConnector[data-decoration-type='deleted'] {
+    --intelli-git-merge-line-background: var(--vscode-diffEditor-unchangedCodeBackground, rgba(128, 128, 128, 0.16));
+    --intelli-git-merge-marker: var(--vscode-diffEditor-move-border, #8b8b8b);
+}
+
+.gutterConnector[data-decoration-type='modified'] {
+    --intelli-git-merge-line-background: color-mix(in srgb, var(--vscode-editorGutter-modifiedBackground, #0078d4) 18%, transparent);
+    --intelli-git-merge-marker: var(--vscode-editorGutter-modifiedBackground, #0078d4);
+}
+
+.gutterConnector[data-decoration-type='conflict'] {
+    --intelli-git-merge-line-background: var(--vscode-diffEditor-removedLineBackground, rgba(201, 60, 55, 0.15));
+    --intelli-git-merge-marker: var(--vscode-editorGutter-deletedBackground, #f28772);
+}
+
+.gutterConnectorFill {
+    fill: var(--intelli-git-merge-line-background);
+}
+
+.gutterConnectorEdge {
+    fill: none;
+    stroke: color-mix(in srgb, var(--intelli-git-merge-marker) 72%, transparent);
+    stroke-dasharray: 2 2;
+    stroke-width: 1px;
+    vector-effect: non-scaling-stroke;
 }
 
 .leftGutterActionGroup,
 .rightGutterActionGroup {
-    display: inline-flex;
     position: absolute;
+    z-index: 2;
+    display: flex;
+    width: 100%;
+    min-height: 18px;
+    box-sizing: border-box;
+    align-items: flex-start;
+    justify-content: center;
     gap: 2px;
-}
-
-.leftGutterActionGroup {
-    left: 3px;
-}
-
-.rightGutterActionGroup {
-    left: 13px;
+    background: transparent;
 }
 
 .gutterActionButton {
@@ -54,34 +114,27 @@
     padding: 0;
     align-items: center;
     justify-content: center;
-    border: 1px solid var(--vscode-button-border, var(--vscode-panel-border));
-    border-radius: 3px;
-    background: var(--vscode-button-secondaryBackground);
-    color: var(--vscode-button-secondaryForeground);
+    border: 0;
+    border-radius: 2px;
+    background: transparent;
+    color: var(--vscode-icon-foreground);
     cursor: pointer;
 }
 
 .gutterActionButton:hover:not(:disabled) {
-    background: var(--vscode-button-secondaryHoverBackground);
+    background: var(--vscode-toolbar-hoverBackground);
 }
 
 .gutterActionButton:focus-visible {
     outline: 1px solid var(--vscode-focusBorder);
-    outline-offset: 1px;
+    outline-offset: 0;
 }
 
 .gutterActionButton:disabled {
-    opacity: 0.55;
+    opacity: 0.45;
     cursor: default;
 }
 
-.deletedSideHint {
-    min-height: 22px;
-    padding: 4px 8px;
-    box-sizing: border-box;
-    border-bottom: 1px solid var(--vscode-panel-border);
-    color: var(--vscode-descriptionForeground);
-    font-size: 11px;
-    line-height: 16px;
+.leftAppendIcon {
+    transform: scaleX(-1);
 }
-

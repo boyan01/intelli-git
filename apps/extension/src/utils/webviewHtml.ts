@@ -43,12 +43,14 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
             window.initialState = ${initialStateJson};
         </script>`;
 
+    // Monaco replaces visible rows with HTML that contains inline layout attributes.
+    // Allow style attributes while keeping every script nonce-restricted.
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource}; font-src ${webview.cspSource}; script-src 'nonce-${nonce}' ${webview.cspSource}; connect-src ${webview.cspSource}; worker-src ${webview.cspSource} blob:;">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource}; style-src-attr 'unsafe-inline'; font-src ${webview.cspSource}; script-src 'nonce-${nonce}' ${webview.cspSource}; connect-src ${webview.cspSource}; worker-src ${webview.cspSource} blob:;">
     <link href="${iconStyleUri}" rel="stylesheet">
     <link href="${styleUri}" rel="stylesheet">
     <link href="${editorStyleUri}" rel="stylesheet">

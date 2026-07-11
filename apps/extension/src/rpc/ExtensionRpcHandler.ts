@@ -31,6 +31,8 @@ import type {
     PublishReviewBranchResult,
     CommitDetails,
     ConflictFileContent,
+    ResolveConflictRequest,
+    SaveConflictResolutionRequest,
     PublishReviewBranchRequest
 } from '@shared/messages';
 import { GitService } from '../services/GitService';
@@ -687,6 +689,7 @@ export class ExtensionRpcHandler {
                 openConflictResolver: this.openConflictResolver,
                 updateConflictResolverTitle: this.updateConflictResolverTitle,
                 getConflictFileContent: this.getConflictFileContent,
+                confirmConflictResolverRestart: this.confirmConflictResolverRestart,
                 saveConflictResolution: this.saveConflictResolution,
                 resolveConflict: this.resolveConflict,
                 openFile: this.openFile,
@@ -759,6 +762,17 @@ export class ExtensionRpcHandler {
         const action = i18n.t('Force Push');
         const selected = await vscode.window.showWarningMessage(
             i18n.t('Force push to {0}/{1}? This can overwrite remote commits. Intelli Git will use --force-with-lease to avoid overwriting newer remote updates.', params.remote, params.branch),
+            { modal: true },
+            action
+        );
+
+        return selected === action;
+    };
+
+    confirmConflictResolverRestart = async (): Promise<boolean> => {
+        const action = i18n.t('Discard Changes and Restart');
+        const selected = await vscode.window.showWarningMessage(
+            i18n.t('Changing whitespace comparison requires restarting the merge. Reviewed changes and result edits will be discarded.'),
             { modal: true },
             action
         );
@@ -1822,9 +1836,12 @@ export class ExtensionRpcHandler {
         };
     };
 
-    saveConflictResolution = async (params: { path: string; repoPath?: string; content: string }): Promise<void> => {
+    saveConflictResolution = async (params: SaveConflictResolutionRequest): Promise<void> => {
         try {
-            await this.getServiceForRepo(params.repoPath).saveConflictResolution(params.path, params.content);
+            await this.getServiceForRepo(params.repoPath).saveConflictResolution(params.path, params.content, {
+                stageSignature: params.stageSignature,
+                resultFingerprint: params.resultFingerprint
+            }, params.resultExists);
             await vscode.commands.executeCommand('intelli-git.refresh');
         } catch (e) {
             vscode.window.showErrorMessage(i18n.t('extension.resolveConflictFailed', `${e}`));
@@ -1832,9 +1849,15 @@ export class ExtensionRpcHandler {
         }
     };
 
-    resolveConflict = async (params: { path: string; repoPath?: string; side: 'ours' | 'theirs' }): Promise<void> => {
+    resolveConflict = async (params: ResolveConflictRequest): Promise<void> => {
         try {
-            await this.getServiceForRepo(params.repoPath).resolveConflict(params.path, params.side);
+            const expected = params.stageSignature && params.resultFingerprint
+                ? {
+                    stageSignature: params.stageSignature,
+                    resultFingerprint: params.resultFingerprint
+                }
+                : undefined;
+            await this.getServiceForRepo(params.repoPath).resolveConflict(params.path, params.side, expected);
             await vscode.commands.executeCommand('intelli-git.refresh');
         } catch (e) {
             vscode.window.showErrorMessage(i18n.t('extension.resolveConflictFailed', `${e}`));

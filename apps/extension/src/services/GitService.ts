@@ -1,12 +1,15 @@
 import simpleGit, { SimpleGit, StatusResult } from 'simple-git';
 import * as vscode from 'vscode';
-import type { ConflictFileContent, ConflictSideContent, FileStatus, CommitFile, GitStatusCode, GitHunk } from '@shared/messages';
+import type { ConflictChange, ConflictFileContent, ConflictResolutionSnapshot, ConflictSideContent, FileStatus, CommitFile, GitStatusCode, GitHunk } from '@shared/messages';
+import { hasConflictMarkerBlocks } from '@shared/conflictMarkers';
 import { logger } from '../utils/logger';
+import { i18n } from '../utils/i18n';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { parseDiffToFileHunks } from '../utils/diffParser';
+import { createHash } from 'node:crypto';
+import { parseDiffToFileHunks, parseDiffToHunks } from '../utils/diffParser';
 import { GitLogService } from './GitLogService';
 import { GitBranchRemoteService } from './GitBranchRemoteService';
 import type { ChangelistStateService, ChangelistStateSnapshot, CommitPlan } from './ChangelistStateService';
@@ -15,6 +18,17 @@ import type { InactiveChangesService, InactiveChangesSnapshot } from './Inactive
 interface ExtensionGitStateSnapshot {
     inactiveChanges?: InactiveChangesSnapshot;
     changelists?: ChangelistStateSnapshot;
+}
+
+interface ConflictStageEntry {
+    mode: string;
+    objectId: string;
+}
+
+interface WorktreeFileSnapshot {
+    content: Buffer;
+    fingerprint: string;
+    kind: 'file' | 'missing' | 'symlink' | 'other';
 }
 
 export interface LocalChangePreview {
@@ -70,8 +84,70 @@ function isExpiredBuild(): boolean {
         && __IS_EXPIRED__;
 }
 
-function containsConflictMarkers(text: string): boolean {
-    return text.includes('<<<<<<<') && text.includes('=======') && text.includes('>>>>>>>');
+function createWorktreeFingerprint(kind: WorktreeFileSnapshot['kind'], content: Buffer): string {
+    return createHash('sha256')
+        .update(kind)
+        .update('\0')
+        .update(content)
+        .digest('hex');
+}
+
+function countContentLines(content: string): number {
+    if (!content) {
+        return 0;
+    }
+    const lines = content.split(/\r\n|\r|\n/);
+    return lines.length - (/(?:\r\n|\r|\n)$/.test(content) ? 1 : 0);
+}
+
+function getDiffRangeStart(start: number, lineCount: number): number {
+    return lineCount === 0 ? start : Math.max(0, start - 1);
+}
+
+function readWorktreeFileSnapshot(filePath: string): WorktreeFileSnapshot {
+    let stat: fs.Stats;
+    try {
+        stat = fs.lstatSync(filePath);
+    } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+            const content = Buffer.alloc(0);
+            return {
+                content,
+                fingerprint: createWorktreeFingerprint('missing', content),
+                kind: 'missing'
+            };
+        }
+        throw error;
+    }
+
+    if (stat.isSymbolicLink()) {
+        const content = Buffer.from(fs.readlinkSync(filePath));
+        return {
+            content,
+            fingerprint: createWorktreeFingerprint('symlink', content),
+            kind: 'symlink'
+        };
+    }
+
+    if (stat.isFile()) {
+        const content = fs.readFileSync(filePath);
+        return {
+            content,
+            fingerprint: createWorktreeFingerprint('file', content),
+            kind: 'file'
+        };
+    }
+
+    const content = Buffer.from(`${stat.mode}:${stat.size}:${stat.mtimeMs}`);
+    return {
+        content: Buffer.alloc(0),
+        fingerprint: createWorktreeFingerprint('other', content),
+        kind: 'other'
+    };
+}
+
+function isRegularConflictMode(mode: string): boolean {
+    return mode === '100644' || mode === '100755';
 }
 
 export class GitService implements vscode.Disposable {
@@ -494,7 +570,7 @@ export class GitService implements vscode.Disposable {
             }
 
             const text = content.toString('utf8');
-            return !containsConflictMarkers(text);
+            return !hasConflictMarkerBlocks(text);
         } catch {
             return false;
         }
@@ -528,17 +604,39 @@ export class GitService implements vscode.Disposable {
         return stagesByPath;
     }
 
-    private parseUnmergedStageObjectIds(output: string): Map<number, string> {
-        const stages = new Map<number, string>();
-        output.split('\n').forEach(line => {
-            const match = line.match(/^\d+\s+([0-9a-f]+)\s+([123])\t/);
+    private parseUnmergedStages(output: string): Map<number, ConflictStageEntry> {
+        const stages = new Map<number, ConflictStageEntry>();
+        output.split('\0').forEach(record => {
+            const match = record.match(/^(\d+)\s+([0-9a-f]+)\s+([123])\t/);
             if (!match) {
                 return;
             }
 
-            stages.set(Number(match[2]), match[1]);
+            stages.set(Number(match[3]), {
+                mode: match[1],
+                objectId: match[2]
+            });
         });
         return stages;
+    }
+
+    private getConflictStageSignature(stages: Map<number, ConflictStageEntry>): string {
+        return [...stages.entries()]
+            .sort(([left], [right]) => left - right)
+            .map(([stage, entry]) => `${stage}:${entry.mode}:${entry.objectId}`)
+            .join('|');
+    }
+
+    private async readConflictStages(repoPath: string): Promise<{
+        stages: Map<number, ConflictStageEntry>;
+        signature: string;
+    }> {
+        const unmerged = await this.git.raw(['ls-files', '-u', '-z', '--', repoPath]);
+        const stages = this.parseUnmergedStages(unmerged);
+        return {
+            stages,
+            signature: this.getConflictStageSignature(stages)
+        };
     }
 
     private async readConflictSide(objectId: string | undefined): Promise<ConflictSideContent> {
@@ -550,6 +648,74 @@ export class GitService implements vscode.Disposable {
             exists: true,
             content: await this.git.raw(['cat-file', '-p', objectId])
         };
+    }
+
+    private async readConflictChanges(
+        filePath: string,
+        baseStage: ConflictStageEntry | undefined,
+        sideStage: ConflictStageEntry | undefined,
+        base: ConflictSideContent,
+        side: ConflictSideContent,
+        sideName: 'current' | 'incoming'
+    ): Promise<ConflictChange[]> {
+        if (!baseStage && !sideStage) {
+            return [];
+        }
+        if (!baseStage && sideStage) {
+            return [{
+                id: `${filePath}:${sideName}:add`,
+                baseStart: 0,
+                baseLineCount: 0,
+                sideStart: 0,
+                sideLineCount: countContentLines(side.content)
+            }];
+        }
+        if (baseStage && !sideStage) {
+            return [{
+                id: `${filePath}:${sideName}:delete`,
+                baseStart: 0,
+                baseLineCount: countContentLines(base.content),
+                sideStart: 0,
+                sideLineCount: 0
+            }];
+        }
+        if (baseStage?.objectId === sideStage?.objectId) {
+            return [];
+        }
+
+        const diff = await this.git.raw([
+            'diff',
+            '--no-ext-diff',
+            '--no-color',
+            '--unified=0',
+            baseStage!.objectId,
+            sideStage!.objectId
+        ]);
+        return parseDiffToHunks(diff, filePath, { idPrefix: `conflict-${sideName}` }).map(hunk => ({
+            id: hunk.id,
+            baseStart: getDiffRangeStart(hunk.oldStart, hunk.oldLineCount),
+            baseLineCount: hunk.oldLineCount,
+            sideStart: getDiffRangeStart(hunk.newStart, hunk.newLineCount),
+            sideLineCount: hunk.newLineCount
+        }));
+    }
+
+    private async assertConflictResolutionSnapshot(
+        filePath: string,
+        expected: ConflictResolutionSnapshot
+    ): Promise<Map<number, ConflictStageEntry>> {
+        const repoPath = this.toRepoPath(filePath);
+        const currentStages = await this.readConflictStages(repoPath);
+        if (!currentStages.signature || currentStages.signature !== expected.stageSignature) {
+            throw new Error(i18n.t('extension.conflictStagesChanged'));
+        }
+
+        const resultSnapshot = readWorktreeFileSnapshot(path.join(this._workspaceRoot, filePath));
+        if (resultSnapshot.fingerprint !== expected.resultFingerprint) {
+            throw new Error(i18n.t('extension.conflictResultChanged'));
+        }
+
+        return currentStages.stages;
     }
 
     private async getAbsoluteGitDir(): Promise<string> {
@@ -599,6 +765,26 @@ export class GitService implements vscode.Disposable {
 
         try {
             const gitDir = await this.getAbsoluteGitDir();
+            const rebaseDir = ['rebase-merge', 'rebase-apply']
+                .map(name => path.join(gitDir, name))
+                .find(candidate => fs.existsSync(candidate));
+            if (rebaseDir) {
+                const headName = this.readGitStateFile(rebaseDir, 'head-name');
+                const onto = this.readGitStateFile(rebaseDir, 'onto');
+                if (headName) {
+                    incomingLabel = headName.replace(/^refs\/heads\//, '').replace(/^refs\/remotes\//, '');
+                }
+                if (onto) {
+                    currentLabel = (await this.git.raw([
+                        'name-rev',
+                        '--name-only',
+                        '--exclude=tags/*',
+                        onto
+                    ])).trim() || currentLabel;
+                }
+                return { baseLabel: 'base', currentLabel, incomingLabel };
+            }
+
             const mergeMessage = this.readGitStateFile(gitDir, 'MERGE_MSG');
             incomingLabel = this.getMergeIncomingLabelFromMessage(mergeMessage) ?? incomingLabel;
 
@@ -621,25 +807,29 @@ export class GitService implements vscode.Disposable {
 
     public async getConflictFileContent(filePath: string): Promise<ConflictFileContent> {
         const repoPath = this.toRepoPath(filePath);
-        const unmerged = await this.git.raw(['ls-files', '-u', '--', repoPath]);
-        const stages = this.parseUnmergedStageObjectIds(unmerged);
+        const { stages, signature } = await this.readConflictStages(repoPath);
 
         if (stages.size === 0) {
             throw new Error(`No unresolved conflict found for ${filePath}`);
         }
 
         const [base, current, incoming] = await Promise.all([
-            this.readConflictSide(stages.get(1)),
-            this.readConflictSide(stages.get(2)),
-            this.readConflictSide(stages.get(3))
+            this.readConflictSide(stages.get(1)?.objectId),
+            this.readConflictSide(stages.get(2)?.objectId),
+            this.readConflictSide(stages.get(3)?.objectId)
+        ]);
+        const [currentChanges, incomingChanges] = await Promise.all([
+            this.readConflictChanges(filePath, stages.get(1), stages.get(2), base, current, 'current'),
+            this.readConflictChanges(filePath, stages.get(1), stages.get(3), base, incoming, 'incoming')
         ]);
 
         const absPath = path.join(this._workspaceRoot, filePath);
-        const resultBuffer = fs.existsSync(absPath) && fs.statSync(absPath).isFile()
-            ? fs.readFileSync(absPath)
-            : Buffer.from('');
-        const result = resultBuffer.toString('utf8');
-        const isBinary = resultBuffer.includes(0) ||
+        const resultSnapshot = readWorktreeFileSnapshot(absPath);
+        const result = resultSnapshot.content.toString('utf8');
+        const hasUnsupportedMode = [...stages.values()].some(stage => !isRegularConflictMode(stage.mode));
+        const isBinary = hasUnsupportedMode ||
+            resultSnapshot.kind === 'other' ||
+            resultSnapshot.content.includes(0) ||
             base.content.includes('\0') ||
             current.content.includes('\0') ||
             incoming.content.includes('\0');
@@ -651,7 +841,11 @@ export class GitService implements vscode.Disposable {
             base,
             current,
             incoming,
+            currentChanges,
+            incomingChanges,
             result,
+            stageSignature: signature,
+            resultFingerprint: resultSnapshot.fingerprint,
             isBinary
         };
     }
@@ -908,8 +1102,16 @@ export class GitService implements vscode.Disposable {
         });
     }
 
-    public async resolveConflict(filePath: string, side: 'ours' | 'theirs'): Promise<void> {
+    public async resolveConflict(
+        filePath: string,
+        side: 'ours' | 'theirs',
+        expected?: ConflictResolutionSnapshot
+    ): Promise<void> {
         return this.runGitMutation(async () => {
+            if (expected) {
+                await this.assertConflictResolutionSnapshot(filePath, expected);
+            }
+
             const repoPath = this.toRepoPath(filePath);
             const unmerged = await this.git.raw(['ls-files', '-u', '--', repoPath]);
             const hasOurs = unmerged.split('\n').some(line => /\s2\t/.test(line));
@@ -928,16 +1130,36 @@ export class GitService implements vscode.Disposable {
         });
     }
 
-    public async saveConflictResolution(filePath: string, content: string): Promise<void> {
+    public async saveConflictResolution(
+        filePath: string,
+        content: string,
+        expected: ConflictResolutionSnapshot,
+        resultExists = true
+    ): Promise<void> {
         return this.runGitMutation(async () => {
-            if (containsConflictMarkers(content)) {
+            if (hasConflictMarkerBlocks(content)) {
                 throw new Error('The final result still contains conflict markers.');
+            }
+            if (!resultExists && content.length > 0) {
+                throw new Error('A deleted merge result cannot contain text.');
+            }
+
+            const stages = await this.assertConflictResolutionSnapshot(filePath, expected);
+            if ([...stages.values()].some(stage => !isRegularConflictMode(stage.mode))) {
+                throw new Error(i18n.t('extension.unsupportedConflictFile'));
+            }
+
+            const repoPath = this.toRepoPath(filePath);
+            if (!resultExists) {
+                await this.git.raw(['rm', '--', repoPath]);
+                this.fireChange();
+                return;
             }
 
             const absPath = path.join(this._workspaceRoot, filePath);
             fs.mkdirSync(path.dirname(absPath), { recursive: true });
             fs.writeFileSync(absPath, content, 'utf8');
-            await this.git.add(this.toRepoPath(filePath));
+            await this.git.add(repoPath);
             this.fireChange();
         });
     }
