@@ -1,0 +1,4 @@
+interface:
+  display_name: "Intelli Git Debug"
+  short_description: "Debug Intelli Git in a real VS Code host"
+  default_prompt: "Use $intelli-git-debug to reproduce and inspect this Intelli Git issue in a real VS Code Extension Development Host."
