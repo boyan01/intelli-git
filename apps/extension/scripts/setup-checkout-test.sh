@@ -51,6 +51,87 @@ append_file() {
     printf '%s\n' "$content" >> "$path"
 }
 
+write_multiple_conflicts_file() {
+    local path="$1"
+    local variant="$2"
+    local first_conflict
+    local current_only_change
+    local middle_conflict
+    local incoming_only_change
+    local identical_change
+    local indent
+    local trailing_whitespace
+    local blank_line_whitespace
+    local last_conflict
+    local line
+
+    case "$variant" in
+        base)
+            first_conflict='base-first'
+            current_only_change='base-current-only-change'
+            middle_conflict=$'base-middle-one\nbase-middle-two\n'
+            incoming_only_change='base-incoming-only-change'
+            identical_change='base-identical-change'
+            indent='    '
+            trailing_whitespace=''
+            blank_line_whitespace=''
+            last_conflict=$'base-last\n'
+            ;;
+        current)
+            first_conflict='current-first'
+            current_only_change='current-only-change'
+            middle_conflict=$'current-middle-combined\n'
+            incoming_only_change='base-incoming-only-change'
+            identical_change='shared-identical-change'
+            indent='        '
+            trailing_whitespace='  '
+            blank_line_whitespace='  '
+            last_conflict=$'current-last-one\ncurrent-last-two\n'
+            ;;
+        incoming)
+            first_conflict='incoming-first'
+            current_only_change='base-current-only-change'
+            middle_conflict=$'incoming-middle-one\nincoming-middle-two\n'
+            incoming_only_change='incoming-only-change'
+            identical_change='shared-identical-change'
+            indent=$'\t'
+            trailing_whitespace=$'\t'
+            blank_line_whitespace=$'\t'
+            last_conflict=$'incoming-last\n'
+            ;;
+        *)
+            die "Unknown multiple conflict variant: $variant"
+            ;;
+    esac
+
+    mkdir -p "$(dirname "$path")"
+    {
+        # The asymmetric blocks offset each other so every variant remains exactly 500 lines.
+        for ((line = 1; line <= 500; line++)); do
+            case "$line" in
+                1) printf 'multiple-conflicts-header\n' ;;
+                25) printf '%s\n' "$first_conflict" ;;
+                80) printf '%s\n' "$current_only_change" ;;
+                140)
+                    printf '%s' "$middle_conflict"
+                    line=$((line + 1))
+                    ;;
+                220) printf '%s\n' "$incoming_only_change" ;;
+                280) printf '%s\n' "$identical_change" ;;
+                340) printf '%sconst value = "shared";\n' "$indent" ;;
+                400)
+                    printf 'return value;%s\n' "$trailing_whitespace"
+                    printf '%s\n' "$blank_line_whitespace"
+                    line=$((line + 1))
+                    ;;
+                460) printf '%s' "$last_conflict" ;;
+                500) printf 'multiple-conflicts-footer\n' ;;
+                *) printf 'line-%03d | shared context for conflict navigation and line mapping\n' "$line" ;;
+            esac
+        done
+    } > "$path"
+}
+
 reset_workspace() {
     rm -rf "$BASE_DIR"
     mkdir -p "$BASE_DIR"
@@ -72,15 +153,7 @@ init_seed_repo() {
     write_file "$SEED_DIR/README.md" "# Checkout test repository"
     write_file "$SEED_DIR/docs/shared.txt" "shared-on-main"
     write_file "$SEED_DIR/src/conflict.txt" "main-base"
-    write_file "$SEED_DIR/src/multiple-conflicts.txt" "header
-base-first
-context-a
-context-b
-context-c
-context-d
-context-e
-base-second
-footer"
+    write_multiple_conflicts_file "$SEED_DIR/src/multiple-conflicts.txt" base
     write_file "$SEED_DIR/src/delete-on-feature.txt" "base-delete-on-feature"
     write_file "$SEED_DIR/src/delete-on-main.txt" "base-delete-on-main"
     write_file "$SEED_DIR/src/safe.txt" "same-on-main-and-feature"
@@ -95,15 +168,7 @@ footer"
 
     run_git "$SEED_DIR" checkout -b "$LOCAL_BRANCH" >/dev/null
     write_file "$SEED_DIR/src/conflict.txt" "feature-branch-version"
-    write_file "$SEED_DIR/src/multiple-conflicts.txt" "header
-feature-first
-context-a
-context-b
-context-c
-context-d
-context-e
-feature-second
-footer"
+    write_multiple_conflicts_file "$SEED_DIR/src/multiple-conflicts.txt" incoming
     rm -f "$SEED_DIR/src/delete-on-feature.txt"
     write_file "$SEED_DIR/src/delete-on-main.txt" "feature-modified-delete-on-main"
     write_file "$SEED_DIR/src/both-added.txt" "feature-added-version"
@@ -240,20 +305,18 @@ scenario_behind_with_conflict() {
 
 scenario_merge_conflict() {
     create_local_tracking_branch
+
     write_file "$WORKTREE_DIR/src/conflict.txt" "main-merge-conflict-change"
-    write_file "$WORKTREE_DIR/src/multiple-conflicts.txt" "header
-main-first
-context-a
-context-b
-context-c
-context-d
-context-e
-main-second
-footer"
+    write_multiple_conflicts_file "$WORKTREE_DIR/src/multiple-conflicts.txt" current
     write_file "$WORKTREE_DIR/src/delete-on-feature.txt" "main-modified-delete-on-feature"
     rm -f "$WORKTREE_DIR/src/delete-on-main.txt"
     write_file "$WORKTREE_DIR/src/both-added.txt" "main-added-version"
-    run_git "$WORKTREE_DIR" add -A src/conflict.txt src/multiple-conflicts.txt src/delete-on-feature.txt src/delete-on-main.txt src/both-added.txt
+    run_git "$WORKTREE_DIR" add -A \
+        src/conflict.txt \
+        src/multiple-conflicts.txt \
+        src/delete-on-feature.txt \
+        src/delete-on-main.txt \
+        src/both-added.txt
     run_git "$WORKTREE_DIR" commit -m "Main side conflict commit" >/dev/null
 
     run_git "$WORKTREE_DIR" merge "$LOCAL_BRANCH" || true
@@ -295,7 +358,7 @@ Scenarios:
   diverged             Local tracking branch exists and diverged from remote
   ahead-conflict       Local branch ahead, while current branch also has checkout conflict
   behind-conflict      Local branch behind, while current branch also has checkout conflict
-  merge-conflict       Create a real merge conflict state in git status
+  merge-conflict       Create a rich 500-line multi-conflict state
   rebase-conflict      Prepare current branch so rebasing onto main creates a conflict
   stash-pop-conflict   Simulate Smart Checkout stash pop restoring into conflict
 EOF
@@ -406,7 +469,8 @@ EOF
             ;;
         merge-conflict)
             echo "Expectation: repository enters multiple real conflict states: UU, UD, DU, and AA."
-            echo "Expectation: src/multiple-conflicts.txt has more than one conflict block for resolver navigation."
+            echo "Expectation: src/multiple-conflicts.txt has 500-line base/current/incoming stages with normal, asymmetric, and whitespace-only conflicts."
+            echo "Expectation: src/multiple-conflicts.txt also has current-only, incoming-only, and identical non-conflicting changes."
             echo "Expectation: delete-related conflicts may require git rm or removing the file to resolve."
             ;;
         rebase-conflict)
