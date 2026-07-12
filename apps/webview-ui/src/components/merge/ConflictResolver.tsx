@@ -64,6 +64,7 @@ interface MergeGapLayout {
 interface MergeHistoryEntry {
     resultDraft: string | null;
     resultExists: boolean;
+    usingResolvedResult: boolean;
     groups: MergeChangeGroup[];
     reviewRanges: MergeReviewRange[];
     activeGroupId: string | null;
@@ -463,6 +464,7 @@ export function ConflictResolver({ file, onClose }: ConflictResolverProps) {
     const [reviewRanges, setReviewRanges] = useState<MergeReviewRange[]>([]);
     const [resultDraft, setResultDraft] = useState<string | null>(null);
     const [resultExists, setResultExists] = useState(false);
+    const [usingResolvedResult, setUsingResolvedResult] = useState(false);
     const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
     const [whitespaceMode, setWhitespaceMode] = useState<WhitespaceCompareMode>('none');
     const [highlightMode, setHighlightMode] = useState<MergeHighlightMode>('words');
@@ -484,6 +486,7 @@ export function ConflictResolver({ file, onClose }: ConflictResolverProps) {
         setReviewRanges([]);
         setResultDraft(null);
         setResultExists(false);
+        setUsingResolvedResult(false);
         setActiveGroupId(null);
         setWhitespaceMode('none');
         setHighlightMode('words');
@@ -503,12 +506,14 @@ export function ConflictResolver({ file, onClose }: ConflictResolverProps) {
                     next.currentChanges,
                     next.incomingChanges
                 );
+                const preserveResolvedResult = next.resolvedCandidate;
                 setContent(next);
-                setGroups(session.groups);
-                setReviewRanges(session.reviewRanges);
-                setResultDraft(session.resultText);
-                setResultExists(next.base.exists);
-                setActiveGroupId(session.groups[0]?.id ?? null);
+                setGroups(preserveResolvedResult ? [] : session.groups);
+                setReviewRanges(preserveResolvedResult ? [] : session.reviewRanges);
+                setResultDraft(preserveResolvedResult ? next.result : session.resultText);
+                setResultExists(preserveResolvedResult || next.base.exists);
+                setUsingResolvedResult(preserveResolvedResult);
+                setActiveGroupId(preserveResolvedResult ? null : session.groups[0]?.id ?? null);
             })
             .catch(e => {
                 if (!cancelled) {
@@ -538,12 +543,7 @@ export function ConflictResolver({ file, onClose }: ConflictResolverProps) {
         }),
         [groups, rangeById]
     );
-    const pendingChangeCount = useMemo(
-        () => reviewRanges.reduce((count, range) => (
-            count + Number(range.leftDecision === 'pending') + Number(range.rightDecision === 'pending')
-        ), 0),
-        [reviewRanges]
-    );
+    const pendingGroupCount = pendingGroups.length;
     const activeGroup = groups.find(group => group.id === activeGroupId) ?? pendingGroups[0];
     const activeRange = activeGroup ? rangeById.get(activeGroup.id) : undefined;
     const activeGroupIndex = activeGroup ? groups.findIndex(group => group.id === activeGroup.id) : -1;
@@ -604,10 +604,12 @@ export function ConflictResolver({ file, onClose }: ConflictResolverProps) {
         : t('Accept Right');
     const controlsDisabled = saving || isContentLoading || changingWhitespaceMode;
     const completeDisabled = controlsDisabled || !visibleContent || visibleContent.isBinary ||
-        resultDraft === null || pendingChangeCount > 0 || hasConflictBlocks(resultText);
-    const statusLabel = pendingChangeCount > 0
-        ? t('{{count}} unresolved', { count: pendingChangeCount })
-        : t('No conflicts remaining');
+        resultDraft === null || pendingGroupCount > 0 || hasConflictBlocks(resultText);
+    const statusLabel = !visibleContent
+        ? ''
+        : pendingGroupCount > 0
+            ? t('{{count}} unresolved', { count: pendingGroupCount })
+            : t('No conflicts remaining');
 
     const completeAction = useCallback(() => {
         rpcEvents.refresh.emit();
@@ -617,15 +619,17 @@ export function ConflictResolver({ file, onClose }: ConflictResolverProps) {
     const createMergeHistoryEntry = useCallback((): MergeHistoryEntry => ({
         resultDraft,
         resultExists,
+        usingResolvedResult,
         groups,
         reviewRanges,
         activeGroupId,
         whitespaceMode
-    }), [activeGroupId, groups, resultDraft, resultExists, reviewRanges, whitespaceMode]);
+    }), [activeGroupId, groups, resultDraft, resultExists, reviewRanges, usingResolvedResult, whitespaceMode]);
 
     const restoreMergeHistoryEntry = useCallback((entry: MergeHistoryEntry) => {
         setResultDraft(entry.resultDraft);
         setResultExists(entry.resultExists);
+        setUsingResolvedResult(entry.usingResolvedResult);
         setGroups(entry.groups);
         setReviewRanges(entry.reviewRanges);
         setActiveGroupId(entry.activeGroupId);
@@ -676,7 +680,7 @@ export function ConflictResolver({ file, onClose }: ConflictResolverProps) {
             (range.leftDecision !== null && range.leftDecision !== 'pending') ||
             (range.rightDecision !== null && range.rightDecision !== 'pending')
         ));
-        const hasResultEdits = resultDraft !== visibleContent.base.content;
+        const hasResultEdits = usingResolvedResult || resultDraft !== visibleContent.base.content;
         setChangingWhitespaceMode(true);
         try {
             if ((hasReviewedChanges || hasResultEdits) && !await rpc.confirmConflictResolverRestart()) {
@@ -697,6 +701,7 @@ export function ConflictResolver({ file, onClose }: ConflictResolverProps) {
             setReviewRanges(session.reviewRanges);
             setResultDraft(session.resultText);
             setResultExists(visibleContent.base.exists);
+            setUsingResolvedResult(false);
             setActiveGroupId(session.groups[0]?.id ?? null);
             setError(null);
         } catch (e) {
@@ -704,7 +709,7 @@ export function ConflictResolver({ file, onClose }: ConflictResolverProps) {
         } finally {
             setChangingWhitespaceMode(false);
         }
-    }, [pushMergeHistory, resultDraft, reviewRanges, visibleContent, whitespaceMode]);
+    }, [pushMergeHistory, resultDraft, reviewRanges, usingResolvedResult, visibleContent, whitespaceMode]);
 
     const acceptFileSide = useCallback(async (side: 'ours' | 'theirs') => {
         if (!visibleContent) {
@@ -863,7 +868,7 @@ export function ConflictResolver({ file, onClose }: ConflictResolverProps) {
         if (!visibleContent || resultDraft === null) {
             return;
         }
-        if (pendingChangeCount > 0) {
+        if (pendingGroupCount > 0) {
             setError(new Error(t('Resolve all conflict blocks before completing the merge.')));
             return;
         }
@@ -887,7 +892,7 @@ export function ConflictResolver({ file, onClose }: ConflictResolverProps) {
         } finally {
             setSaving(false);
         }
-    }, [completeAction, file, pendingChangeCount, resultDraft, resultExists, t, visibleContent]);
+    }, [completeAction, file, pendingGroupCount, resultDraft, resultExists, t, visibleContent]);
 
     const handleKeyDown = useCallback((event: ReactKeyboardEvent<HTMLElement>) => {
         if ((event.metaKey || event.ctrlKey) && event.key === 'Enter' && !completeDisabled) {
@@ -1009,11 +1014,11 @@ export function ConflictResolver({ file, onClose }: ConflictResolverProps) {
                     <div className={styles.binaryState}>
                         <div className={styles.message}>{t('Binary conflict files cannot be edited in Intelli Git yet.')}</div>
                         <div className={styles.binaryActions}>
-                            <button className={styles.button} type="button" onClick={() => void acceptFileSide('ours')} disabled={saving || isContentLoading}>
+                            <button className={styles.button} type="button" onClick={() => void acceptFileSide('ours')} disabled={saving || isContentLoading || !visibleContent}>
                                 <span className="codicon codicon-arrow-left" aria-hidden="true"></span>
                                 {t('Accept Current Change')}
                             </button>
-                            <button className={styles.button} type="button" onClick={() => void acceptFileSide('theirs')} disabled={saving || isContentLoading}>
+                            <button className={styles.button} type="button" onClick={() => void acceptFileSide('theirs')} disabled={saving || isContentLoading || !visibleContent}>
                                 <span className="codicon codicon-arrow-right" aria-hidden="true"></span>
                                 {t('Accept Incoming Change')}
                             </button>
@@ -1049,10 +1054,10 @@ export function ConflictResolver({ file, onClose }: ConflictResolverProps) {
             </div>
             <div className={styles.footer}>
                 <div className={styles.footerLeft}>
-                    <button className={styles.footerButton} type="button" onClick={() => void acceptFileSide('ours')} disabled={saving || isContentLoading}>
+                    <button className={styles.footerButton} type="button" onClick={() => void acceptFileSide('ours')} disabled={saving || isContentLoading || !visibleContent}>
                         {acceptLeftFileLabel}
                     </button>
-                    <button className={styles.footerButton} type="button" onClick={() => void acceptFileSide('theirs')} disabled={saving || isContentLoading}>
+                    <button className={styles.footerButton} type="button" onClick={() => void acceptFileSide('theirs')} disabled={saving || isContentLoading || !visibleContent}>
                         {acceptRightFileLabel}
                     </button>
                 </div>
@@ -1081,7 +1086,8 @@ export function ConflictResolverPage() {
     }, [file]);
 
     useEffect(() => rpcEvents.revealConflictResolverFile.subscribe(next => {
-        setFile({ path: next.path, repoPath: next.repoPath });
+        const nextFile = { path: next.path, repoPath: next.repoPath };
+        setFile(current => current && isSameFileReference(current, nextFile) ? current : nextFile);
     }), []);
 
     if (!file) {

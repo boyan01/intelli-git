@@ -478,6 +478,13 @@ function filterChangesByWhitespaceMode(
             .slice(change.sideStart, change.sideStart + change.sideLineCount)
             .map(line => normalizeWhitespaceForComparison(line.text, whitespaceMode));
 
+        if (
+            comparableBaseLines.length === comparableSideLines.length &&
+            comparableBaseLines.every((line, index) => line === comparableSideLines[index])
+        ) {
+            return [];
+        }
+
         if (comparableBaseLines.length * comparableSideLines.length > 250_000) {
             return [change];
         }
@@ -750,17 +757,20 @@ function changeTouchesRange(
 ): boolean {
     const changeEnd = change.rangeOffset + change.rangeLength;
     if (change.rangeLength === 0) {
-        return change.rangeOffset >= range.startOffset && change.rangeOffset <= range.endOffset;
+        if (range.startOffset === range.endOffset) {
+            return change.rangeOffset === range.startOffset;
+        }
+        return change.rangeOffset >= range.startOffset && change.rangeOffset < range.endOffset;
     }
     if (range.startOffset === range.endOffset) {
-        return change.rangeOffset <= range.startOffset && changeEnd >= range.endOffset;
+        return change.rangeOffset <= range.startOffset && changeEnd > range.endOffset;
     }
     return change.rangeOffset < range.endOffset && changeEnd > range.startOffset;
 }
 
 function transformOffset(
     offset: number,
-    affinity: 'start' | 'end',
+    affinity: 'start' | 'empty-end',
     changes: Array<{ rangeOffset: number; rangeLength: number; text: string }>
 ): number {
     let delta = 0;
@@ -774,10 +784,17 @@ function transformOffset(
             delta += change.text.length - change.rangeLength;
             continue;
         }
+        if (offset === changeStart) {
+            if (affinity === 'empty-end' && change.rangeLength === 0) {
+                delta += change.text.length;
+                continue;
+            }
+            return changeStart + delta;
+        }
         if (offset === changeEnd && change.rangeLength > 0) {
             return changeStart + delta + change.text.length;
         }
-        return changeStart + delta + (affinity === 'end' ? change.text.length : 0);
+        return changeStart + delta;
     }
     return offset + delta;
 }
@@ -787,23 +804,44 @@ export function applyMergeContentChanges(
     rawChanges: Array<{ rangeOffset: number; rangeLength: number; text: string }>
 ): { ranges: MergeReviewRange[]; touchedGroupIds: string[] } {
     const changes = [...rawChanges].sort((left, right) => left.rangeOffset - right.rangeOffset);
+    const touched = new Set<string>();
+    for (const change of changes) {
+        const touchingRanges = ranges.filter(range => changeTouchesRange(change, range));
+        if (change.rangeLength === 0) {
+            const target = touchingRanges.find(range => range.startOffset < range.endOffset) ?? touchingRanges[0];
+            if (target) {
+                touched.add(target.groupId);
+            }
+            continue;
+        }
+        for (const range of touchingRanges) {
+            touched.add(range.groupId);
+        }
+    }
     const touchedGroupIds = ranges
-        .filter(range => changes.some(change => changeTouchesRange(change, range)))
+        .filter(range => touched.has(range.groupId))
         .map(range => range.groupId);
-    const touched = new Set(touchedGroupIds);
     return {
-        ranges: ranges.map(range => ({
-            ...range,
-            startOffset: transformOffset(range.startOffset, 'start', changes),
-            endOffset: transformOffset(range.endOffset, 'end', changes),
-            leftDecision: touched.has(range.groupId) && range.leftDecision !== null
-                ? 'pending'
-                : range.leftDecision,
-            rightDecision: touched.has(range.groupId) && range.rightDecision !== null
-                ? 'pending'
-                : range.rightDecision,
-            lastAppliedSide: touched.has(range.groupId) ? null : range.lastAppliedSide
-        })),
+        ranges: ranges.map(range => {
+            const isTouched = touched.has(range.groupId);
+            const isEmpty = range.startOffset === range.endOffset;
+            return {
+                ...range,
+                startOffset: transformOffset(range.startOffset, 'start', changes),
+                endOffset: transformOffset(
+                    range.endOffset,
+                    isEmpty && isTouched ? 'empty-end' : 'start',
+                    changes
+                ),
+                leftDecision: isTouched && range.leftDecision !== null
+                    ? 'pending'
+                    : range.leftDecision,
+                rightDecision: isTouched && range.rightDecision !== null
+                    ? 'pending'
+                    : range.rightDecision,
+                lastAppliedSide: isTouched ? null : range.lastAppliedSide
+            };
+        }),
         touchedGroupIds
     };
 }

@@ -190,20 +190,27 @@ describe('GitService conflict resolution', () => {
         fs.rmSync(tempDir, { recursive: true, force: true });
     });
 
-    async function createTextConflict(): Promise<GitService> {
-        fs.writeFileSync(path.join(tempDir, 'conflict.txt'), 'base\n');
-        await git.add('conflict.txt');
+    async function createTextConflicts(filePaths: string[] = ['conflict.txt']): Promise<GitService> {
+        filePaths.forEach(filePath => {
+            fs.mkdirSync(path.dirname(path.join(tempDir, filePath)), { recursive: true });
+            fs.writeFileSync(path.join(tempDir, filePath), `base:${filePath}\n`);
+        });
+        await git.add('.');
         await git.commit('Initial commit');
 
         const baseBranch = (await git.branch()).current;
         await git.checkoutLocalBranch('feature');
-        fs.writeFileSync(path.join(tempDir, 'conflict.txt'), 'incoming\n');
-        await git.add('conflict.txt');
+        filePaths.forEach(filePath => {
+            fs.writeFileSync(path.join(tempDir, filePath), `incoming:${filePath}\n`);
+        });
+        await git.add('.');
         await git.commit('Incoming change');
 
         await git.checkout(baseBranch);
-        fs.writeFileSync(path.join(tempDir, 'conflict.txt'), 'current\n');
-        await git.add('conflict.txt');
+        filePaths.forEach(filePath => {
+            fs.writeFileSync(path.join(tempDir, filePath), `current:${filePath}\n`);
+        });
+        await git.add('.');
         await git.commit('Current change');
 
         try {
@@ -304,7 +311,7 @@ describe('GitService conflict resolution', () => {
     });
 
     it('preserves the exact worktree result and saved line endings', async () => {
-        const service = await createTextConflict();
+        const service = await createTextConflicts();
         const resultPath = path.join(tempDir, 'conflict.txt');
         const worktreeResult = `manual prefix\r\n${fs.readFileSync(resultPath, 'utf8')}`;
         fs.writeFileSync(resultPath, worktreeResult);
@@ -318,7 +325,7 @@ describe('GitService conflict resolution', () => {
     });
 
     it('rejects a stale resolution after the worktree result changes externally', async () => {
-        const service = await createTextConflict();
+        const service = await createTextConflicts();
         const conflict = await service.getConflictFileContent('conflict.txt');
         const resultPath = path.join(tempDir, 'conflict.txt');
         fs.writeFileSync(resultPath, 'external edit\n');
@@ -330,8 +337,92 @@ describe('GitService conflict resolution', () => {
         expect(await git.raw(['ls-files', '-u', '--', 'conflict.txt'])).toContain('\tconflict.txt');
     });
 
+    it('rejects a stale resolution after the worktree executable bit changes externally', async () => {
+        if (process.platform === 'win32') {
+            return;
+        }
+
+        const service = await createTextConflicts();
+        const resultPath = path.join(tempDir, 'conflict.txt');
+        fs.chmodSync(resultPath, 0o644);
+        const conflict = await service.getConflictFileContent('conflict.txt');
+        const originalResult = fs.readFileSync(resultPath, 'utf8');
+        fs.chmodSync(resultPath, 0o755);
+
+        await expect(service.saveConflictResolution('conflict.txt', 'resolver edit\n', conflict))
+            .rejects.toThrow('result file changed');
+
+        expect(fs.readFileSync(resultPath, 'utf8')).toBe(originalResult);
+        expect(fs.statSync(resultPath).mode & 0o111).not.toBe(0);
+        expect(await git.raw(['ls-files', '-u', '--', 'conflict.txt'])).toContain('\tconflict.txt');
+    });
+
+    it('reports when the existing worktree result no longer contains conflict markers', async () => {
+        const service = await createTextConflicts();
+        const resultPath = path.join(tempDir, 'conflict.txt');
+
+        let conflict = await service.getConflictFileContent('conflict.txt');
+        expect(conflict.resolvedCandidate).toBe(false);
+
+        fs.writeFileSync(resultPath, 'manual resolution\n');
+        conflict = await service.getConflictFileContent('conflict.txt');
+
+        expect(conflict.result).toBe('manual resolution\n');
+        expect(conflict.resolvedCandidate).toBe(true);
+    });
+
+    it('rejects saving through a worktree symlink without changing its target', async () => {
+        if (process.platform === 'win32') {
+            return;
+        }
+
+        const outsideDir = fs.mkdtempSync(path.join(os.tmpdir(), 'intelli-git-conflict-target-'));
+        try {
+            const service = await createTextConflicts();
+            const resultPath = path.join(tempDir, 'conflict.txt');
+            const outsidePath = path.join(outsideDir, 'outside.txt');
+            fs.writeFileSync(outsidePath, 'outside sentinel\n');
+            fs.unlinkSync(resultPath);
+            fs.symlinkSync(outsidePath, resultPath);
+            const conflict = await service.getConflictFileContent('conflict.txt');
+
+            expect(conflict.isBinary).toBe(true);
+            await expect(service.saveConflictResolution('conflict.txt', 'resolver edit\n', conflict))
+                .rejects.toThrow('cannot be edited');
+
+            expect(fs.readFileSync(outsidePath, 'utf8')).toBe('outside sentinel\n');
+            expect(await git.raw(['ls-files', '-u', '--', 'conflict.txt'])).toContain('\tconflict.txt');
+        } finally {
+            fs.rmSync(outsideDir, { recursive: true, force: true });
+        }
+    });
+
+    it('rejects conflict paths whose parent directory became a symlink', async () => {
+        if (process.platform === 'win32') {
+            return;
+        }
+
+        const outsideDir = fs.mkdtempSync(path.join(os.tmpdir(), 'intelli-git-conflict-parent-'));
+        try {
+            const service = await createTextConflicts(['nested/conflict.txt']);
+            const outsidePath = path.join(outsideDir, 'conflict.txt');
+            fs.writeFileSync(outsidePath, 'outside parent sentinel\n');
+            fs.rmSync(path.join(tempDir, 'nested'), { recursive: true, force: true });
+            fs.symlinkSync(outsideDir, path.join(tempDir, 'nested'), 'dir');
+
+            await expect(service.getConflictFileContent('nested/conflict.txt'))
+                .rejects.toThrow('cannot be edited');
+
+            expect(fs.readFileSync(outsidePath, 'utf8')).toBe('outside parent sentinel\n');
+            expect(await git.raw(['ls-files', '-u', '--', 'nested/conflict.txt']))
+                .toContain('\tnested/conflict.txt');
+        } finally {
+            fs.rmSync(outsideDir, { recursive: true, force: true });
+        }
+    });
+
     it('rejects a stale resolution after the conflict stages change', async () => {
-        const service = await createTextConflict();
+        const service = await createTextConflicts();
         const conflict = await service.getConflictFileContent('conflict.txt');
         const resultPath = path.join(tempDir, 'conflict.txt');
         const originalResult = fs.readFileSync(resultPath, 'utf8');
@@ -341,6 +432,56 @@ describe('GitService conflict resolution', () => {
             .rejects.toThrow('conflict changed');
 
         expect(fs.readFileSync(resultPath, 'utf8')).toBe(originalResult);
+    });
+
+    it('rejects whole-side resolution after the conflict was staged externally', async () => {
+        const service = await createTextConflicts();
+        const resultPath = path.join(tempDir, 'conflict.txt');
+        fs.writeFileSync(resultPath, 'external resolution\n');
+        await git.add('conflict.txt');
+        const indexBefore = await git.raw(['ls-files', '-s', '--', 'conflict.txt']);
+
+        await expect(service.resolveConflict('conflict.txt', 'ours'))
+            .rejects.toThrow('No unresolved conflict found');
+
+        expect(fs.readFileSync(resultPath, 'utf8')).toBe('external resolution\n');
+        expect(await git.raw(['ls-files', '-s', '--', 'conflict.txt'])).toBe(indexBefore);
+        expect((await git.status()).staged).toContain('conflict.txt');
+    });
+
+    it('reads and resolves a conflict filename as a literal pathspec', async () => {
+        const service = await createTextConflicts(['*.txt', 'other.txt']);
+        const literalPath = path.join(tempDir, '*.txt');
+        fs.writeFileSync(literalPath, 'manual literal resolution\n');
+
+        const status = await service.getStatus();
+        expect(status.find(file => file.path === '*.txt')?.resolvedCandidate).toBe(true);
+        expect(status.find(file => file.path === 'other.txt')?.resolvedCandidate).toBe(false);
+
+        const conflict = await service.getConflictFileContent('*.txt');
+        expect(conflict.current.content).toBe('current:*.txt\n');
+        expect(conflict.incoming.content).toBe('incoming:*.txt\n');
+        expect(conflict.result).toBe('manual literal resolution\n');
+
+        await service.resolveConflict('*.txt', 'ours', conflict);
+
+        expect(fs.readFileSync(literalPath, 'utf8')).toBe('current:*.txt\n');
+        const unmerged = await git.raw(['ls-files', '-u', '-z']);
+        expect(unmerged).not.toContain('\t*.txt\0');
+        expect(unmerged).toContain('\tother.txt\0');
+    });
+
+    it('saves a conflict filename without staging another pathspec match', async () => {
+        const service = await createTextConflicts(['*.txt', 'other.txt']);
+        const conflict = await service.getConflictFileContent('*.txt');
+
+        await service.saveConflictResolution('*.txt', 'resolved literal\n', conflict);
+
+        expect(fs.readFileSync(path.join(tempDir, '*.txt'), 'utf8')).toBe('resolved literal\n');
+        expect(fs.readFileSync(path.join(tempDir, 'other.txt'), 'utf8')).toContain('<<<<<<<');
+        const unmerged = await git.raw(['ls-files', '-u', '-z']);
+        expect(unmerged).not.toContain('\t*.txt\0');
+        expect(unmerged).toContain('\tother.txt\0');
     });
 
     it('resolves modify/delete conflicts by staging the deleted side instead of writing an empty file', async () => {
@@ -487,6 +628,118 @@ describe('GitService conflict resolution', () => {
         expect(conflict.current.exists).toBe(true);
         expect(conflict.incoming.exists).toBe(true);
         expect(conflict.isBinary).toBe(true);
+    });
+
+    it('treats invalid UTF-8 without NUL bytes as binary while preserving whole-side resolution', async () => {
+        const baseContent = Buffer.concat([Buffer.from([0xff]), Buffer.from('base\n')]);
+        const currentContent = Buffer.concat([Buffer.from([0xff]), Buffer.from('current\n')]);
+        const incomingContent = Buffer.concat([Buffer.from([0xff]), Buffer.from('incoming\n')]);
+        fs.writeFileSync(path.join(tempDir, 'invalid-utf8.dat'), baseContent);
+        await git.add('invalid-utf8.dat');
+        await git.commit('Initial invalid UTF-8 content');
+
+        const baseBranch = (await git.branch()).current;
+        await git.checkoutLocalBranch('feature');
+        fs.writeFileSync(path.join(tempDir, 'invalid-utf8.dat'), incomingContent);
+        await git.add('invalid-utf8.dat');
+        await git.commit('Incoming invalid UTF-8 change');
+
+        await git.checkout(baseBranch);
+        fs.writeFileSync(path.join(tempDir, 'invalid-utf8.dat'), currentContent);
+        await git.add('invalid-utf8.dat');
+        await git.commit('Current invalid UTF-8 change');
+
+        try {
+            await git.merge(['feature']);
+        } catch {
+            // The invalid UTF-8 conflict state is the scenario under test.
+        }
+
+        const service = new GitService(tempDir, tempDir, git);
+        const conflict = await service.getConflictFileContent('invalid-utf8.dat');
+        const incomingObjectId = (await git.raw(['ls-files', '-u', '--', 'invalid-utf8.dat']))
+            .split('\n')
+            .find(line => /\s3\t/.test(line))
+            ?.split(/\s+/)[1];
+
+        expect(conflict.isBinary).toBe(true);
+        expect(conflict.resolvedCandidate).toBe(false);
+        expect(conflict.currentChanges).toEqual([]);
+        expect(conflict.incomingChanges).toEqual([]);
+
+        await service.resolveConflict('invalid-utf8.dat', 'theirs', conflict);
+
+        expect(fs.readFileSync(path.join(tempDir, 'invalid-utf8.dat'))).toEqual(incomingContent);
+        expect((await git.revparse([':invalid-utf8.dat'])).trim()).toBe(incomingObjectId);
+    });
+
+    it('blocks whole-side resolution for gitlink conflicts without changing the selected submodule commit', async () => {
+        const submoduleRepo = fs.mkdtempSync(path.join(os.tmpdir(), 'intelli-git-submodule-test-'));
+        try {
+            const submoduleGit = simpleGit(submoduleRepo);
+            await submoduleGit.init();
+            await submoduleGit.addConfig('user.name', 'Test User');
+            await submoduleGit.addConfig('user.email', 'test@example.com');
+            fs.writeFileSync(path.join(submoduleRepo, 'content.txt'), 'base\n');
+            await submoduleGit.add('content.txt');
+            await submoduleGit.commit('Base submodule commit');
+            const baseObjectId = (await submoduleGit.revparse(['HEAD'])).trim();
+
+            await submoduleGit.checkoutLocalBranch('current');
+            fs.writeFileSync(path.join(submoduleRepo, 'content.txt'), 'current\n');
+            await submoduleGit.add('content.txt');
+            await submoduleGit.commit('Current submodule commit');
+            const currentObjectId = (await submoduleGit.revparse(['HEAD'])).trim();
+
+            await submoduleGit.checkout(baseObjectId);
+            await submoduleGit.checkoutLocalBranch('incoming');
+            fs.writeFileSync(path.join(submoduleRepo, 'content.txt'), 'incoming\n');
+            await submoduleGit.add('content.txt');
+            await submoduleGit.commit('Incoming submodule commit');
+            const incomingObjectId = (await submoduleGit.revparse(['HEAD'])).trim();
+
+            git.env('GIT_ALLOW_PROTOCOL', 'file');
+            await git.raw(['submodule', 'add', submoduleRepo, 'module']);
+            const moduleGit = simpleGit(path.join(tempDir, 'module'));
+            await moduleGit.checkout(baseObjectId);
+            await git.add(['.gitmodules', 'module']);
+            await git.commit('Add base submodule');
+
+            const baseBranch = (await git.branch()).current;
+            await git.checkoutLocalBranch('feature');
+            await moduleGit.checkout(incomingObjectId);
+            await git.add('module');
+            await git.commit('Select incoming submodule commit');
+
+            await git.checkout(baseBranch);
+            await moduleGit.checkout(currentObjectId);
+            await git.add('module');
+            await git.commit('Select current submodule commit');
+
+            try {
+                await git.merge(['feature']);
+            } catch {
+                // The gitlink conflict state is the scenario under test.
+            }
+
+            const service = new GitService(tempDir, tempDir, git);
+            const conflict = await service.getConflictFileContent('module');
+            const indexBefore = await git.raw(['ls-files', '-u', '--', 'module']);
+            const worktreeHeadBefore = (await moduleGit.revparse(['HEAD'])).trim();
+
+            expect(conflict.isBinary).toBe(true);
+            expect(conflict.base).toEqual({ exists: true, content: '' });
+            expect(conflict.current).toEqual({ exists: true, content: '' });
+            expect(conflict.incoming).toEqual({ exists: true, content: '' });
+
+            await expect(service.resolveConflict('module', 'theirs', conflict))
+                .rejects.toThrow('cannot be edited');
+
+            expect(await git.raw(['ls-files', '-u', '--', 'module'])).toBe(indexBefore);
+            expect((await moduleGit.revparse(['HEAD'])).trim()).toBe(worktreeHeadBefore);
+        } finally {
+            fs.rmSync(submoduleRepo, { recursive: true, force: true });
+        }
     });
 
     it('marks only existing text conflict files without markers as resolved candidates', async () => {

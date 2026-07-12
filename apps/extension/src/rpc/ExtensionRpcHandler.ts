@@ -1813,12 +1813,15 @@ export class ExtensionRpcHandler {
     };
 
     openConflictResolver = async (params: ConflictResolverOpenRequest): Promise<void> => {
+        const request = params.repoPath
+            ? params
+            : { ...params, repoPath: this.gitService.getWorkspaceRoot() };
         if (this.openConflictResolverPanel) {
-            this.openConflictResolverPanel(params);
+            this.openConflictResolverPanel(request);
             return;
         }
 
-        await vscode.commands.executeCommand('intelli-git.openConflictResolver', params);
+        await vscode.commands.executeCommand('intelli-git.openConflictResolver', request);
     };
 
     updateConflictResolverTitle = async (params: { path: string; repoPath?: string }): Promise<void> => {
@@ -1851,13 +1854,10 @@ export class ExtensionRpcHandler {
 
     resolveConflict = async (params: ResolveConflictRequest): Promise<void> => {
         try {
-            const expected = params.stageSignature && params.resultFingerprint
-                ? {
-                    stageSignature: params.stageSignature,
-                    resultFingerprint: params.resultFingerprint
-                }
-                : undefined;
-            await this.getServiceForRepo(params.repoPath).resolveConflict(params.path, params.side, expected);
+            await this.getServiceForRepo(params.repoPath).resolveConflict(params.path, params.side, {
+                stageSignature: params.stageSignature,
+                resultFingerprint: params.resultFingerprint
+            });
             await vscode.commands.executeCommand('intelli-git.refresh');
         } catch (e) {
             vscode.window.showErrorMessage(i18n.t('extension.resolveConflictFailed', `${e}`));

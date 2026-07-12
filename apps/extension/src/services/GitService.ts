@@ -8,6 +8,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { isUtf8 } from 'node:buffer';
 import { createHash } from 'node:crypto';
 import { parseDiffToFileHunks, parseDiffToHunks } from '../utils/diffParser';
 import { GitLogService } from './GitLogService';
@@ -84,9 +85,15 @@ function isExpiredBuild(): boolean {
         && __IS_EXPIRED__;
 }
 
-function createWorktreeFingerprint(kind: WorktreeFileSnapshot['kind'], content: Buffer): string {
+function createWorktreeFingerprint(
+    kind: WorktreeFileSnapshot['kind'],
+    content: Buffer,
+    executable = false
+): string {
     return createHash('sha256')
         .update(kind)
+        .update('\0')
+        .update(executable ? 'executable' : 'non-executable')
         .update('\0')
         .update(content)
         .digest('hex');
@@ -133,7 +140,7 @@ function readWorktreeFileSnapshot(filePath: string): WorktreeFileSnapshot {
         const content = fs.readFileSync(filePath);
         return {
             content,
-            fingerprint: createWorktreeFingerprint('file', content),
+            fingerprint: createWorktreeFingerprint('file', content, (stat.mode & 0o111) !== 0),
             kind: 'file'
         };
     }
@@ -148,6 +155,46 @@ function readWorktreeFileSnapshot(filePath: string): WorktreeFileSnapshot {
 
 function isRegularConflictMode(mode: string): boolean {
     return mode === '100644' || mode === '100755';
+}
+
+function isBinaryConflictContent(content: Buffer): boolean {
+    return content.includes(0) || !isUtf8(content);
+}
+
+function toLiteralGitPathspec(repoPath: string): string {
+    return `:(literal)${repoPath}`;
+}
+
+function resolveSafeConflictWorktreePath(workspaceRoot: string, filePath: string): string {
+    const rootPath = path.resolve(workspaceRoot);
+    const absolutePath = path.resolve(rootPath, filePath);
+    const relativePath = path.relative(rootPath, absolutePath);
+    if (
+        !relativePath ||
+        relativePath === '..' ||
+        relativePath.startsWith(`..${path.sep}`) ||
+        path.isAbsolute(relativePath)
+    ) {
+        throw new Error(i18n.t('extension.unsupportedConflictFile'));
+    }
+
+    let currentPath = rootPath;
+    for (const segment of relativePath.split(path.sep).slice(0, -1)) {
+        currentPath = path.join(currentPath, segment);
+        try {
+            const stat = fs.lstatSync(currentPath);
+            if (stat.isSymbolicLink() || !stat.isDirectory()) {
+                throw new Error(i18n.t('extension.unsupportedConflictFile'));
+            }
+        } catch (error) {
+            if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+                break;
+            }
+            throw error;
+        }
+    }
+
+    return absolutePath;
 }
 
 export class GitService implements vscode.Disposable {
@@ -553,27 +600,19 @@ export class GitService implements vscode.Disposable {
         return hash;
     };
 
-    private isResolvedConflictCandidate(filePath: string, stages: Set<number> | undefined): boolean {
-        try {
-            if (!stages?.has(2) || !stages.has(3)) {
-                return false;
-            }
-
-            const absPath = path.join(this._workspaceRoot, filePath);
-            if (!fs.existsSync(absPath) || !fs.statSync(absPath).isFile()) {
-                return false;
-            }
-
-            const content = fs.readFileSync(absPath);
-            if (content.includes(0)) {
-                return false;
-            }
-
-            const text = content.toString('utf8');
-            return !hasConflictMarkerBlocks(text);
-        } catch {
+    private isResolvedConflictCandidate(
+        stages: Set<number> | undefined,
+        resultSnapshot: WorktreeFileSnapshot
+    ): boolean {
+        if (!stages?.has(2) || !stages.has(3) || resultSnapshot.kind !== 'file') {
             return false;
         }
+
+        if (isBinaryConflictContent(resultSnapshot.content)) {
+            return false;
+        }
+
+        return !hasConflictMarkerBlocks(resultSnapshot.content.toString('utf8'));
     }
 
     private async getUnmergedStageNumbers(filePaths: string[]): Promise<Map<string, Set<number>>> {
@@ -581,12 +620,14 @@ export class GitService implements vscode.Disposable {
             return new Map();
         }
 
-        const repoPaths = filePaths.map(filePath => this.toRepoPath(filePath));
-        const output = await this.git.raw(['ls-files', '-u', '--', ...repoPaths]);
+        const repoPathspecs = filePaths
+            .map(filePath => this.toRepoPath(filePath))
+            .map(toLiteralGitPathspec);
+        const output = await this.git.raw(['ls-files', '-u', '-z', '--', ...repoPathspecs]);
         const stagesByPath = new Map<string, Set<number>>();
 
-        output.split('\n').forEach(line => {
-            const match = line.match(/^\d+\s+[0-9a-f]+\s+([123])\t(.+)$/);
+        output.split('\0').forEach(record => {
+            const match = record.match(/^\d+\s+[0-9a-f]+\s+([123])\t([\s\S]+)$/);
             if (!match) {
                 return;
             }
@@ -631,7 +672,13 @@ export class GitService implements vscode.Disposable {
         stages: Map<number, ConflictStageEntry>;
         signature: string;
     }> {
-        const unmerged = await this.git.raw(['ls-files', '-u', '-z', '--', repoPath]);
+        const unmerged = await this.git.raw([
+            'ls-files',
+            '-u',
+            '-z',
+            '--',
+            toLiteralGitPathspec(repoPath)
+        ]);
         const stages = this.parseUnmergedStages(unmerged);
         return {
             stages,
@@ -639,14 +686,24 @@ export class GitService implements vscode.Disposable {
         };
     }
 
-    private async readConflictSide(objectId: string | undefined): Promise<ConflictSideContent> {
+    private async readConflictSide(objectId: string | undefined): Promise<{
+        content: Buffer;
+        side: ConflictSideContent;
+    }> {
         if (!objectId) {
-            return { exists: false, content: '' };
+            return {
+                content: Buffer.alloc(0),
+                side: { exists: false, content: '' }
+            };
         }
 
+        const content = Buffer.from(await this.git.binaryCatFile(['-p', objectId]));
         return {
-            exists: true,
-            content: await this.git.raw(['cat-file', '-p', objectId])
+            content,
+            side: {
+                exists: true,
+                content: content.toString('utf8')
+            }
         };
     }
 
@@ -710,7 +767,9 @@ export class GitService implements vscode.Disposable {
             throw new Error(i18n.t('extension.conflictStagesChanged'));
         }
 
-        const resultSnapshot = readWorktreeFileSnapshot(path.join(this._workspaceRoot, filePath));
+        const resultSnapshot = readWorktreeFileSnapshot(
+            resolveSafeConflictWorktreePath(this._workspaceRoot, filePath)
+        );
         if (resultSnapshot.fingerprint !== expected.resultFingerprint) {
             throw new Error(i18n.t('extension.conflictResultChanged'));
         }
@@ -813,27 +872,48 @@ export class GitService implements vscode.Disposable {
             throw new Error(`No unresolved conflict found for ${filePath}`);
         }
 
-        const [base, current, incoming] = await Promise.all([
+        const absPath = resolveSafeConflictWorktreePath(this._workspaceRoot, filePath);
+        const resultSnapshot = readWorktreeFileSnapshot(absPath);
+        const result = resultSnapshot.content.toString('utf8');
+        const stageNumbers = new Set(stages.keys());
+        const labels = await this.getConflictLabels();
+        const hasUnsupportedMode = [...stages.values()].some(stage => !isRegularConflictMode(stage.mode));
+        if (hasUnsupportedMode) {
+            return {
+                path: filePath,
+                ...labels,
+                base: { exists: stages.has(1), content: '' },
+                current: { exists: stages.has(2), content: '' },
+                incoming: { exists: stages.has(3), content: '' },
+                currentChanges: [],
+                incomingChanges: [],
+                result,
+                stageSignature: signature,
+                resultFingerprint: resultSnapshot.fingerprint,
+                resolvedCandidate: false,
+                isBinary: true
+            };
+        }
+
+        const [baseSide, currentSide, incomingSide] = await Promise.all([
             this.readConflictSide(stages.get(1)?.objectId),
             this.readConflictSide(stages.get(2)?.objectId),
             this.readConflictSide(stages.get(3)?.objectId)
         ]);
-        const [currentChanges, incomingChanges] = await Promise.all([
-            this.readConflictChanges(filePath, stages.get(1), stages.get(2), base, current, 'current'),
-            this.readConflictChanges(filePath, stages.get(1), stages.get(3), base, incoming, 'incoming')
-        ]);
-
-        const absPath = path.join(this._workspaceRoot, filePath);
-        const resultSnapshot = readWorktreeFileSnapshot(absPath);
-        const result = resultSnapshot.content.toString('utf8');
-        const hasUnsupportedMode = [...stages.values()].some(stage => !isRegularConflictMode(stage.mode));
-        const isBinary = hasUnsupportedMode ||
-            resultSnapshot.kind === 'other' ||
-            resultSnapshot.content.includes(0) ||
-            base.content.includes('\0') ||
-            current.content.includes('\0') ||
-            incoming.content.includes('\0');
-        const labels = await this.getConflictLabels();
+        const base = baseSide.side;
+        const current = currentSide.side;
+        const incoming = incomingSide.side;
+        const isBinary = (resultSnapshot.kind !== 'file' && resultSnapshot.kind !== 'missing') ||
+            isBinaryConflictContent(resultSnapshot.content) ||
+            isBinaryConflictContent(baseSide.content) ||
+            isBinaryConflictContent(currentSide.content) ||
+            isBinaryConflictContent(incomingSide.content);
+        const [currentChanges, incomingChanges] = isBinary
+            ? [[], []]
+            : await Promise.all([
+                this.readConflictChanges(filePath, stages.get(1), stages.get(2), base, current, 'current'),
+                this.readConflictChanges(filePath, stages.get(1), stages.get(3), base, incoming, 'incoming')
+            ]);
 
         return {
             path: filePath,
@@ -846,6 +926,7 @@ export class GitService implements vscode.Disposable {
             result,
             stageSignature: signature,
             resultFingerprint: resultSnapshot.fingerprint,
+            resolvedCandidate: this.isResolvedConflictCandidate(stageNumbers, resultSnapshot),
             isBinary
         };
     }
@@ -965,7 +1046,13 @@ export class GitService implements vscode.Disposable {
         files.forEach(file => {
             try {
                 if (file.status === 'C' || file.status === 'U') {
-                    file.resolvedCandidate = this.isResolvedConflictCandidate(file.path, unmergedStagesByPath.get(file.path));
+                    const resultSnapshot = readWorktreeFileSnapshot(
+                        resolveSafeConflictWorktreePath(this._workspaceRoot, file.path)
+                    );
+                    file.resolvedCandidate = this.isResolvedConflictCandidate(
+                        unmergedStagesByPath.get(file.path),
+                        resultSnapshot
+                    );
                 }
 
                 // file.path is workspace relative
@@ -1108,24 +1195,28 @@ export class GitService implements vscode.Disposable {
         expected?: ConflictResolutionSnapshot
     ): Promise<void> {
         return this.runGitMutation(async () => {
-            if (expected) {
-                await this.assertConflictResolutionSnapshot(filePath, expected);
+            const repoPath = this.toRepoPath(filePath);
+            const pathspec = toLiteralGitPathspec(repoPath);
+            const stages = expected
+                ? await this.assertConflictResolutionSnapshot(filePath, expected)
+                : (await this.readConflictStages(repoPath)).stages;
+            if (stages.size === 0) {
+                throw new Error(`No unresolved conflict found for ${filePath}`);
+            }
+            if ([...stages.values()].some(stage => !isRegularConflictMode(stage.mode))) {
+                throw new Error(i18n.t('extension.unsupportedConflictFile'));
             }
 
-            const repoPath = this.toRepoPath(filePath);
-            const unmerged = await this.git.raw(['ls-files', '-u', '--', repoPath]);
-            const hasOurs = unmerged.split('\n').some(line => /\s2\t/.test(line));
-            const hasTheirs = unmerged.split('\n').some(line => /\s3\t/.test(line));
-
-            const keepDeleted = side === 'ours' ? !hasOurs : !hasTheirs;
+            const selectedStage = side === 'ours' ? 2 : 3;
+            const keepDeleted = !stages.has(selectedStage);
             if (keepDeleted) {
-                await this.git.raw(['rm', '--', repoPath]);
+                await this.git.raw(['rm', '--', pathspec]);
                 this.fireChange();
                 return;
             }
 
-            await this.git.raw(['checkout', `--${side}`, '--', repoPath]);
-            await this.git.add(repoPath);
+            await this.git.raw(['checkout', `--${side}`, '--', pathspec]);
+            await this.git.raw(['add', '--', pathspec]);
             this.fireChange();
         });
     }
@@ -1149,17 +1240,26 @@ export class GitService implements vscode.Disposable {
                 throw new Error(i18n.t('extension.unsupportedConflictFile'));
             }
 
+            const absPath = resolveSafeConflictWorktreePath(this._workspaceRoot, filePath);
+            const currentResultSnapshot = readWorktreeFileSnapshot(absPath);
+            if (currentResultSnapshot.fingerprint !== expected.resultFingerprint) {
+                throw new Error(i18n.t('extension.conflictResultChanged'));
+            }
+            if (currentResultSnapshot.kind !== 'file' && currentResultSnapshot.kind !== 'missing') {
+                throw new Error(i18n.t('extension.unsupportedConflictFile'));
+            }
+
             const repoPath = this.toRepoPath(filePath);
+            const pathspec = toLiteralGitPathspec(repoPath);
             if (!resultExists) {
-                await this.git.raw(['rm', '--', repoPath]);
+                await this.git.raw(['rm', '--', pathspec]);
                 this.fireChange();
                 return;
             }
 
-            const absPath = path.join(this._workspaceRoot, filePath);
             fs.mkdirSync(path.dirname(absPath), { recursive: true });
             fs.writeFileSync(absPath, content, 'utf8');
-            await this.git.add(repoPath);
+            await this.git.raw(['add', '--', pathspec]);
             this.fireChange();
         });
     }

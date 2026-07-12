@@ -147,6 +147,22 @@ describe('conflictModel', () => {
         expect(ignoredSession.reviewRanges).toHaveLength(0);
     });
 
+    it('filters a large whitespace-only hunk without building an LCS table', () => {
+        const lineCount = 501;
+        const base = 'value\n'.repeat(lineCount);
+        const left = '  value   \n'.repeat(lineCount);
+        const changes = [{
+            id: 'large-whitespace',
+            baseStart: 0,
+            baseLineCount: lineCount,
+            sideStart: 0,
+            sideLineCount: lineCount
+        }];
+
+        expect(buildMergeSessionDocument(base, left, base, changes, [], 'trim').groups).toHaveLength(0);
+        expect(buildMergeSessionDocument(base, left, base, changes, [], 'ignore').groups).toHaveLength(0);
+    });
+
     it('starts an add/add conflict from an empty Base result', () => {
         const session = buildMergeSessionDocument(
             '',
@@ -404,6 +420,159 @@ describe('conflictModel', () => {
             rightDecision: 'applied',
             lastAppliedSide: 'right'
         });
+    });
+
+    it('does not expand a pending range into a manual edit that starts at its end', () => {
+        const session = buildMergeSessionDocument(
+            'a\r\nstable',
+            'A\r\nstable',
+            'a\r\nstable',
+            [{ id: 'left', baseStart: 0, baseLineCount: 1, sideStart: 0, sideLineCount: 1 }],
+            []
+        );
+        const editedContent = 'a\r\nStable';
+        const updated = applyMergeContentChanges(session.reviewRanges, [
+            { rangeOffset: 3, rangeLength: 1, text: 'S' }
+        ]);
+        const accepted = applyMergeGroupDecision(
+            editedContent,
+            updated.ranges,
+            session.groups[0],
+            'left',
+            'applied'
+        );
+
+        expect(updated.touchedGroupIds).toEqual([]);
+        expect(updated.ranges[0]).toMatchObject({ startOffset: 0, endOffset: 3 });
+        expect(accepted.content).toBe('A\r\nStable');
+    });
+
+    it('keeps adjacent ranges disjoint when inserting at their shared boundary', () => {
+        const session = buildMergeSessionDocument(
+            'a\nb\n',
+            'A\nb\n',
+            'a\nB\n',
+            [{ id: 'left', baseStart: 0, baseLineCount: 1, sideStart: 0, sideLineCount: 1 }],
+            [{ id: 'right', baseStart: 1, baseLineCount: 1, sideStart: 1, sideLineCount: 1 }]
+        );
+        const editedContent = 'a\nmanual\nb\n';
+        const updated = applyMergeContentChanges(session.reviewRanges, [
+            { rangeOffset: 2, rangeLength: 0, text: 'manual\n' }
+        ]);
+        const accepted = applyMergeGroupDecision(
+            editedContent,
+            updated.ranges,
+            session.groups[0],
+            'left',
+            'applied'
+        );
+
+        expect(updated.touchedGroupIds).toEqual(['change-1']);
+        expect(updated.ranges[0]).toMatchObject({ startOffset: 0, endOffset: 2 });
+        expect(updated.ranges[1]).toMatchObject({ startOffset: 2, endOffset: 11 });
+        expect(updated.ranges[0].endOffset).toBeLessThanOrEqual(updated.ranges[1].startOffset);
+        expect(accepted.content).toBe('A\nmanual\nb\n');
+    });
+
+    it('maps both sides of a shared boundary to the same offset when a replacement spans it', () => {
+        const ranges = [
+            {
+                groupId: 'change-0',
+                startOffset: 0,
+                endOffset: 2,
+                leftDecision: 'pending' as const,
+                rightDecision: null,
+                lastAppliedSide: null
+            },
+            {
+                groupId: 'change-1',
+                startOffset: 2,
+                endOffset: 4,
+                leftDecision: null,
+                rightDecision: 'pending' as const,
+                lastAppliedSide: null
+            }
+        ];
+        const updated = applyMergeContentChanges(ranges, [
+            { rangeOffset: 1, rangeLength: 2, text: 'X' }
+        ]);
+
+        expect(updated.touchedGroupIds).toEqual(['change-0', 'change-1']);
+        expect(updated.ranges[0]).toMatchObject({ startOffset: 0, endOffset: 1 });
+        expect(updated.ranges[1]).toMatchObject({ startOffset: 1, endOffset: 3 });
+    });
+
+    it('keeps an empty range anchored when a following range owns a boundary insertion', () => {
+        const updated = applyMergeContentChanges([
+            {
+                groupId: 'change-0',
+                startOffset: 0,
+                endOffset: 0,
+                leftDecision: 'pending' as const,
+                rightDecision: null,
+                lastAppliedSide: null
+            },
+            {
+                groupId: 'change-1',
+                startOffset: 0,
+                endOffset: 4,
+                leftDecision: null,
+                rightDecision: 'pending' as const,
+                lastAppliedSide: null
+            }
+        ], [
+            { rangeOffset: 0, rangeLength: 0, text: 'manual' }
+        ]);
+
+        expect(updated.touchedGroupIds).toEqual(['change-1']);
+        expect(updated.ranges[0]).toMatchObject({ startOffset: 0, endOffset: 0 });
+        expect(updated.ranges[1]).toMatchObject({ startOffset: 0, endOffset: 10 });
+    });
+
+    it('transforms multiple Monaco changes from original document offsets', () => {
+        const ranges = [
+            {
+                groupId: 'change-0',
+                startOffset: 2,
+                endOffset: 6,
+                leftDecision: 'applied' as const,
+                rightDecision: null,
+                lastAppliedSide: 'left' as const
+            },
+            {
+                groupId: 'change-1',
+                startOffset: 10,
+                endOffset: 12,
+                leftDecision: null,
+                rightDecision: 'cancelled' as const,
+                lastAppliedSide: null
+            }
+        ];
+        const updated = applyMergeContentChanges(ranges, [
+            { rangeOffset: 10, rangeLength: 0, text: 'xy' },
+            { rangeOffset: 3, rangeLength: 1, text: 'manual' }
+        ]);
+
+        expect(updated.touchedGroupIds).toEqual(['change-0', 'change-1']);
+        expect(updated.ranges[0]).toMatchObject({ startOffset: 2, endOffset: 11 });
+        expect(updated.ranges[1]).toMatchObject({ startOffset: 15, endOffset: 19 });
+    });
+
+    it('expands an empty EOF range for all insertions at the same offset', () => {
+        const updated = applyMergeContentChanges([{
+            groupId: 'change-0',
+            startOffset: 6,
+            endOffset: 6,
+            leftDecision: 'pending',
+            rightDecision: 'pending',
+            lastAppliedSide: null
+        }], [
+            { rangeOffset: 6, rangeLength: 0, text: 'right' },
+            { rangeOffset: 6, rangeLength: 0, text: 'left' }
+        ]);
+
+        expect(updated.touchedGroupIds).toEqual(['change-0']);
+        expect(updated.ranges[0]).toMatchObject({ startOffset: 6, endOffset: 15 });
     });
 
     it('builds inline diff segments while preserving unchanged tokens', () => {

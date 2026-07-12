@@ -253,10 +253,12 @@ export const MonacoCodeEditor = forwardRef<MonacoCodeEditorHandle, MonacoCodeEdi
         let mouseSubscription: Monaco.IDisposable | null = null;
         let scrollSubscription: Monaco.IDisposable | null = null;
         let resizeObserver: ResizeObserver | null = null;
+        let monacoApi: MonacoApi | null = null;
         const host = hostRef.current;
         if (!host) {
             return;
         }
+        const languageId = getMonacoLanguageIdForPath(filePath);
 
         const layoutEditor = (dimension?: EditorDimension | null) => {
             if (layoutFrameRef.current) {
@@ -329,7 +331,19 @@ export const MonacoCodeEditor = forwardRef<MonacoCodeEditorHandle, MonacoCodeEdi
         };
 
         resizeObserver = new ResizeObserver(() => {
-            layoutEditor();
+            if (disposed) {
+                return;
+            }
+
+            const dimension = getElementDimension(host);
+            if (!dimension) {
+                return;
+            }
+            if (editor) {
+                layoutEditor(dimension);
+            } else if (monacoApi) {
+                createEditor(monacoApi, languageId, dimension);
+            }
         });
         resizeObserver.observe(host);
 
@@ -338,17 +352,10 @@ export const MonacoCodeEditor = forwardRef<MonacoCodeEditorHandle, MonacoCodeEdi
                 return;
             }
 
+            monacoApi = monaco;
             const dimension = getElementDimension(host);
-            const languageId = getMonacoLanguageIdForPath(filePath);
             if (dimension) {
                 createEditor(monaco, languageId, dimension);
-            } else {
-                window.requestAnimationFrame(() => {
-                    const nextDimension = getElementDimension(host);
-                    if (nextDimension) {
-                        createEditor(monaco, languageId, nextDimension);
-                    }
-                });
             }
         }).catch(error => {
             console.error('Failed to initialize Monaco code editor.', error);

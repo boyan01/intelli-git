@@ -241,6 +241,7 @@ export interface ConflictFileContent {
     result: string;
     stageSignature: string;
     resultFingerprint: string;
+    resolvedCandidate: boolean;
     isBinary: boolean;
 }
 
@@ -254,7 +255,7 @@ export interface SaveConflictResolutionRequest extends RepositoryFileReference, 
     resultExists: boolean;
 }
 
-export interface ResolveConflictRequest extends RepositoryFileReference, Partial<ConflictResolutionSnapshot> {
+export interface ResolveConflictRequest extends RepositoryFileReference, ConflictResolutionSnapshot {
     side: 'ours' | 'theirs';
 }
 
