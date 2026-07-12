@@ -152,8 +152,8 @@ export class BackgroundFetchService implements vscode.Disposable {
         }
 
         try {
-            await gitService.branchRemote.fetchRemoteTracking(ORIGIN_REMOTE);
-            logger.debug('Background fetch completed', { repoPath: scope.repoPath, remote: ORIGIN_REMOTE, reason });
+            const changed = await gitService.branchRemote.fetchRemoteTracking(ORIGIN_REMOTE);
+            logger.debug('Background fetch completed', { repoPath: scope.repoPath, remote: ORIGIN_REMOTE, reason, changed });
         } catch (error) {
             logger.warn('Background fetch failed', { repoPath: scope.repoPath, remote: ORIGIN_REMOTE, reason, error: formatError(error) });
         }

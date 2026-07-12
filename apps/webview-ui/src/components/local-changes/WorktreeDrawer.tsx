@@ -4,7 +4,7 @@ import type { WorktreeInfo } from '@shared/messages';
 import type { WorktreeItemContext } from '@shared/webviewContext';
 import { BasicTreeView, type TreeNode } from '../common/BasicTreeView';
 import { LoadingProgressBar } from '../common/LoadingProgressBar';
-import { rpc, rpcEvents } from '../../lib/rpc_client';
+import { emitRefresh, rpc } from '../../lib/rpc_client';
 import styles from './WorktreeDrawer.module.css';
 
 interface WorktreeDrawerProps {
@@ -110,7 +110,7 @@ export function WorktreeDrawer({ open, worktrees, loading, onClose }: WorktreeDr
         if (!switched) {
             await rpc.openWorktree(worktree.path);
         }
-        rpcEvents.refresh.emit();
+        emitRefresh(['commit', 'branch', 'push', 'worktrees'], 'worktree-opened');
     }, []);
 
     const handleNodeSelect = useCallback((node: TreeNode<WorktreeNodeData>) => {
@@ -168,7 +168,7 @@ export function WorktreeDrawer({ open, worktrees, loading, onClose }: WorktreeDr
         }
 
         await rpc.pruneWorktrees();
-        rpcEvents.refresh.emit();
+        emitRefresh(['worktrees'], 'worktrees-pruned');
     };
 
     return (

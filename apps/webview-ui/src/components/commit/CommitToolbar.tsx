@@ -1,4 +1,4 @@
-import { rpc, rpcEvents } from '../../lib/rpc_client';
+import { emitRefresh, rpc } from '../../lib/rpc_client';
 import { useTranslation } from 'react-i18next';
 import { ViewModeToggle } from '../common/ViewModeToggle';
 import type { ChangelistState, RepositoryFileReference } from '@shared/messages';
@@ -33,7 +33,10 @@ export function CommitToolbar({
                     title={t('Refresh')}
                     aria-label={t('Refresh')}
                     data-tooltip={t('Refresh')}
-                    onClick={() => rpcEvents.refresh.emit()}
+                    onClick={async () => {
+                        await rpc.invalidateCommitViewState();
+                        emitRefresh(['commit'], 'manual');
+                    }}
                 >
                     <i className="codicon codicon-sync"></i>
                 </button>
@@ -48,7 +51,7 @@ export function CommitToolbar({
                             data-tooltip={t('Create Changelist')}
                             onClick={async () => {
                                 await rpc.createChangelist();
-                                rpcEvents.refresh.emit();
+                                emitRefresh(['commit'], 'changelist-created');
                             }}
                         >
                             <i className="codicon codicon-add"></i>
@@ -76,7 +79,7 @@ export function CommitToolbar({
                             data-tooltip={t('Stage All Tracked')}
                             onClick={async () => {
                                 await rpc.stageTracked();
-                                rpcEvents.refresh.emit();
+                                emitRefresh(['commit'], 'tracked-files-staged');
                             }}
                             disabled={!hasTrackedChanges}
                         >

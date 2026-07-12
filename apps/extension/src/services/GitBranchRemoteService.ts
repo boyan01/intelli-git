@@ -615,15 +615,30 @@ export class GitBranchRemoteService {
         });
     }
 
-    public async fetchRemoteTracking(remote: string): Promise<void> {
+    public async fetchRemoteTracking(remote: string): Promise<boolean> {
         return this.runMutation(async () => {
             const remotes = await this.getRemotes();
             if (!remotes.includes(remote)) {
-                return;
+                return false;
             }
 
+            const remoteRefPrefix = `refs/remotes/${remote}/`;
+            const before = await this.options.git.raw([
+                'for-each-ref',
+                '--format=%(refname):%(objectname)',
+                remoteRefPrefix
+            ]);
             await this.options.git.fetch(['--no-tags', '--quiet', remote]);
-            this.options.notifyChanged();
+            const after = await this.options.git.raw([
+                'for-each-ref',
+                '--format=%(refname):%(objectname)',
+                remoteRefPrefix
+            ]);
+            const changed = before !== after;
+            if (changed) {
+                this.options.notifyChanged();
+            }
+            return changed;
         });
     }
 

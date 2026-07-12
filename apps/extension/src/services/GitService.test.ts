@@ -99,6 +99,37 @@ describe('GitService mutation queue', () => {
     });
 });
 
+describe('GitService commit view status cache', () => {
+    it('joins concurrent view loads and reuses the result until invalidated', async () => {
+        let releaseStatus: ((value: { files: never[]; conflicted: never[]; current: string }) => void) | undefined;
+        const firstStatus = new Promise<{ files: never[]; conflicted: never[]; current: string }>(resolve => {
+            releaseStatus = resolve;
+        });
+        const status = vi.fn()
+            .mockReturnValueOnce(firstStatus)
+            .mockResolvedValue({ files: [], conflicted: [], current: 'main' });
+        const service = new GitService('/workspace', '/workspace', { status } as unknown as SimpleGit);
+
+        const first = service.getStatusForView();
+        const second = service.getStatusForView();
+        expect(status).toHaveBeenCalledOnce();
+
+        releaseStatus?.({ files: [], conflicted: [], current: 'main' });
+        await expect(Promise.all([first, second])).resolves.toEqual([[], []]);
+
+        await expect(service.getStatusForView()).resolves.toEqual([]);
+        expect(status).toHaveBeenCalledOnce();
+
+        service.invalidateStatusCache();
+        await expect(service.getStatusForView()).resolves.toEqual([]);
+        expect(status).toHaveBeenCalledTimes(2);
+
+        await expect(service.refreshStatusCache()).resolves.toBe(false);
+        status.mockResolvedValueOnce({ files: [], conflicted: [], current: 'feature' });
+        await expect(service.refreshStatusCache()).resolves.toBe(true);
+    });
+});
+
 describe('GitService repository scope', () => {
     let tempDir: string;
     let git: SimpleGit;
@@ -1587,6 +1618,34 @@ describe('GitService branch remote workflows', () => {
 
         expect(push).toHaveBeenCalledWith('origin', 'main:main', ['--force-with-lease', '--no-verify']);
         expect(notifyChanged).toHaveBeenCalledTimes(1);
+    });
+
+    it('notifies background fetch changes only when remote refs move', async () => {
+        const getRemotes = vi.fn().mockResolvedValue([{ name: 'origin' }]);
+        const fetch = vi.fn().mockResolvedValue(undefined);
+        const raw = vi.fn()
+            .mockResolvedValueOnce('refs/remotes/origin/main:aaaa\n')
+            .mockResolvedValueOnce('refs/remotes/origin/main:aaaa\n')
+            .mockResolvedValueOnce('refs/remotes/origin/main:aaaa\n')
+            .mockResolvedValueOnce('refs/remotes/origin/main:bbbb\n');
+        const notifyChanged = vi.fn();
+        const service = new GitBranchRemoteService({
+            git: { getRemotes, fetch, raw } as unknown as SimpleGit,
+            gitRoot: tempDir,
+            notifyChanged,
+            withTemporaryStash: async () => { },
+            createEditorGit: () => {
+                throw new Error('Not used');
+            },
+            runMutation: async operation => operation(),
+            getCommitFiles: async () => []
+        });
+
+        await expect(service.fetchRemoteTracking('origin')).resolves.toBe(false);
+        expect(notifyChanged).not.toHaveBeenCalled();
+
+        await expect(service.fetchRemoteTracking('origin')).resolves.toBe(true);
+        expect(notifyChanged).toHaveBeenCalledOnce();
     });
 
     it('pulls with merge through temporary stash protection', async () => {

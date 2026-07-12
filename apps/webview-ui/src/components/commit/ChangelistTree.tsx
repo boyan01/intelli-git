@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { BasicTreeView } from '../common/BasicTreeView';
 import type { TreeNode, BasicTreeViewRef } from '../common/BasicTreeView';
 import { getFileIcon } from '../../lib/fileIcons';
-import { rpc, rpcEvents } from '@/lib/rpc_client';
+import { emitRefresh, rpc } from '@/lib/rpc_client';
 import { logger } from '@/utils/logger';
 import styles from '../file-tree/BaseFileTree.module.css';
 import { compactSingleChildFolders } from '../file-tree/treeUtils';
@@ -451,7 +451,7 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
                         } else {
                             await rpc.unstageFiles(refs);
                         }
-                        rpcEvents.refresh.emit();
+                        emitRefresh(['commit'], 'files-staged');
                     }}
                 >
                     <i className={`codicon ${action.kind === 'stage' ? 'codicon-add' : 'codicon-remove'}`} />
@@ -749,7 +749,7 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
             }
         }
 
-        rpcEvents.refresh.emit();
+        emitRefresh(['commit'], 'changelist-updated');
     }, [changelistState.mode]);
 
     const getDragData = useCallback((node: TreeNode<FileNodeData>): Record<string, string> => {

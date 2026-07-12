@@ -170,6 +170,7 @@ export interface CommitViewState {
     hasRepository?: boolean;
     repositories?: RepositoryCommitViewState[];
     activeRepository?: RepositoryInfo;
+    cacheSessionId?: string;
 }
 
 export interface PushTarget {
@@ -385,6 +386,7 @@ export interface ExtensionMethods {
     getStatus: () => Promise<FileStatus[]>;
     getChangelistState: () => Promise<ChangelistState>;
     getCommitViewState: () => Promise<CommitViewState>;
+    invalidateCommitViewState: () => Promise<void>;
     getBranchInfo: () => Promise<BranchInfo>;
     getStashList: () => Promise<StashItem[]>;
     getStashFiles: (index: number) => Promise<CommitFile[]>;
@@ -487,13 +489,29 @@ export interface PushFailedResult {
     behindCount?: number;
 }
 
+export type RefreshScope = 'commit' | 'branch' | 'worktrees' | 'push' | 'stash' | 'gitLog';
+
+export interface RefreshEvent {
+    scopes: RefreshScope[];
+    reason?: string;
+}
+
+export interface FileDiagnosticsChange {
+    repoPath: string;
+    files: Array<{
+        path: string;
+        error: boolean;
+    }>;
+}
+
 export interface WebviewMethods {
     activeFileChange: (params: { path: string; commitHash?: string }) => void;
     revealConflictResolverFile: (params: ConflictResolverOpenRequest) => void;
     triggerConflictResolverAction: (params: ConflictResolverContextActionRequest) => void;
     revealLog: (params: GitLogRevealRequest) => void;
     filterLogByBranch: (params: { branch: string }) => void;
-    refresh: () => void;
+    refresh: (event: RefreshEvent) => void;
+    fileDiagnosticsChange: (change: FileDiagnosticsChange) => void;
     switchTab: (tab: 'commit' | 'stash' | 'push') => void;
     toggleWorktreesDrawer: () => void;
     triggerCommitAiAction: (action: CommitAiAction) => void;

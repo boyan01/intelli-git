@@ -218,13 +218,13 @@ async function setChangeBlockInactive(
         if (inactiveHunkId !== hunk.id) {
             await inactiveChangesService.markMatchingHunkActive(relativePath, inactiveHunkId, currentHunks);
         }
-        provider.rpc?.refresh();
+        provider.requestRefresh({ scopes: ['commit'], reason: 'inactive-change-updated' });
         await vscode.commands.executeCommand('intelli-git.refreshChangeBlockDecorations');
         return;
     }
 
     if (isCurrentlyInactive) {
-        provider.rpc?.refresh();
+        provider.requestRefresh({ scopes: ['commit'], reason: 'inactive-change-unchanged' });
         await vscode.commands.executeCommand('intelli-git.refreshChangeBlockDecorations');
         return;
     }
@@ -241,7 +241,7 @@ async function setChangeBlockInactive(
     }
 
     await inactiveChangesService.markHunkInactive(relativePath, inactiveHunkId);
-    provider.rpc?.refresh();
+    provider.requestRefresh({ scopes: ['commit'], reason: 'inactive-change-updated' });
     await vscode.commands.executeCommand('intelli-git.refreshChangeBlockDecorations');
 }
 
@@ -388,7 +388,7 @@ export function registerChangelistCommands(
         gitService,
         inactiveChangesService,
         changelistStateService,
-        refreshCommitView: () => provider.rpc?.refresh(),
+        refreshCommitView: () => provider.requestRefresh({ scopes: ['commit'], reason: 'changelist-operation' }),
         refreshDecorations: createDefaultRefreshDecorations(),
         setModeContext: async mode => {
             await vscode.commands.executeCommand('setContext', 'intelli-git.changelistMode', mode);
@@ -592,7 +592,7 @@ export function registerChangelistCommands(
                 if (confirm === i18n.t('Rollback')) {
                     try {
                         await gitService.rollbackFiles(paths);
-                        provider.rpc?.refresh();
+                        provider.requestRefresh({ scopes: ['commit'], reason: 'changelist-operation' });
                     } catch (e) {
                         vscode.window.showErrorMessage(i18n.t('extension.rollbackFailed', `${e}`));
                     }
@@ -610,7 +610,7 @@ export function registerChangelistCommands(
                 });
                 try {
                     await gitService.stash(message, paths);
-                    provider.rpc?.refresh();
+                    provider.requestRefresh({ scopes: ['commit'], reason: 'changelist-operation' });
                 } catch (e) {
                     vscode.window.showErrorMessage(i18n.t('extension.stashFailed', `${e}`));
                 }
@@ -642,7 +642,7 @@ export function registerChangelistCommands(
                                     throw error;
                                 }
                             }
-                            provider.rpc?.refresh();
+                            provider.requestRefresh({ scopes: ['commit'], reason: 'changelist-operation' });
                         } catch (e) {
                             vscode.window.showErrorMessage(i18n.t('extension.deleteFailed', `${e}`));
                         }
@@ -683,7 +683,7 @@ export function registerChangelistCommands(
                 } else {
                     await gitService.stageFiles(paths);
                 }
-                provider.rpc?.refresh();
+                provider.requestRefresh({ scopes: ['commit'], reason: 'changelist-operation' });
             } catch (e) {
                 vscode.window.showErrorMessage(i18n.t('extension.stageFailed', `${e}`));
             }
@@ -703,7 +703,7 @@ export function registerChangelistCommands(
                 } else {
                     await gitService.unstageFiles(paths);
                 }
-                provider.rpc?.refresh();
+                provider.requestRefresh({ scopes: ['commit'], reason: 'changelist-operation' });
             } catch (e) {
                 vscode.window.showErrorMessage(i18n.t('extension.unstageFailed', `${e}`));
             }
@@ -718,7 +718,7 @@ export function registerChangelistCommands(
 
             try {
                 await (resolveGitService(args.repoPath) || gitService).resolveConflict(args.path, 'ours');
-                provider.rpc?.refresh();
+                provider.requestRefresh({ scopes: ['commit'], reason: 'changelist-operation' });
             } catch (e) {
                 vscode.window.showErrorMessage(i18n.t('extension.resolveConflictFailed', `${e}`));
             }
@@ -733,7 +733,7 @@ export function registerChangelistCommands(
 
             try {
                 await (resolveGitService(args.repoPath) || gitService).resolveConflict(args.path, 'theirs');
-                provider.rpc?.refresh();
+                provider.requestRefresh({ scopes: ['commit'], reason: 'changelist-operation' });
             } catch (e) {
                 vscode.window.showErrorMessage(i18n.t('extension.resolveConflictFailed', `${e}`));
             }
@@ -765,7 +765,7 @@ export function registerChangelistCommands(
                 } else {
                     await service.stageFiles(resolvedPaths);
                 }
-                provider.rpc?.refresh();
+                provider.requestRefresh({ scopes: ['commit'], reason: 'changelist-operation' });
             } catch (e) {
                 vscode.window.showErrorMessage(i18n.t('extension.stageFailed', `${e}`));
             }

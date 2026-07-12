@@ -94,8 +94,10 @@ export function usePushData(selectedRemote: string, selectedRemoteBranch: string
     }, [loadCommits]);
 
     // Refresh without unmounting the visible list; otherwise expanded commits flicker.
-    useRpcEvent(rpcEvents.refresh, () => {
-        loadCommits();
+    useRpcEvent(rpcEvents.refresh, event => {
+        if (event.scopes.includes('push')) {
+            loadCommits();
+        }
     });
 
     const handleLoadMore = useCallback(async () => {

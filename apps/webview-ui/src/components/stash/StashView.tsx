@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import type { StashItem, CommitFile, FileStatus } from '@shared/messages';
+import type { StashItem, CommitFile, FileStatus, RefreshScope } from '@shared/messages';
 import type { StashItemContext } from '@shared/webviewContext';
 import { useTranslation } from 'react-i18next';
 import { useRpcData } from '../../hooks/useRpcData';
@@ -11,10 +11,15 @@ import { BaseFileTree } from '../file-tree/BaseFileTree';
 import type { BaseFileTreeRef } from '../file-tree/BaseFileTree';
 import styles from './StashView.module.css';
 
+const STASH_REFRESH_SCOPES: RefreshScope[] = ['stash'];
+
 export function StashView() {
     const { t } = useTranslation();
     const loadStashes = useCallback(() => rpc.getStashList(), []);
-    const { data: stashes, loading } = useRpcData(loadStashes, { initialValue: [] as StashItem[] });
+    const { data: stashes, loading } = useRpcData(loadStashes, {
+        initialValue: [] as StashItem[],
+        refreshScopes: STASH_REFRESH_SCOPES
+    });
     const [selectedIndex, setSelectedIndex] = usePersistedState('stash.selectedIndex');
     const [viewMode, setViewMode] = usePersistedState('stash.viewMode');
     const [selectedFile, setSelectedFile] = useState<string | null>(null);
@@ -34,7 +39,7 @@ export function StashView() {
         loadStashFiles,
         {
             initialValue: [] as CommitFile[],
-            refreshOnEvent: true
+            refreshScopes: STASH_REFRESH_SCOPES
         }
     );
 

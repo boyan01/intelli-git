@@ -82,7 +82,10 @@ export function registerWorktreeCommands(
 ): void {
     const refreshWorktreeState = async () => {
         await repositoryManager.initialize();
-        commitViewProvider.rpc?.refresh();
+        commitViewProvider.requestRefresh({
+            scopes: ['commit', 'branch', 'worktrees', 'push', 'stash'],
+            reason: 'worktree-state'
+        });
     };
 
     context.subscriptions.push(

@@ -653,6 +653,7 @@ export class ExtensionRpcHandler {
                 getStatus: this.getStatus,
                 getChangelistState: this.getChangelistState,
                 getCommitViewState: this.getCommitViewState,
+                invalidateCommitViewState: this.invalidateCommitViewState,
                 getBranchInfo: this.gitReadRpcHandler.getBranchInfo,
                 getStashList: this.gitReadRpcHandler.getStashList,
                 getStashFiles: this.gitReadRpcHandler.getStashFiles,
@@ -1147,7 +1148,7 @@ export class ExtensionRpcHandler {
             return [];
         }
 
-        const status = await gitService.getStatus();
+        const status = await gitService.getStatusForView();
         gitService.inactiveChangesService?.syncWithStatus(status);
         gitService.changelistStateService?.syncWithStatus(status);
 
@@ -1200,7 +1201,8 @@ export class ExtensionRpcHandler {
         const changelistState = activeRepositoryState?.changelistState || this.getCurrentChangelistState();
         const elapsedMs = Date.now() - startedAt;
 
-        logger.info('[refresh] commit view state loaded', {
+        const logCommitViewState = elapsedMs >= 250 ? logger.info : logger.debug;
+        logCommitViewState('[refresh] commit view state loaded', {
             elapsedMs,
             repositories: repositoryStates.length,
             files: repositoryStates.reduce((sum, state) => sum + state.files.length, 0),
@@ -1216,6 +1218,10 @@ export class ExtensionRpcHandler {
             repositories: repositoryStates,
             activeRepository: activeRepositoryState?.repository
         };
+    };
+
+    invalidateCommitViewState = async (): Promise<void> => {
+        this.repositoryManager.getActiveService()?.invalidateStatusCache();
     };
 
     private getCurrentChangelistState(gitService?: GitService): ChangelistState {

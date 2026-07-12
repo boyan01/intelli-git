@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent a
 import { useTranslation } from 'react-i18next';
 import type { ConflictFileContent, RepositoryFileReference } from '@shared/messages';
 import type { MergeEditorContext } from '@shared/webviewContext';
-import { rpc, rpcEvents } from '../../lib/rpc_client';
+import { emitRefresh, rpc, rpcEvents } from '../../lib/rpc_client';
 import {
     applyMergeContentChanges,
     applyMergeGroupDecision,
@@ -618,7 +618,7 @@ export function ConflictResolver({ file, onClose }: ConflictResolverProps) {
             : t('No conflicts remaining');
 
     const completeAction = useCallback(() => {
-        rpcEvents.refresh.emit();
+        emitRefresh(['commit', 'branch'], 'conflict-resolved');
         onClose();
     }, [onClose]);
 

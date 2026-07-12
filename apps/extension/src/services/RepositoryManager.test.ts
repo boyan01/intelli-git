@@ -91,6 +91,17 @@ describe('RepositoryManager worktree discovery', () => {
         expect(worktreeRepo?.gitDir).toContain(path.join('.git', 'worktrees'));
     });
 
+    it('coalesces concurrent repository scans', async () => {
+        __setWorkspaceFolders([]);
+        manager = new RepositoryManager(createExtensionContext() as never);
+
+        const first = manager.initialize();
+        const second = manager.initialize();
+
+        expect(second).toBe(first);
+        await first;
+    });
+
     it('marks the opened folder as a worktree when VS Code opens a linked worktree', async () => {
         const repoPath = path.join(tempDir, 'repo');
         const worktreePath = path.join(tempDir, 'repo-worktree');

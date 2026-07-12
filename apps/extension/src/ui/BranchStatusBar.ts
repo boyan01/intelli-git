@@ -8,6 +8,8 @@ export class BranchStatusBar {
     private gitService: GitService;
     private repository?: RepositoryScope;
     private currentBranch: string = '';
+    private updateInFlight?: Promise<void>;
+    private updatePending = false;
 
     constructor(gitService: GitService, repository?: RepositoryScope) {
         this.gitService = gitService;
@@ -20,25 +22,43 @@ export class BranchStatusBar {
         this.statusBarItem.name = vscode.l10n.t('Intelli Git: Branch');
         this.statusBarItem.command = 'intelli-git.showBranchPicker';
 
-        this.update();
+        void this.update();
     }
 
-    public async update() {
-        try {
-            const branches = await this.gitService.branchRemote.getBranches();
-            this.currentBranch = branches.current;
-            this.statusBarItem.text = `$(git-branch) ${this.currentBranch}`;
-            this.statusBarItem.tooltip = this.repository?.name
-                ? `${vscode.l10n.t('Switch Branch')} · ${this.repository.name}`
-                : vscode.l10n.t('Switch Branch');
-            this.statusBarItem.show();
-        } catch {
-            this.statusBarItem.text = `$(git-branch) ${vscode.l10n.t('No Branch')}`;
-            this.statusBarItem.tooltip = this.repository?.name
-                ? `${vscode.l10n.t('Switch Branch')} · ${this.repository.name}`
-                : vscode.l10n.t('Switch Branch');
-            this.statusBarItem.show();
+    public update(): Promise<void> {
+        if (this.updateInFlight) {
+            this.updatePending = true;
+            return this.updateInFlight;
         }
+
+        const run = async () => {
+            do {
+                this.updatePending = false;
+                try {
+                    const branches = await this.gitService.branchRemote.getBranches();
+                    this.currentBranch = branches.current;
+                    this.statusBarItem.text = `$(git-branch) ${this.currentBranch}`;
+                    this.statusBarItem.tooltip = this.repository?.name
+                        ? `${vscode.l10n.t('Switch Branch')} · ${this.repository.name}`
+                        : vscode.l10n.t('Switch Branch');
+                    this.statusBarItem.show();
+                } catch {
+                    this.statusBarItem.text = `$(git-branch) ${vscode.l10n.t('No Branch')}`;
+                    this.statusBarItem.tooltip = this.repository?.name
+                        ? `${vscode.l10n.t('Switch Branch')} · ${this.repository.name}`
+                        : vscode.l10n.t('Switch Branch');
+                    this.statusBarItem.show();
+                }
+            } while (this.updatePending);
+        };
+
+        const request = run().finally(() => {
+            if (this.updateInFlight === request) {
+                this.updateInFlight = undefined;
+            }
+        });
+        this.updateInFlight = request;
+        return request;
     }
 
     public dispose() {

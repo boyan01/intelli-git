@@ -158,8 +158,10 @@ export const useLogCommitLoader = (repositoryPath?: string): UseLogCommitLoaderR
 
     // Subscribe to refresh events to reload commits when Git state changes
     useEffect(() => {
-        return rpcEvents.refresh.subscribe(() => {
-            loadMore(true);
+        return rpcEvents.refresh.subscribe(event => {
+            if (event.scopes.includes('gitLog')) {
+                loadMore(true);
+            }
         });
     }, [loadMore]);
 

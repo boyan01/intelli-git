@@ -756,11 +756,11 @@ describe('ExtensionRpcHandler no repository state', () => {
             isSubmodule: false as const
         };
         const serviceA = {
-            getStatus: vi.fn().mockResolvedValue([{ path: 'a.txt', status: 'M', staged: false }]),
+            getStatusForView: vi.fn().mockResolvedValue([{ path: 'a.txt', status: 'M', staged: false }]),
             getWorkspaceRoot: () => '/workspace/repo-a'
         } as Partial<GitService>;
         const serviceB = {
-            getStatus: vi.fn().mockResolvedValue([{ path: 'b.txt', status: 'M', staged: false }]),
+            getStatusForView: vi.fn().mockResolvedValue([{ path: 'b.txt', status: 'M', staged: false }]),
             getWorkspaceRoot: () => '/workspace/repo-b'
         } as Partial<GitService>;
 
@@ -802,8 +802,8 @@ describe('ExtensionRpcHandler no repository state', () => {
             inactiveHunkIds: [],
             hasStagedInactive: false
         }]);
-        expect(serviceA.getStatus).not.toHaveBeenCalled();
-        expect(serviceB.getStatus).toHaveBeenCalledOnce();
+        expect(serviceA.getStatusForView).not.toHaveBeenCalled();
+        expect(serviceB.getStatusForView).toHaveBeenCalledOnce();
     });
 
     it('rescans repositories after initializing a repository', async () => {

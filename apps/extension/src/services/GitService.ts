@@ -206,6 +206,11 @@ export class GitService implements vscode.Disposable {
     private _onDidChange = new vscode.EventEmitter<void>();
     private gitMutationQueue: Promise<void> = Promise.resolve();
     private readonly gitMutationContext = new AsyncLocalStorage<boolean>();
+    private viewStatusCache?: { files: FileStatus[]; loadedAt: number };
+    private viewStatusInFlight?: Promise<FileStatus[]>;
+    private viewStatusGeneration = 0;
+    private viewStatusFingerprint?: string;
+    private latestStatusIdentity = '';
     public readonly log: GitLogService;
     public readonly branchRemote: GitBranchRemoteService;
 
@@ -289,7 +294,43 @@ export class GitService implements vscode.Disposable {
      */
     private fireChange() {
         this.log.invalidateGraphCache();
+        this.invalidateStatusCache();
         this._onDidChange.fire();
+    }
+
+    public invalidateStatusCache(): void {
+        this.viewStatusGeneration += 1;
+        this.viewStatusCache = undefined;
+    }
+
+    private cloneStatus(files: FileStatus[]): FileStatus[] {
+        return files.map(file => ({
+            ...file,
+            hunks: file.hunks?.map(hunk => ({ ...hunk })),
+            inactiveHunkIds: file.inactiveHunkIds ? [...file.inactiveHunkIds] : undefined
+        }));
+    }
+
+    private applyCurrentDiagnostics(files: FileStatus[]): FileStatus[] {
+        return files.map(file => {
+            const uri = vscode.Uri.file(path.join(this._workspaceRoot, file.path));
+            const error = vscode.languages.getDiagnostics(uri)
+                .some(diagnostic => diagnostic.severity === vscode.DiagnosticSeverity.Error);
+            return error === Boolean(file.error) ? file : { ...file, error };
+        });
+    }
+
+    private createStatusFingerprint(files: FileStatus[]): string {
+        return JSON.stringify({
+            identity: this.latestStatusIdentity,
+            files: files.map(file => ({
+                path: file.path,
+                status: file.status,
+                staged: file.staged,
+                resolvedCandidate: file.resolvedCandidate,
+                hunks: file.hunks?.map(hunk => hunk.id)
+            }))
+        });
     }
 
     public async runGitMutation<T>(operation: () => Promise<T>): Promise<T> {
@@ -935,7 +976,53 @@ export class GitService implements vscode.Disposable {
         };
     }
 
-    public getStatus = async (): Promise<FileStatus[]> => {
+    public getStatus = async (): Promise<FileStatus[]> => this.loadStatus();
+
+    public getStatusForView = async (): Promise<FileStatus[]> => {
+        if (this.viewStatusCache) {
+            logger.debug('[git-status] view cache hit', {
+                ageMs: Date.now() - this.viewStatusCache.loadedAt,
+                files: this.viewStatusCache.files.length
+            });
+            return this.applyCurrentDiagnostics(this.cloneStatus(this.viewStatusCache.files));
+        }
+
+        if (this.viewStatusInFlight) {
+            logger.debug('[git-status] joined in-flight view refresh');
+            const files = await this.viewStatusInFlight;
+            if (!this.viewStatusCache) {
+                return this.getStatusForView();
+            }
+            return this.cloneStatus(files);
+        }
+
+        const generation = this.viewStatusGeneration;
+        const request = this.loadStatus().then(files => {
+            if (generation === this.viewStatusGeneration) {
+                this.viewStatusCache = {
+                    files: this.cloneStatus(files),
+                    loadedAt: Date.now()
+                };
+                this.viewStatusFingerprint = this.createStatusFingerprint(files);
+            }
+            return files;
+        }).finally(() => {
+            if (this.viewStatusInFlight === request) {
+                this.viewStatusInFlight = undefined;
+            }
+        });
+        this.viewStatusInFlight = request;
+        return this.cloneStatus(await request);
+    };
+
+    public refreshStatusCache = async (): Promise<boolean> => {
+        const previousFingerprint = this.viewStatusFingerprint;
+        this.invalidateStatusCache();
+        await this.getStatusForView();
+        return previousFingerprint === undefined || previousFingerprint !== this.viewStatusFingerprint;
+    };
+
+    private loadStatus = async (): Promise<FileStatus[]> => {
         const startedAt = Date.now();
         const workspaceRoot = this.getWorkspaceRoot();
         logger.debug(`Fetching git status at: ${workspaceRoot}`);
@@ -947,6 +1034,13 @@ export class GitService implements vscode.Disposable {
             const gitStatusStartedAt = Date.now();
             const status: StatusResult = await this.git.status();
             gitStatusMs = Date.now() - gitStatusStartedAt;
+            this.latestStatusIdentity = JSON.stringify({
+                current: status.current,
+                tracking: status.tracking,
+                ahead: status.ahead,
+                behind: status.behind,
+                detached: status.detached
+            });
 
             status.files.forEach(file => {
                 const wsPath = this.toWorkspacePath(file.path);
@@ -1073,14 +1167,19 @@ export class GitService implements vscode.Disposable {
         });
         const diagnosticsMs = Date.now() - diagnosticsStartedAt;
 
-        logger.debug('[git-status] loaded', {
+        const metrics = {
             elapsedMs: Date.now() - startedAt,
             gitStatusMs,
             diffMs,
             diagnosticsMs,
             files: files.length,
             hunkFiles: hunkFileCount
-        });
+        };
+        if (metrics.elapsedMs >= 250) {
+            logger.info('[git-status] slow load', metrics);
+        } else {
+            logger.debug('[git-status] loaded', metrics);
+        }
 
         return files.sort((a, b) => a.path.localeCompare(b.path));
     }

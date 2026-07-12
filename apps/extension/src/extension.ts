@@ -9,7 +9,7 @@ import { BranchStatusBar, GitLogStatusBar } from './ui';
 import { registerStashCommands, registerGlobalNavigationCommands, registerWorktreeCommands, registerBranchCommands, registerLogCommands, registerLogFileCommands, registerChangelistCommands, registerAiCommands, registerEditorGitCommands } from './commands';
 import { logger } from './utils/logger';
 import { ChangeBlockEditorController } from './editor/ChangeBlockEditorController';
-import type { ConflictResolverContextAction } from '@shared/messages';
+import type { ConflictResolverContextAction, RefreshScope } from '@shared/messages';
 import type { MergeEditorContext } from '@shared/webviewContext';
 
 interface RepositoryQuickPickItem extends vscode.QuickPickItem {
@@ -246,6 +246,8 @@ export async function activate(context: vscode.ExtensionContext) {
     let repoBoundDisposables: vscode.Disposable[] = [];
     let gitWatcherDisposables: vscode.Disposable[] = [];
     let gitWatcherGeneration = 0;
+    const gitStateRefreshScopes: RefreshScope[] = ['commit', 'branch', 'push', 'stash', 'gitLog'];
+    const repositoryRefreshScopes: RefreshScope[] = ['commit', 'branch', 'worktrees', 'push', 'stash', 'gitLog'];
 
     const disposeRepoBoundDisposables = () => {
         for (const disposable of repoBoundDisposables.splice(0)) {
@@ -284,9 +286,39 @@ export async function activate(context: vscode.ExtensionContext) {
         }
 
         gitWatcherDisposables.push(
-            watcher.onChange(() => {
-                repositoryManager.initialize().catch(e => logger.error('Failed to rescan repositories after git watcher change', e));
-                triggerRefresh();
+            watcher.onChange(change => {
+                const activeService = repositoryManager.getActiveService();
+                for (const repository of repositoryManager.getRepositories()) {
+                    const service = repositoryManager.getService(repository.repoPath);
+                    if (service !== activeService) {
+                        service?.invalidateStatusCache();
+                    }
+                }
+
+                if (change.kind === 'repositories') {
+                    void repositoryManager.initialize()
+                        .then(() => requestRefresh('repository-watcher', repositoryRefreshScopes, true))
+                        .catch(e => logger.error('Failed to rescan repositories after git watcher change', e));
+                    return;
+                }
+                if (!activeService) {
+                    requestRefresh('git-watcher', gitStateRefreshScopes);
+                    return;
+                }
+                void activeService.refreshStatusCache()
+                    .then(changed => {
+                        if (changed) {
+                            requestRefresh('git-watcher', gitStateRefreshScopes);
+                            return;
+                        }
+                        logger.debug('[refresh] skipped unchanged git watcher state');
+                        provider.requestRefresh({ scopes: ['stash'], reason: 'git-watcher' });
+                    })
+                    .catch(error => {
+                        activeService.invalidateStatusCache();
+                        logger.warn('Failed to pre-refresh Git status after watcher change', error);
+                        requestRefresh('git-watcher-fallback', gitStateRefreshScopes);
+                    });
             }),
             watcher
         );
@@ -324,14 +356,34 @@ export async function activate(context: vscode.ExtensionContext) {
         }
     };
 
-    const triggerRefresh = () => {
-        provider.rpc?.refresh();
-        gitLogProvider.rpc?.refresh();
-        branchStatusBar?.update();
-        gitLogStatusBar?.update();
-        changeBlockEditorController?.refresh();
-        void updateRemoteProviderContext();
-        void updateWorktreesContext();
+    const requestRefresh = (
+        reason: string,
+        scopes: RefreshScope[] = gitStateRefreshScopes,
+        refreshRepositoryContext = false
+    ) => {
+        logger.debug('[refresh] requested', {
+            reason,
+            scopes: scopes.join(','),
+            commitViewVisible: provider.isVisible(),
+            gitLogVisible: gitLogProvider.isVisible()
+        });
+        const localChangesScopes = scopes.filter(scope => scope !== 'gitLog');
+        if (localChangesScopes.length > 0) {
+            provider.requestRefresh({ scopes: localChangesScopes, reason });
+        }
+        if (scopes.includes('gitLog')) {
+            gitLogProvider.requestRefresh({ scopes: ['gitLog'], reason });
+        }
+        if (scopes.includes('branch')) {
+            void branchStatusBar?.update();
+        }
+        if (scopes.includes('commit')) {
+            changeBlockEditorController?.refresh();
+        }
+        if (refreshRepositoryContext) {
+            void updateRemoteProviderContext();
+            void updateWorktreesContext();
+        }
     };
 
     const bindActiveRepository = () => {
@@ -376,7 +428,7 @@ export async function activate(context: vscode.ExtensionContext) {
             branchStatusBar,
             gitLogStatusBar,
             changeBlockEditorController,
-            gitService.onDidChange(triggerRefresh)
+            gitService.onDidChange(() => requestRefresh('git-mutation', gitStateRefreshScopes))
         );
 
         updateRepositoryContext();
@@ -443,7 +495,7 @@ export async function activate(context: vscode.ExtensionContext) {
         onRefresh: async () => {
             await repositoryManager.initialize();
             bindActiveRepository();
-            triggerRefresh();
+            requestRefresh('manual', repositoryRefreshScopes, true);
             void resetGitWatcher();
         }
     });
@@ -475,14 +527,14 @@ export async function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(
         vscode.commands.registerCommand('intelli-git.repository.add', async () => {
             await addRepositoryFromDialog(repositoryManager, updateRepositoryContext);
-            triggerRefresh();
+            requestRefresh('repository-added', repositoryRefreshScopes, true);
         })
     );
 
     context.subscriptions.push(
         vscode.commands.registerCommand('intelli-git.repository.scanWorkspace', async () => {
             await scanWorkspaceRepositories(repositoryManager, updateRepositoryContext);
-            triggerRefresh();
+            requestRefresh('repository-scan', repositoryRefreshScopes, true);
         })
     );
 
@@ -493,7 +545,7 @@ export async function activate(context: vscode.ExtensionContext) {
             }
             await repositoryManager.removeRepository(args.repoPath);
             updateRepositoryContext();
-            triggerRefresh();
+            requestRefresh('repository-removed', repositoryRefreshScopes, true);
         })
     );
 
@@ -503,32 +555,41 @@ export async function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(
         repositoryManager.onDidChangeActiveRepo(() => {
             bindActiveRepository();
-            triggerRefresh();
+            requestRefresh('active-repository', repositoryRefreshScopes, true);
         }),
         repositoryManager.onDidChangeRepositories(() => {
             updateRepositoryContext();
             backgroundFetchService.refreshRepositories();
             void resetGitWatcher();
-            triggerRefresh();
-        })
-    );
-
-    context.subscriptions.push(
-        vscode.workspace.onDidChangeWorkspaceFolders(() => {
-            void repositoryManager.initialize()
-                .then(() => {
-                    bindActiveRepository();
-                    triggerRefresh();
-                    void resetGitWatcher();
-                })
-                .catch(e => logger.error('Failed to refresh repositories after workspace folder change', e));
+            requestRefresh('repositories-changed', repositoryRefreshScopes, true);
         })
     );
 
     // Watch for diagnostic changes to update file error status in changelist
     context.subscriptions.push(
-        vscode.languages.onDidChangeDiagnostics(() => {
-            triggerRefresh();
+        vscode.languages.onDidChangeDiagnostics(event => {
+            const gitService = repositoryManager.getActiveService();
+            const repoPath = repositoryManager.getActiveRepoPath();
+            if (!gitService || !repoPath || !provider.isVisible()) {
+                return;
+            }
+
+            const workspaceRoot = gitService.getWorkspaceRoot();
+            const files = event.uris.flatMap(uri => {
+                if (uri.scheme !== 'file') {
+                    return [];
+                }
+                const relativePath = path.relative(workspaceRoot, uri.fsPath);
+                if (!relativePath || relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
+                    return [];
+                }
+                const error = vscode.languages.getDiagnostics(uri)
+                    .some(diagnostic => diagnostic.severity === vscode.DiagnosticSeverity.Error);
+                return [{ path: relativePath.replace(/\\/g, '/'), error }];
+            });
+            if (files.length > 0) {
+                provider.sendFileDiagnosticsChange({ repoPath, files });
+            }
         })
     );
 
@@ -536,7 +597,8 @@ export async function activate(context: vscode.ExtensionContext) {
         vscode.workspace.onDidChangeConfiguration((event) => {
             if (event.affectsConfiguration('intelli-git.changelist.mode')) {
                 updateChangelistModeContext();
-                triggerRefresh();
+                repositoryManager.getActiveService()?.invalidateStatusCache();
+                requestRefresh('changelist-mode', ['commit']);
             }
         })
     );

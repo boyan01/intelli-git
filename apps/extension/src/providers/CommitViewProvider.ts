@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
-import type { ChangelistFileSelection, CommitAiAction } from '@shared/messages';
+import { randomUUID } from 'node:crypto';
+import type { ChangelistFileSelection, CommitAiAction, FileDiagnosticsChange, RefreshEvent } from '@shared/messages';
 import { BaseWebviewProvider, WebviewProviderOptions } from './BaseWebviewProvider';
 import { ConflictResolverPanel } from './ConflictResolverPanel';
 import type { ExtensionRpcHandlerOptions } from '../rpc';
@@ -10,6 +11,9 @@ export class CommitViewProvider extends BaseWebviewProvider implements vscode.We
     private _view?: vscode.WebviewView;
     private _selectedChangelistFile: ChangelistFileSelection | null = null;
     private _isChangelistTreeFocused = false;
+    private _pendingRefresh?: RefreshEvent;
+    private _refreshTimeout?: NodeJS.Timeout;
+    private readonly cacheSessionId = randomUUID();
 
     constructor(options: WebviewProviderOptions) {
         super(options);
@@ -44,6 +48,54 @@ export class CommitViewProvider extends BaseWebviewProvider implements vscode.We
         return undefined;
     }
 
+    protected getInitialState(): unknown {
+        return {
+            activeRepoPath: this.options.repositoryManager.getActiveRepoPath(),
+            cacheSessionId: this.cacheSessionId
+        };
+    }
+
+    public requestRefresh(event: RefreshEvent): void {
+        const scopes = new Set([...(this._pendingRefresh?.scopes || []), ...event.scopes]);
+        const reasons = new Set([
+            ...(this._pendingRefresh?.reason?.split(',') || []),
+            ...(event.reason?.split(',') || [])
+        ].filter(Boolean));
+        this._pendingRefresh = {
+            scopes: Array.from(scopes),
+            reason: Array.from(reasons).join(',')
+        };
+
+        if (!this.isVisible() || this._refreshTimeout) {
+            return;
+        }
+
+        this._refreshTimeout = setTimeout(() => this.flushRefresh(), 100);
+    }
+
+    public sendFileDiagnosticsChange(change: FileDiagnosticsChange): void {
+        if (this.isVisible()) {
+            void this._rpc?.proxy.fileDiagnosticsChange(change);
+        }
+    }
+
+    public isVisible(): boolean {
+        return this._view?.visible === true;
+    }
+
+    private flushRefresh(): void {
+        if (this._refreshTimeout) {
+            clearTimeout(this._refreshTimeout);
+            this._refreshTimeout = undefined;
+        }
+        if (!this.isVisible() || !this._pendingRefresh) {
+            return;
+        }
+        const event = this._pendingRefresh;
+        this._pendingRefresh = undefined;
+        void this._rpc?.proxy.refresh(event);
+    }
+
     protected getRpcHandlerOptions(): Partial<ExtensionRpcHandlerOptions> {
         return {
             onChangelistSelectionChange: (selection) => {
@@ -70,6 +122,13 @@ export class CommitViewProvider extends BaseWebviewProvider implements vscode.We
         _token: vscode.CancellationToken,
     ) {
         this._view = webviewView;
+        this._pendingRefresh = undefined;
+
+        this._disposables.push(webviewView.onDidChangeVisibility(() => {
+            if (webviewView.visible) {
+                this.flushRefresh();
+            }
+        }));
 
         this.setupWebview(webviewView.webview, () => !this._view);
         webviewView.webview.html = this.getHtml(webviewView.webview);
@@ -77,6 +136,7 @@ export class CommitViewProvider extends BaseWebviewProvider implements vscode.We
         this.setupActiveFileListener();
 
         webviewView.onDidDispose(() => {
+            this._view = undefined;
             this._selectedChangelistFile = null;
             this._isChangelistTreeFocused = false;
             void vscode.commands.executeCommand('setContext', 'intelli-git.hasSelectedChangelistFile', false);
@@ -134,5 +194,13 @@ export class CommitViewProvider extends BaseWebviewProvider implements vscode.We
         }, 100);
 
         this._disposables.push(activeEditorListener);
+    }
+
+    public override dispose(): void {
+        if (this._refreshTimeout) {
+            clearTimeout(this._refreshTimeout);
+            this._refreshTimeout = undefined;
+        }
+        super.dispose();
     }
 }

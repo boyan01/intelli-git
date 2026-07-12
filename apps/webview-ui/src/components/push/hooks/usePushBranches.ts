@@ -3,8 +3,11 @@ import { rpc } from '@/lib/rpc_client';
 import { usePersistedState } from '../../../hooks/usePersistedState';
 import { useRpcData } from '@/hooks/useRpcData';
 import { resolvePushTarget } from '../pushTarget';
+import type { RefreshScope } from '@shared/messages';
 
-export function usePushBranches() {
+const PUSH_REFRESH_SCOPES: RefreshScope[] = ['push'];
+
+export function usePushBranches(enabled = true) {
     const loadPushInitState = useCallback(async () => await rpc.getPushInitState(), []);
 
     // 1. Load Initial State (Local branch & Remotes)
@@ -15,7 +18,8 @@ export function usePushBranches() {
         loadPushInitState,
         {
             initialValue: { repositoryPath: '', localBranch: '', remotes: [], protectedPushTargets: [] },
-            refreshOnEvent: true,
+            enabled,
+            refreshScopes: PUSH_REFRESH_SCOPES,
             cacheKey: 'push.initState'
         }
     );
@@ -66,6 +70,8 @@ export function usePushBranches() {
         loadRemoteBranches,
         {
             initialValue: { remote: '', branches: [] },
+            enabled,
+            refreshScopes: PUSH_REFRESH_SCOPES,
             cacheKey: 'push.remoteBranches'
         }
     );

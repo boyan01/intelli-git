@@ -12,9 +12,10 @@ import { rpc, rpcEvents } from '../../lib/rpc_client';
 import { usePersistedState } from '../../hooks/usePersistedState';
 import { useRpcData } from '../../hooks/useRpcData';
 import { useTranslation } from 'react-i18next';
-import type { BranchListData } from '@shared/messages';
+import type { BranchListData, RefreshScope } from '@shared/messages';
 
 const NARROW_THRESHOLD = 800;
+const GIT_LOG_REFRESH_SCOPES: RefreshScope[] = ['gitLog'];
 
 const emptyBranchListData: BranchListData = {
     hasRepository: true,
@@ -44,11 +45,11 @@ export function GitLogView() {
         reload: reloadActiveRepository
     } = useRpcData(
         loadActiveRepository,
-        { initialValue: undefined, loadingOnRefresh: true }
+        { initialValue: undefined, loadingOnRefresh: true, refreshScopes: GIT_LOG_REFRESH_SCOPES }
     );
     const { data: branchListData, loading: branchListLoading, reload: reloadBranchList } = useRpcData(
         loadBranchListData,
-        { initialValue: emptyBranchListData, loadingOnRefresh: true }
+        { initialValue: emptyBranchListData, loadingOnRefresh: true, refreshScopes: GIT_LOG_REFRESH_SCOPES }
     );
 
     const [branchSplitRatio, setBranchSplitRatio] = usePersistedState('gitLog.branchSplitRatio');
@@ -75,7 +76,8 @@ export function GitLogView() {
     const { data: commitDetails } = useRpcData(
         loadCommitDetails,
         {
-            initialValue: undefined
+            initialValue: undefined,
+            refreshOnEvent: false
         }
     );
 

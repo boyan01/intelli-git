@@ -15,7 +15,7 @@ export function registerStashCommands(
         vscode.commands.registerCommand('intelli-git.stashPop', async (args: any) => {
             if (args && typeof args.stashIndex === 'number') {
                 await gitService.popStash(args.stashIndex);
-                provider.rpc?.refresh();
+                provider.requestRefresh({ scopes: ['commit', 'stash'], reason: 'stash-popped' });
             }
         })
     );
@@ -24,7 +24,7 @@ export function registerStashCommands(
         vscode.commands.registerCommand('intelli-git.stashApply', async (args: any) => {
             if (args && typeof args.stashIndex === 'number') {
                 await gitService.applyStash(args.stashIndex);
-                provider.rpc?.refresh();
+                provider.requestRefresh({ scopes: ['commit'], reason: 'stash-applied' });
             }
         })
     );
@@ -40,7 +40,7 @@ export function registerStashCommands(
                 );
                 if (confirm) {
                     await gitService.dropStash(args.stashIndex);
-                    provider.rpc?.refresh();
+                    provider.requestRefresh({ scopes: ['stash'], reason: 'stash-dropped' });
                 }
             }
         })

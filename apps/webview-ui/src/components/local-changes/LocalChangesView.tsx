@@ -8,7 +8,7 @@ import { usePersistedState } from '../../hooks/usePersistedState';
 import { useRpcData } from '../../hooks/useRpcData';
 import { rpc, rpcEvents } from '../../lib/rpc_client';
 import { useVersionCheck } from '../../hooks/useVersionCheck';
-import type { BranchInfo, WorktreeInfo } from '@shared/messages';
+import type { BranchInfo, RefreshScope, WorktreeInfo } from '@shared/messages';
 import { BranchStatus } from '../common/BranchStatus';
 import { VersionCheckBanner } from '../common/VersionCheckBanner';
 import { VersionExpiredPanel } from '../common/VersionExpiredPanel';
@@ -23,6 +23,9 @@ const defaultBranchInfo: BranchInfo = {
     behind: 0,
     rebaseStatus: 'none'
 };
+
+const BRANCH_REFRESH_SCOPES: RefreshScope[] = ['branch'];
+const WORKTREE_REFRESH_SCOPES: RefreshScope[] = ['worktrees'];
 
 type RebaseAction = 'continue' | 'abort';
 
@@ -92,29 +95,31 @@ export function LocalChangesView() {
     const { t } = useTranslation();
     const [persistedTab, setPersistedTab] = usePersistedState('commit.activeTab');
     const [tabTimestamp, setTabTimestamp] = usePersistedState('commit.activeTabTimestamp');
+    const [worktreeDrawerOpen, setWorktreeDrawerOpen] = useState(false);
     const loadBranchInfo = useCallback(() => rpc.getBranchInfo(), []);
     const loadWorktrees = useCallback(() => rpc.getWorktrees(), []);
     const { data: branches } = useRpcData(loadBranchInfo, {
         initialValue: defaultBranchInfo,
-        cacheKey: 'commit.branchInfo'
+        cacheKey: 'commit.branchInfo',
+        refreshScopes: BRANCH_REFRESH_SCOPES
     });
     const { data: worktrees, loading: worktreesLoading } = useRpcData(loadWorktrees, {
-        initialValue: [] as WorktreeInfo[]
+        initialValue: [] as WorktreeInfo[],
+        enabled: worktreeDrawerOpen,
+        refreshScopes: WORKTREE_REFRESH_SCOPES
     });
-    const [worktreeDrawerOpen, setWorktreeDrawerOpen] = useState(false);
     const [reviewingCommitPushTarget, setReviewingCommitPushTarget] = useState(false);
     const [rebaseActionPending, setRebaseActionPending] = useState<RebaseAction | null>(null);
     const [commitOptions, setCommitOptions] = useState<CommitOptions>({
         push: false,
         signOff: false
     });
-    const pushBranches = usePushBranches();
-
     // Determine initial tab: use persisted value only if set within 10 seconds
     const [activeTab, setActiveTabState] = useState<'commit' | 'stash' | 'push'>(() => {
         const elapsed = Date.now() - tabTimestamp;
         return elapsed > 10000 ? 'commit' : persistedTab;
     });
+    const pushBranches = usePushBranches(activeTab === 'push' || commitOptions.push || reviewingCommitPushTarget);
 
     const setActiveTab = useCallback((tab: 'commit' | 'stash' | 'push') => {
         setActiveTabState(tab);

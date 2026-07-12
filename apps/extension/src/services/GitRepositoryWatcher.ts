@@ -19,6 +19,10 @@ interface RepositoryState {
     onDidChange: vscode.Event<void>;
 }
 
+export interface GitWatcherChange {
+    kind: 'state' | 'repositories';
+}
+
 /**
  * Watches Git state changes using VS Code's built-in Git extension API.
  * This is the preferred watcher as it captures all Git changes including CLI.
@@ -26,7 +30,7 @@ interface RepositoryState {
 export class VSCodeGitWatcher implements vscode.Disposable {
     private disposables: vscode.Disposable[] = [];
     private refreshTimeout?: NodeJS.Timeout;
-    private onChangeEmitter = new vscode.EventEmitter<void>();
+    private onChangeEmitter = new vscode.EventEmitter<GitWatcherChange>();
     private _isActive = false;
 
     public readonly onChange = this.onChangeEmitter.event;
@@ -56,14 +60,14 @@ export class VSCodeGitWatcher implements vscode.Disposable {
 
             // Watch existing repositories
             for (const repo of api.repositories) {
-                this.disposables.push(repo.state.onDidChange(() => this.scheduleRefresh()));
+                this.disposables.push(repo.state.onDidChange(() => this.scheduleRefresh('state')));
             }
 
             // Watch for new repositories
             this.disposables.push(
                 api.onDidOpenRepository(repo => {
-                    this.disposables.push(repo.state.onDidChange(() => this.scheduleRefresh()));
-                    this.scheduleRefresh();
+                    this.disposables.push(repo.state.onDidChange(() => this.scheduleRefresh('state')));
+                    this.scheduleRefresh('repositories');
                 })
             );
 
@@ -74,12 +78,19 @@ export class VSCodeGitWatcher implements vscode.Disposable {
         }
     }
 
-    private scheduleRefresh() {
+    private pendingKind: GitWatcherChange['kind'] = 'state';
+
+    private scheduleRefresh(kind: GitWatcherChange['kind']) {
+        if (kind === 'repositories') {
+            this.pendingKind = kind;
+        }
         if (this.refreshTimeout) {
             clearTimeout(this.refreshTimeout);
         }
         this.refreshTimeout = setTimeout(() => {
-            this.onChangeEmitter.fire();
+            const pendingKind = this.pendingKind;
+            this.pendingKind = 'state';
+            this.onChangeEmitter.fire({ kind: pendingKind });
         }, 200);
     }
 
@@ -94,23 +105,42 @@ export class VSCodeGitWatcher implements vscode.Disposable {
 
 class CompositeGitWatcher implements vscode.Disposable {
     private disposables: vscode.Disposable[] = [];
-    private onChangeEmitter = new vscode.EventEmitter<void>();
+    private onChangeEmitter = new vscode.EventEmitter<GitWatcherChange>();
+    private refreshTimeout?: NodeJS.Timeout;
+    private pendingKind: GitWatcherChange['kind'] = 'state';
 
     public readonly onChange = this.onChangeEmitter.event;
 
-    constructor(watchers: Array<vscode.Disposable & { onChange: vscode.Event<void> }>) {
+    constructor(watchers: Array<vscode.Disposable & { onChange: vscode.Event<GitWatcherChange> }>) {
         this.disposables.push(this.onChangeEmitter);
         for (const watcher of watchers) {
             this.disposables.push(
-                watcher.onChange(() => this.onChangeEmitter.fire()),
+                watcher.onChange(change => this.scheduleRefresh(change)),
                 watcher
             );
         }
     }
 
+    private scheduleRefresh(change: GitWatcherChange): void {
+        if (change.kind === 'repositories') {
+            this.pendingKind = change.kind;
+        }
+        if (this.refreshTimeout) {
+            clearTimeout(this.refreshTimeout);
+        }
+        this.refreshTimeout = setTimeout(() => {
+            const pendingKind = this.pendingKind;
+            this.pendingKind = 'state';
+            this.onChangeEmitter.fire({ kind: pendingKind });
+        }, 200);
+    }
+
     dispose() {
         this.disposables.forEach(d => d.dispose());
         this.disposables = [];
+        if (this.refreshTimeout) {
+            clearTimeout(this.refreshTimeout);
+        }
     }
 }
 
@@ -121,7 +151,8 @@ class CompositeGitWatcher implements vscode.Disposable {
 export class FileSystemGitWatcher implements vscode.Disposable {
     private disposables: vscode.Disposable[] = [];
     private refreshTimeout?: NodeJS.Timeout;
-    private onChangeEmitter = new vscode.EventEmitter<void>();
+    private onChangeEmitter = new vscode.EventEmitter<GitWatcherChange>();
+    private pendingKind: GitWatcherChange['kind'] = 'state';
 
     public readonly onChange = this.onChangeEmitter.event;
 
@@ -151,15 +182,24 @@ export class FileSystemGitWatcher implements vscode.Disposable {
         if (uri.path.endsWith('.lock')) {
             return;
         }
-        this.scheduleRefresh();
+        const gitPath = uri.path.replace(/\\/g, '/');
+        const kind = /\/\.git\/(?:HEAD|config|commondir|gitdir|worktrees)(?:\/|$)/.test(gitPath)
+            ? 'repositories'
+            : 'state';
+        this.scheduleRefresh(kind);
     };
 
-    private scheduleRefresh() {
+    private scheduleRefresh(kind: GitWatcherChange['kind']) {
+        if (kind === 'repositories') {
+            this.pendingKind = kind;
+        }
         if (this.refreshTimeout) {
             clearTimeout(this.refreshTimeout);
         }
         this.refreshTimeout = setTimeout(() => {
-            this.onChangeEmitter.fire();
+            const pendingKind = this.pendingKind;
+            this.pendingKind = 'state';
+            this.onChangeEmitter.fire({ kind: pendingKind });
         }, 200);
     }
 
@@ -180,7 +220,7 @@ export async function createGitWatcher(
     _context: vscode.ExtensionContext,
     workspaceRoots: string[],
     additionalRoots: string[] = []
-): Promise<vscode.Disposable & { onChange: vscode.Event<void> }> {
+): Promise<vscode.Disposable & { onChange: vscode.Event<GitWatcherChange> }> {
     const vsCodeWatcher = new VSCodeGitWatcher();
 
     // Wait a bit for async initialization

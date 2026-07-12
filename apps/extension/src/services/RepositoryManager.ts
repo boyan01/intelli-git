@@ -62,6 +62,8 @@ export class RepositoryManager implements vscode.Disposable {
     private _onDidChangeRepositories = new vscode.EventEmitter<void>();
     private _onDidFallbackActiveRepo = new vscode.EventEmitter<{ previousRepoPath: string; nextRepoPath?: string }>();
     private disposables: vscode.Disposable[] = [];
+    private initializeInFlight?: Promise<void>;
+    private initializePending = false;
 
     public readonly onDidChangeActiveRepo = this._onDidChangeActiveRepo.event;
     public readonly onDidChangeRepositories = this._onDidChangeRepositories.event;
@@ -70,13 +72,30 @@ export class RepositoryManager implements vscode.Disposable {
     constructor(private context: vscode.ExtensionContext) {
         this.disposables.push(
             vscode.workspace.onDidChangeWorkspaceFolders(() => {
-                this.scanRepositories().catch(e => logger.error('Failed to scan repositories after workspace change', e));
+                this.initialize().catch(e => logger.error('Failed to scan repositories after workspace change', e));
             })
         );
     }
 
-    public async initialize(): Promise<void> {
-        await this.scanRepositories();
+    public initialize(): Promise<void> {
+        if (this.initializeInFlight) {
+            this.initializePending = true;
+            return this.initializeInFlight;
+        }
+
+        const run = async () => {
+            do {
+                this.initializePending = false;
+                await this.scanRepositories();
+            } while (this.initializePending);
+        };
+        const request = run().finally(() => {
+            if (this.initializeInFlight === request) {
+                this.initializeInFlight = undefined;
+            }
+        });
+        this.initializeInFlight = request;
+        return request;
     }
 
     private getUserRepositoryPaths(): string[] {
