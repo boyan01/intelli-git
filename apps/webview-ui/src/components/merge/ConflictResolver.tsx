@@ -81,6 +81,10 @@ function getFileReferenceKey(file: RepositoryFileReference): string {
     return `${file.repoPath || ''}\u0000${file.path}`;
 }
 
+function getShortObjectId(objectId: string | undefined): string {
+    return objectId ? objectId.slice(0, 12) : '—';
+}
+
 function isEditableKeyboardTarget(target: EventTarget | null): boolean {
     if (!(target instanceof HTMLElement)) {
         return false;
@@ -607,7 +611,9 @@ export function ConflictResolver({ file, onClose }: ConflictResolverProps) {
         resultDraft === null || pendingGroupCount > 0 || hasConflictBlocks(resultText);
     const statusLabel = !visibleContent
         ? ''
-        : pendingGroupCount > 0
+        : visibleContent.kind !== 'text'
+            ? ''
+            : pendingGroupCount > 0
             ? t('{{count}} unresolved', { count: pendingGroupCount })
             : t('No conflicts remaining');
 
@@ -947,7 +953,8 @@ export function ConflictResolver({ file, onClose }: ConflictResolverProps) {
     return (
         <section className={styles.resolver} aria-label={t('Conflict Resolver')} tabIndex={0} onKeyDown={handleKeyDown}>
             <div className={styles.header}>
-                <div className={styles.actions}>
+                <div className={`${styles.actions} ${visibleContent && visibleContent.kind !== 'text' ? styles.specialHeaderActions : ''}`}>
+                    {visibleContent && visibleContent.kind !== 'text' && <span className={styles.specialPath}>{file.path}</span>}
                     <button className={styles.iconButton} type="button" onClick={goToPreviousConflict} disabled={controlsDisabled || !previousPendingGroup} title={t('Previous Conflict')} aria-label={t('Previous Conflict')}>
                         <span className="codicon codicon-arrow-up" aria-hidden="true"></span>
                     </button>
@@ -994,26 +1001,30 @@ export function ConflictResolver({ file, onClose }: ConflictResolverProps) {
                 <div className={styles.statusText}>{statusLabel}</div>
             </div>
 
-            <div className={styles.paneHeaderGrid}>
-                <div className={styles.integratedPaneHeader}>
-                    <span>{t('Changes from {{name}}', { name: currentBranchLabel })}</span>
+            {(!visibleContent || visibleContent.kind === 'text') && (
+                <div className={styles.paneHeaderGrid}>
+                    <div className={styles.integratedPaneHeader}>
+                        <span>{t('Changes from {{name}}', { name: currentBranchLabel })}</span>
+                    </div>
+                    <div className={`${styles.integratedPaneHeader} ${styles.resultHeader}`}>
+                        <span>{t('Result')}</span>
+                        <span className={styles.resultPath}>{file.path}</span>
+                    </div>
+                    <div className={`${styles.integratedPaneHeader} ${styles.rightHeader}`}>
+                        <span>{t('Changes from {{name}}', { name: incomingBranchLabel })}</span>
+                    </div>
                 </div>
-                <div className={`${styles.integratedPaneHeader} ${styles.resultHeader}`}>
-                    <span>{t('Result')}</span>
-                    <span className={styles.resultPath}>{file.path}</span>
-                </div>
-                <div className={`${styles.integratedPaneHeader} ${styles.rightHeader}`}>
-                    <span>{t('Changes from {{name}}', { name: incomingBranchLabel })}</span>
-                </div>
-            </div>
+            )}
 
             <div className={styles.content}>
                 {isContentLoading && <div className={styles.message}>{t('Loading...')}</div>}
                 {error && <div className={`${styles.message} ${styles.error}`}>{error.message}</div>}
-                {visibleContent?.isBinary && (
-                    <div className={styles.binaryState}>
-                        <div className={styles.message}>{t('Binary conflict files cannot be edited in Intelli Git yet.')}</div>
-                        <div className={styles.binaryActions}>
+                {visibleContent?.kind === 'binary' && (
+                    <div className={styles.specialConflictState}>
+                        <span className={`codicon codicon-file-binary ${styles.specialConflictIcon}`} aria-hidden="true"></span>
+                        <div className={styles.specialConflictTitle}>{t('Binary file conflict')}</div>
+                        <div className={styles.specialConflictDescription}>{t('Choose one complete version of the file. Binary content cannot be merged inline.')}</div>
+                        <div className={styles.specialConflictActions}>
                             <button className={styles.button} type="button" onClick={() => void acceptFileSide('ours')} disabled={saving || isContentLoading || !visibleContent}>
                                 <span className="codicon codicon-arrow-left" aria-hidden="true"></span>
                                 {t('Accept Current Change')}
@@ -1022,10 +1033,44 @@ export function ConflictResolver({ file, onClose }: ConflictResolverProps) {
                                 <span className="codicon codicon-arrow-right" aria-hidden="true"></span>
                                 {t('Accept Incoming Change')}
                             </button>
+                            <button className={styles.button} type="button" onClick={() => void rpc.openFile(file)} disabled={saving || isContentLoading}>
+                                <span className="codicon codicon-go-to-file" aria-hidden="true"></span>
+                                {t('Open File')}
+                            </button>
                         </div>
                     </div>
                 )}
-                {visibleContent && !visibleContent.isBinary && resultDraft !== null && (
+                {visibleContent?.kind === 'submodule' && (
+                    <div className={styles.specialConflictState}>
+                        <span className={`codicon codicon-repo ${styles.specialConflictIcon}`} aria-hidden="true"></span>
+                        <div className={styles.specialConflictTitle}>{t('Submodule conflict')}</div>
+                        <div className={styles.specialConflictDescription}>{t('Resolve the submodule to the commit you want, then stage the submodule path in the parent repository.')}</div>
+                        <div className={styles.commitChoices}>
+                            <div className={styles.commitChoice}>
+                                <span>{t('Current commit')}</span>
+                                <code title={visibleContent.current.objectId}>{getShortObjectId(visibleContent.current.objectId)}</code>
+                            </div>
+                            <div className={styles.commitChoice}>
+                                <span>{t('Incoming commit')}</span>
+                                <code title={visibleContent.incoming.objectId}>{getShortObjectId(visibleContent.incoming.objectId)}</code>
+                            </div>
+                        </div>
+                        <div className={styles.specialConflictActions}>
+                            <button className={styles.button} type="button" onClick={() => void rpc.openFile(file)} disabled={saving || isContentLoading}>
+                                <span className="codicon codicon-folder-opened" aria-hidden="true"></span>
+                                {t('Open Submodule')}
+                            </button>
+                        </div>
+                    </div>
+                )}
+                {visibleContent?.kind === 'unsupported' && (
+                    <div className={styles.specialConflictState}>
+                        <span className={`codicon codicon-warning ${styles.specialConflictIcon}`} aria-hidden="true"></span>
+                        <div className={styles.specialConflictTitle}>{t('Unsupported conflict')}</div>
+                        <div className={styles.specialConflictDescription}>{t('This Git entry type cannot be resolved in Intelli Git. Resolve and stage it with Git, then refresh the view.')}</div>
+                    </div>
+                )}
+                {visibleContent && visibleContent.kind === 'text' && resultDraft !== null && (
                     <ThreeWayMergeEditor
                         filePath={file.path}
                         leftText={visibleContent.current.content}
@@ -1054,20 +1099,26 @@ export function ConflictResolver({ file, onClose }: ConflictResolverProps) {
             </div>
             <div className={styles.footer}>
                 <div className={styles.footerLeft}>
-                    <button className={styles.footerButton} type="button" onClick={() => void acceptFileSide('ours')} disabled={saving || isContentLoading || !visibleContent}>
-                        {acceptLeftFileLabel}
-                    </button>
-                    <button className={styles.footerButton} type="button" onClick={() => void acceptFileSide('theirs')} disabled={saving || isContentLoading || !visibleContent}>
-                        {acceptRightFileLabel}
-                    </button>
+                    {visibleContent?.kind === 'text' && (
+                        <>
+                            <button className={styles.footerButton} type="button" onClick={() => void acceptFileSide('ours')} disabled={saving || isContentLoading}>
+                                {acceptLeftFileLabel}
+                            </button>
+                            <button className={styles.footerButton} type="button" onClick={() => void acceptFileSide('theirs')} disabled={saving || isContentLoading}>
+                                {acceptRightFileLabel}
+                            </button>
+                        </>
+                    )}
                 </div>
                 <div className={styles.footerRight}>
                     <button className={styles.footerButton} type="button" onClick={onClose} disabled={saving}>
                         {t('Cancel')}
                     </button>
-                    <button className={`${styles.footerButton} ${styles.applyButton}`} type="button" onClick={() => void saveResolution()} disabled={completeDisabled}>
-                        {t('Apply')}
-                    </button>
+                    {(!visibleContent || visibleContent.kind === 'text') && (
+                        <button className={`${styles.footerButton} ${styles.applyButton}`} type="button" onClick={() => void saveResolution()} disabled={completeDisabled}>
+                            {t('Apply')}
+                        </button>
+                    )}
                 </div>
             </div>
         </section>

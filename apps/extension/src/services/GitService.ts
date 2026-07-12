@@ -686,18 +686,18 @@ export class GitService implements vscode.Disposable {
         };
     }
 
-    private async readConflictSide(objectId: string | undefined): Promise<{
+    private async readConflictSide(stage: ConflictStageEntry | undefined): Promise<{
         content: Buffer;
         side: ConflictSideContent;
     }> {
-        if (!objectId) {
+        if (!stage) {
             return {
                 content: Buffer.alloc(0),
                 side: { exists: false, content: '' }
             };
         }
 
-        const content = Buffer.from(await this.git.binaryCatFile(['-p', objectId]));
+        const content = Buffer.from(await this.git.binaryCatFile(['-p', stage.objectId]));
         return {
             content,
             side: {
@@ -877,28 +877,31 @@ export class GitService implements vscode.Disposable {
         const result = resultSnapshot.content.toString('utf8');
         const stageNumbers = new Set(stages.keys());
         const labels = await this.getConflictLabels();
-        const hasUnsupportedMode = [...stages.values()].some(stage => !isRegularConflictMode(stage.mode));
+        const stageEntries = [...stages.values()];
+        const hasUnsupportedMode = stageEntries.some(stage => !isRegularConflictMode(stage.mode));
         if (hasUnsupportedMode) {
+            const kind = stageEntries.every(stage => stage.mode === '160000') ? 'submodule' : 'unsupported';
             return {
                 path: filePath,
                 ...labels,
-                base: { exists: stages.has(1), content: '' },
-                current: { exists: stages.has(2), content: '' },
-                incoming: { exists: stages.has(3), content: '' },
+                base: { exists: stages.has(1), content: '', objectId: stages.get(1)?.objectId },
+                current: { exists: stages.has(2), content: '', objectId: stages.get(2)?.objectId },
+                incoming: { exists: stages.has(3), content: '', objectId: stages.get(3)?.objectId },
                 currentChanges: [],
                 incomingChanges: [],
                 result,
                 stageSignature: signature,
                 resultFingerprint: resultSnapshot.fingerprint,
                 resolvedCandidate: false,
-                isBinary: true
+                isBinary: true,
+                kind
             };
         }
 
         const [baseSide, currentSide, incomingSide] = await Promise.all([
-            this.readConflictSide(stages.get(1)?.objectId),
-            this.readConflictSide(stages.get(2)?.objectId),
-            this.readConflictSide(stages.get(3)?.objectId)
+            this.readConflictSide(stages.get(1)),
+            this.readConflictSide(stages.get(2)),
+            this.readConflictSide(stages.get(3))
         ]);
         const base = baseSide.side;
         const current = currentSide.side;
@@ -927,7 +930,8 @@ export class GitService implements vscode.Disposable {
             stageSignature: signature,
             resultFingerprint: resultSnapshot.fingerprint,
             resolvedCandidate: this.isResolvedConflictCandidate(stageNumbers, resultSnapshot),
-            isBinary
+            isBinary,
+            kind: isBinary ? 'binary' : 'text'
         };
     }
 

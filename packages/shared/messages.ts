@@ -217,7 +217,10 @@ export interface ChangelistFileSelection {
 export interface ConflictSideContent {
     exists: boolean;
     content: string;
+    objectId?: string;
 }
+
+export type ConflictFileKind = 'text' | 'binary' | 'submodule' | 'unsupported';
 
 export interface ConflictChange {
     id: string;
@@ -243,6 +246,7 @@ export interface ConflictFileContent {
     resultFingerprint: string;
     resolvedCandidate: boolean;
     isBinary: boolean;
+    kind: ConflictFileKind;
 }
 
 export interface ConflictResolutionSnapshot {

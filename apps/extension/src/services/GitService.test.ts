@@ -263,6 +263,7 @@ describe('GitService conflict resolution', () => {
         expect(conflict.stageSignature).toMatch(/^1:100644:[0-9a-f]+\|2:100644:[0-9a-f]+\|3:100644:[0-9a-f]+$/);
         expect(conflict.resultFingerprint).toMatch(/^[0-9a-f]{64}$/);
         expect(conflict.isBinary).toBe(false);
+        expect(conflict.kind).toBe('text');
 
         await service.saveConflictResolution('conflict.txt', 'resolved\n', conflict);
 
@@ -628,6 +629,7 @@ describe('GitService conflict resolution', () => {
         expect(conflict.current.exists).toBe(true);
         expect(conflict.incoming.exists).toBe(true);
         expect(conflict.isBinary).toBe(true);
+        expect(conflict.kind).toBe('binary');
     });
 
     it('treats invalid UTF-8 without NUL bytes as binary while preserving whole-side resolution', async () => {
@@ -663,6 +665,7 @@ describe('GitService conflict resolution', () => {
             ?.split(/\s+/)[1];
 
         expect(conflict.isBinary).toBe(true);
+        expect(conflict.kind).toBe('binary');
         expect(conflict.resolvedCandidate).toBe(false);
         expect(conflict.currentChanges).toEqual([]);
         expect(conflict.incomingChanges).toEqual([]);
@@ -728,9 +731,10 @@ describe('GitService conflict resolution', () => {
             const worktreeHeadBefore = (await moduleGit.revparse(['HEAD'])).trim();
 
             expect(conflict.isBinary).toBe(true);
-            expect(conflict.base).toEqual({ exists: true, content: '' });
-            expect(conflict.current).toEqual({ exists: true, content: '' });
-            expect(conflict.incoming).toEqual({ exists: true, content: '' });
+            expect(conflict.kind).toBe('submodule');
+            expect(conflict.base).toEqual({ exists: true, content: '', objectId: baseObjectId });
+            expect(conflict.current).toEqual({ exists: true, content: '', objectId: currentObjectId });
+            expect(conflict.incoming).toEqual({ exists: true, content: '', objectId: incomingObjectId });
 
             await expect(service.resolveConflict('module', 'theirs', conflict))
                 .rejects.toThrow('cannot be edited');

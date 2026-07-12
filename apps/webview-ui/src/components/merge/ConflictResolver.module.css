@@ -34,6 +34,18 @@
     overflow: hidden;
 }
 
+.specialHeaderActions > :not(.specialPath) {
+    display: none;
+}
+
+.specialPath {
+    overflow: hidden;
+    color: var(--vscode-descriptionForeground);
+    font-size: 11px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .button,
 .iconButton,
 .compactButton,
@@ -366,18 +378,71 @@
     color: var(--vscode-errorForeground);
 }
 
-.binaryState {
+.specialConflictState {
     display: flex;
-    min-height: 0;
+    width: min(520px, calc(100% - 48px));
+    margin: auto;
+    padding: 24px;
+    box-sizing: border-box;
+    align-items: center;
     flex-direction: column;
+    gap: 10px;
+    border: 1px solid var(--vscode-panel-border);
+    border-radius: 6px;
+    background: var(--vscode-sideBar-background);
+}
+
+.specialConflictIcon {
+    color: var(--vscode-descriptionForeground);
+    font-size: 30px;
+}
+
+.specialConflictTitle {
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.specialConflictDescription {
+    max-width: 440px;
+    color: var(--vscode-descriptionForeground);
+    font-size: 12px;
+    line-height: 18px;
+    text-align: center;
+}
+
+.specialConflictActions {
+    display: flex;
+    margin-top: 4px;
+    gap: 6px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.commitChoices {
+    display: grid;
+    width: min(400px, 100%);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
 }
 
-.binaryActions {
+.commitChoice {
     display: flex;
-    padding: 0 12px;
-    gap: 6px;
-    flex-wrap: wrap;
+    min-width: 0;
+    padding: 8px 10px;
+    flex-direction: column;
+    gap: 4px;
+    border: 1px solid var(--vscode-panel-border);
+    border-radius: 3px;
+    color: var(--vscode-descriptionForeground);
+    font-size: 11px;
+}
+
+.commitChoice code {
+    overflow: hidden;
+    color: var(--vscode-foreground);
+    font-family: var(--vscode-editor-font-family);
+    font-size: 12px;
+    text-overflow: ellipsis;
 }
 
 .footer {
