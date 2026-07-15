@@ -15,6 +15,11 @@ let inputBoxResponse: unknown;
 let quickPickResponse: unknown;
 const inputBoxCalls: unknown[] = [];
 const quickPickCalls: Array<{ items: unknown; options: unknown }> = [];
+let backgroundFetchConfig = {
+    enabled: false,
+    onStartup: true,
+    intervalMinutes: 15
+};
 
 export class EventEmitter<T> {
     private listeners = new Set<(event: T) => unknown>();
@@ -56,6 +61,9 @@ export const workspace = {
     onDidChangeWorkspaceFolders(listener: () => unknown) {
         return workspaceFolderEmitter.event(listener);
     },
+    onDidChangeConfiguration(listener: (event: { affectsConfiguration(section: string): boolean }) => unknown) {
+        return configurationEmitter.event(listener);
+    },
     getConfiguration(section?: string) {
         return {
             get<T>(key: string, defaultValue: T): T {
@@ -64,6 +72,9 @@ export const workspace = {
                 }
                 if (section === 'intelli-git.push' && key === 'confirmProtectedBranch') {
                     return confirmProtectedBranchPush as T;
+                }
+                if (section === 'intelli-git.backgroundFetch' && key in backgroundFetchConfig) {
+                    return backgroundFetchConfig[key as keyof typeof backgroundFetchConfig] as T;
                 }
                 return defaultValue;
             },
@@ -94,6 +105,7 @@ export const workspace = {
 };
 
 const workspaceFolderEmitter = new EventEmitter<void>();
+const configurationEmitter = new EventEmitter<{ affectsConfiguration(section: string): boolean }>();
 
 class MockUri {
     public readonly path: string;
@@ -148,6 +160,10 @@ export const commands = {
 };
 
 export const window = {
+    state: { focused: true },
+    onDidChangeWindowState(listener: (event: { focused: boolean }) => unknown) {
+        return windowStateEmitter.event(listener);
+    },
     async showWarningMessage(message: string, ...args: unknown[]): Promise<unknown> {
         warningMessages.push({ message, args });
         return warningMessageResponse;
@@ -203,6 +219,8 @@ export const window = {
         };
     }
 };
+
+const windowStateEmitter = new EventEmitter<{ focused: boolean }>();
 
 export const env = {
     get language() {
@@ -278,6 +296,10 @@ export function __getChangelistMode(): string {
 
 export function __setConfirmProtectedBranchPush(value: boolean): void {
     confirmProtectedBranchPush = value;
+}
+
+export function __setBackgroundFetchConfig(config: Partial<typeof backgroundFetchConfig>): void {
+    backgroundFetchConfig = { ...backgroundFetchConfig, ...config };
 }
 
 export function __getExecutedCommands(): Array<{ command: string; args: unknown[] }> {

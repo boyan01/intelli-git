@@ -124,9 +124,15 @@ describe('GitService commit view status cache', () => {
         await expect(service.getStatusForView()).resolves.toEqual([]);
         expect(status).toHaveBeenCalledTimes(2);
 
-        await expect(service.refreshStatusCache()).resolves.toBe(false);
+        await expect(service.refreshStatusCache()).resolves.toEqual({
+            commitChanged: false,
+            branchChanged: false
+        });
         status.mockResolvedValueOnce({ files: [], conflicted: [], current: 'feature' });
-        await expect(service.refreshStatusCache()).resolves.toBe(true);
+        await expect(service.refreshStatusCache()).resolves.toEqual({
+            commitChanged: false,
+            branchChanged: true
+        });
     });
 });
 
@@ -1603,7 +1609,8 @@ describe('GitService branch remote workflows', () => {
         const push = vi.fn().mockResolvedValue(undefined);
         const notifyChanged = vi.fn();
         const service = new GitBranchRemoteService({
-            git: { push } as unknown as SimpleGit,
+            git: {} as SimpleGit,
+            remoteGit: { push } as unknown as SimpleGit,
             gitRoot: tempDir,
             notifyChanged,
             withTemporaryStash: async () => { },
@@ -1617,39 +1624,12 @@ describe('GitService branch remote workflows', () => {
         await service.forcePush('origin', 'main:main', { noVerify: true });
 
         expect(push).toHaveBeenCalledWith('origin', 'main:main', ['--force-with-lease', '--no-verify']);
-        expect(notifyChanged).toHaveBeenCalledTimes(1);
-    });
-
-    it('notifies background fetch changes only when remote refs move', async () => {
-        const getRemotes = vi.fn().mockResolvedValue([{ name: 'origin' }]);
-        const fetch = vi.fn().mockResolvedValue(undefined);
-        const raw = vi.fn()
-            .mockResolvedValueOnce('refs/remotes/origin/main:aaaa\n')
-            .mockResolvedValueOnce('refs/remotes/origin/main:aaaa\n')
-            .mockResolvedValueOnce('refs/remotes/origin/main:aaaa\n')
-            .mockResolvedValueOnce('refs/remotes/origin/main:bbbb\n');
-        const notifyChanged = vi.fn();
-        const service = new GitBranchRemoteService({
-            git: { getRemotes, fetch, raw } as unknown as SimpleGit,
-            gitRoot: tempDir,
-            notifyChanged,
-            withTemporaryStash: async () => { },
-            createEditorGit: () => {
-                throw new Error('Not used');
-            },
-            runMutation: async operation => operation(),
-            getCommitFiles: async () => []
-        });
-
-        await expect(service.fetchRemoteTracking('origin')).resolves.toBe(false);
-        expect(notifyChanged).not.toHaveBeenCalled();
-
-        await expect(service.fetchRemoteTracking('origin')).resolves.toBe(true);
-        expect(notifyChanged).toHaveBeenCalledOnce();
+        expect(notifyChanged).toHaveBeenCalledWith('remote');
     });
 
     it('pulls with merge through temporary stash protection', async () => {
-        const pull = vi.fn().mockResolvedValue(undefined);
+        const fetch = vi.fn().mockResolvedValue(undefined);
+        const merge = vi.fn().mockResolvedValue(undefined);
         const notifyChanged = vi.fn();
         let runMutationCalls = 0;
         const runMutation = async <T>(operation: () => Promise<T>): Promise<T> => {
@@ -1660,7 +1640,8 @@ describe('GitService branch remote workflows', () => {
             await operation();
         });
         const service = new GitBranchRemoteService({
-            git: { pull } as unknown as SimpleGit,
+            git: { merge } as unknown as SimpleGit,
+            remoteGit: { fetch } as unknown as SimpleGit,
             gitRoot: tempDir,
             notifyChanged,
             withTemporaryStash,
@@ -1676,7 +1657,8 @@ describe('GitService branch remote workflows', () => {
         expect(runMutationCalls).toBe(1);
         expect(withTemporaryStash).toHaveBeenCalledTimes(1);
         expect(withTemporaryStash.mock.calls[0][0]).toBe('pull origin/main');
-        expect(pull).toHaveBeenCalledWith('origin', 'main');
+        expect(fetch).toHaveBeenCalledWith(['origin', 'main']);
+        expect(merge).toHaveBeenCalledWith(['FETCH_HEAD']);
         expect(notifyChanged).not.toHaveBeenCalled();
     });
 

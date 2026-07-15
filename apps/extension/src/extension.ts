@@ -220,9 +220,8 @@ export async function activate(context: vscode.ExtensionContext) {
         })
     );
     await repositoryManager.initialize();
-    const backgroundFetchService = new BackgroundFetchService(repositoryManager);
     const parentRepositoryScmIntegration = new ParentRepositoryScmIntegrationService(repositoryManager);
-    context.subscriptions.push(backgroundFetchService, parentRepositoryScmIntegration);
+    context.subscriptions.push(parentRepositoryScmIntegration);
     parentRepositoryScmIntegration.scheduleCheck();
 
     if (!repositoryManager.getActiveService()) {
@@ -306,13 +305,18 @@ export async function activate(context: vscode.ExtensionContext) {
                     return;
                 }
                 void activeService.refreshStatusCache()
-                    .then(changed => {
-                        if (changed) {
-                            requestRefresh('git-watcher', gitStateRefreshScopes);
-                            return;
+                    .then(({ commitChanged, branchChanged }) => {
+                        const scopes: RefreshScope[] = ['stash'];
+                        if (commitChanged) {
+                            scopes.push('commit');
                         }
-                        logger.debug('[refresh] skipped unchanged git watcher state');
-                        provider.requestRefresh({ scopes: ['stash'], reason: 'git-watcher' });
+                        if (branchChanged) {
+                            scopes.push('branch', 'push', 'gitLog');
+                        }
+                        if (scopes.length === 1) {
+                            logger.debug('[refresh] skipped unchanged git watcher state');
+                        }
+                        requestRefresh('git-watcher', scopes);
                     })
                     .catch(error => {
                         activeService.invalidateStatusCache();
@@ -386,6 +390,11 @@ export async function activate(context: vscode.ExtensionContext) {
         }
     };
 
+    const backgroundFetchService = new BackgroundFetchService(repositoryManager, () => {
+        requestRefresh('background-fetch', ['branch', 'push', 'gitLog']);
+    });
+    context.subscriptions.push(backgroundFetchService);
+
     const bindActiveRepository = () => {
         disposeRepoBoundDisposables();
 
@@ -428,7 +437,11 @@ export async function activate(context: vscode.ExtensionContext) {
             branchStatusBar,
             gitLogStatusBar,
             changeBlockEditorController,
-            gitService.onDidChange(() => requestRefresh('git-mutation', gitStateRefreshScopes))
+            gitService.onWillRunGitMutation(() => backgroundFetchService.cancelActiveFetch('interactive-git-operation')),
+            gitService.onDidChange(kind => requestRefresh(
+                kind === 'remote' ? 'git-remote' : 'git-mutation',
+                kind === 'remote' ? ['branch', 'push', 'gitLog'] : gitStateRefreshScopes
+            ))
         );
 
         updateRepositoryContext();
@@ -559,7 +572,7 @@ export async function activate(context: vscode.ExtensionContext) {
         }),
         repositoryManager.onDidChangeRepositories(() => {
             updateRepositoryContext();
-            backgroundFetchService.refreshRepositories();
+            void backgroundFetchService.refreshRepositories();
             void resetGitWatcher();
             requestRefresh('repositories-changed', repositoryRefreshScopes, true);
         })

@@ -39,8 +39,9 @@ const PARTIAL_REMOTE_LINK_CAPABILITIES: RemoteLinkCapabilities = {
 
 export interface GitBranchRemoteServiceOptions {
     git: SimpleGit;
+    remoteGit?: SimpleGit;
     gitRoot: string;
-    notifyChanged: () => void;
+    notifyChanged: (kind?: 'local' | 'remote') => void;
     withTemporaryStash: (operationName: string, operation: () => Promise<void>) => Promise<void>;
     createEditorGit: (envOverrides: NodeJS.ProcessEnv) => SimpleGit;
     runMutation: <T>(operation: () => Promise<T>) => Promise<T>;
@@ -314,7 +315,19 @@ function parseWorktreeCheckoutError(error: unknown): { branch: string; path: str
 }
 
 export class GitBranchRemoteService {
-    constructor(private readonly options: GitBranchRemoteServiceOptions) { }
+    private remoteGit: SimpleGit | undefined;
+
+    constructor(private readonly options: GitBranchRemoteServiceOptions) {
+        this.remoteGit = options.remoteGit;
+    }
+
+    private getRemoteGit(): SimpleGit {
+        this.remoteGit ??= simpleGit({
+            baseDir: this.options.gitRoot,
+            maxConcurrentProcesses: 1
+        });
+        return this.remoteGit;
+    }
 
     private runMutation<T>(operation: () => Promise<T>): Promise<T> {
         return this.options.runMutation(operation);
@@ -475,32 +488,38 @@ export class GitBranchRemoteService {
     }
 
     public async push(remote: string, branch: string, options?: { noVerify?: boolean; setUpstream?: boolean }): Promise<void> {
-        const args: string[] = [];
-        if (options?.setUpstream) {
-            args.push('--set-upstream');
-        }
-        if (options?.noVerify) {
-            args.push('--no-verify');
-        }
-        await this.options.git.push(remote, branch, args);
-        this.options.notifyChanged();
+        return this.runMutation(async () => {
+            const args: string[] = [];
+            if (options?.setUpstream) {
+                args.push('--set-upstream');
+            }
+            if (options?.noVerify) {
+                args.push('--no-verify');
+            }
+            await this.getRemoteGit().push(remote, branch, args);
+            this.options.notifyChanged('remote');
+        });
     }
 
     public async forcePush(remote: string, branch: string, options?: { noVerify?: boolean; setUpstream?: boolean }): Promise<void> {
-        const args: string[] = ['--force-with-lease'];
-        if (options?.setUpstream) {
-            args.push('--set-upstream');
-        }
-        if (options?.noVerify) {
-            args.push('--no-verify');
-        }
-        await this.options.git.push(remote, branch, args);
-        this.options.notifyChanged();
+        return this.runMutation(async () => {
+            const args: string[] = ['--force-with-lease'];
+            if (options?.setUpstream) {
+                args.push('--set-upstream');
+            }
+            if (options?.noVerify) {
+                args.push('--no-verify');
+            }
+            await this.getRemoteGit().push(remote, branch, args);
+            this.options.notifyChanged('remote');
+        });
     }
 
     public async pushTags(remote: string): Promise<void> {
-        await this.options.git.pushTags(remote);
-        this.options.notifyChanged();
+        return this.runMutation(async () => {
+            await this.getRemoteGit().pushTags(remote);
+            this.options.notifyChanged('remote');
+        });
     }
 
     public async setUpstreamBranch(remote: string, remoteBranch: string): Promise<void> {
@@ -522,8 +541,9 @@ export class GitBranchRemoteService {
 
     public async pull(): Promise<void> {
         return this.runMutation(async () => {
+            await this.getRemoteGit().fetch();
             await this.options.withTemporaryStash('pull --rebase', async () => {
-                await this.options.git.raw(['pull', '--rebase']);
+                await this.options.git.rebase(['@{upstream}']);
             });
         });
     }
@@ -610,35 +630,8 @@ export class GitBranchRemoteService {
 
     public async fetch(): Promise<void> {
         return this.runMutation(async () => {
-            await this.options.git.fetch(['--all', '--prune']);
-            this.options.notifyChanged();
-        });
-    }
-
-    public async fetchRemoteTracking(remote: string): Promise<boolean> {
-        return this.runMutation(async () => {
-            const remotes = await this.getRemotes();
-            if (!remotes.includes(remote)) {
-                return false;
-            }
-
-            const remoteRefPrefix = `refs/remotes/${remote}/`;
-            const before = await this.options.git.raw([
-                'for-each-ref',
-                '--format=%(refname):%(objectname)',
-                remoteRefPrefix
-            ]);
-            await this.options.git.fetch(['--no-tags', '--quiet', remote]);
-            const after = await this.options.git.raw([
-                'for-each-ref',
-                '--format=%(refname):%(objectname)',
-                remoteRefPrefix
-            ]);
-            const changed = before !== after;
-            if (changed) {
-                this.options.notifyChanged();
-            }
-            return changed;
+            await this.getRemoteGit().fetch(['--all', '--prune']);
+            this.options.notifyChanged('remote');
         });
     }
 
@@ -649,9 +642,9 @@ export class GitBranchRemoteService {
 
             try {
                 if (force) {
-                    await this.options.git.fetch([remote, `+${branch}:${branch}`]);
+                    await this.getRemoteGit().fetch([remote, `+${branch}:${branch}`]);
                 } else {
-                    await this.options.git.fetch([remote, `${branch}:${branch}`]);
+                    await this.getRemoteGit().fetch([remote, `${branch}:${branch}`]);
                 }
                 this.options.notifyChanged();
                 return 'success';
@@ -1182,16 +1175,18 @@ export class GitBranchRemoteService {
 
     public async pullWithRebase(remote: string, branch: string): Promise<void> {
         return this.runMutation(async () => {
+            await this.getRemoteGit().fetch([remote, branch]);
             await this.options.withTemporaryStash(`pull --rebase ${remote}/${branch}`, async () => {
-                await this.options.git.raw(['pull', '--rebase', remote, branch]);
+                await this.options.git.rebase(['FETCH_HEAD']);
             });
         });
     }
 
     public async pullWithMerge(remote: string, branch: string): Promise<void> {
         return this.runMutation(async () => {
+            await this.getRemoteGit().fetch([remote, branch]);
             await this.options.withTemporaryStash(`pull ${remote}/${branch}`, async () => {
-                await this.options.git.pull(remote, branch);
+                await this.options.git.merge(['FETCH_HEAD']);
             });
         });
     }

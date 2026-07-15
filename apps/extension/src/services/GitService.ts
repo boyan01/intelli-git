@@ -203,21 +203,24 @@ export class GitService implements vscode.Disposable {
     private _gitRoot: string;
     private _inactiveChangesService?: InactiveChangesService;
     private _changelistStateService?: ChangelistStateService;
-    private _onDidChange = new vscode.EventEmitter<void>();
+    private _onDidChange = new vscode.EventEmitter<'local' | 'remote'>();
+    private _onWillRunGitMutation = new vscode.EventEmitter<void>();
     private gitMutationQueue: Promise<void> = Promise.resolve();
     private readonly gitMutationContext = new AsyncLocalStorage<boolean>();
     private viewStatusCache?: { files: FileStatus[]; loadedAt: number };
     private viewStatusInFlight?: Promise<FileStatus[]>;
     private viewStatusGeneration = 0;
     private viewStatusFingerprint?: string;
+    private viewBranchFingerprint?: string;
     private latestStatusIdentity = '';
     public readonly log: GitLogService;
     public readonly branchRemote: GitBranchRemoteService;
 
     /**
-     * Fired after this service completes a Git mutation. Repository watchers handle external changes.
+     * Fired after this service completes a local or remote Git operation. Repository watchers handle external changes.
      */
     public readonly onDidChange = this._onDidChange.event;
+    public readonly onWillRunGitMutation = this._onWillRunGitMutation.event;
 
     public get inactiveChangesService(): InactiveChangesService | undefined {
         return this._inactiveChangesService;
@@ -241,7 +244,7 @@ export class GitService implements vscode.Disposable {
         this.branchRemote = new GitBranchRemoteService({
             git: this.git,
             gitRoot: this._gitRoot,
-            notifyChanged: () => this.fireChange(),
+            notifyChanged: kind => this.fireChange(kind),
             withTemporaryStash: (operationName, operation) => this.withTemporaryStash(operationName, operation),
             createEditorGit: envOverrides => this.createEditorGit(envOverrides),
             runMutation: operation => this.runGitMutation(operation),
@@ -292,10 +295,12 @@ export class GitService implements vscode.Disposable {
     /**
      * Notify listeners that Git state has changed.
      */
-    private fireChange() {
+    private fireChange(kind: 'local' | 'remote' = 'local') {
         this.log.invalidateGraphCache();
-        this.invalidateStatusCache();
-        this._onDidChange.fire();
+        if (kind === 'local') {
+            this.invalidateStatusCache();
+        }
+        this._onDidChange.fire(kind);
     }
 
     public invalidateStatusCache(): void {
@@ -322,7 +327,6 @@ export class GitService implements vscode.Disposable {
 
     private createStatusFingerprint(files: FileStatus[]): string {
         return JSON.stringify({
-            identity: this.latestStatusIdentity,
             files: files.map(file => ({
                 path: file.path,
                 status: file.status,
@@ -338,6 +342,7 @@ export class GitService implements vscode.Disposable {
             return operation();
         }
 
+        this._onWillRunGitMutation.fire();
         const run = this.gitMutationQueue.then(
             () => this.gitMutationContext.run(true, operation),
             () => this.gitMutationContext.run(true, operation)
@@ -601,6 +606,7 @@ export class GitService implements vscode.Disposable {
 
     public dispose() {
         this._onDidChange.dispose();
+        this._onWillRunGitMutation.dispose();
     }
 
     public getWorkspaceRoot(): string {
@@ -1004,6 +1010,7 @@ export class GitService implements vscode.Disposable {
                     loadedAt: Date.now()
                 };
                 this.viewStatusFingerprint = this.createStatusFingerprint(files);
+                this.viewBranchFingerprint = this.latestStatusIdentity;
             }
             return files;
         }).finally(() => {
@@ -1015,11 +1022,15 @@ export class GitService implements vscode.Disposable {
         return this.cloneStatus(await request);
     };
 
-    public refreshStatusCache = async (): Promise<boolean> => {
-        const previousFingerprint = this.viewStatusFingerprint;
+    public refreshStatusCache = async (): Promise<{ commitChanged: boolean; branchChanged: boolean }> => {
+        const previousStatusFingerprint = this.viewStatusFingerprint;
+        const previousBranchFingerprint = this.viewBranchFingerprint;
         this.invalidateStatusCache();
         await this.getStatusForView();
-        return previousFingerprint === undefined || previousFingerprint !== this.viewStatusFingerprint;
+        return {
+            commitChanged: previousStatusFingerprint === undefined || previousStatusFingerprint !== this.viewStatusFingerprint,
+            branchChanged: previousBranchFingerprint === undefined || previousBranchFingerprint !== this.viewBranchFingerprint
+        };
     };
 
     private loadStatus = async (): Promise<FileStatus[]> => {

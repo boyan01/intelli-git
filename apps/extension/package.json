@@ -1452,14 +1452,14 @@
         },
         "intelli-git.backgroundFetch.enabled": {
           "type": "boolean",
-          "default": true,
-          "scope": "resource",
+          "default": false,
+          "scope": "window",
           "description": "%intelli-git.config.backgroundFetch.enabled.description%"
         },
         "intelli-git.backgroundFetch.onStartup": {
           "type": "boolean",
           "default": true,
-          "scope": "resource",
+          "scope": "window",
           "description": "%intelli-git.config.backgroundFetch.onStartup.description%"
         },
         "intelli-git.backgroundFetch.intervalMinutes": {
@@ -1467,7 +1467,7 @@
           "default": 15,
           "minimum": 1,
           "maximum": 1440,
-          "scope": "resource",
+          "scope": "window",
           "description": "%intelli-git.config.backgroundFetch.intervalMinutes.description%"
         },
         "intelli-git.editor.changeBlockDecorations": {

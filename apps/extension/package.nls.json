@@ -75,7 +75,7 @@
   "intelli-git.config.changelist.mode.staged": "Separate staged and unstaged changes.",
   "intelli-git.config.changelist.mode.changes": "Use IntelliJ-style changelists with one active list.",
   "intelli-git.config.push.confirmProtectedBranch.description": "Require confirmation before pushing directly to protected targets such as origin/main or origin/master.",
-  "intelli-git.config.backgroundFetch.enabled.description": "Periodically fetch origin in the background to keep remote branch state fresh without changing the working tree.",
+  "intelli-git.config.backgroundFetch.enabled.description": "Optionally fetch origin in an isolated background process. Disabled by default; prefer VS Code Git: Autofetch for routine remote updates.",
   "intelli-git.config.backgroundFetch.onStartup.description": "Fetch origin shortly after Intelli Git starts.",
   "intelli-git.config.backgroundFetch.intervalMinutes.description": "Minutes between background origin fetches while the VS Code window is active.",
   "intelli-git.config.editor.changeBlockDecorations.description": "Controls Intelli Git change block labels in editors.",

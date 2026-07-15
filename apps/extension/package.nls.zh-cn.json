@@ -75,7 +75,7 @@
   "intelli-git.config.changelist.mode.staged": "区分已暂存与未暂存更改。",
   "intelli-git.config.changelist.mode.changes": "使用 IntelliJ 风格的变更列表，并保持唯一 active 列表。",
   "intelli-git.config.push.confirmProtectedBranch.description": "推送到 origin/main 或 origin/master 这类受保护目标前要求确认。",
-  "intelli-git.config.backgroundFetch.enabled.description": "在后台定期 fetch origin，保持远端分支状态新鲜，但不改变工作区。",
+  "intelli-git.config.backgroundFetch.enabled.description": "可选地使用独立后台进程 fetch origin。默认关闭；常规远端更新建议优先使用 VS Code Git: Autofetch。",
   "intelli-git.config.backgroundFetch.onStartup.description": "Intelli Git 启动后稍等片刻自动 fetch origin。",
   "intelli-git.config.backgroundFetch.intervalMinutes.description": "VS Code 窗口活跃时后台 fetch origin 的间隔分钟数。",
   "intelli-git.config.editor.changeBlockDecorations.description": "控制编辑器中的 Intelli Git 变更块标签。",
