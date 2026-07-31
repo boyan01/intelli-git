@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.0.8
+
+- Added an opt-in experimental three-way merge editor with per-change review, editable results, and dedicated binary and submodule conflict actions.
+- Added conflict resolution support for marker-free manually resolved files directly from the commit view.
+- Improved commit view responsiveness by coalescing repeated refreshes and preserving visible content during background validation.
+- Prevented remote fetch and push operations from blocking local Git status reads, and disabled Intelli Git background fetches by default.
+- Extended the Early Access build lifetime from 30 days to 180 days, with expiration warnings limited to the final seven days.
+
 ## 0.0.7
 
 - Added Create Patch submenu actions for changelist, staged, unstaged, and untracked tree nodes.
