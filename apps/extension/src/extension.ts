@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { CommitViewProvider, ConflictResolverPanel, GitLogViewProvider, StashContentProvider, RevisionContentProvider } from './providers';
+import { CommitViewProvider, ConflictResolverPanel, GitLogViewProvider, openConflictFile, StashContentProvider, RevisionContentProvider } from './providers';
 import { RepositoryManager, type RepositoryScope } from './services/RepositoryManager';
 import { createGitWatcher } from './services/GitRepositoryWatcher';
 import { BackgroundFetchService } from './services/BackgroundFetchService';
@@ -471,7 +471,7 @@ export async function activate(context: vscode.ExtensionContext) {
                 return;
             }
 
-            ConflictResolverPanel.createOrShow({
+            void openConflictFile({
                 extensionUri: context.extensionUri,
                 context,
                 repositoryManager

@@ -7,6 +7,27 @@ function getPanelKey(file: RepositoryFileReference): string {
     return `${file.repoPath || ''}:${file.path}`;
 }
 
+export async function openConflictFile(
+    options: WebviewProviderOptions,
+    file: ConflictResolverOpenRequest
+): Promise<void> {
+    const enabled = vscode.workspace
+        .getConfiguration('intelli-git.mergeEditor')
+        .get<boolean>('enabled', false);
+
+    if (enabled) {
+        ConflictResolverPanel.createOrShow(options, file);
+        return;
+    }
+
+    const repoPath = file.repoPath || options.repositoryManager.getActiveService()?.getWorkspaceRoot();
+    if (!repoPath) {
+        return;
+    }
+
+    await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(path.join(repoPath, file.path)));
+}
+
 export class ConflictResolverPanel extends BaseWebviewProvider {
     private static panels = new Map<string, ConflictResolverPanel>();
     private key: string;

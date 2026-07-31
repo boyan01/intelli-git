@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import { randomUUID } from 'node:crypto';
 import type { ChangelistFileSelection, CommitAiAction, FileDiagnosticsChange, RefreshEvent } from '@shared/messages';
 import { BaseWebviewProvider, WebviewProviderOptions } from './BaseWebviewProvider';
-import { ConflictResolverPanel } from './ConflictResolverPanel';
+import { openConflictFile } from './ConflictResolverPanel';
 import type { ExtensionRpcHandlerOptions } from '../rpc';
 
 export class CommitViewProvider extends BaseWebviewProvider implements vscode.WebviewViewProvider {
@@ -107,7 +107,7 @@ export class CommitViewProvider extends BaseWebviewProvider implements vscode.We
                 void vscode.commands.executeCommand('setContext', 'intelli-git.changelistTreeFocus', focused);
             },
             openConflictResolver: file => {
-                ConflictResolverPanel.createOrShow(this.options, file);
+                void openConflictFile(this.options, file);
             }
         };
     }

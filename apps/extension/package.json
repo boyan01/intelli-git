@@ -1444,6 +1444,12 @@
           ],
           "description": "%intelli-git.config.changelist.mode.description%"
         },
+        "intelli-git.mergeEditor.enabled": {
+          "type": "boolean",
+          "default": false,
+          "scope": "window",
+          "description": "%intelli-git.config.mergeEditor.enabled.description%"
+        },
         "intelli-git.push.confirmProtectedBranch": {
           "type": "boolean",
           "default": true,
