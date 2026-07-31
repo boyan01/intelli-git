@@ -7,7 +7,7 @@ const NOW = Date.UTC(2026, 4, 24);
 describe('getVersionCheckState', () => {
     it('expires marketplace builds when the build macro is expired', () => {
         const state = getVersionCheckState({
-            buildTime: NOW - (45 * DAY_MS),
+            buildTime: NOW - (181 * DAY_MS),
             isDevBuild: false,
             isExpired: true,
             now: NOW
@@ -19,7 +19,7 @@ describe('getVersionCheckState', () => {
 
     it('warns before an Early Access build expires', () => {
         const state = getVersionCheckState({
-            buildTime: NOW - (24 * DAY_MS),
+            buildTime: NOW - (174 * DAY_MS),
             isDevBuild: false,
             isExpired: false,
             now: NOW
@@ -32,7 +32,7 @@ describe('getVersionCheckState', () => {
 
     it('preserves dev build metadata while expiring dev builds', () => {
         const state = getVersionCheckState({
-            buildTime: NOW - (31 * DAY_MS),
+            buildTime: NOW - (181 * DAY_MS),
             isDevBuild: true,
             isExpired: true,
             now: NOW

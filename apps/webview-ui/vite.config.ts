@@ -63,7 +63,7 @@ export default defineConfig(({ mode }) => {
   const isDevBuild = buildChannel === 'dev';
   const daysAgo = parseFloat(env.DEBUG_BUILD_DAYS_AGO || '0');
   const finalBuildTime = Date.now() - (daysAgo * 24 * 60 * 60 * 1000);
-  const expirationExpression = `(Date.now() - ${finalBuildTime} > 30 * 24 * 60 * 60 * 1000)`;
+  const expirationExpression = `(Date.now() - ${finalBuildTime} > 180 * 24 * 60 * 60 * 1000)`;
 
   return {
     envDir: repoRoot,

@@ -21,7 +21,7 @@ function createMacroReplacePlugin(finalBuildTime, buildChannel) {
   const buildTimeLiteral = JSON.stringify(String(finalBuildTime));
   const buildChannelLiteral = JSON.stringify(buildChannel);
   const isDevBuildLiteral = JSON.stringify(isDevBuild);
-  const expiredExpr = `(Date.now() - ${finalBuildTime} > 30 * 24 * 60 * 60 * 1000)`;
+  const expiredExpr = `(Date.now() - ${finalBuildTime} > 180 * 24 * 60 * 60 * 1000)`;
 
   return {
     name: 'macro-replace',

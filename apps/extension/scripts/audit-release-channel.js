@@ -12,7 +12,7 @@ const RAW_MACROS = [
     '__IS_EXPIRED__'
 ];
 const DEV_VERSION_PATTERN = /-dev\.\d+$/;
-const EARLY_ACCESS_EXPIRATION_PATTERN = /Date\.now\(\)\s*-\s*\d+\s*>\s*(?:30\s*\*\s*24\s*\*\s*60\s*\*\s*60\s*\*\s*(?:1000|1e3)|720\s*\*\s*60\s*\*\s*60\s*\*\s*(?:1000|1e3)|2592e6|2592000000)/;
+const EARLY_ACCESS_EXPIRATION_PATTERN = /Date\.now\(\)\s*-\s*\d+\s*>\s*(?:180\s*\*\s*24\s*\*\s*60\s*\*\s*60\s*\*\s*(?:1000|1e3)|4320\s*\*\s*60\s*\*\s*60\s*\*\s*(?:1000|1e3)|15552e6|15552000000)/;
 const BLOCKED_VSIX_ENTRIES = [
     { pattern: /^extension\/(?:\.agent|\.agents|\.codex|\.claude)\//, reason: 'agent-local notes must not ship' },
     { pattern: /^extension\/(?:src|apps|packages)\//, reason: 'source workspace files must not ship' },

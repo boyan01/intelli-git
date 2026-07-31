@@ -1,5 +1,5 @@
-export const EXPIRATION_DAYS = 30;
-export const WARNING_DAYS = 23;
+export const EXPIRATION_DAYS = 180;
+export const WARNING_DAYS = 173;
 
 export interface VersionCheckState {
     isDevBuild: boolean;
