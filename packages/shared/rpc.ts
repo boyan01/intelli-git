@@ -51,6 +51,7 @@ export interface RpcTraceEvent {
 }
 
 export interface RpcPeerOptions {
+    methodTimeoutsMs?: Record<string, number>;
     trace?: (event: RpcTraceEvent) => void;
 }
 
@@ -113,7 +114,7 @@ export class RpcPeer<TRemote = any, TLocal = any> {
                     });
                     reject(new Error(`RPC timeout for method: ${method}`));
                 }
-            }, 60000);
+            }, this.options.methodTimeoutsMs?.[method] ?? 60000);
 
             this.pendingRequests.set(id, { resolve, reject, timeout, method, startedAt });
 

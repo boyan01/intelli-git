@@ -137,5 +137,9 @@
   "intelli-git.commands.changelist.moveToList.title": "移动到变更列表...",
   "intelli-git.commands.revealCurrentChangeBlock.title": "在提交面板中显示",
   "intelli-git.commands.hunk.toggleInactive.title": "Toggle Inactive",
-  "intelli-git.config.ai.copilot.model.description": "用于生成提交信息的首选 GitHub Copilot 模型 ID (例如: gpt-5-mini, gpt-4.1, claude-sonnet-4)。"
+  "intelli-git.config.ai.copilot.model.description": "用于生成提交信息的首选 GitHub Copilot 模型 ID (例如: gpt-5-mini, gpt-4.1, claude-sonnet-4)。",
+  "intelli-git.config.ai.provider.codex": "使用已安装的 Codex CLI 及其登录状态生成文本。",
+  "intelli-git.config.ai.codex.path.description": "扩展运行主机上的 Codex CLI：codex 或绝对路径，不包含参数或引号。需要支持 --ignore-user-config 的较新 CLI。",
+  "intelli-git.config.ai.codex.model.description": "Codex 模型 ID。留空使用 CLI 默认模型。文本生成复用 CLI 身份认证，但不加载用户 config.toml。",
+  "intelli-git.config.ai.codex.reasoningEffort.description": "Codex 思考强度。留空使用模型默认值。通过配置 AI 提供商入口选择所选模型支持的强度。"
 }

@@ -1403,13 +1403,15 @@
             "copilot",
             "anthropic",
             "google",
-            "custom"
+            "custom",
+            "codex"
           ],
           "enumDescriptions": [
             "%intelli-git.config.ai.provider.copilot%",
             "%intelli-git.config.ai.provider.anthropic%",
             "%intelli-git.config.ai.provider.google%",
-            "%intelli-git.config.ai.provider.custom%"
+            "%intelli-git.config.ai.provider.custom%",
+            "%intelli-git.config.ai.provider.codex%"
           ],
           "markdownDescription": "%intelli-git.config.ai.provider.markdownDescription%"
         },
@@ -1543,6 +1545,22 @@
           "type": "string",
           "default": "https://api.openai.com/v1",
           "description": "%intelli-git.config.ai.custom.apiUrl.description%"
+        },
+        "intelli-git.ai.codex.path": {
+          "type": "string",
+          "default": "codex",
+          "scope": "machine",
+          "description": "%intelli-git.config.ai.codex.path.description%"
+        },
+        "intelli-git.ai.codex.reasoningEffort": {
+          "type": "string",
+          "default": "",
+          "description": "%intelli-git.config.ai.codex.reasoningEffort.description%"
+        },
+        "intelli-git.ai.codex.model": {
+          "type": "string",
+          "default": "",
+          "description": "%intelli-git.config.ai.codex.model.description%"
         }
       }
     }

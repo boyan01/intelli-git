@@ -137,5 +137,9 @@
   "intelli-git.commands.changelist.moveToList.title": "Move to Changelist...",
   "intelli-git.commands.revealCurrentChangeBlock.title": "Reveal in Commit Panel",
   "intelli-git.commands.hunk.toggleInactive.title": "Toggle Inactive",
-  "intelli-git.config.ai.copilot.model.description": "Preferred GitHub Copilot model id to use for commit message generation (for example: gpt-5-mini, gpt-4.1, claude-sonnet-4)."
+  "intelli-git.config.ai.copilot.model.description": "Preferred GitHub Copilot model id to use for commit message generation (for example: gpt-5-mini, gpt-4.1, claude-sonnet-4).",
+  "intelli-git.config.ai.provider.codex": "Generate text using the installed Codex CLI and its login.",
+  "intelli-git.config.ai.codex.path.description": "Codex CLI executable on the extension host: codex or an absolute path, without arguments or quotes. Requires a recent CLI supporting --ignore-user-config.",
+  "intelli-git.config.ai.codex.model.description": "Codex model ID. Leave blank for the CLI default. Text generation reuses CLI authentication but does not load user config.toml.",
+  "intelli-git.config.ai.codex.reasoningEffort.description": "Codex reasoning effort. Leave blank for the model default. Use Configure AI Provider to choose an effort supported by the selected model."
 }

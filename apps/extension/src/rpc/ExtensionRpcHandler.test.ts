@@ -4,6 +4,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { ExtensionRpcHandler } from './ExtensionRpcHandler';
 import { GitReadRpcHandler } from './GitReadRpcHandler';
+import { CodexCliLanguageModel } from '../services/CodexCliService';
 import type { ChangelistState } from '@shared/messages';
 import type { ChangelistStateService } from '../services/ChangelistStateService';
 import type { GitService } from '../services/GitService';
@@ -979,6 +980,38 @@ describe('ExtensionRpcHandler AI provider', () => {
         expect(prompt).toContain('Current commit message:\nOld subject\n\nExisting body');
         expect(prompt).toContain('Diff:\n');
         expect(prompt).toContain('+new');
+    });
+});
+
+describe('ExtensionRpcHandler Codex provider', () => {
+    it('routes only the selected staged diff to Codex and exposes the provider status', async () => {
+        const original = vscodeMock.workspace.getConfiguration;
+        const configuration = vi.spyOn(vscodeMock.workspace, 'getConfiguration').mockImplementation((section, scope) => {
+            const config = original(section, scope);
+            return section === 'intelli-git.ai' ? {
+                ...config,
+                get: ((key: string, fallback?: unknown) => key === 'provider' ? 'codex' : config.get(key, fallback)) as typeof config.get
+            } : config;
+        });
+        const sendRequest = vi.spyOn(CodexCliLanguageModel.prototype, 'sendRequest').mockResolvedValue({
+            text: createTextStream('Improve the selected change'),
+            stream: (async function* () {})()
+        });
+        try {
+            const diff = 'diff --git a/selected.ts b/selected.ts\n@@ -1 +1 @@\n-old\n+selected';
+            const getStagedDiffForFiles = vi.fn().mockResolvedValue(diff);
+            const handler = createHandler({ getStagedDiffForFiles });
+            await expect(handler.getAIProviderStatus()).resolves.toMatchObject({
+                provider: 'codex', label: 'Codex CLI', isConfigured: true
+            });
+            await expect(handler.generateCommitMessage({ files: ['selected.ts'], mode: 'subject' }))
+                .resolves.toMatchObject({ message: 'Improve the selected change', fileCount: 1, hunkCount: 1 });
+            expect(getStagedDiffForFiles).toHaveBeenCalledWith(['selected.ts']);
+            expect(JSON.stringify(sendRequest.mock.calls[0][0])).toContain('+selected');
+        } finally {
+            configuration.mockRestore();
+            sendRequest.mockRestore();
+        }
     });
 });
 

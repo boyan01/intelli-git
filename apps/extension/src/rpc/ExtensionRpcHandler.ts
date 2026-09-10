@@ -41,6 +41,7 @@ import { ChangelistStateService } from '../services/ChangelistStateService';
 import { InactiveChangesService } from '../services/InactiveChangesService';
 import { AnthropicService } from '../services/AnthropicService';
 import { GoogleAiService } from '../services/GoogleAiService';
+import { CodexCliLanguageModel } from '../services/CodexCliService';
 import { OpenAiService } from '../services/CustomOpenAiService';
 import { i18n } from '../utils/i18n';
 import {
@@ -1980,15 +1981,15 @@ export class ExtensionRpcHandler {
 
             messages.push(vscode.LanguageModelChatMessage.User(`Diff:\n${diff}`));
 
-            logger.debug('Generating commit message:', diff.length);
+            logger.info('Generating commit message', { provider: model.vendor, model: model.id, mode, diffBytes: Buffer.byteLength(diff) });
             const response = await model.sendRequest(messages, {}, new vscode.CancellationTokenSource().token);
-            logger.debug('Generating commit message responsed');
+            logger.info('Commit message provider responded', { provider: model.vendor, model: model.id });
 
             let fullMessage = '';
             for await (const fragment of response.text) {
                 fullMessage += fragment;
             }
-            logger.debug('Generated commit message:', fullMessage);
+            logger.info('Generated commit message', { outputBytes: Buffer.byteLength(fullMessage) });
             return {
                 message: fullMessage.trim(),
                 mode,
@@ -2005,6 +2006,7 @@ export class ExtensionRpcHandler {
         const provider = vscode.workspace.getConfiguration('intelli-git.ai').get<string>('provider', AiProvider.Copilot);
         if (
             provider === AiProvider.Copilot ||
+            provider === AiProvider.Codex ||
             provider === AiProvider.Anthropic ||
             provider === AiProvider.Google ||
             provider === AiProvider.OpenAi
@@ -2016,6 +2018,10 @@ export class ExtensionRpcHandler {
     }
 
     private getAiProviderLabel(provider: AiProviderId): string {
+        if (provider === AiProvider.Codex) {
+            return 'Codex CLI';
+        }
+
         if (provider === AiProvider.Copilot) {
             return 'Copilot';
         }
@@ -2074,7 +2080,7 @@ export class ExtensionRpcHandler {
     }
 
     private async getAiProviderConfigurationIssue(provider: AiProviderId): Promise<string | undefined> {
-        if (provider === AiProvider.Copilot || provider === AiProvider.OpenAi) {
+        if (provider === AiProvider.Copilot || provider === AiProvider.OpenAi || provider === AiProvider.Codex) {
             return undefined;
         }
 
@@ -2092,6 +2098,15 @@ export class ExtensionRpcHandler {
 
     private async getAIModel(): Promise<vscode.LanguageModelChat> {
         const provider = this.getCurrentAiProvider();
+
+        if (provider === AiProvider.Codex) {
+            const config = vscode.workspace.getConfiguration('intelli-git.ai.codex');
+            return new CodexCliLanguageModel(
+                config.get<string>('path', 'codex').trim() || 'codex',
+                config.get<string>('model', '').trim(),
+                config.get<string>('reasoningEffort', '').trim()
+            );
+        }
 
         if (provider === AiProvider.Anthropic) {
             const apiKey = await getAiApiKey(this.context, 'anthropic');

@@ -20,7 +20,9 @@ export interface RemoteLinkInfo {
     capabilities: RemoteLinkCapabilities;
 }
 
-export type AiProviderId = 'copilot' | 'anthropic' | 'google' | 'custom';
+export const AI_GENERATION_TIMEOUT_MS = 120000;
+
+export type AiProviderId = 'copilot' | 'anthropic' | 'google' | 'custom' | 'codex';
 
 export interface AiProviderStatus {
     provider: AiProviderId;

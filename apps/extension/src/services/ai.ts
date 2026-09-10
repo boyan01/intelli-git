@@ -1,5 +1,6 @@
 export const AiProvider = {
     Copilot: 'copilot',
+    Codex: 'codex',
     Anthropic: 'anthropic',
     Google: 'google',
     OpenAi: 'custom'

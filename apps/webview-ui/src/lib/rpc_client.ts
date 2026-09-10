@@ -1,4 +1,5 @@
 import { RpcPeer } from '@shared/rpc';
+import { AI_GENERATION_TIMEOUT_MS } from '@shared/messages';
 import { vscode } from './vscode';
 import type { CommitAiAction, ConflictResolverContextActionRequest, ConflictResolverOpenRequest, ExtensionMethods, FileDiagnosticsChange, GitLogRevealRequest, RefreshEvent, RefreshScope, WebviewMethods } from '@shared/messages';
 
@@ -36,6 +37,10 @@ const _rpc = new RpcPeer<ExtensionMethods, WebviewMethods>(
         postMessage: (message) => vscode.postMessage(message)
     },
     {
+        methodTimeoutsMs: {
+            generateCommitMessage: AI_GENERATION_TIMEOUT_MS + 30000,
+            testAIProvider: AI_GENERATION_TIMEOUT_MS + 30000
+        },
         trace: event => {
             if (event.elapsedMs === undefined) {
                 return;
