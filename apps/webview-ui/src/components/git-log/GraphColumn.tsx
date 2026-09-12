@@ -16,6 +16,9 @@ interface GraphColumnProps {
 }
 
 export const CELL_WIDTH = 16;
+const ARROW_HALF_WIDTH = 4;
+const ARROW_HEIGHT = 6;
+const ARROW_HIT_PADDING = 4;
 
 // Determine stroke color based on row state
 const getStrokeColor = (isSelected: boolean, isHovered: boolean, hasFocus: boolean): string => {
@@ -67,9 +70,15 @@ export const GraphColumn: React.FC<GraphColumnProps> = ({
 
     const getPath = (line: GraphLine) => {
         const x1 = line.x1 * CELL_WIDTH + CELL_WIDTH / 2;
-        const y1 = getY(line.y1);
+        let y1 = getY(line.y1);
         const x2 = line.x2 * CELL_WIDTH + CELL_WIDTH / 2;
-        const y2 = getY(line.y2);
+        let y2 = getY(line.y2);
+
+        // Stop the stem at the triangle base so its round cap cannot blunt the tip.
+        if (line.isLongDistance && line.targetCommitHash) {
+            if (line.arrowDirection === 'down') y2 -= ARROW_HEIGHT;
+            else y1 += ARROW_HEIGHT;
+        }
 
         if (line.x1 === line.x2) {
             return `M ${x1} ${y1} L ${x2} ${y2}`;
@@ -88,17 +97,18 @@ export const GraphColumn: React.FC<GraphColumnProps> = ({
         const x = (isDown ? line.x2 : line.x1) * CELL_WIDTH + CELL_WIDTH / 2;
         const arrowY = getY(isDown ? line.y2 : line.y1);
 
-        // Triangle arrow - filled for better visibility
-        const arrowSize = 5;
-        const arrowPath = isDown
-            ? `M ${x} ${arrowY} L ${x - arrowSize} ${arrowY - arrowSize * 1.5} L ${x + arrowSize} ${arrowY - arrowSize * 1.5} Z`
-            : `M ${x} ${arrowY} L ${x - arrowSize} ${arrowY + arrowSize * 1.5} L ${x + arrowSize} ${arrowY + arrowSize * 1.5} Z`;
-        const hitAreaY = isDown ? arrowY - 15 : arrowY;
+        const baseY = arrowY + (isDown ? -ARROW_HEIGHT : ARROW_HEIGHT);
+        const arrowPath = `M ${x} ${arrowY} L ${x - ARROW_HALF_WIDTH} ${baseY} L ${x + ARROW_HALF_WIDTH} ${baseY} Z`;
+        const hitAreaY = Math.max(0, Math.min(arrowY, baseY) - ARROW_HIT_PADDING);
+        // Leave the area below a down arrow available to an edge reusing its column.
+        const hitAreaBottom = Math.min(svgHeight, Math.max(arrowY, baseY) + (isDown ? 0 : ARROW_HIT_PADDING));
+        const hitAreaHeight = hitAreaBottom - hitAreaY;
         const isArrowHovered = hoveredArrowIndex === index;
 
         return (
             <g
                 key={`arrow-${index}`}
+                data-arrow-target={line.targetCommitHash}
                 style={{ cursor: 'pointer' }}
                 onMouseEnter={() => setHoveredArrowIndex(index)}
                 onMouseLeave={() => setHoveredArrowIndex(null)}
@@ -109,10 +119,11 @@ export const GraphColumn: React.FC<GraphColumnProps> = ({
             >
                 {isArrowHovered && (
                     <rect
-                        x={x - 9}
-                        y={hitAreaY + 1}
-                        width={18}
-                        height={13}
+                        x={x - CELL_WIDTH / 2 + 0.5}
+                        y={hitAreaY + 0.5}
+                        width={CELL_WIDTH - 1}
+                        height={hitAreaHeight - 1}
+                        pointerEvents="none"
                         rx={3}
                         fill={line.color}
                         fillOpacity={0.12}
@@ -123,19 +134,19 @@ export const GraphColumn: React.FC<GraphColumnProps> = ({
                 )}
                 {/* Larger hit area */}
                 <rect
-                    x={x - 10}
+                    x={x - CELL_WIDTH / 2}
                     y={hitAreaY}
-                    width={20}
-                    height={15}
+                    width={CELL_WIDTH}
+                    height={hitAreaHeight}
                     fill="transparent"
+                    pointerEvents="all"
                 />
                 {/* Filled triangle arrow */}
                 <path
                     d={arrowPath}
                     fill={line.color}
-                    stroke={isArrowHovered ? 'var(--vscode-focusBorder)' : line.color}
-                    strokeWidth={isArrowHovered ? 2 : 1}
-                    strokeLinejoin="round"
+                    stroke="none"
+                    pointerEvents="none"
                 />
             </g>
         );
@@ -144,18 +155,17 @@ export const GraphColumn: React.FC<GraphColumnProps> = ({
     return (
         <svg width={graphWidth} height={svgHeight} style={{ overflow: 'visible', pointerEvents: 'auto' }}>
             {node.lines.map((line, i) => (
-                <React.Fragment key={i}>
-                    <path
-                        d={getPath(line)}
-                        stroke={line.color}
-                        strokeWidth={getLineStrokeWidth(line)}
-                        fill="none"
-                        strokeLinecap={line.isDashed ? 'butt' : 'round'}
-                        strokeDasharray={line.isDashed ? '2 3' : undefined}
-                        strokeDashoffset={line.isDashed ? ((rowTop ?? rowIndex * rowHeight) + getY(line.y1)) % 5 : undefined}
-                    />
-                    {renderArrow(line, i)}
-                </React.Fragment>
+                <path
+                    key={i}
+                    d={getPath(line)}
+                    stroke={line.color}
+                    strokeWidth={getLineStrokeWidth(line)}
+                    fill="none"
+                    pointerEvents="none"
+                    strokeLinecap={line.isDashed ? 'butt' : 'round'}
+                    strokeDasharray={line.isDashed ? '2 3' : undefined}
+                    strokeDashoffset={line.isDashed ? ((rowTop ?? rowIndex * rowHeight) + getY(line.y1)) % 5 : undefined}
+                />
             ))}
             <circle
                 cx={node.column * CELL_WIDTH + CELL_WIDTH / 2}
@@ -165,6 +175,7 @@ export const GraphColumn: React.FC<GraphColumnProps> = ({
                 stroke={getStrokeColor(isSelected, isHovered, hasFocus)}
                 strokeWidth={STROKE_WIDTH}
             />
+            {node.lines.map(renderArrow)}
         </svg>
     );
 };

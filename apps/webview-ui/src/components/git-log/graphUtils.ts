@@ -82,6 +82,7 @@ function getDefaultBranchRefRank(ref: LogCommit['refs'][number], hasRemoteHead: 
 
 function findDefaultBranchTipHash(commits: LogCommit[]): string | null {
     let best: { hash: string; rank: number; commitIndex: number } | null = null;
+    const candidates = new Map<string, number>();
 
     for (let commitIndex = 0; commitIndex < commits.length; commitIndex++) {
         const commit = commits[commitIndex];
@@ -91,6 +92,7 @@ function findDefaultBranchTipHash(commits: LogCommit[]): string | null {
         for (const ref of refs) {
             const rank = getDefaultBranchRefRank(ref, hasRemoteHead);
             if (rank === null) continue;
+            candidates.set(commit.hash, Math.min(candidates.get(commit.hash) ?? rank, rank));
 
             if (
                 best === null
@@ -102,7 +104,22 @@ function findDefaultBranchTipHash(commits: LogCommit[]): string | null {
         }
     }
 
-    return best?.hash ?? null;
+    if (!best) return null;
+
+    // A remote tip ahead of the local branch belongs to the same first-parent spine.
+    // Keep divergent histories separate, including merges through a second parent.
+    const commitByHash = new Map(commits.map(commit => [commit.hash, commit]));
+    for (const [candidateHash, rank] of candidates) {
+        if (Math.floor(rank / 3) !== Math.floor(best.rank / 3)) continue;
+        let currentHash: string | undefined = candidateHash;
+        const visited = new Set<string>();
+        while (currentHash && !visited.has(currentHash)) {
+            if (currentHash === best.hash) return candidateHash;
+            visited.add(currentHash);
+            currentHash = commitByHash.get(currentHash)?.parentHashes[0];
+        }
+    }
+    return best.hash;
 }
 
 function buildDefaultBranchHashes(commits: LogCommit[]): Set<string> {
@@ -130,8 +147,12 @@ export function computeGraph(
 ): Map<string, GraphNode> {
     const graph = new Map<string, GraphNode>();
     const lanes: (LaneInfo | null)[] = [];
+    const arrowColumns = new Set<number>();
     const commitIndexMap = new Map<string, number>();
     const defaultBranchHashes = options.preferDefaultBranchLane ? buildDefaultBranchHashes(commits) : new Set<string>();
+    let reserveDefaultLane = defaultBranchHashes.has(commits[0]?.hash);
+    let nextColorIndex = defaultBranchHashes.size > 0 ? 1 : 0;
+    const allocateColor = (): string => BRANCH_COLORS[nextColorIndex++ % BRANCH_COLORS.length];
     const isDefaultBranchHash = (hash: string | undefined): boolean => !!hash && defaultBranchHashes.has(hash);
 
     const ensureLaneExists = (index: number): void => {
@@ -141,10 +162,10 @@ export function computeGraph(
     };
 
     const findEmptyLane = (excludedLanes: Set<number> = new Set()): number => {
-        ensureLaneExists(0);
+        ensureLaneExists(reserveDefaultLane ? 1 : 0);
 
-        for (let i = 0; i < lanes.length; i++) {
-            if (!excludedLanes.has(i) && lanes[i] === null) {
+        for (let i = reserveDefaultLane ? 1 : 0; i < lanes.length; i++) {
+            if (!excludedLanes.has(i) && !arrowColumns.has(i) && lanes[i] === null) {
                 return i;
             }
         }
@@ -162,6 +183,7 @@ export function computeGraph(
     const isFilteredMode = commits.some(c => c.filteredAncestors && c.filteredAncestors.length > 0);
 
     for (let rowIndex = 0; rowIndex < commits.length; rowIndex++) {
+        arrowColumns.clear();
         const commit = commits[rowIndex];
         const { hash, parentHashes: rawParentHashes } = commit;
 
@@ -182,19 +204,19 @@ export function computeGraph(
             }
         }
 
-        // Check if any suspended connections should resume 2 rows before target
+        // Check if any suspended connections should resume one row before target
         const resumingConnections: SuspendedConnection[] = [];
         for (let i = suspendedConnections.length - 1; i >= 0; i--) {
             const conn = suspendedConnections[i];
             const targetRowIndex = commitIndexMap.get(conn.targetHash);
-            if (targetRowIndex !== undefined && targetRowIndex - rowIndex === 2) {
+            if (targetRowIndex !== undefined && targetRowIndex - rowIndex === 1) {
                 resumingConnections.push(conn);
                 suspendedConnections.splice(i, 1);
             }
         }
 
         // 1. Find all lanes expecting this commit
-        let expectingLanes: number[] = [];
+        const expectingLanes: number[] = [];
         for (let i = 0; i < lanes.length; i++) {
             if (lanes[i]?.targetHash === hash) {
                 expectingLanes.push(i);
@@ -202,38 +224,28 @@ export function computeGraph(
         }
 
         const isDefaultBranchCommit = isDefaultBranchHash(hash);
-        if (isDefaultBranchCommit && !expectingLanes.includes(0)) {
-            const defaultBranchLane = expectingLanes[0];
-            if (defaultBranchLane !== undefined && lanes[0] === null) {
-                lanes[0] = lanes[defaultBranchLane];
-                lanes[defaultBranchLane] = null;
-                expectingLanes = expectingLanes.map(lane => lane === defaultBranchLane ? 0 : lane);
+        // Keep incoming coordinates unchanged; route side lanes into the pinned node.
+        let myLaneIndex = isDefaultBranchCommit ? 0 : expectingLanes[0] ?? findEmptyLane();
+        if (!isDefaultBranchCommit && expectingLanes.length > 0 && !lanes[expectingLanes[0]]?.isResuming) {
+            // A down arrow may have kept this lane to the right at the previous boundary.
+            // Reclaim the empty column before placing the node, keeping the incoming bend.
+            for (let column = reserveDefaultLane ? 1 : 0; column < myLaneIndex; column++) {
+                if (lanes[column] === null) {
+                    myLaneIndex = column;
+                    break;
+                }
             }
         }
-
-        // 2. Determine my column
-        let myLaneIndex: number;
-        const usableExpectingLanes = expectingLanes;
-        if (isDefaultBranchCommit && (expectingLanes.includes(0) || lanes[0] === null)) {
-            myLaneIndex = 0;
-            ensureLaneExists(myLaneIndex);
-        } else if (usableExpectingLanes.length > 0) {
-            myLaneIndex = usableExpectingLanes[0];
-        } else if (reconnectingConnections.length > 0) {
-            myLaneIndex = findEmptyLane();
-        } else {
-            myLaneIndex = findEmptyLane();
-        }
-
-        const myColor = BRANCH_COLORS[myLaneIndex % BRANCH_COLORS.length];
+        ensureLaneExists(myLaneIndex);
+        const myColor = isDefaultBranchCommit
+            ? BRANCH_COLORS[0]
+            : lanes[expectingLanes[0]]?.color ?? reconnectingConnections[0]?.color ?? allocateColor();
         const isMerge = parentHashes.length > 1;
         maxX = myLaneIndex;
 
         // 3. Draw incoming line from previous row (if not reconnecting)
-        if (usableExpectingLanes.includes(myLaneIndex) && lanes[myLaneIndex] !== null) {
+        if (expectingLanes.includes(myLaneIndex) && lanes[myLaneIndex] !== null) {
             const laneInfo = lanes[myLaneIndex]!;
-            const distance = rowIndex - laneInfo.sourceRowIndex;
-            const isLong = distance > LONG_DISTANCE_THRESHOLD;
 
             lines.push({
                 x1: myLaneIndex,
@@ -242,14 +254,11 @@ export function computeGraph(
                 y2: 0.5,
                 color: laneInfo.color,
                 isMerge: false,
-                isLongDistance: isLong,
-                targetCommitHash: isLong ? laneInfo.sourceHash : undefined,
-                arrowDirection: isLong ? 'up' : undefined,
                 isDashed: laneInfo.isDashed
             });
         }
 
-        // 4. Draw reconnecting connections (from lanes that resumed 2 rows ago)
+        // 4. Draw reconnecting connections (at a target without a visible resume row)
         for (const conn of reconnectingConnections) {
             // Find the lane that was used for this connection
             let reconnectLane = lanes.findIndex(l => l?.targetHash === hash && l?.sourceHash === conn.sourceHash);
@@ -274,6 +283,25 @@ export function computeGraph(
             lanes[reconnectLane] = null;
         }
 
+        // 5. Draw incoming merges from other lanes
+        for (const fromLane of expectingLanes) {
+            if (fromLane === myLaneIndex) continue;
+            const laneInfo = lanes[fromLane]!;
+
+            if (fromLane > maxX) maxX = fromLane;
+
+            lines.push({
+                x1: fromLane,
+                y1: 0,
+                x2: myLaneIndex,
+                y2: 0.5,
+                color: laneInfo.color,
+                isMerge: true,
+                isDashed: laneInfo.isDashed
+            });
+            lanes[fromLane] = null;
+        }
+
         // Calculate how many new lanes are needed for merge parents (fork lines)
         let neededForForks = 0;
         if (parentHashes.length > 1) {
@@ -287,7 +315,17 @@ export function computeGraph(
             }
         }
 
-        // 4b. Handle resuming connections (2 rows before target) - draw arrow and allocate lane
+        // Resume after incoming bends have released their columns.
+        // Other incoming curves must not cross through an arrow stem.
+        const unavailableResumeColumns = new Set<number>([myLaneIndex]);
+        for (const line of lines) {
+            if (line.y1 !== 0 || line.y2 !== 0.5) continue;
+            for (let column = Math.min(line.x1, line.x2) + 1; column < Math.max(line.x1, line.x2); column++) {
+                unavailableResumeColumns.add(column);
+            }
+        }
+
+        // 4b. Handle resuming connections (one row before target) - draw arrow and allocate lane
         let reservedForForks = 0;
         for (const conn of resumingConnections) {
             // Find an empty lane, but skip myLaneIndex and lanes reserved for forks
@@ -296,7 +334,7 @@ export function computeGraph(
             ensureLaneExists(0);
             for (let i = 0; i < lanes.length; i++) {
                 // Skip current commit's lane
-                if (i === myLaneIndex) continue;
+                if (unavailableResumeColumns.has(i) || (reserveDefaultLane && i === 0)) continue;
 
                 if (lanes[i] === null) {
                     if (skipped < neededForForks - reservedForForks) {
@@ -309,15 +347,16 @@ export function computeGraph(
                 }
             }
             if (resumeLane === -1) {
-                resumeLane = findEmptyLane(new Set([myLaneIndex]));
+                resumeLane = findEmptyLane(unavailableResumeColumns);
             }
 
             if (resumeLane > maxX) maxX = resumeLane;
 
-            // Draw only the arrow indicator at center (y=0.5), line continues to y=1
+            // Keep the arrow stem in one column until it reaches the target row.
+            arrowColumns.add(resumeLane);
             lines.push({
                 x1: resumeLane,
-                y1: 0.5,
+                y1: 0.3,
                 x2: resumeLane,
                 y2: 1,
                 color: conn.color,
@@ -337,30 +376,6 @@ export function computeGraph(
                 isResuming: true,
                 isDashed: conn.isDashed
             };
-        }
-
-        // 5. Draw incoming merges from other lanes
-        for (let i = 1; i < expectingLanes.length; i++) {
-            const fromLane = expectingLanes[i];
-            const laneInfo = lanes[fromLane]!;
-            const distance = rowIndex - laneInfo.sourceRowIndex;
-            const isLong = distance > LONG_DISTANCE_THRESHOLD;
-
-            if (fromLane > maxX) maxX = fromLane;
-
-            lines.push({
-                x1: fromLane,
-                y1: 0,
-                x2: myLaneIndex,
-                y2: 0.5,
-                color: laneInfo.color,
-                isMerge: true,
-                isLongDistance: isLong,
-                targetCommitHash: isLong ? laneInfo.sourceHash : undefined,
-                arrowDirection: isLong ? 'up' : undefined,
-                isDashed: laneInfo.isDashed
-            });
-            lanes[fromLane] = null;
         }
 
         // 6. Draw pass-through lines for other active lanes
@@ -383,15 +398,17 @@ export function computeGraph(
 
                 // Check if this should become a suspended connection
                 const totalDistance = effectiveTargetIndex - laneInfo.sourceRowIndex;
-                const shouldSuspend = totalDistance > LONG_DISTANCE_THRESHOLD && distance >= 2 && distanceToTarget > 2;
+                const shouldSuspend = !(reserveDefaultLane && i === 0)
+                    && totalDistance > LONG_DISTANCE_THRESHOLD && distance >= 1 && distanceToTarget > 1;
                 if (shouldSuspend) {
-                    // Add arrow line pointing down before suspending
+                    // End inside the neighboring row so another edge can reuse the boundary below.
+                    arrowColumns.add(i);
                     if (i > maxX) maxX = i;
                     lines.push({
                         x1: i,
                         y1: 0,
                         x2: i,
-                        y2: 0.5,
+                        y2: 0.7,
                         color: laneInfo.color,
                         isMerge: false,
                         isLongDistance: true,
@@ -415,11 +432,8 @@ export function computeGraph(
                     if (i > maxX) maxX = i;
 
                     // If this lane was just resumed (isResuming), skip drawing here
-                    // because step 4b already drew the line from y=0.5 to y=1
-                    if (laneInfo.isResuming) {
-                        // Clear the flag and skip drawing
-                        lanes[i] = { ...laneInfo, isResuming: false };
-                    } else {
+                    // because step 4b already drew the arrow stem
+                    if (!laneInfo.isResuming) {
                         lines.push({
                             x1: i,
                             y1: 0,
@@ -499,12 +513,13 @@ export function computeGraph(
                     // Find existing lane for this parent, but exclude resuming lanes
                     let parentLaneIndex = lanes.findIndex(l => l?.targetHash === parentHash && !l?.isResuming);
                     if (parentLaneIndex === -1) {
-                        parentLaneIndex = findEmptyLane();
+                        parentLaneIndex = isDefaultBranchHash(parentHash) && !lanes[0] ? 0 : findEmptyLane();
+                        ensureLaneExists(parentLaneIndex);
                         lanes[parentLaneIndex] = {
                             targetHash: parentHash,
                             sourceRowIndex: rowIndex,
                             sourceHash: hash,
-                            color: BRANCH_COLORS[parentLaneIndex % BRANCH_COLORS.length]
+                            color: reserveDefaultLane && parentLaneIndex === 0 ? BRANCH_COLORS[0] : allocateColor()
                         };
                     }
 
@@ -524,23 +539,57 @@ export function computeGraph(
             });
         }
 
-        // 8. Compact lanes to fill empty gaps on the left
-        const compactedLanes: (LaneInfo | null)[] = [];
+        // 8. Make room for main only when it appears, bending existing lines at this boundary.
+        let pinnedLaneIndex = reserveDefaultLane ? 0 : -1;
+        const nextHash = commits[rowIndex + 1]?.hash;
+        if (!reserveDefaultLane && isDefaultBranchHash(nextHash)) {
+            reserveDefaultLane = true;
+            pinnedLaneIndex = lanes.findIndex(lane => lane?.targetHash === nextHash);
+            if (pinnedLaneIndex > 0 && (arrowColumns.has(pinnedLaneIndex) || arrowColumns.has(0))) {
+                pinnedLaneIndex = -1;
+            }
+        }
+        const compactedLanes: (LaneInfo | null)[] = reserveDefaultLane
+            ? [lanes[pinnedLaneIndex] ?? null]
+            : [];
         const laneMapping = new Map<number, number>();
 
+        if (pinnedLaneIndex >= 0 && lanes[pinnedLaneIndex]) laneMapping.set(pinnedLaneIndex, 0);
+
+        // Only upward arrows continue across this boundary; downward arrows have ended.
+        const continuingArrowColumns = new Set([...arrowColumns].filter(column => lanes[column] !== null));
+        for (const column of continuingArrowColumns) {
+            while (compactedLanes.length <= column) compactedLanes.push(null);
+            compactedLanes[column] = lanes[column];
+            if (lanes[column]) laneMapping.set(column, column);
+        }
+        let nextColumn = reserveDefaultLane ? 1 : 0;
         for (let i = 0; i < lanes.length; i++) {
-            if (lanes[i] !== null) {
-                const newIndex = compactedLanes.length;
-                compactedLanes.push(lanes[i]);
-                laneMapping.set(i, newIndex);
+            if (i !== pinnedLaneIndex && !continuingArrowColumns.has(i) && lanes[i] !== null) {
+                // Do not pull an edge left behind a terminating arrow just to compact it.
+                // A necessary rightward move (for example, making room for main) can reuse its slot.
+                while (continuingArrowColumns.has(nextColumn) || compactedLanes[nextColumn]
+                    || (nextColumn < i && arrowColumns.has(nextColumn))) nextColumn++;
+                while (compactedLanes.length <= nextColumn) compactedLanes.push(null);
+                compactedLanes[nextColumn] = lanes[i];
+                laneMapping.set(i, nextColumn++);
             }
+        }
+        while (compactedLanes.length > (reserveDefaultLane ? 1 : 0) && compactedLanes.at(-1) === null) {
+            compactedLanes.pop();
         }
 
         // Apply mapping to lines that extend to the next row (y2 === 1)
         lines.forEach(line => {
-            if (line.y2 === 1) {
+            if (line.y2 === 1 && line.arrowDirection !== 'down') {
                 const newX2 = laneMapping.get(line.x2);
                 if (newX2 !== undefined) {
+                    // Approach a released arrow column in the lower half, below its head.
+                    if (newX2 !== line.x1 && line.y1 === 0 && arrowColumns.has(newX2)
+                        && !continuingArrowColumns.has(newX2)) {
+                        lines.push({ ...line, x2: line.x1, y2: 0.5 });
+                        line.y1 = 0.5;
+                    }
                     line.x2 = newX2;
                 }
             }
