@@ -153,14 +153,14 @@ describe('GitService repository scope', () => {
     });
 
     it('preserves workspace scope when the opened folder is inside the git root', async () => {
-        fs.mkdirSync(path.join(tempDir, 'app'), { recursive: true });
+        fs.mkdirSync(path.join(tempDir, 'app', 'src'), { recursive: true });
         fs.writeFileSync(path.join(tempDir, 'root.txt'), 'base\n');
-        fs.writeFileSync(path.join(tempDir, 'app', 'scoped.txt'), 'base\n');
-        await git.add(['root.txt', 'app/scoped.txt']);
+        fs.writeFileSync(path.join(tempDir, 'app', 'src', 'scoped.txt'), 'base\n');
+        await git.add(['root.txt', 'app/src/scoped.txt']);
         await git.commit('Initial commit');
 
         fs.writeFileSync(path.join(tempDir, 'root.txt'), 'changed\n');
-        fs.writeFileSync(path.join(tempDir, 'app', 'scoped.txt'), 'changed\n');
+        fs.writeFileSync(path.join(tempDir, 'app', 'src', 'scoped.txt'), 'changed\n');
 
         const workspaceRoot = path.join(tempDir, 'app');
         const service = await GitService.create(workspaceRoot);
@@ -168,7 +168,7 @@ describe('GitService repository scope', () => {
 
         expect(service.getWorkspaceRoot()).toBe(fs.realpathSync(workspaceRoot));
         expect(service.getGitRoot()).toBe(fs.realpathSync(tempDir));
-        expect(status.map(file => file.path)).toEqual(['scoped.txt']);
+        expect(status.map(file => file.path)).toEqual(['src/scoped.txt']);
     });
 });
 

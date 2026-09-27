@@ -277,7 +277,8 @@ export class GitService implements vscode.Disposable {
         if (this._gitRoot === this._workspaceRoot) {
             return filePath;
         }
-        return path.relative(this._gitRoot, path.join(this._workspaceRoot, filePath));
+        return path.relative(this._gitRoot, path.join(this._workspaceRoot, filePath))
+            .replaceAll(path.sep, path.posix.sep);
     }
 
     public toWorkspacePath(repoPath: string): string | null {
@@ -289,7 +290,7 @@ export class GitService implements vscode.Disposable {
         if (rel.startsWith('..') || path.isAbsolute(rel)) {
             return null;
         }
-        return rel;
+        return rel.replaceAll(path.sep, path.posix.sep);
     }
 
     /**
