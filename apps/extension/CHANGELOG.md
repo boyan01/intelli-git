@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.0.9
+
+- Added a Codex CLI AI provider with model discovery, configurable reasoning effort, and guided setup from Intelli Git.
+- Improved Git Log graph readability with more stable branch lanes, clearer folded edges, and sharper arrow routing.
+- Fixed change detection for Windows workspaces opened below the repository root by normalizing scoped repository paths.
+
 ## 0.0.8
 
 - Added an opt-in experimental three-way merge editor with per-change review, editable results, and dedicated binary and submodule conflict actions.
