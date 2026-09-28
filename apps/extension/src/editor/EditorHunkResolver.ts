@@ -214,7 +214,7 @@ export class EditorHunkResolver {
         }
 
         const status = await this.getStatus();
-        const matchingFiles = status.filter(file => file.path === target.relativePath);
+        const matchingFiles = await this.gitService.getFileStatusWithHunks(target.relativePath, status);
         const mode = this.changelistStateService.getState().mode;
         const match = findBestHunkMatch(
             matchingFiles,
@@ -242,7 +242,7 @@ export class EditorHunkResolver {
         }
 
         const status = await this.getStatus();
-        const matchingFiles = status.filter(file => file.path === target.relativePath);
+        const matchingFiles = await this.gitService.getFileStatusWithHunks(target.relativePath, status);
         const mode = this.changelistStateService.getState().mode;
         const result: EditorHunkDecoration[] = [];
 

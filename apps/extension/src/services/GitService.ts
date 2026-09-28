@@ -373,42 +373,54 @@ export class GitService implements vscode.Disposable {
         );
     }
 
-    private async parseUntrackedFileHunks(files: FileStatus[]): Promise<Map<string, GitHunk[]>> {
-        const diffParts: string[] = [];
+    // Status snapshots stay content-free for untracked files. Only editor operations
+    // request their whole-file hunk, with a hard byte limit even if the file grows.
+    public async getFileStatusWithHunks(filePath: string, status?: FileStatus[]): Promise<FileStatus[]> {
+        const files = (status ?? await this.getStatus()).filter(file => file.path === filePath);
+        if (!files.some(file => file.status === '?')) {
+            return files;
+        }
 
-        for (const file of files) {
+        const maxBytes = 1024 * 1024;
+        let hunks: GitHunk[] | undefined;
+        try {
+            const handle = await fs.promises.open(path.join(this._workspaceRoot, filePath), 'r');
             try {
-                const fullPath = path.join(this._workspaceRoot, file.path);
-                const content = await fs.promises.readFile(fullPath, 'utf8');
-                if (content.length === 0) {
-                    continue;
+                const stat = await handle.stat();
+                if (!stat.isFile() || stat.size > maxBytes) {
+                    return files;
                 }
-
-                const repoPath = this.toRepoPath(file.path);
-                const lineCount = content.split('\n').length;
-                diffParts.push([
+                const buffer = Buffer.alloc(maxBytes + 1);
+                let length = 0;
+                while (length < buffer.length) {
+                    const { bytesRead } = await handle.read(buffer, length, buffer.length - length, null);
+                    if (bytesRead === 0) break;
+                    length += bytesRead;
+                }
+                if (length === 0 || length > maxBytes || buffer.subarray(0, length).includes(0)) {
+                    return files;
+                }
+                const content = buffer.subarray(0, length).toString('utf8');
+                const repoPath = this.toRepoPath(filePath);
+                const diff = [
                     `diff --git a/${repoPath} b/${repoPath}`,
                     'new file mode 100644',
                     'index 0000000..1111111',
                     '--- /dev/null',
                     `+++ b/${repoPath}`,
-                    `@@ -0,0 +1,${lineCount} @@`,
+                    `@@ -0,0 +1,${content.split('\n').length} @@`,
                     `+${content.replace(/\n/g, '\n+')}`
-                ].join('\n'));
-            } catch (e) {
-                logger.debug('Failed to parse untracked file hunks', { path: file.path, error: `${e}` });
+                ].join('\n');
+                hunks = parseDiffToFileHunks(diff, repoPath => this.toWorkspacePath(repoPath), {
+                    idPrefix: 'worktree'
+                }).get(filePath);
+            } finally {
+                await handle.close();
             }
+        } catch (error) {
+            logger.debug('Failed to read untracked file hunks', { path: filePath, error: `${error}` });
         }
-
-        if (diffParts.length === 0) {
-            return new Map();
-        }
-
-        return parseDiffToFileHunks(
-            diffParts.join('\n'),
-            repoPath => this.toWorkspacePath(repoPath),
-            { idPrefix: 'worktree' }
-        );
+        return files.map(file => file.status === '?' ? { ...file, hunks } : file);
     }
 
     private async hasLocalChanges(): Promise<boolean> {
@@ -1105,11 +1117,9 @@ export class GitService implements vscode.Disposable {
         const diffStartedAt = Date.now();
         const shouldResolveGitHunks = (file: FileStatus) =>
             file.status === 'M' || (file.status === 'A' && file.staged) || file.status === 'D';
-        const shouldAttachHunks = (file: FileStatus) => shouldResolveGitHunks(file) || file.status === '?';
 
         const hasStagedDiff = files.some(file => file.staged && shouldResolveGitHunks(file));
         const hasWorktreeDiff = files.some(file => !file.staged && shouldResolveGitHunks(file));
-        const untrackedFiles = files.filter(file => file.status === '?');
         const workspacePathspec = this.getWorkspacePathspecArgs();
 
         try {
@@ -1119,9 +1129,6 @@ export class GitService implements vscode.Disposable {
             const worktreeHunks = hasWorktreeDiff
                 ? await this.parseWorkspaceDiff(workspacePathspec, 'worktree')
                 : new Map<string, GitHunk[]>();
-            const untrackedHunks = untrackedFiles.length > 0
-                ? await this.parseUntrackedFileHunks(untrackedFiles)
-                : new Map<string, GitHunk[]>();
 
             for (const file of files) {
                 if (this._inactiveChangesService) {
@@ -1129,13 +1136,11 @@ export class GitService implements vscode.Disposable {
                     file.inactiveHunkIds = this._inactiveChangesService.getInactiveHunkIds(file.path);
                 }
 
-                if (!shouldAttachHunks(file)) {
+                if (!shouldResolveGitHunks(file)) {
                     continue;
                 }
 
-                const hunks = file.status === '?'
-                    ? untrackedHunks.get(file.path)
-                    : file.staged ? stagedHunks.get(file.path) : worktreeHunks.get(file.path);
+                const hunks = file.staged ? stagedHunks.get(file.path) : worktreeHunks.get(file.path);
                 if (hunks) {
                     file.hunks = hunks;
                     hunkFileCount++;

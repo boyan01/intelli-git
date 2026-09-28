@@ -159,7 +159,7 @@ async function resolveEditorChangeBlockTargetFromArgs(
     }
 
     const status = await gitService.getStatus();
-    const matchingFiles = status.filter(file => file.path === args.path);
+    const matchingFiles = await gitService.getFileStatusWithHunks(args.path, status);
     for (const fileStatus of matchingFiles) {
         const hunk = fileStatus.hunks?.find(hunk => hunk.id === args.hunkId);
         if (hunk) {
@@ -207,6 +207,17 @@ async function setChangeBlockInactive(
         targetLine,
         action: inactive ? 'inactive' : 'active'
     });
+
+    if (fileStatus.status === '?') {
+        if (inactive) {
+            await inactiveChangesService.markInactive([relativePath]);
+        } else {
+            await inactiveChangesService.markActive([relativePath]);
+        }
+        provider.requestRefresh({ scopes: ['commit'], reason: 'inactive-change-updated' });
+        await vscode.commands.executeCommand('intelli-git.refreshChangeBlockDecorations');
+        return;
+    }
 
     const inactiveHunkIds = inactiveChangesService.getInactiveHunkIds(relativePath);
     const inactiveHunkId = fileStatus.staged ? toWorktreeHunkId(hunk.id) : hunk.id;
@@ -863,7 +874,7 @@ export function registerChangelistCommands(
 
             const relativePath = path.relative(workspaceRoot, filePath).replace(/\\/g, '/');
             const status = await gitService.getStatus();
-            const matchingFiles = status.filter(f => f.path === relativePath);
+            const matchingFiles = await gitService.getFileStatusWithHunks(relativePath, status);
             const hunkMatch = findBestHunkMatch(matchingFiles, lineChange, targetLine);
             const inactiveHunkIds = inactiveChangesService.getInactiveHunkIds(relativePath);
             const hunk = hunkMatch?.hunk;

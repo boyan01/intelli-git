@@ -106,3 +106,17 @@ test('InactiveChangesService migrates global state only when explicitly requeste
 
     assert.equal(service.isInactive('README.md'), true);
 });
+
+test('InactiveChangesService preserves legacy untracked hunk assignments without loading content', async () => {
+    const context = createExtensionContext();
+    const service = new InactiveChangesService(context as never);
+    const filePath = 'new.txt';
+    const hunk = createHunk(`${filePath}:worktree:0:0:1:2:oldhash`, 0, 1, 0, 2);
+    await service.markHunkInactive(filePath, hunk.id);
+    service.syncWithStatus([{ path: filePath, status: '?', staged: false }]);
+    assert.equal(service.isInactive(filePath), true);
+    const reopened = new InactiveChangesService(context as never);
+    assert.equal(reopened.isInactive(filePath), true);
+    await service.markMatchingHunkActive(filePath, hunk.id, [hunk]);
+    assert.equal(service.isInactive(filePath), false);
+});

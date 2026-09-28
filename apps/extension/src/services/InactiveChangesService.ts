@@ -218,6 +218,14 @@ export class InactiveChangesService {
             }
 
             const entries = grouped.get(path) || [];
+            // Untracked files have always had one whole-file hunk. Preserve legacy
+            // assignments when status no longer eagerly includes that hunk.
+            if (entries.some(entry => entry.status === '?')) {
+                this.state.files[path] = { all: true };
+                entries.forEach(entry => { entry.inactive = true; });
+                changed = true;
+                continue;
+            }
             const hunks = Array.from(new Map(
                 entries.flatMap(entry => (entry.hunks || []).map(hunk => [hunk.id, hunk]))
             ).values());

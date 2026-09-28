@@ -1030,6 +1030,45 @@ describe('GitService staging inactive changes', () => {
         expect(headNameStatus.trim()).toBe('D\tsrc/deleted.txt');
     });
 
+    it('does not open untracked content during status refresh and reads only the requested file', async () => {
+        fs.writeFileSync(path.join(tempDir, 'tracked.txt'), 'base\n');
+        await git.add('tracked.txt');
+        await git.commit('Initial commit');
+        fs.mkdirSync(path.join(tempDir, 'dependencies'));
+        for (let i = 0; i < 200; i++) {
+            fs.writeFileSync(path.join(tempDir, 'dependencies', `${i}.txt`), 'dependency\n');
+        }
+        const service = new GitService(tempDir, tempDir, git);
+        const open = vi.spyOn(fs.promises, 'open');
+        const readFile = vi.spyOn(fs.promises, 'readFile');
+        try {
+            const status = await service.getStatus();
+            expect(status).toHaveLength(200);
+            expect(status.every(file => file.hunks === undefined)).toBe(true);
+            expect(open).not.toHaveBeenCalled();
+            expect(readFile).not.toHaveBeenCalled();
+            const [file] = await service.getFileStatusWithHunks('dependencies/0.txt', status);
+            expect(file.hunks).toHaveLength(1);
+            expect(open).toHaveBeenCalledTimes(1);
+            expect(open.mock.calls[0][0]).toBe(fs.realpathSync(path.join(tempDir, 'dependencies/0.txt')));
+        } finally {
+            open.mockRestore();
+            readFile.mockRestore();
+        }
+    });
+
+    it('keeps large, binary and missing untracked files out of editor hunk parsing', async () => {
+        const service = new GitService(tempDir, tempDir, git);
+        fs.writeFileSync(path.join(tempDir, 'large.txt'), Buffer.alloc(1024 * 1024 + 1, 65));
+        fs.writeFileSync(path.join(tempDir, 'binary.bin'), Buffer.from([65, 0, 66]));
+        for (const name of ['large.txt', 'binary.bin', 'missing.txt']) {
+            const status: FileStatus[] = [{ path: name, status: '?', staged: false }];
+            const [file] = await service.getFileStatusWithHunks(name, status);
+            expect(file.path).toBe(name);
+            expect(file.hunks).toBeUndefined();
+        }
+    });
+
     it('commits untracked files from a changelist plan', async () => {
         fs.mkdirSync(path.join(tempDir, 'src'));
         fs.writeFileSync(path.join(tempDir, 'tracked.txt'), 'base\n');
@@ -1042,8 +1081,11 @@ describe('GitService staging inactive changes', () => {
         const status = await service.getStatus();
         const untrackedStatus = status.find(file => file.path === 'src/new.txt' && file.status === '?');
         expect(untrackedStatus).toBeTruthy();
-        expect(untrackedStatus?.hunks).toHaveLength(1);
-        expect(untrackedStatus?.hunks?.[0]).toMatchObject({
+        expect(untrackedStatus?.hunks).toBeUndefined();
+        const [editorStatus] = await service.getFileStatusWithHunks('src/new.txt', status);
+        expect(editorStatus.hunks).toHaveLength(1);
+        expect(untrackedStatus?.hunks).toBeUndefined();
+        expect(editorStatus.hunks?.[0]).toMatchObject({
             oldStart: 0,
             oldLineCount: 0,
             newStart: 1,
