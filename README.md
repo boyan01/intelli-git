@@ -1,104 +1,94 @@
 # Intelli Git
 
-JetBrains-style Git workflows for Visual Studio Code.
+IntelliJ-style Git workflows for Visual Studio Code.
 
-Intelli Git is a free, open-source VS Code extension for developers who prefer IntelliJ-style changelists and regularly split local work into precise commits. It adds a focused commit panel, Git Log, stash tools, push workflows, and optional AI-assisted commit message generation without replacing VS Code's built-in Git extension.
+Organize work into changelists, review your changes, and commit one task at a time. Intelli Git brings a dedicated commit panel and Git Log to VS Code, with stash, branch, and push tools close at hand.
 
-[Install from Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=boyan01.intelli-git) · [Download a VSIX](https://github.com/boyan01/intelli-git/releases) · [Report an issue](https://github.com/boyan01/intelli-git/issues)
+It is free and open source, and works alongside VS Code's built-in Git support.
 
-## Screenshots
-
-### Commit View In Staged Mode
-
-Use the familiar Git index workflow with staged, unstaged, untracked, inactive, stash, push, and branch context in one side bar view.
-
-![Intelli Git commit view in staged mode](assets/intelli-git-commit-staged.png)
-
-### Commit View In Changes Mode
-
-Use IntelliJ-style changelists when you want the active changelist to define what gets committed while other work stays visible but separate.
-
-![Intelli Git commit view in changes mode](assets/intelli-git-commit-changes.png)
-
-### Git Log
-
-Browse history with branch filters, commit graph, commit metadata, and details actions from the VS Code panel.
-
-![Intelli Git Git Log panel](assets/intelli-git-log.png)
+[Install](https://marketplace.visualstudio.com/items?itemName=boyan01.intelli-git) · [Releases](https://github.com/boyan01/intelli-git/releases) · [Issues](https://github.com/boyan01/intelli-git/issues)
 
 ## Features
 
-- Commit panel with `staged` mode for the normal staged / unstaged Git model.
-- `changes` mode with IntelliJ-style changelists and one active changelist.
-- Inactive changes for keeping local work out of the current commit flow.
-- Native VS Code context menus for files, folders, changelists, stash entries, branches, and commits.
-- Git Log with branch filtering, commit graph, file history actions, cherry-pick, revert, reset, and commit message editing.
-- Stash and push workflows from the Intelli Git UI.
-- AI commit message generation with GitHub Copilot, Codex CLI, Anthropic, Google AI, or a custom OpenAI-compatible endpoint.
+- **Changelists:** keep unrelated work separate and commit the active changelist.
+- **Staging:** use the familiar staged / unstaged workflow, with inactive changes for work you want to set aside.
+- **Git Log:** browse the commit graph, filter history by branch or path, inspect changes, and cherry-pick or revert commits.
+- **Everyday Git tools:** manage stashes, switch branches, push changes, and work across repositories and worktrees.
+- **Optional AI assistance:** generate commit messages from the changes you select, using your preferred provider.
 
-## Commit Panel Modes
+## Getting Started
 
-Intelli Git supports two commit panel modes through `intelli-git.changelist.mode`:
+Requires VS Code 1.100.0 or newer, Git on your system path, and a Git repository opened in VS Code.
 
-- `staged`: commits follow the Git index. Staged files define the commit selection and staging actions are available from the toolbar and file context menus.
-- `changes`: commits use IntelliJ-style changelists. New tracked changes go into the active changelist, and commit execution only includes that active changelist.
+1. Install **Intelli Git** from the [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=boyan01.intelli-git), or install a VSIX from [GitHub Releases](https://github.com/boyan01/intelli-git/releases).
+2. Open the Intelli Git view in the activity bar, or run `Intelli: Focus Commit View` from the Command Palette.
+3. Stage the files you want to commit, or choose an active changelist in `changes` mode. Write your commit message and commit. Open **Git Log** in the bottom panel to explore repository history.
 
-Both modes keep the tree file-oriented. Changelist and file context menus use native VS Code webview context menus instead of custom DOM menus.
+### Choose Your Commit Workflow
 
-## AI And Privacy
+Intelli Git starts in `staged` mode. To use IntelliJ-style changelists, add this to your VS Code settings:
 
-Intelli Git runs locally inside VS Code and reads Git state from the workspace you open.
+```json
+{
+  "intelli-git.changelist.mode": "changes"
+}
+```
 
-AI features are optional. When AI commit message generation is used, selected diff context may be sent to the configured AI provider. No AI request is made unless you invoke an AI action. API keys configured through Intelli Git are stored in VS Code SecretStorage.
+| Mode | What gets committed |
+| --- | --- |
+| `changes` | Changes assigned to the active changelist. Other changelists stay out of the commit. |
+| `staged` (default) | Changes in the Git index. Stage and unstage files to choose what to commit. |
 
-## Requirements
+In `changes` mode, use the context menus to create changelists, move files between them, and choose the active list. In `staged` mode, you can mark changes as inactive to keep them out of the current commit.
 
-- Visual Studio Code 1.100.0 or newer
-- Git available on your system path
-- A Git repository opened in VS Code
+## Screenshots
 
-GitHub Copilot mode requires the GitHub Copilot extension. Codex CLI mode requires the CLI installed and authenticated on the extension host. External AI providers require user-provided credentials.
+### Changelists
 
-## Usage
+Group changes by task and commit the active changelist.
 
-Open the Intelli Git activity bar view to review local changes, organize files, create commits, stash changes, and push to remotes.
+![Intelli Git commit view in changes mode](assets/intelli-git-commit-changes.png)
 
-Open the Git Log panel to browse commit history, filter by branch or path, inspect commit files, and run commit-level actions.
+### Staging
 
-Run `Intelli: Configure AI Provider` from the Command Palette to choose an AI provider and configure credentials.
+Review staged, unstaged, and inactive changes in the commit panel.
+
+![Intelli Git commit view in staged mode](assets/intelli-git-commit-staged.png)
+
+### Git Log
+
+Browse the commit graph and inspect a commit's details and changed files.
+
+![Intelli Git Git Log panel](assets/intelli-git-log.png)
+
+## AI Commit Messages
+
+Run `Intelli: Configure AI Provider` from the Command Palette to set up GitHub Copilot, Codex CLI, Anthropic, Google AI, or a custom OpenAI-compatible endpoint.
+
+GitHub Copilot requires its VS Code extension. Codex CLI must be installed and authenticated on the extension host. For external providers, configure your own endpoint and credentials as needed.
+
+AI features are optional. When you invoke generation, selected diff context may be sent to the configured provider. API keys configured through Intelli Git are stored in VS Code SecretStorage.
 
 ## Development
 
-### Prerequisites
-
-- Node.js 22.13.0+ or 20.19.0+
-- VS Code
-
-### Clone And Install Dependencies
+Use the Node.js version in [.nvmrc](.nvmrc). Clone the repository and install dependencies from its root:
 
 ```bash
 git clone https://github.com/boyan01/intelli-git.git
 cd intelli-git
 npm ci
+npm run compile
 ```
 
-### Build
+Press `F5` in VS Code to launch the Extension Development Host. The configured launch task starts the build watchers; reload the extension host to pick up changes.
+
+To start the watchers manually:
 
 ```bash
-# Full build (webview + extension TypeScript)
-npm run compile
-
-# Build webview only
-npm run build:webview --workspace intelli-git
-
-# Watch extension and webview builds together
 npm run watch:extension
-
-# Watch mode for webview UI
-npm run watch --workspace webview-ui
 ```
 
-### Quality Checks
+### Checks
 
 ```bash
 npm run lint
@@ -106,36 +96,32 @@ npm run compile
 npm run test
 ```
 
-### Package
+### Packaging
 
 ```bash
-# Create a Marketplace-ready .vsix package
+# Marketplace build
 npm run package:extension
 
-# Create an Open VSX-ready .vsix package
+# Open VSX build
 npm run package:extension:open-vsx
 
-# Create a dev .vsix package
+# Development build
 npm run package:extension:dev
 ```
 
-### Development Workflow
-
-1. Run `npm run watch:extension`
-2. Press `F5` in VS Code to launch the Extension Development Host
-3. Make changes and reload the extension host to see updates
+VSIX packages are written to `out/`.
 
 ## Contributing
 
-Bug reports, focused improvements, and pull requests are welcome. Include reproducible steps for bugs and discuss larger changes in an issue before implementing them.
+Bug reports and pull requests are welcome. For bugs, include your Intelli Git and VS Code versions, the repository state, and steps to reproduce the problem. Keep credentials and private code out of public reports.
 
-Follow the repository guidance in [AGENTS.md](AGENTS.md) and run the quality checks above before submitting a pull request.
+For larger changes, open an issue to discuss the approach first. Follow [AGENTS.md](AGENTS.md) and run the checks above before submitting a pull request.
 
-## Releases And Source Code
+## Releases
 
-New releases are built from version tags such as `v0.0.10` in this repository. Each release includes the VSIX and a link to the corresponding source tag, including the build scripts. Existing tags and releases are preserved. Earlier `v0.0.x` tags from the documentation repository do not contain the extension source; the corresponding source commits retain their original `intelli-git-extension-v0.0.x` tags.
+New releases use `vX.Y.Z` tags. To build a release, check out its tag and follow the development and packaging steps above.
 
-To build a release from source, check out its source tag, run `npm ci`, and then run `npm run package:extension`.
+For older releases from before the source migration, the source is under the corresponding `intelli-git-extension-vX.Y.Z` tag; the original `vX.Y.Z` tags contain documentation only.
 
 ## License
 

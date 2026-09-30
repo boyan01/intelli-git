@@ -1,79 +1,79 @@
 # Intelli Git
 
-Intelli Git is a free, open-source extension that brings JetBrains-style Git workflows to Visual Studio Code.
+IntelliJ-style Git workflows for Visual Studio Code.
 
-It provides a focused commit panel, changelist-style organization, stash tools, push workflows, Git Log browsing, and AI-assisted commit message generation without replacing VS Code's built-in Git support.
+Organize work into changelists, review your changes, and commit one task at a time. Intelli Git brings a dedicated commit panel and Git Log to VS Code, with stash, branch, and push tools close at hand.
 
-[Install from Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=boyan01.intelli-git) · [Source code](https://github.com/boyan01/intelli-git) · [Download a VSIX](https://github.com/boyan01/intelli-git/releases)
+It is free and open source, and works alongside VS Code's built-in Git support.
 
-## Screenshots
-
-### Commit View In Staged Mode
-
-![Intelli Git commit view in staged mode](https://raw.githubusercontent.com/boyan01/intelli-git/main/assets/intelli-git-commit-staged.png)
-
-### Commit View In Changes Mode
-
-![Intelli Git commit view in changes mode](https://raw.githubusercontent.com/boyan01/intelli-git/main/assets/intelli-git-commit-changes.png)
-
-### Git Log
-
-![Intelli Git Git Log panel](https://raw.githubusercontent.com/boyan01/intelli-git/main/assets/intelli-git-log.png)
+[Install](https://marketplace.visualstudio.com/items?itemName=boyan01.intelli-git) · [Source](https://github.com/boyan01/intelli-git) · [Releases](https://github.com/boyan01/intelli-git/releases) · [Issues](https://github.com/boyan01/intelli-git/issues)
 
 ## Features
 
-- Commit panel with `staged` mode for the normal staged / unstaged Git model.
-- `changes` mode with IntelliJ-style changelists and one active changelist.
-- Inactive changes for keeping local work out of the current commit flow.
-- Native VS Code context menus for files, folders, changelists, stash entries, branches, and commits.
-- Git Log with branch filtering, commit graph, file history actions, cherry-pick, revert, reset, and commit message editing.
-- Stash and push workflows from the Intelli Git UI.
-- AI commit message generation with GitHub Copilot, Codex CLI, Anthropic, Google AI, or a custom OpenAI-compatible endpoint.
+- **Changelists:** keep unrelated work separate and commit the active changelist.
+- **Staging:** use the familiar staged / unstaged workflow, with inactive changes for work you want to set aside.
+- **Git Log:** browse the commit graph, filter history by branch or path, inspect changes, and cherry-pick or revert commits.
+- **Everyday Git tools:** manage stashes, switch branches, push changes, and work across repositories and worktrees.
+- **Optional AI assistance:** generate commit messages from the changes you select, using your preferred provider.
 
-## Commit Panel Modes
+## Getting Started
 
-The extension supports two commit panel modes through `intelli-git.changelist.mode`:
+Requires VS Code 1.100.0 or newer, Git on your system path, and a Git repository opened in VS Code.
 
-- `staged`: follows the normal Git staged and unstaged model.
-- `changes`: uses IntelliJ-style changelists and commits only the active changelist.
+1. Install **Intelli Git** from the [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=boyan01.intelli-git), or install a VSIX from [GitHub Releases](https://github.com/boyan01/intelli-git/releases).
+2. Open the Intelli Git view in the activity bar, or run `Intelli: Focus Commit View` from the Command Palette.
+3. Stage the files you want to commit, or choose an active changelist in `changes` mode. Write your commit message and commit. Open **Git Log** in the bottom panel to explore repository history.
 
-## Requirements
+### Choose Your Commit Workflow
 
-- Visual Studio Code 1.100.0 or newer
-- Git available on your system path
-- A Git repository opened in VS Code
+Intelli Git starts in `staged` mode. To use IntelliJ-style changelists, add this to your VS Code settings:
 
-AI features are optional. GitHub Copilot mode requires the GitHub Copilot extension. Codex CLI mode requires the CLI installed and authenticated on the extension host. External AI providers require user-provided credentials, stored in VS Code SecretStorage when configured through Intelli Git commands.
+```json
+{
+  "intelli-git.changelist.mode": "changes"
+}
+```
 
-## Usage
+| Mode | What gets committed |
+| --- | --- |
+| `changes` | Changes assigned to the active changelist. Other changelists stay out of the commit. |
+| `staged` (default) | Changes in the Git index. Stage and unstage files to choose what to commit. |
 
-Open the Intelli Git activity bar view to review local changes, organize files, create commits, stash changes, and push to remotes.
+In `changes` mode, use the context menus to create changelists, move files between them, and choose the active list. In `staged` mode, you can mark changes as inactive to keep them out of the current commit.
 
-Open the Git Log panel to browse commit history, filter by branch or path, inspect commit files, and run commit-level actions.
+## Screenshots
 
-Run `Intelli: Configure AI Provider` from the Command Palette to choose an AI provider and configure credentials.
+### Changelists
 
-## Privacy
+Group changes by task and commit the active changelist.
 
-Intelli Git runs locally inside VS Code and reads Git repository state from the workspace you open.
+![Intelli Git commit view in changes mode](https://raw.githubusercontent.com/boyan01/intelli-git/main/assets/intelli-git-commit-changes.png)
 
-When AI commit message generation is used, selected diff context may be sent to the configured AI provider. No AI request is made unless you invoke an AI action.
+### Staging
 
-API keys are stored with VS Code SecretStorage. Legacy settings-based API keys are migrated and cleared automatically when possible.
+Review staged, unstaged, and inactive changes in the commit panel.
 
-## Known Limitations
+![Intelli Git commit view in staged mode](https://raw.githubusercontent.com/boyan01/intelli-git/main/assets/intelli-git-commit-staged.png)
 
-- Changelist behavior is implemented by the extension and is not a native Git concept.
-- Some operations depend on the current repository state and may be blocked by merge conflicts or unsupported Git states.
-- AI output quality depends on the selected provider and model.
+### Git Log
 
-## Support
+Browse the commit graph and inspect a commit's details and changed files.
 
-For support and issue reporting, open a report in the [Intelli Git repository](https://github.com/boyan01/intelli-git/issues/new/choose).
+![Intelli Git Git Log panel](https://raw.githubusercontent.com/boyan01/intelli-git/main/assets/intelli-git-log.png)
 
-## Source Code And Contributions
+## AI Commit Messages
 
-Source code, build instructions, and contribution guidance are available in the [Intelli Git repository](https://github.com/boyan01/intelli-git). New GitHub releases use `vX.Y.Z` tags and link to the corresponding source so you can obtain and build that version.
+Run `Intelli: Configure AI Provider` from the Command Palette to set up GitHub Copilot, Codex CLI, Anthropic, Google AI, or a custom OpenAI-compatible endpoint.
+
+GitHub Copilot requires its VS Code extension. Codex CLI must be installed and authenticated on the extension host. For external providers, configure your own endpoint and credentials as needed.
+
+AI features are optional. When you invoke generation, selected diff context may be sent to the configured provider. API keys configured through Intelli Git are stored in VS Code SecretStorage.
+
+## Feedback And Contributions
+
+Found a bug or have an idea? [Open an issue](https://github.com/boyan01/intelli-git/issues). Include your Intelli Git and VS Code versions and steps to reproduce the problem. Keep credentials and private code out of public reports.
+
+Source code, build instructions, and contribution guidance are in the [Intelli Git repository](https://github.com/boyan01/intelli-git).
 
 ## License
 
