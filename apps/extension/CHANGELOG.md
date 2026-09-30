@@ -1,9 +1,10 @@
 # Changelog
 
-## Unreleased
+## 0.0.10
 
 - Open-sourced Intelli Git, with source code and contribution guidance in the Intelli Git repository.
 - Removed Early Access expiration warnings and restrictions so builds keep working without a time limit.
+- Fixed excessive memory use during change detection in repositories with large untracked directories.
 
 ## 0.0.9
 
