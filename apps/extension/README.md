@@ -1,12 +1,10 @@
 # Intelli Git
 
-Intelli Git brings JetBrains-style Git workflows to Visual Studio Code.
+Intelli Git is a free, open-source extension that brings JetBrains-style Git workflows to Visual Studio Code.
 
 It provides a focused commit panel, changelist-style organization, stash tools, push workflows, Git Log browsing, and AI-assisted commit message generation without replacing VS Code's built-in Git support.
 
 [Install from Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=boyan01.intelli-git) · [Source code](https://github.com/boyan01/intelli-git) · [Download a VSIX](https://github.com/boyan01/intelli-git/releases)
-
-Intelli Git is free and open source under GPL-3.0-or-later. You can use it for personal or commercial work. Builds do not expire.
 
 ## Screenshots
 
@@ -81,6 +79,4 @@ Source code, build instructions, and contribution guidance are available in the 
 
 Copyright (c) 2026 yangbin.
 
-Intelli Git is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version (`GPL-3.0-or-later`).
-
-Intelli Git is distributed without any warranty. See [LICENSE](LICENSE) for the full license text. Third-party components retain their own licenses; see [ThirdPartyNotices.txt](ThirdPartyNotices.txt).
+Licensed under [GPL-3.0-or-later](LICENSE). Third-party licenses are listed in [ThirdPartyNotices.txt](ThirdPartyNotices.txt).

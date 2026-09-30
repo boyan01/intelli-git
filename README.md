@@ -6,8 +6,6 @@ Intelli Git is a free, open-source VS Code extension for developers who prefer I
 
 [Install from Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=boyan01.intelli-git) · [Download a VSIX](https://github.com/boyan01/intelli-git/releases) · [Report an issue](https://github.com/boyan01/intelli-git/issues)
 
-This repository contains the extension source code, development history, documentation, and releases. Intelli Git is licensed under GPL-3.0-or-later and can be used for personal or commercial work. Builds do not expire.
-
 ## Screenshots
 
 ### Commit View In Staged Mode
@@ -131,7 +129,7 @@ npm run package:extension:dev
 
 Bug reports, focused improvements, and pull requests are welcome. Include reproducible steps for bugs and discuss larger changes in an issue before implementing them.
 
-Follow the repository guidance in [AGENTS.md](AGENTS.md) and run the quality checks above before submitting a pull request. Contributions are licensed under GPL-3.0-or-later.
+Follow the repository guidance in [AGENTS.md](AGENTS.md) and run the quality checks above before submitting a pull request.
 
 ## Releases And Source Code
 
@@ -143,6 +141,4 @@ To build a release from source, check out its source tag, run `npm ci`, and then
 
 Copyright (c) 2026 yangbin.
 
-Intelli Git is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version (`GPL-3.0-or-later`).
-
-Intelli Git is distributed without any warranty. See [LICENSE](LICENSE) for the full license text. Third-party components retain their own licenses; see [ThirdPartyNotices.txt](apps/extension/ThirdPartyNotices.txt).
+Licensed under [GPL-3.0-or-later](LICENSE). Third-party licenses are listed in [ThirdPartyNotices.txt](apps/extension/ThirdPartyNotices.txt).

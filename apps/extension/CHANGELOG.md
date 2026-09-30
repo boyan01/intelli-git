@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Licensed Intelli Git under GPL-3.0-or-later, with source code and contribution guidance in the Intelli Git repository.
+- Open-sourced Intelli Git, with source code and contribution guidance in the Intelli Git repository.
 - Removed Early Access expiration warnings and restrictions so builds keep working without a time limit.
 
 ## 0.0.9

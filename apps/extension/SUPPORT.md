@@ -1,7 +1,5 @@
 # Support
 
-Intelli Git is a free, open-source Visual Studio Code extension licensed under GPL-3.0-or-later. Source code and build instructions are available at https://github.com/boyan01/intelli-git.
-
 ## Reporting Issues
 
 Use the Intelli Git repository for bug reports, feature requests, questions, and AI provider problems:

@@ -1,7 +1,7 @@
 Third-party notices for Intelli Git
 
-Intelli Git's own code is licensed under GPL-3.0-or-later. Third-party
-components retain the licenses and copyright notices reproduced below.
+Third-party components retain the licenses and copyright notices
+reproduced below.
 This file covers the production dependency tree recorded in package-lock.json
 and the vendored Seti icon assets. It includes some dependencies used only
 at build time. Update these notices when changing dependencies or assets.
