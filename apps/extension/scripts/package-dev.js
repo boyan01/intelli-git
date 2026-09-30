@@ -10,8 +10,8 @@ const baseVersion = packageData.version.replace(/(?:-dev\.\d+)+$/, '');
 const originalPackageJson = baseVersion === packageData.version
     ? originalPackageJsonOnDisk
     : `${JSON.stringify({ ...packageData, version: baseVersion }, null, 2)}\n`;
-const baseContentUrl = process.env.VSCE_BASE_CONTENT_URL || 'https://raw.githubusercontent.com/boyan01/intelli-git/main/apps/extension';
-const baseImagesUrl = process.env.VSCE_BASE_IMAGES_URL || 'https://raw.githubusercontent.com/boyan01/intelli-git/main/apps/extension';
+const baseContentUrl = process.env.VSCE_BASE_CONTENT_URL || 'https://raw.githubusercontent.com/boyan01/intelli-git/main';
+const baseImagesUrl = process.env.VSCE_BASE_IMAGES_URL || 'https://raw.githubusercontent.com/boyan01/intelli-git/main';
 const shouldInstall = process.argv.includes('--install');
 process.env.INTELLI_GIT_BUILD_CHANNEL = 'dev';
 process.env.MODE = process.env.MODE || 'dev';

@@ -1567,10 +1567,10 @@
   },
   "scripts": {
     "clean": "rm -rf out",
-    "package": "INTELLI_GIT_BUILD_CHANNEL=marketplace vsce package --baseContentUrl ${VSCE_BASE_CONTENT_URL:-https://raw.githubusercontent.com/boyan01/intelli-git/main/apps/extension} --baseImagesUrl ${VSCE_BASE_IMAGES_URL:-https://raw.githubusercontent.com/boyan01/intelli-git/main/apps/extension} -o ../../out/intelli-git-${npm_package_version}.vsix && npm run audit:release-channel -- --channel marketplace --vsix ../../out/intelli-git-${npm_package_version}.vsix",
+    "package": "INTELLI_GIT_BUILD_CHANNEL=marketplace vsce package --baseContentUrl ${VSCE_BASE_CONTENT_URL:-https://raw.githubusercontent.com/boyan01/intelli-git/main} --baseImagesUrl ${VSCE_BASE_IMAGES_URL:-https://raw.githubusercontent.com/boyan01/intelli-git/main} -o ../../out/intelli-git-${npm_package_version}.vsix && npm run audit:release-channel -- --channel marketplace --vsix ../../out/intelli-git-${npm_package_version}.vsix",
     "package:open-vsx": "INTELLI_GIT_BUILD_CHANNEL=marketplace npm run package",
     "package:dev": "node scripts/package-dev.js",
-    "publish:marketplace": "INTELLI_GIT_BUILD_CHANNEL=marketplace vsce publish --baseContentUrl ${VSCE_BASE_CONTENT_URL:-https://raw.githubusercontent.com/boyan01/intelli-git/main/apps/extension} --baseImagesUrl ${VSCE_BASE_IMAGES_URL:-https://raw.githubusercontent.com/boyan01/intelli-git/main/apps/extension}",
+    "publish:marketplace": "INTELLI_GIT_BUILD_CHANNEL=marketplace vsce publish --baseContentUrl ${VSCE_BASE_CONTENT_URL:-https://raw.githubusercontent.com/boyan01/intelli-git/main} --baseImagesUrl ${VSCE_BASE_IMAGES_URL:-https://raw.githubusercontent.com/boyan01/intelli-git/main}",
     "publish:open-vsx": "npm run package:open-vsx && OVSX_PAT=\"${OVSX_PAT:-$(security find-generic-password -a \"$USER\" -s intelli-git-ovsx-pat -w 2>/dev/null)}\" && : \"${OVSX_PAT:?Set OVSX_PAT or store the token in macOS Keychain as intelli-git-ovsx-pat before publishing to Open VSX}\" && ovsx --pat \"$OVSX_PAT\" publish ../../out/intelli-git-${npm_package_version}.vsix",
     "audit:release-channel": "node scripts/audit-release-channel.js",
     "vscode:prepublish": "npm run compile",

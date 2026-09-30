@@ -1,32 +1,52 @@
 # Intelli Git
 
-IntelliJ-style Git workflows for Visual Studio Code.
+[![Visual Studio Marketplace Version](https://vsmarketplacebadges.dev/version/boyan01.intelli-git.svg?style=flat-square&color=blue&label=Marketplace)](https://marketplace.visualstudio.com/items?itemName=boyan01.intelli-git)
+[![Visual Studio Marketplace Installs](https://vsmarketplacebadges.dev/installs/boyan01.intelli-git.svg?style=flat-square)](https://marketplace.visualstudio.com/items?itemName=boyan01.intelli-git)
+[![Open VSX Version](https://img.shields.io/open-vsx/v/boyan01/intelli-git?style=flat-square&label=Open%20VSX&color=purple)](https://open-vsx.org/extension/boyan01/intelli-git)
+[![License: GPL-3.0-or-later](https://img.shields.io/badge/License-GPL--3.0--or--later-blue.svg?style=flat-square)](LICENSE)
+[![VS Code Engine](https://img.shields.io/badge/VS%20Code-%3E%3D%201.100.0-007ACC.svg?style=flat-square&logo=visual-studio-code)](https://code.visualstudio.com/)
 
-Organize work into changelists, review your changes, and commit one task at a time. Intelli Git brings a dedicated commit panel and Git Log to VS Code, with stash, branch, and push tools close at hand.
+**The JetBrains-style Git tool suite for Visual Studio Code.**
 
-It is free and open source, and works alongside VS Code's built-in Git support.
+Intelli Git brings an IntelliJ IDEA-style Git workflow to VS Code. Organize changes into **changelists**, review diffs, browse commit history in an interactive **Git Log graph**, and manage branches, **worktrees, and stashes** from the editor.
 
-[Install](https://marketplace.visualstudio.com/items?itemName=boyan01.intelli-git) · [Releases](https://github.com/boyan01/intelli-git/releases) · [Issues](https://github.com/boyan01/intelli-git/issues)
+[Install from Marketplace](https://marketplace.visualstudio.com/items?itemName=boyan01.intelli-git) · [Install from Open VSX](https://open-vsx.org/extension/boyan01/intelli-git) · [Releases & VSIX](https://github.com/boyan01/intelli-git/releases) · [Report Issue](https://github.com/boyan01/intelli-git/issues)
 
-## Features
+---
 
-- **Changelists:** keep unrelated work separate and commit the active changelist.
-- **Staging:** use the familiar staged / unstaged workflow, with inactive changes for work you want to set aside.
-- **Git Log:** browse the commit graph, filter history by branch or path, inspect changes, and cherry-pick or revert commits.
-- **Everyday Git tools:** manage stashes, switch branches, push changes, and work across repositories and worktrees.
-- **Optional AI assistance:** generate commit messages from the changes you select, using your preferred provider.
+## ✨ Key Features
 
-## Getting Started
+- 📑 **IntelliJ-Style Changelists:** Organize code into multiple independent changelists. Work on multiple tasks or quick fixes simultaneously, and commit only the active changelist.
+- ⚡ **Dedicated Commit Panel:** Review diffs, stage files, mark changes as inactive, and review conflicts in a separate group. Commit and push from the same panel.
+- 🌲 **Interactive Git Log & Commit Graph:** Browse commit lanes and topology, filter by branch/author/path, inspect commit diffs, and perform cherry-pick, revert, or branch operations directly from the graph.
+- 🌿 **First-Class Git Worktree Support:** Manage parallel worktrees via a dedicated drawer—switch, reveal, open, or prune stale worktrees.
+- 📦 **Stash & Multi-Repo Tools:** Inspect stash diffs, pop, apply, drop, and switch between multiple workspace repositories.
+- 🤖 **Flexible AI Commit Assistance:** Generate conventional commit messages, pull request titles, and summaries using GitHub Copilot, Codex CLI, Anthropic Claude, Google Gemini, or any custom OpenAI-compatible endpoint.
 
-Requires VS Code 1.100.0 or newer, Git on your system path, and a Git repository opened in VS Code.
+---
 
-1. Install **Intelli Git** from the [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=boyan01.intelli-git), or install a VSIX from [GitHub Releases](https://github.com/boyan01/intelli-git/releases).
-2. Open the Intelli Git view in the activity bar, or run `Intelli: Focus Commit View` from the Command Palette.
-3. Stage the files you want to commit, or choose an active changelist in `changes` mode. Write your commit message and commit. Open **Git Log** in the bottom panel to explore repository history.
+## 🚀 Getting Started
 
-### Choose Your Commit Workflow
+### Requirements
 
-Intelli Git starts in `staged` mode. To use IntelliJ-style changelists, add this to your VS Code settings:
+- **VS Code**: `1.100.0` or newer
+- **Git**: Installed and available in your system `PATH`
+- A workspace containing one or more Git repositories
+
+### Installation & Quick Start
+
+1. Install **Intelli Git** from the [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=boyan01.intelli-git) or download the latest VSIX from [GitHub Releases](https://github.com/boyan01/intelli-git/releases).
+2. Click the **Intelli Git** icon on the Activity Bar, or press `Ctrl+Shift+P` / `Cmd+Shift+P` and run:
+   ```text
+   Intelli: Focus Commit View
+   ```
+3. Run `Focus Git Log` to open the **Git Log** view in the bottom panel and explore repository history.
+
+---
+
+## 🔄 Choose Your Commit Workflow
+
+Intelli Git supports two commit workflows. Choose one in settings:
 
 ```json
 {
@@ -34,91 +54,118 @@ Intelli Git starts in `staged` mode. To use IntelliJ-style changelists, add this
 }
 ```
 
-| Mode | What gets committed |
-| --- | --- |
-| `changes` | Changes assigned to the active changelist. Other changelists stay out of the commit. |
-| `staged` (default) | Changes in the Git index. Stage and unstage files to choose what to commit. |
+| Feature | `changes` Mode (IntelliJ Style) | `staged` Mode (Classic Git Style, Default) |
+| :--- | :--- | :--- |
+| **Commit Target** | Only changes in the **Active Changelist** | All changes currently in the **Git Index (Staged)** |
+| **Multitasking** | Move files/hunks across named changelists | Use `Mark as Inactive Changes` to set work aside |
+| **Context Menus** | `Create Changelist`, `Set Active Changelist`, `Move to Changelist...` | `Stage`, `Unstage`, `Mark as Inactive Changes` |
+| **Best For** | Parallel tasks, bugfixes mid-feature, clean commits | Traditional git add / git commit mental models |
 
-In `changes` mode, use the context menus to create changelists, move files between them, and choose the active list. In `staged` mode, you can mark changes as inactive to keep them out of the current commit.
+Move files between changelists from the commit panel. To move an individual hunk, hover over its change block in the editor and choose `Move to Changelist...`.
 
-## Screenshots
+Inactive changes remain in the working tree and can be moved back to active changes when needed.
 
-### Changelists
+---
 
-Group changes by task and commit the active changelist.
+## 📸 Screenshots
+
+### Changelists Mode
+
+Group changes by task, isolate work-in-progress, and commit only what is ready.
 
 ![Intelli Git commit view in changes mode](assets/intelli-git-commit-changes.png)
 
-### Staging
+### Staged Mode
 
-Review staged, unstaged, and inactive changes in the commit panel.
+Stage, unstage, and mark changes as inactive without losing diff context.
 
 ![Intelli Git commit view in staged mode](assets/intelli-git-commit-staged.png)
 
-### Git Log
+### Interactive Git Log Panel
 
-Browse the commit graph and inspect a commit's details and changed files.
+Explore commit lanes, branch topology, author details, and diffs with fast filtering.
 
 ![Intelli Git Git Log panel](assets/intelli-git-log.png)
 
-## AI Commit Messages
+---
 
-Run `Intelli: Configure AI Provider` from the Command Palette to set up GitHub Copilot, Codex CLI, Anthropic, Google AI, or a custom OpenAI-compatible endpoint.
+## 🤖 AI Commit Messages
 
-GitHub Copilot requires its VS Code extension. Codex CLI must be installed and authenticated on the extension host. For external providers, configure your own endpoint and credentials as needed.
+Intelli Git includes smart AI commit message generation tailored to your exact staged or changelist diff.
 
-AI features are optional. When you invoke generation, selected diff context may be sent to the configured provider. API keys configured through Intelli Git are stored in VS Code SecretStorage.
+Run **`Intelli: Configure AI Provider`** from the Command Palette to choose your backend:
 
-## Development
+- **GitHub Copilot**: Uses your active VS Code Copilot subscription (supports model selection).
+- **Codex CLI**: Integrates directly with your local authenticated Codex CLI.
+- **Anthropic Claude**: Connect with your Anthropic API Key (Claude 3.5 Sonnet, etc.).
+- **Google Gemini**: Connect with your Google AI Studio API Key.
+- **Custom OpenAI-Compatible**: Self-hosted models, Ollama, DeepSeek, OpenRouter, or vLLM.
 
-Use the Node.js version in [.nvmrc](.nvmrc). Clone the repository and install dependencies from its root:
+> **Privacy & Security**: AI generation is strictly opt-in. Diff context is sent only when explicitly requested. API keys are encrypted in VS Code's native `SecretStorage`.
+
+---
+
+## ⌨️ Common Commands
+
+| Command | Description |
+| :--- | :--- |
+| `Intelli: Focus Commit View` | Reveal the Intelli Git commit panel |
+| `Focus Git Log` | Open the interactive commit graph in the bottom panel |
+| `Worktrees` | View, switch, and prune Git worktrees |
+| `Intelli: Switch Branch` | Open the branch switch / checkout dialog |
+| `Intelli: Configure AI Provider` | Switch or configure AI backends & API keys |
+| `Push...` | Push commits with protected branch confirmation |
+
+---
+
+## ⚙️ Key Settings
+
+| Setting | Default | Description |
+| :--- | :--- | :--- |
+| `intelli-git.changelist.mode` | `"staged"` | Workflow mode: `"staged"` or `"changes"` |
+| `intelli-git.ai.provider` | `"copilot"` | AI backend: `copilot`, `codex`, `anthropic`, `google`, or `custom` |
+| `intelli-git.ai.commitPrompt` | *(Conventional Commit)* | Custom prompt template for commit generation |
+| `intelli-git.backgroundFetch.enabled` | `false` | Periodically fetch remotes in the background |
+| `intelli-git.push.confirmProtectedBranch` | `true` | Prompt for confirmation when pushing to protected branches |
+
+---
+
+## 🛠️ Development & Contributing
+
+Intelli Git is organized as a monorepo (`apps/extension`, `apps/webview-ui`, `packages/shared`).
+
+Use the Node.js version specified in [.nvmrc](.nvmrc).
 
 ```bash
+# 1. Clone repository
 git clone https://github.com/boyan01/intelli-git.git
 cd intelli-git
+
+# 2. Install dependencies & compile
 npm ci
 npm run compile
-```
 
-Press `F5` in VS Code to launch the Extension Development Host. The configured launch task starts the build watchers; reload the extension host to pick up changes.
-
-To start the watchers manually:
-
-```bash
+# 3. Start development watchers
 npm run watch:extension
 ```
 
-### Checks
+Press `F5` in VS Code to launch the **Extension Development Host**.
+
+### Quality Checks & Packaging
 
 ```bash
-npm run lint
-npm run compile
-npm run test
+npm run lint          # Run linter across all workspaces
+npm run test          # Execute tests
+npm run package:extension:dev # Build dev VSIX into out/
 ```
 
-### Packaging
+Contributions are welcome! Please follow [AGENTS.md](AGENTS.md) conventions for commit messages, architecture rules, and testing requirements before opening a PR.
 
-```bash
-# Marketplace build
-npm run package:extension
+---
 
-# Open VSX build
-npm run package:extension:open-vsx
-
-# Development build
-npm run package:extension:dev
-```
-
-VSIX packages are written to `out/`.
-
-## Contributing
-
-Bug reports and pull requests are welcome. For bugs, include your Intelli Git and VS Code versions, the repository state, and steps to reproduce the problem. Keep credentials and private code out of public reports.
-
-For larger changes, open an issue to discuss the approach first. Follow [AGENTS.md](AGENTS.md) and run the checks above before submitting a pull request.
-
-## License
+## 📄 License
 
 Copyright (c) 2026 yangbin.
 
-Licensed under [GPL-3.0-or-later](LICENSE). Third-party licenses are listed in [ThirdPartyNotices.txt](apps/extension/ThirdPartyNotices.txt).
+Licensed under the [GNU General Public License v3.0 or later (GPL-3.0-or-later)](LICENSE).
+Third-party notices and licenses are documented in [ThirdPartyNotices.txt](apps/extension/ThirdPartyNotices.txt).
