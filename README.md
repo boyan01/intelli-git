@@ -117,12 +117,6 @@ Bug reports and pull requests are welcome. For bugs, include your Intelli Git an
 
 For larger changes, open an issue to discuss the approach first. Follow [AGENTS.md](AGENTS.md) and run the checks above before submitting a pull request.
 
-## Releases
-
-New releases use `vX.Y.Z` tags. To build a release, check out its tag and follow the development and packaging steps above.
-
-For older releases from before the source migration, the source is under the corresponding `intelli-git-extension-vX.Y.Z` tag; the original `vX.Y.Z` tags contain documentation only.
-
 ## License
 
 Copyright (c) 2026 yangbin.
