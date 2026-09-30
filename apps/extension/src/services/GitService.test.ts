@@ -12,6 +12,35 @@ interface GitServiceInternals {
     createEditorGit(envOverrides: NodeJS.ProcessEnv): SimpleGit;
 }
 
+describe('GitService without build expiration', () => {
+    let tempDir: string;
+
+    afterEach(() => {
+        vi.unstubAllGlobals();
+        fs.rmSync(tempDir, { recursive: true, force: true });
+    });
+
+    it('stages and commits files even when a legacy expiration flag is set', async () => {
+        vi.stubGlobal('__IS_EXPIRED__', true);
+        tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'intelli-git-no-expiration-test-'));
+        const git = simpleGit(tempDir);
+        await git.init();
+        await git.addConfig('user.name', 'Intelli Git Test');
+        await git.addConfig('user.email', 'intelli-git-test@example.com');
+        await git.addConfig('commit.gpgsign', 'false');
+        fs.writeFileSync(path.join(tempDir, 'single.txt'), 'Single file change\n');
+        fs.writeFileSync(path.join(tempDir, 'batch.txt'), 'Batch file change\n');
+        const service = new GitService(tempDir, tempDir, git);
+
+        await service.stageFile('single.txt');
+        await service.stageFiles(['batch.txt']);
+        await service.commit('Commit without build expiration');
+
+        expect((await git.status()).isClean()).toBe(true);
+        expect(await git.raw(['ls-tree', '--name-only', 'HEAD'])).toBe('batch.txt\nsingle.txt\n');
+    });
+});
+
 describe('GitService git environment handling', () => {
     let tempDir: string;
     let originalPager: string | undefined;

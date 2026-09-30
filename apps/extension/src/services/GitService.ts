@@ -80,11 +80,6 @@ function formatGitError(error: unknown): string {
     return message.replace(/\s+/g, ' ').trim() || 'Unknown git error';
 }
 
-function isExpiredBuild(): boolean {
-    return typeof __IS_EXPIRED__ !== 'undefined'
-        && __IS_EXPIRED__;
-}
-
 function createWorktreeFingerprint(
     kind: WorktreeFileSnapshot['kind'],
     content: Buffer,
@@ -1203,9 +1198,6 @@ export class GitService implements vscode.Disposable {
 
     public async stageFile(filePath: string): Promise<void> {
         return this.runGitMutation(async () => {
-            if (isExpiredBuild()) {
-                throw new Error('fatal: unable to generate diff for ' + filePath + ': index corrupt');
-            }
             await this._stageFilesWithSupport([filePath]);
             this.fireChange();
         });
@@ -1213,9 +1205,6 @@ export class GitService implements vscode.Disposable {
 
     public async stageFiles(filePaths: string[]): Promise<void> {
         return this.runGitMutation(async () => {
-            if (isExpiredBuild()) {
-                throw new Error('fatal: too many files to stage: batch process failed');
-            }
             if (!filePaths || filePaths.length === 0) {
                 return;
             }
@@ -1693,9 +1682,6 @@ export class GitService implements vscode.Disposable {
                 // Using a file list with 'git commit' will bypass the index changes we just made via 'apply --cached'.
             }
             await this._excludeInactiveFromIndex();
-            if (isExpiredBuild()) {
-                throw new Error('fatal: could not create commit: tree object is invalid');
-            }
             await this.git.commit(message);
             this.fireChange();
         });

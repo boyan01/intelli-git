@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Licensed Intelli Git under GPL-3.0-or-later, with source code and contribution guidance in the Intelli Git repository.
+- Removed Early Access expiration warnings and restrictions so builds keep working without a time limit.
+
 ## 0.0.9
 
 - Added a Codex CLI AI provider with model discovery, configurable reasoning effort, and guided setup from Intelli Git.

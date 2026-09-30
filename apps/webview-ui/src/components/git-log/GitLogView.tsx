@@ -3,8 +3,6 @@ import { BranchListPanel } from './BranchListPanel';
 import { LogListPanel } from './LogListPanel';
 import { CommitDetailsView } from '../common/CommitDetailsView';
 import { LoadingProgressBar } from '../common/LoadingProgressBar';
-import { useVersionCheck } from '../../hooks/useVersionCheck';
-import { VersionExpiredPanel } from '../common/VersionExpiredPanel';
 import styles from './GitLogView.module.css';
 
 import { useState, useCallback, useEffect, useRef } from 'react';
@@ -100,7 +98,6 @@ export function GitLogView() {
         ]);
     }, [reloadActiveRepository, reloadBranchList]);
 
-    const { isExpired } = useVersionCheck();
     const hasRepository = activeRepositoryLoading
         ? branchListData.hasRepository !== false
         : Boolean(activeRepositoryPath) && branchListData.hasRepository !== false;
@@ -165,7 +162,7 @@ export function GitLogView() {
         />
     );
 
-    const commitDetailsPanel = isExpired ? <VersionExpiredPanel /> : (
+    const commitDetailsPanel = (
         <CommitDetailsView
             selectedHashes={selectedHashes}
             commit={commitDetails}

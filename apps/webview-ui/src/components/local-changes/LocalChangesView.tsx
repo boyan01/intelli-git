@@ -7,11 +7,8 @@ import { useTranslation } from 'react-i18next';
 import { usePersistedState } from '../../hooks/usePersistedState';
 import { useRpcData } from '../../hooks/useRpcData';
 import { rpc, rpcEvents } from '../../lib/rpc_client';
-import { useVersionCheck } from '../../hooks/useVersionCheck';
 import type { BranchInfo, RefreshScope, WorktreeInfo } from '@shared/messages';
 import { BranchStatus } from '../common/BranchStatus';
-import { VersionCheckBanner } from '../common/VersionCheckBanner';
-import { VersionExpiredPanel } from '../common/VersionExpiredPanel';
 import { WorktreeDrawer } from './WorktreeDrawer';
 import { usePushBranches } from '../push/hooks/usePushBranches';
 import styles from './LocalChangesView.module.css';
@@ -214,7 +211,6 @@ export function LocalChangesView() {
     }, [setActiveTab]);
 
     const isRebasing = branches.rebaseStatus && branches.rebaseStatus !== 'none';
-    const { isExpired } = useVersionCheck();
 
     useEffect(() => {
         if (!isRebasing && rebaseActionPending) {
@@ -222,17 +218,8 @@ export function LocalChangesView() {
         }
     }, [isRebasing, rebaseActionPending]);
 
-    if (isExpired) {
-        return (
-            <div className={styles.container}>
-                <VersionExpiredPanel />
-            </div>
-        );
-    }
-
     return (
         <div className={styles.container}>
-            <VersionCheckBanner />
             <WorktreeDrawer
                 open={worktreeDrawerOpen}
                 worktrees={worktrees}

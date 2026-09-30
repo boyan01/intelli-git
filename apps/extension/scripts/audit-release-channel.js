@@ -151,8 +151,8 @@ function auditBundle(bundle, channel, issues) {
     }
 
     const hasEarlyAccessExpiration = EARLY_ACCESS_EXPIRATION_PATTERN.test(bundle.contents);
-    if (!hasEarlyAccessExpiration) {
-        issues.push(`${bundle.name} does not contain the Early Access expiration expression`);
+    if (hasEarlyAccessExpiration) {
+        issues.push(`${bundle.name} still contains the Early Access expiration expression`);
     }
 }
 

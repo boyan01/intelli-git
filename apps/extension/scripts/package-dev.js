@@ -11,7 +11,7 @@ const originalPackageJson = baseVersion === packageData.version
     ? originalPackageJsonOnDisk
     : `${JSON.stringify({ ...packageData, version: baseVersion }, null, 2)}\n`;
 const baseContentUrl = process.env.VSCE_BASE_CONTENT_URL || 'https://raw.githubusercontent.com/boyan01/intelli-git/main/apps/extension';
-const baseImagesUrl = process.env.VSCE_BASE_IMAGES_URL || 'https://boyan01.github.io/intelli_git';
+const baseImagesUrl = process.env.VSCE_BASE_IMAGES_URL || 'https://raw.githubusercontent.com/boyan01/intelli-git/main/apps/extension';
 const shouldInstall = process.argv.includes('--install');
 process.env.INTELLI_GIT_BUILD_CHANNEL = 'dev';
 process.env.MODE = process.env.MODE || 'dev';
@@ -65,7 +65,7 @@ try {
     const outFilePath = path.join(outDir, `${packageData.name}-${newVersion}.vsix`);
     const outFileArg = path.relative(packageRoot, outFilePath);
 
-    execSync(`vsce package --allow-missing-repository --skip-license --baseContentUrl "${baseContentUrl}" --baseImagesUrl "${baseImagesUrl}" -o "${outFileArg}"`, { stdio: ['ignore', process.stdout, process.stderr] });
+    execSync(`vsce package --baseContentUrl "${baseContentUrl}" --baseImagesUrl "${baseImagesUrl}" -o "${outFileArg}"`, { stdio: ['ignore', process.stdout, process.stderr] });
 
     console.log(`\nSuccessfully packaged version to: ${outFilePath}`);
     execFileSync(process.execPath, [

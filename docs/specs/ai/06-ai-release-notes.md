@@ -41,7 +41,7 @@ Copy markdown or write release draft
 AI Release Notes
 +------------------------------------------------------------------+
 | Product: intelli-git extension                                   |
-| Range: intelli-git-extension-v0.0.3..HEAD                         |
+| Range: v0.0.10..HEAD                                             |
 +------------------------------------------------------------------+
 | Product-facing                                                   |
 | [x] Improve Git Log reference labels                              |
@@ -63,7 +63,7 @@ AI Release Notes
 
 ## Functional Requirements
 
-- Detect previous product tag with prefix `intelli-git-extension-v`.
+- Detect the previous release tag in `vX.Y.Z` format.
 - Let user choose range manually.
 - Parse commit subjects and bodies.
 - Classify commits:
@@ -146,4 +146,3 @@ interface AiReleaseNotesDraft {
 - Excluded commits are visible with reasons.
 - Generated markdown is editable before use.
 - No publish/tag side effect occurs.
-

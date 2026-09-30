@@ -4,9 +4,9 @@ Intelli Git brings JetBrains-style Git workflows to Visual Studio Code.
 
 It provides a focused commit panel, changelist-style organization, stash tools, push workflows, Git Log browsing, and AI-assisted commit message generation without replacing VS Code's built-in Git support.
 
-## Early Access
+[Install from Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=boyan01.intelli-git) · [Source code](https://github.com/boyan01/intelli-git) · [Download a VSIX](https://github.com/boyan01/intelli-git/releases)
 
-Intelli Git is currently free during Early Access.
+Intelli Git is free and open source under GPL-3.0-or-later. You can use it for personal or commercial work. Builds do not expire.
 
 ## Screenshots
 
@@ -30,7 +30,7 @@ Intelli Git is currently free during Early Access.
 - Native VS Code context menus for files, folders, changelists, stash entries, branches, and commits.
 - Git Log with branch filtering, commit graph, file history actions, cherry-pick, revert, reset, and commit message editing.
 - Stash and push workflows from the Intelli Git UI.
-- AI commit message generation with GitHub Copilot, Anthropic, Google AI, or a custom OpenAI-compatible endpoint.
+- AI commit message generation with GitHub Copilot, Codex CLI, Anthropic, Google AI, or a custom OpenAI-compatible endpoint.
 
 ## Commit Panel Modes
 
@@ -45,7 +45,7 @@ The extension supports two commit panel modes through `intelli-git.changelist.mo
 - Git available on your system path
 - A Git repository opened in VS Code
 
-AI features are optional. GitHub Copilot mode requires the GitHub Copilot extension. External AI providers require user-provided credentials, stored in VS Code SecretStorage when configured through Intelli Git commands.
+AI features are optional. GitHub Copilot mode requires the GitHub Copilot extension. Codex CLI mode requires the CLI installed and authenticated on the extension host. External AI providers require user-provided credentials, stored in VS Code SecretStorage when configured through Intelli Git commands.
 
 ## Usage
 
@@ -73,6 +73,14 @@ API keys are stored with VS Code SecretStorage. Legacy settings-based API keys a
 
 For support and issue reporting, open a report in the [Intelli Git repository](https://github.com/boyan01/intelli-git/issues/new/choose).
 
+## Source Code And Contributions
+
+Source code, build instructions, and contribution guidance are available in the [Intelli Git repository](https://github.com/boyan01/intelli-git). New GitHub releases use `vX.Y.Z` tags and link to the corresponding source so you can obtain and build that version.
+
 ## License
 
-Proprietary License. See `LICENSE` for details.
+Copyright (c) 2026 yangbin.
+
+Intelli Git is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version (`GPL-3.0-or-later`).
+
+Intelli Git is distributed without any warranty. See [LICENSE](LICENSE) for the full license text. Third-party components retain their own licenses; see [ThirdPartyNotices.txt](ThirdPartyNotices.txt).
