@@ -204,30 +204,7 @@ Improve AI provider setup flow
 - 构建、审计、CI、依赖整理、内部脚本等默认不进入 release commit body，除非用户需要知道。
 
 ### Intelli Git Extension Release
-`boyan01/intelli-git` 中的 release tag 使用简短版本号：
-
-```text
-vx.x.x
-```
-
-例如：
-
-```text
-v0.0.10
-```
-
-发布 `apps/extension` 时：
-1. tag version 必须与 `apps/extension/package.json` 中的 `version` 一致。
-2. tag 必须指向实际要发布的 commit，不能从未打 tag 的 branch head 发布。
-3. 写 changelog 前必须先阅读上一次发布对应源码 commit 之后的 commit history，并按 `Commit Message Requirements` 提炼用户可见变化。
-4. changelog 只写产品相关、用户可感知或需要知道的内容；构建、CI、测试、依赖、内部重构、发布脚本等默认不写入 changelog。
-5. VSIX 必须从对应 tag 的 commit 重新构建并审计后再发布。
-6. Marketplace / Open VSX 发布完成后，必须在源码仓库 `boyan01/intelli-git` 创建 GitHub Release。
-   - release 直接使用对应的 `vX.Y.Z` tag，例如 `v0.0.10`。
-   - release notes 只复制 product-facing changelog，并包含 Marketplace 安装链接。
-   - public release 必须附加已审计的同一份 VSIX，并同时保留 Marketplace 安装链接。
-   - release notes 必须链接到对应 tag 的源码和构建说明，让用户能取得该 VSIX 对应的完整源码。
-   - 迁移前已有的 tags 和 releases 保留原样，不移动 tag，不覆盖旧附件。
+准备版本、发布或恢复失败发布时，读取 `.agents/skills/intelli-git-release/SKILL.md`；项目发布约定、GitHub 配置、构建和恢复步骤统一维护在该 skill 中。
 
 ### 添加 Context Menus
 参见 `.agent/workflows/add-context-menu.md`。

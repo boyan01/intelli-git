@@ -15,10 +15,9 @@
     "package:extension:open-vsx": "INTELLI_GIT_BUILD_CHANNEL=marketplace npm run package:open-vsx --workspace=intelli-git",
     "package:extension:dev": "INTELLI_GIT_BUILD_CHANNEL=dev MODE=dev npm run package:dev --workspace=intelli-git",
     "install:extension:dev": "INTELLI_GIT_BUILD_CHANNEL=dev MODE=dev npm run package:dev --workspace=intelli-git -- --install",
-    "publish:extension:marketplace": "INTELLI_GIT_BUILD_CHANNEL=marketplace npm run publish:marketplace --workspace=intelli-git",
-    "publish:extension:open-vsx": "INTELLI_GIT_BUILD_CHANNEL=marketplace npm run publish:open-vsx --workspace=intelli-git",
     "lint": "npm run lint --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present"
+    "test": "npm run test --workspaces --if-present",
+    "test:release": "node --test scripts/release.test.js"
   },
   "devDependencies": {
     "@rollup/plugin-replace": "^6.0.3",

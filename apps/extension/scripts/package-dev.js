@@ -69,11 +69,10 @@ try {
 
     console.log(`\nSuccessfully packaged version to: ${outFilePath}`);
     execFileSync(process.execPath, [
-        path.join(__dirname, 'audit-release-channel.js'),
-        '--channel',
-        'dev',
-        '--vsix',
-        outFilePath
+        path.join(__dirname, 'verify-vsix.js'),
+        outFilePath,
+        '--version',
+        newVersion
     ], { stdio: ['ignore', process.stdout, process.stderr] });
 
     if (shouldInstall) {
