@@ -7,6 +7,52 @@ const { test } = require('node:test');
 
 const root = path.resolve(__dirname, '..');
 
+test('production packaging creates the VSIX output directory in a clean checkout', (t) => {
+    const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'intelli-git-package-'));
+    t.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
+    const extension = path.join(temporary, 'apps/extension');
+    const sourceManifest = JSON.parse(fs.readFileSync(path.join(root, 'apps/extension/package.json'), 'utf8'));
+    const files = {
+        'package.json': JSON.stringify({
+            name: 'intelli-git',
+            publisher: 'boyan01',
+            version: '0.0.11',
+            license: 'GPL-3.0-or-later',
+            repository: { type: 'git', url: 'https://github.com/boyan01/intelli-git.git' },
+            engines: { vscode: '^1.100.0' },
+            activationEvents: ['onStartupFinished'],
+            main: './out/extension.js',
+            scripts: {
+                package: sourceManifest.scripts.package,
+                'verify:vsix': sourceManifest.scripts['verify:vsix'],
+            },
+        }),
+        'README.md': '# Packaging fixture\n',
+        'LICENSE.txt': fs.readFileSync(path.join(root, 'LICENSE'), 'utf8'),
+        '.vscodeignore': 'scripts/**\n',
+        'out/extension.js': 'exports.activate = () => {};\n',
+        'out/webview/index.html': '<html></html>',
+        'out/webview/webview.js': 'console.log("test");',
+        'scripts/verify-vsix.js': fs.readFileSync(path.join(root, 'apps/extension/scripts/verify-vsix.js'), 'utf8'),
+    };
+    for (const [file, contents] of Object.entries(files)) {
+        const location = path.join(extension, file);
+        fs.mkdirSync(path.dirname(location), { recursive: true });
+        fs.writeFileSync(location, contents);
+    }
+    const output = path.join(temporary, 'out/intelli-git-0.0.11.vsix');
+    assert.equal(fs.existsSync(path.dirname(output)), false);
+    const result = spawnSync('npm', ['run', 'package'], {
+        cwd: extension,
+        env: { ...process.env, PATH: `${path.join(root, 'node_modules/.bin')}${path.delimiter}${process.env.PATH}` },
+        encoding: 'utf8',
+        timeout: 30000,
+    });
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    assert.equal(fs.existsSync(output), true);
+    assert.match(result.stdout, /VSIX package verified:/);
+});
+
 test('VSIX checks allow source and maps but reject invalid versions, missing outputs and unwanted files', (t) => {
     const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'intelli-git-vsix-'));
     t.after(() => fs.rmSync(temporary, { recursive: true, force: true }));

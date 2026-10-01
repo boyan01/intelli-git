@@ -1567,7 +1567,7 @@
   },
   "scripts": {
     "clean": "rm -rf out",
-    "package": "INTELLI_GIT_BUILD_CHANNEL=marketplace vsce package --baseContentUrl ${VSCE_BASE_CONTENT_URL:-https://raw.githubusercontent.com/boyan01/intelli-git/main} --baseImagesUrl ${VSCE_BASE_IMAGES_URL:-https://raw.githubusercontent.com/boyan01/intelli-git/main} -o ../../out/intelli-git-${npm_package_version}.vsix && npm run verify:vsix -- ../../out/intelli-git-${npm_package_version}.vsix --version ${npm_package_version}",
+    "package": "mkdir -p ../../out && INTELLI_GIT_BUILD_CHANNEL=marketplace vsce package --baseContentUrl ${VSCE_BASE_CONTENT_URL:-https://raw.githubusercontent.com/boyan01/intelli-git/main} --baseImagesUrl ${VSCE_BASE_IMAGES_URL:-https://raw.githubusercontent.com/boyan01/intelli-git/main} -o ../../out/intelli-git-${npm_package_version}.vsix && npm run verify:vsix -- ../../out/intelli-git-${npm_package_version}.vsix --version ${npm_package_version}",
     "package:open-vsx": "INTELLI_GIT_BUILD_CHANNEL=marketplace npm run package",
     "package:dev": "node scripts/package-dev.js",
     "vscode:prepublish": "npm run compile",
