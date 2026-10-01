@@ -1,7 +1,17 @@
 import { RpcPeer } from '@shared/rpc';
 import { AI_GENERATION_TIMEOUT_MS } from '@shared/messages';
 import { vscode } from './vscode';
-import type { CommitAiAction, ConflictResolverContextActionRequest, ConflictResolverOpenRequest, ExtensionMethods, FileDiagnosticsChange, GitLogRevealRequest, RefreshEvent, RefreshScope, WebviewMethods } from '@shared/messages';
+import type {
+    CommitAiAction,
+    ConflictResolverContextActionRequest,
+    ConflictResolverOpenRequest,
+    ExtensionMethods,
+    FileDiagnosticsChange,
+    GitLogRevealRequest,
+    RefreshEvent,
+    RefreshScope,
+    WebviewMethods,
+} from '@shared/messages';
 
 type Listener<T> = (data: T) => void;
 
@@ -14,7 +24,7 @@ export class EventStream<T> {
     }
 
     emit(data: T) {
-        this.listeners.forEach(listener => listener(data));
+        this.listeners.forEach((listener) => listener(data));
     }
 }
 
@@ -34,21 +44,21 @@ export const rpcEvents = {
 
 const _rpc = new RpcPeer<ExtensionMethods, WebviewMethods>(
     {
-        postMessage: (message) => vscode.postMessage(message)
+        postMessage: (message) => vscode.postMessage(message),
     },
     {
         methodTimeoutsMs: {
             generateCommitMessage: AI_GENERATION_TIMEOUT_MS + 30000,
-            testAIProvider: AI_GENERATION_TIMEOUT_MS + 30000
+            testAIProvider: AI_GENERATION_TIMEOUT_MS + 30000,
         },
-        trace: event => {
+        trace: (event) => {
             if (event.elapsedMs === undefined) {
                 return;
             }
 
             const log = event.ok === false ? console.warn : console.debug;
             log('[Intelli Git RPC]', event);
-        }
+        },
     }
 );
 

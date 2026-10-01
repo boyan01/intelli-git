@@ -20,7 +20,11 @@
 }
 
 .resultPane {
-    background: color-mix(in srgb, var(--vscode-editor-lineHighlightBackground, transparent) 45%, var(--vscode-editor-background));
+    background: color-mix(
+        in srgb,
+        var(--vscode-editor-lineHighlightBackground, transparent) 45%,
+        var(--vscode-editor-background)
+    );
 }
 
 .editorGutter {
@@ -72,7 +76,11 @@
 }
 
 .gutterConnector[data-decoration-type='modified'] {
-    --intelli-git-merge-line-background: color-mix(in srgb, var(--vscode-editorGutter-modifiedBackground, #0078d4) 18%, transparent);
+    --intelli-git-merge-line-background: color-mix(
+        in srgb,
+        var(--vscode-editorGutter-modifiedBackground, #0078d4) 18%,
+        transparent
+    );
     --intelli-git-merge-marker: var(--vscode-editorGutter-modifiedBackground, #0078d4);
 }
 

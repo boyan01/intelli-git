@@ -67,7 +67,10 @@ export class RpcPeer<TRemote = any, TLocal = any> {
     private postMessageTarget: PostMessageImpl;
     private _proxy: TRemote | null = null;
 
-    constructor(postMessageTarget: PostMessageImpl, private readonly options: RpcPeerOptions = {}) {
+    constructor(
+        postMessageTarget: PostMessageImpl,
+        private readonly options: RpcPeerOptions = {}
+    ) {
         this.postMessageTarget = postMessageTarget;
     }
 
@@ -76,19 +79,22 @@ export class RpcPeer<TRemote = any, TLocal = any> {
      */
     public get proxy(): TRemote {
         if (!this._proxy) {
-            this._proxy = new Proxy({}, {
-                get: (_target, prop: string) => {
-                    return (...args: any[]) => {
-                        if (args.length === 0) {
-                            return this.call(prop);
-                        }
-                        if (args.length === 1) {
-                            return this.call(prop, args[0]);
-                        }
-                        return this.call(prop, args);
-                    };
+            this._proxy = new Proxy(
+                {},
+                {
+                    get: (_target, prop: string) => {
+                        return (...args: any[]) => {
+                            if (args.length === 0) {
+                                return this.call(prop);
+                            }
+                            if (args.length === 1) {
+                                return this.call(prop, args[0]);
+                            }
+                            return this.call(prop, args);
+                        };
+                    },
                 }
-            }) as TRemote;
+            ) as TRemote;
         }
         return this._proxy!;
     }
@@ -110,7 +116,7 @@ export class RpcPeer<TRemote = any, TLocal = any> {
                         direction: 'outgoing',
                         elapsedMs: Date.now() - startedAt,
                         ok: false,
-                        error: 'timeout'
+                        error: 'timeout',
                     });
                     reject(new Error(`RPC timeout for method: ${method}`));
                 }
@@ -122,7 +128,7 @@ export class RpcPeer<TRemote = any, TLocal = any> {
                 type: 'rpc-request',
                 id,
                 method,
-                params
+                params,
             });
 
             this.trace({ method, id, direction: 'outgoing' });
@@ -137,7 +143,7 @@ export class RpcPeer<TRemote = any, TLocal = any> {
         // Handle instance own properties (arrow function fields)
         for (const [method, handler] of Object.entries(handlers)) {
             if (typeof handler === 'function') {
-                this.handlers.set(method, (handler as Function).bind(handlers));
+                this.handlers.set(method, handler.bind(handlers));
             }
         }
 
@@ -187,14 +193,14 @@ export class RpcPeer<TRemote = any, TLocal = any> {
             this.postMessageTarget.postMessage({
                 type: 'rpc-response',
                 id,
-                result
+                result,
             });
             this.trace({
                 method,
                 id,
                 direction: 'incoming',
                 elapsedMs: Date.now() - startedAt,
-                ok: true
+                ok: true,
             });
         } catch (error: any) {
             const messageText = error.message || String(error);
@@ -203,7 +209,7 @@ export class RpcPeer<TRemote = any, TLocal = any> {
                 id,
                 error: messageText,
                 errorCode: typeof error.code === 'string' ? error.code : undefined,
-                errorData: error.data
+                errorData: error.data,
             });
             this.trace({
                 method,
@@ -211,7 +217,7 @@ export class RpcPeer<TRemote = any, TLocal = any> {
                 direction: 'incoming',
                 elapsedMs: Date.now() - startedAt,
                 ok: false,
-                error: messageText
+                error: messageText,
             });
         }
     }
@@ -230,7 +236,7 @@ export class RpcPeer<TRemote = any, TLocal = any> {
                     direction: 'outgoing',
                     elapsedMs: Date.now() - startedAt,
                     ok: false,
-                    error
+                    error,
                 });
                 reject(new RpcError(error, errorCode, errorData));
             } else {
@@ -239,7 +245,7 @@ export class RpcPeer<TRemote = any, TLocal = any> {
                     id,
                     direction: 'outgoing',
                     elapsedMs: Date.now() - startedAt,
-                    ok: true
+                    ok: true,
                 });
                 resolve(result);
             }

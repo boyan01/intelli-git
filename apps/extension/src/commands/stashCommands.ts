@@ -62,10 +62,16 @@ export function registerStashCommands(
                 const leftUri = createStashContentUri(gitService, parentRef, filePath);
                 const rightUri = createStashContentUri(gitService, stashRef, filePath);
 
-                await vscode.commands.executeCommand('vscode.diff', leftUri, rightUri, `${filePath} (Stash@{${args.stashIndex}})`, {
-                    preview: true,
-                    viewColumn: vscode.ViewColumn.Active
-                });
+                await vscode.commands.executeCommand(
+                    'vscode.diff',
+                    leftUri,
+                    rightUri,
+                    `${filePath} (Stash@{${args.stashIndex}})`,
+                    {
+                        preview: true,
+                        viewColumn: vscode.ViewColumn.Active,
+                    }
+                );
             }
         })
     );

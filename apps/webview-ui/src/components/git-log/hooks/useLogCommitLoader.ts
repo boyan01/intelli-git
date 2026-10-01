@@ -26,14 +26,16 @@ function arrayEquals<T>(left?: T[], right?: T[]): boolean {
 }
 
 function filtersEqual(left: Partial<LogOptions>, right: Partial<LogOptions>): boolean {
-    return left.branch === right.branch
-        && left.search === right.search
-        && left.regexMode === right.regexMode
-        && left.caseSensitive === right.caseSensitive
-        && arrayEquals(left.authors, right.authors)
-        && arrayEquals(left.paths, right.paths)
-        && left.since === right.since
-        && left.until === right.until;
+    return (
+        left.branch === right.branch &&
+        left.search === right.search &&
+        left.regexMode === right.regexMode &&
+        left.caseSensitive === right.caseSensitive &&
+        arrayEquals(left.authors, right.authors) &&
+        arrayEquals(left.paths, right.paths) &&
+        left.since === right.since &&
+        left.until === right.until
+    );
 }
 
 // Build initial filters from cached values to match FilterToolbar's initial state
@@ -42,7 +44,10 @@ function getInitialFilters(): Partial<LogOptions> {
     const branch = deserializePersistedValue('gitLog.filter.branch', state['gitLog.filter.branch']);
     const search = deserializePersistedValue('gitLog.filter.search', state['gitLog.filter.search']);
     const regexMode = deserializePersistedValue('gitLog.filter.regexMode', state['gitLog.filter.regexMode']);
-    const caseSensitive = deserializePersistedValue('gitLog.filter.caseSensitive', state['gitLog.filter.caseSensitive']);
+    const caseSensitive = deserializePersistedValue(
+        'gitLog.filter.caseSensitive',
+        state['gitLog.filter.caseSensitive']
+    );
     const authors = deserializePersistedValue('gitLog.filter.authors', state['gitLog.filter.authors']);
     const paths = deserializePersistedValue('gitLog.filter.paths', state['gitLog.filter.paths']);
     const since = deserializePersistedValue('gitLog.filter.since', state['gitLog.filter.since']);
@@ -56,7 +61,7 @@ function getInitialFilters(): Partial<LogOptions> {
         authors: authors.length > 0 ? authors : undefined,
         paths: paths.length > 0 ? paths : undefined,
         since,
-        until
+        until,
     };
 }
 
@@ -108,9 +113,9 @@ export const useLogCommitLoader = (repositoryPath?: string): UseLogCommitLoaderR
                     rpc.getLog({
                         maxCount: BATCH_SIZE,
                         skip: currentCount,
-                        ...currentFilters
+                        ...currentFilters,
                     }),
-                    shouldReset ? rpc.getUnpushedCommits() : Promise.resolve([])
+                    shouldReset ? rpc.getUnpushedCommits() : Promise.resolve([]),
                 ]);
 
                 if (shouldReset) {
@@ -120,7 +125,7 @@ export const useLogCommitLoader = (repositoryPath?: string): UseLogCommitLoaderR
                 setHasMore(newCommits.length >= BATCH_SIZE);
                 const isResetLoad = shouldReset;
 
-                setCommits(prev => {
+                setCommits((prev) => {
                     const result = isResetLoad ? newCommits : [...prev, ...newCommits];
                     updateStoredState('gitLog.commits', serializePersistedValue('gitLog.commits', result));
                     commitsLengthRef.current = result.length;
@@ -138,7 +143,7 @@ export const useLogCommitLoader = (repositoryPath?: string): UseLogCommitLoaderR
     }, []);
 
     const updateFilters = useCallback((nextFilters: Partial<LogOptions>) => {
-        setFilters(prev => filtersEqual(prev, nextFilters) ? prev : nextFilters);
+        setFilters((prev) => (filtersEqual(prev, nextFilters) ? prev : nextFilters));
     }, []);
 
     useEffect(() => {
@@ -158,7 +163,7 @@ export const useLogCommitLoader = (repositoryPath?: string): UseLogCommitLoaderR
 
     // Subscribe to refresh events to reload commits when Git state changes
     useEffect(() => {
-        return rpcEvents.refresh.subscribe(event => {
+        return rpcEvents.refresh.subscribe((event) => {
             if (event.scopes.includes('gitLog')) {
                 loadMore(true);
             }
@@ -173,6 +178,6 @@ export const useLogCommitLoader = (repositoryPath?: string): UseLogCommitLoaderR
         unpushedCommits,
         latestUnpushedHash,
         loadMore,
-        setFilters: updateFilters
+        setFilters: updateFilters,
     };
 };

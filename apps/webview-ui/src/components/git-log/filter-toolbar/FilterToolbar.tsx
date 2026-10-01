@@ -55,11 +55,11 @@ export const FilterToolbar: React.FC<FilterToolbarProps> = ({ onFilterChange, ex
         setPaths([]);
         setSince(undefined);
         setUntil(undefined);
-        setDateResetToken(token => token + 1);
+        setDateResetToken((token) => token + 1);
     }, [setBranch, setSearch, setRegexMode, setCaseSensitive, setAuthors, setPaths, setSince, setUntil]);
 
     useEffect(() => {
-        return rpcEvents.clearGitLogFilters.subscribe(scope => {
+        return rpcEvents.clearGitLogFilters.subscribe((scope) => {
             if (scope === 'branch') {
                 setBranch('all');
                 return;
@@ -83,7 +83,7 @@ export const FilterToolbar: React.FC<FilterToolbarProps> = ({ onFilterChange, ex
                 authors: authors.length > 0 ? authors : undefined,
                 paths: paths.length > 0 ? paths : undefined,
                 since,
-                until
+                until,
             });
         }, delay);
         return () => clearTimeout(timer);
@@ -136,7 +136,7 @@ export const FilterToolbar: React.FC<FilterToolbarProps> = ({ onFilterChange, ex
                 key: 'branch',
                 label: `${t('Branch')}: ${branch}`,
                 title: branch,
-                onClear: () => setBranch('all')
+                onClear: () => setBranch('all'),
             });
         }
 
@@ -145,7 +145,7 @@ export const FilterToolbar: React.FC<FilterToolbarProps> = ({ onFilterChange, ex
                 key: 'search',
                 label: `${t('Text or Hash')}: ${search.trim()}`,
                 title: search.trim(),
-                onClear: () => setSearch('')
+                onClear: () => setSearch(''),
             });
         }
 
@@ -153,7 +153,7 @@ export const FilterToolbar: React.FC<FilterToolbarProps> = ({ onFilterChange, ex
             filters.push({
                 key: 'regex',
                 label: t('Regex'),
-                onClear: () => setRegexMode(false)
+                onClear: () => setRegexMode(false),
             });
         }
 
@@ -161,27 +161,29 @@ export const FilterToolbar: React.FC<FilterToolbarProps> = ({ onFilterChange, ex
             filters.push({
                 key: 'case',
                 label: t('Match Case'),
-                onClear: () => setCaseSensitive(false)
+                onClear: () => setCaseSensitive(false),
             });
         }
 
         if (authors.length > 0) {
             filters.push({
                 key: 'authors',
-                label: authors.length === 1
-                    ? `${t('Author')}: ${authors[0]}`
-                    : t('{{count}} Authors', { count: authors.length }),
+                label:
+                    authors.length === 1
+                        ? `${t('Author')}: ${authors[0]}`
+                        : t('{{count}} Authors', { count: authors.length }),
                 title: authors.join('\n'),
-                onClear: () => setAuthors([])
+                onClear: () => setAuthors([]),
             });
         }
 
         if (since || until) {
-            const label = since && until
-                ? t('Date: {{since}} - {{until}}', { since, until })
-                : since
-                    ? t('Since {{date}}', { date: since })
-                    : t('Until {{date}}', { date: until });
+            const label =
+                since && until
+                    ? t('Date: {{since}} - {{until}}', { since, until })
+                    : since
+                      ? t('Since {{date}}', { date: since })
+                      : t('Until {{date}}', { date: until });
             filters.push({
                 key: 'date',
                 label,
@@ -189,24 +191,40 @@ export const FilterToolbar: React.FC<FilterToolbarProps> = ({ onFilterChange, ex
                 onClear: () => {
                     setSince(undefined);
                     setUntil(undefined);
-                    setDateResetToken(token => token + 1);
-                }
+                    setDateResetToken((token) => token + 1);
+                },
             });
         }
 
         if (paths.length > 0) {
             filters.push({
                 key: 'paths',
-                label: paths.length === 1
-                    ? `${t('Path')}: ${paths[0]}`
-                    : t('{{count}} Paths', { count: paths.length }),
+                label: paths.length === 1 ? `${t('Path')}: ${paths[0]}` : t('{{count}} Paths', { count: paths.length }),
                 title: paths.join('\n'),
-                onClear: () => setPaths([])
+                onClear: () => setPaths([]),
             });
         }
 
         return filters;
-    }, [branch, search, regexMode, caseSensitive, authors, since, until, paths, t, setBranch, setSearch, setRegexMode, setCaseSensitive, setAuthors, setSince, setUntil, setPaths]);
+    }, [
+        branch,
+        search,
+        regexMode,
+        caseSensitive,
+        authors,
+        since,
+        until,
+        paths,
+        t,
+        setBranch,
+        setSearch,
+        setRegexMode,
+        setCaseSensitive,
+        setAuthors,
+        setSince,
+        setUntil,
+        setPaths,
+    ]);
 
     return (
         <div className={styles.container}>
@@ -218,7 +236,7 @@ export const FilterToolbar: React.FC<FilterToolbarProps> = ({ onFilterChange, ex
                         className={styles.searchInput}
                         placeholder={t('Text or Hash')}
                         value={search}
-                        onChange={e => setSearch(e.target.value)}
+                        onChange={(e) => setSearch(e.target.value)}
                     />
                     <button
                         className={`${styles.inlineToggle} ${regexMode ? styles.active : ''}`}
@@ -258,7 +276,7 @@ export const FilterToolbar: React.FC<FilterToolbarProps> = ({ onFilterChange, ex
                 {/* User filter */}
                 <UserFilter
                     key={`${repositoryPath ?? 'default'}:${authors.join('\n') || 'all'}`}
-                    onChange={authors => setAuthors(authors ?? [])}
+                    onChange={(authors) => setAuthors(authors ?? [])}
                     initialAuthors={authors}
                 />
 
@@ -275,9 +293,7 @@ export const FilterToolbar: React.FC<FilterToolbarProps> = ({ onFilterChange, ex
                     onClick={handlePathClick}
                     title={paths.length > 0 ? paths.join('\n') : t('Select files or folders')}
                 >
-                    <span className={styles.ellipsis}>
-                        {getPathLabel()}
-                    </span>
+                    <span className={styles.ellipsis}>{getPathLabel()}</span>
                     {paths.length > 0 ? (
                         <span
                             className={`codicon codicon-close path-clear ${styles.icon} ${styles.iconMedium}`}
@@ -291,7 +307,7 @@ export const FilterToolbar: React.FC<FilterToolbarProps> = ({ onFilterChange, ex
 
             {activeFilters.length > 0 && (
                 <div className={styles.activeFilters}>
-                    {activeFilters.map(filter => (
+                    {activeFilters.map((filter) => (
                         <button
                             key={filter.key}
                             className={styles.filterChip}

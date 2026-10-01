@@ -24,7 +24,9 @@ function normalizeExistingPath(filePath: string): string {
 }
 
 function showNoActiveRepositoryMessage(): void {
-    void vscode.window.showInformationMessage(vscode.l10n.t('Open a folder that contains a Git repository, or initialize one in the current workspace.'));
+    void vscode.window.showInformationMessage(
+        vscode.l10n.t('Open a folder that contains a Git repository, or initialize one in the current workspace.')
+    );
 }
 
 /**
@@ -84,7 +86,7 @@ export function registerWorktreeCommands(
         await repositoryManager.initialize();
         commitViewProvider.requestRefresh({
             scopes: ['commit', 'branch', 'worktrees', 'push', 'stash'],
-            reason: 'worktree-state'
+            reason: 'worktree-state',
         });
     };
 
@@ -101,9 +103,13 @@ export function registerWorktreeCommands(
             }
 
             const normalizedPath = normalizeExistingPath(args.path);
-            const repo = repositoryManager.getRepositories().find(item => normalizeExistingPath(item.repoPath) === normalizedPath);
+            const repo = repositoryManager
+                .getRepositories()
+                .find((item) => normalizeExistingPath(item.repoPath) === normalizedPath);
             if (!repo) {
-                await vscode.window.showWarningMessage(vscode.l10n.t('Open this worktree in VS Code before switching Intelli Git to it.'));
+                await vscode.window.showWarningMessage(
+                    vscode.l10n.t('Open this worktree in VS Code before switching Intelli Git to it.')
+                );
                 return;
             }
 
@@ -114,7 +120,9 @@ export function registerWorktreeCommands(
     context.subscriptions.push(
         vscode.commands.registerCommand('intelli-git.worktree.open', async (args?: { path?: string }) => {
             if (args?.path) {
-                await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(args.path), { forceNewWindow: true });
+                await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(args.path), {
+                    forceNewWindow: true,
+                });
             }
         })
     );
@@ -135,40 +143,46 @@ export function registerWorktreeCommands(
     );
 
     context.subscriptions.push(
-        vscode.commands.registerCommand('intelli-git.worktree.remove', async (args?: { path?: string; branch?: string; isDirty?: boolean }) => {
-            if (!args?.path) {
-                return;
-            }
-
-            const isDirty = args.isDirty ?? false;
-            let confirm: string | undefined;
-
-            if (isDirty) {
-                confirm = await vscode.window.showWarningMessage(
-                    vscode.l10n.t('Worktree {0} has uncommitted changes. Removing it will permanently delete all uncommitted changes on disk. Are you sure you want to force remove it?', args.branch || args.path),
-                    { modal: true, detail: args.path },
-                    vscode.l10n.t('Force Remove')
-                );
-                if (confirm !== vscode.l10n.t('Force Remove')) {
+        vscode.commands.registerCommand(
+            'intelli-git.worktree.remove',
+            async (args?: { path?: string; branch?: string; isDirty?: boolean }) => {
+                if (!args?.path) {
                     return;
                 }
-            } else {
-                confirm = await vscode.window.showWarningMessage(
-                    vscode.l10n.t('Remove worktree {0}?', args.branch || args.path),
-                    { modal: true, detail: args.path },
-                    vscode.l10n.t('Remove')
-                );
-                if (confirm !== vscode.l10n.t('Remove')) {
-                    return;
+
+                const isDirty = args.isDirty ?? false;
+                let confirm: string | undefined;
+
+                if (isDirty) {
+                    confirm = await vscode.window.showWarningMessage(
+                        vscode.l10n.t(
+                            'Worktree {0} has uncommitted changes. Removing it will permanently delete all uncommitted changes on disk. Are you sure you want to force remove it?',
+                            args.branch || args.path
+                        ),
+                        { modal: true, detail: args.path },
+                        vscode.l10n.t('Force Remove')
+                    );
+                    if (confirm !== vscode.l10n.t('Force Remove')) {
+                        return;
+                    }
+                } else {
+                    confirm = await vscode.window.showWarningMessage(
+                        vscode.l10n.t('Remove worktree {0}?', args.branch || args.path),
+                        { modal: true, detail: args.path },
+                        vscode.l10n.t('Remove')
+                    );
+                    if (confirm !== vscode.l10n.t('Remove')) {
+                        return;
+                    }
+                }
+
+                try {
+                    await gitService.branchRemote.removeWorktree(args.path, isDirty);
+                    await refreshWorktreeState();
+                } catch (error) {
+                    vscode.window.showErrorMessage(vscode.l10n.t('Failed to remove worktree: {0}', String(error)));
                 }
             }
-
-            try {
-                await gitService.branchRemote.removeWorktree(args.path, isDirty);
-                await refreshWorktreeState();
-            } catch (error) {
-                vscode.window.showErrorMessage(vscode.l10n.t('Failed to remove worktree: {0}', String(error)));
-            }
-        })
+        )
     );
 }

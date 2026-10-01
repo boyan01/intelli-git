@@ -56,7 +56,7 @@ function splitContentLines(content: string): ContentLine[] {
             startOffset,
             endOffset: offset,
             body,
-            text: content.slice(startOffset, offset)
+            text: content.slice(startOffset, offset),
         });
         lineNumber++;
     }
@@ -84,7 +84,7 @@ function parseMarkerLine(body: string, marker: '<' | '|' | '=' | '>'): MarkerLin
 
     return {
         size,
-        label: suffix.trim()
+        label: suffix.trim(),
     };
 }
 
@@ -170,7 +170,7 @@ export function parseConflictMarkerBlocks(content: string): ConflictMarkerBlock[
             currentText: currentLines.join(''),
             baseText: baseLines.join(''),
             incomingText: incomingLines.join(''),
-            markerText: content.slice(startLine.startOffset, endLine.endOffset)
+            markerText: content.slice(startLine.startOffset, endLine.endOffset),
         });
         startIndex = endIndex;
     }

@@ -23,6 +23,6 @@ test('ChangelistStateService remaps stale hunk assignments to the nearest curren
     assert.equal(assignment.fileListId, undefined);
     assert.deepEqual(assignment.hunkListIds, {
         [remappedHunk.id]: secondaryList.id,
-        [activeHunk.id]: 'changes'
+        [activeHunk.id]: 'changes',
     });
 });

@@ -80,7 +80,7 @@ const CONTEXT_ONLY_COMMANDS = [
     'intelli-git.ai.configureProviderFromWebview',
     'intelli-git.ai.selectCopilotModelFromWebview',
     'intelli-git.ai.testProviderFromWebview',
-    'intelli-git.ai.openCommitPromptSettingsFromWebview'
+    'intelli-git.ai.openCommitPromptSettingsFromWebview',
 ];
 
 const GLOBAL_COMMANDS = [
@@ -96,7 +96,7 @@ const GLOBAL_COMMANDS = [
     'intelli-git.ai.selectCopilotModel',
     'intelli-git.ai.configureProvider',
     'intelli-git.ai.setApiKey',
-    'intelli-git.ai.openCommitPromptSettings'
+    'intelli-git.ai.openCommitPromptSettings',
 ];
 
 const ACTIVE_REPOSITORY_COMMANDS = [
@@ -104,7 +104,7 @@ const ACTIVE_REPOSITORY_COMMANDS = [
     'intelli-git.branch.create',
     'intelli-git.changelist.createList',
     'intelli-git.openLogAtCurrentBlame',
-    'intelli-git.showFileHistory'
+    'intelli-git.showFileHistory',
 ];
 
 function readPackageJson(): any {
@@ -122,7 +122,10 @@ test('context-only commands are hidden from the command palette', () => {
     );
     const activeRepositoryCommands = new Set(
         commandPalette
-            .filter((item: { command?: string; when?: string }) => item.command && item.when === 'intelli-git.hasActiveRepository')
+            .filter(
+                (item: { command?: string; when?: string }) =>
+                    item.command && item.when === 'intelli-git.hasActiveRepository'
+            )
             .map((item: { command: string }) => item.command)
     );
 
@@ -132,7 +135,11 @@ test('context-only commands are hidden from the command palette', () => {
 
     for (const command of GLOBAL_COMMANDS) {
         assert.equal(hiddenCommands.has(command), false, `${command} should stay visible in the Command Palette`);
-        assert.equal(activeRepositoryCommands.has(command), false, `${command} should not require an active repository`);
+        assert.equal(
+            activeRepositoryCommands.has(command),
+            false,
+            `${command} should not require an active repository`
+        );
     }
 
     for (const command of ACTIVE_REPOSITORY_COMMANDS) {
@@ -149,7 +156,7 @@ test('remote commit link commands are scoped by detected provider', () => {
         'intelli-git.log.openOnGitHub': 'github',
         'intelli-git.log.openOnGitLab': 'gitlab',
         'intelli-git.log.openOnBitbucket': 'bitbucket',
-        'intelli-git.log.openOnAzureDevOps': 'azure'
+        'intelli-git.log.openOnAzureDevOps': 'azure',
     };
 
     for (const [command, provider] of Object.entries(expectedProviders)) {
@@ -166,7 +173,9 @@ test('remote commit link commands are scoped by detected provider', () => {
 test('mark resolved is available for resolved conflict groups only', () => {
     const packageJson = readPackageJson();
     const webviewContext = packageJson.contributes.menus['webview/context'] ?? [];
-    const item = webviewContext.find((entry: { command?: string }) => entry.command === 'intelli-git.changelist.markResolved');
+    const item = webviewContext.find(
+        (entry: { command?: string }) => entry.command === 'intelli-git.changelist.markResolved'
+    );
 
     assert.ok(item, 'mark resolved should be registered in the changelist context menu');
     assert.match(item.when, /webviewSection == 'changelistFile'/);
@@ -181,11 +190,23 @@ test('merge resolver commands are scoped to native webview context sections', ()
     const packageJson = readPackageJson();
     const webviewContext = packageJson.contributes.menus['webview/context'] ?? [];
     const expected = new Map([
-        ['intelli-git.merge.acceptLeft', "(webviewSection == 'mergeEditorLeft' || webviewSection == 'mergeEditorResult') && canReviewLeft == true"],
-        ['intelli-git.merge.cancelLeft', "(webviewSection == 'mergeEditorLeft' || webviewSection == 'mergeEditorResult') && canReviewLeft == true"],
-        ['intelli-git.merge.acceptRight', "(webviewSection == 'mergeEditorRight' || webviewSection == 'mergeEditorResult') && canReviewRight == true"],
-        ['intelli-git.merge.cancelRight', "(webviewSection == 'mergeEditorRight' || webviewSection == 'mergeEditorResult') && canReviewRight == true"],
-        ['intelli-git.merge.markReviewed', "webviewSection == 'mergeEditorResult' && canMarkReviewed == true"]
+        [
+            'intelli-git.merge.acceptLeft',
+            "(webviewSection == 'mergeEditorLeft' || webviewSection == 'mergeEditorResult') && canReviewLeft == true",
+        ],
+        [
+            'intelli-git.merge.cancelLeft',
+            "(webviewSection == 'mergeEditorLeft' || webviewSection == 'mergeEditorResult') && canReviewLeft == true",
+        ],
+        [
+            'intelli-git.merge.acceptRight',
+            "(webviewSection == 'mergeEditorRight' || webviewSection == 'mergeEditorResult') && canReviewRight == true",
+        ],
+        [
+            'intelli-git.merge.cancelRight',
+            "(webviewSection == 'mergeEditorRight' || webviewSection == 'mergeEditorResult') && canReviewRight == true",
+        ],
+        ['intelli-git.merge.markReviewed', "webviewSection == 'mergeEditorResult' && canMarkReviewed == true"],
     ]);
 
     for (const [command, when] of expected) {

@@ -49,27 +49,36 @@ export const BranchListPanel: React.FC<BranchListPanelProps> = ({ data, isLoadin
         }
     }, [data, cachedScrollTop]);
 
-    const handleToggle = useCallback((id: string, expanded: boolean) => {
-        setExpandedIds(prev => {
-            const next = new Set(prev);
-            if (expanded) {
-                next.add(id);
-            } else {
-                next.delete(id);
+    const handleToggle = useCallback(
+        (id: string, expanded: boolean) => {
+            setExpandedIds((prev) => {
+                const next = new Set(prev);
+                if (expanded) {
+                    next.add(id);
+                } else {
+                    next.delete(id);
+                }
+                return next;
+            });
+        },
+        [setExpandedIds]
+    );
+
+    const handleSelect = useCallback(
+        (node: TreeNode<BranchNodeData>) => {
+            setSelectedId(node.id);
+        },
+        [setSelectedId]
+    );
+
+    const handleBranchAction = useCallback(
+        (node: TreeNode<BranchNodeData>) => {
+            if (node.data?.type !== 'folder') {
+                onBranchFilter?.(node.data?.fullPath || node.id);
             }
-            return next;
-        });
-    }, [setExpandedIds]);
-
-    const handleSelect = useCallback((node: TreeNode<BranchNodeData>) => {
-        setSelectedId(node.id);
-    }, [setSelectedId]);
-
-    const handleBranchAction = useCallback((node: TreeNode<BranchNodeData>) => {
-        if (node.data?.type !== 'folder') {
-            onBranchFilter?.(node.data?.fullPath || node.id);
-        }
-    }, [onBranchFilter]);
+        },
+        [onBranchFilter]
+    );
 
     // Sort branches with priority branches first
     const sortBranchNames = useCallback((names: string[]): string[] => {
@@ -90,117 +99,124 @@ export const BranchListPanel: React.FC<BranchListPanelProps> = ({ data, isLoadin
     // Filter items by filter text
     const filterItems = useCallback((items: string[], filter: string): string[] => {
         if (!filter) return items;
-        return items.filter(i => i.toLowerCase().includes(filter.toLowerCase()));
+        return items.filter((i) => i.toLowerCase().includes(filter.toLowerCase()));
     }, []);
 
     // Get branch info for local branches
-    const getBranchInfo = useCallback((branchName: string): LocalBranchInfo | undefined => {
-        return data?.localBranchesInfo?.find(info => info.name === branchName);
-    }, [data]);
+    const getBranchInfo = useCallback(
+        (branchName: string): LocalBranchInfo | undefined => {
+            return data?.localBranchesInfo?.find((info) => info.name === branchName);
+        },
+        [data]
+    );
 
     // Build tree nodes from branch list
-    const buildBranchTree = useCallback((
-        branches: string[],
-        idPrefix: string,
-        type: 'local' | 'remote' | 'tag',
-        remoteName?: string
-    ): TreeNode<BranchNodeData>[] => {
-        // Build hierarchical structure
-        interface TempNode {
-            name: string;
-            path: string;
-            children: Map<string, TempNode>;
-            isLeaf: boolean;
-        }
+    const buildBranchTree = useCallback(
+        (
+            branches: string[],
+            idPrefix: string,
+            type: 'local' | 'remote' | 'tag',
+            remoteName?: string
+        ): TreeNode<BranchNodeData>[] => {
+            // Build hierarchical structure
+            interface TempNode {
+                name: string;
+                path: string;
+                children: Map<string, TempNode>;
+                isLeaf: boolean;
+            }
 
-        const root = new Map<string, TempNode>();
+            const root = new Map<string, TempNode>();
 
-        for (const branch of branches) {
-            const parts = branch.split('/');
-            let currentLevel = root;
+            for (const branch of branches) {
+                const parts = branch.split('/');
+                let currentLevel = root;
 
-            for (let i = 0; i < parts.length; i++) {
-                const part = parts[i];
-                const isLast = i === parts.length - 1;
-                const path = parts.slice(0, i + 1).join('/');
+                for (let i = 0; i < parts.length; i++) {
+                    const part = parts[i];
+                    const isLast = i === parts.length - 1;
+                    const path = parts.slice(0, i + 1).join('/');
 
-                if (!currentLevel.has(part)) {
-                    currentLevel.set(part, {
-                        name: part,
-                        path: path,
-                        children: new Map(),
-                        isLeaf: isLast
-                    });
-                }
+                    if (!currentLevel.has(part)) {
+                        currentLevel.set(part, {
+                            name: part,
+                            path: path,
+                            children: new Map(),
+                            isLeaf: isLast,
+                        });
+                    }
 
-                if (!isLast) {
-                    currentLevel = currentLevel.get(part)!.children;
+                    if (!isLast) {
+                        currentLevel = currentLevel.get(part)!.children;
+                    }
                 }
             }
-        }
 
-        // Convert to TreeNode, sorted
-        const convertToTreeNodes = (nodes: Map<string, TempNode>, depth: number): TreeNode<BranchNodeData>[] => {
-            const entries = Array.from(nodes.entries());
+            // Convert to TreeNode, sorted
+            const convertToTreeNodes = (nodes: Map<string, TempNode>, depth: number): TreeNode<BranchNodeData>[] => {
+                const entries = Array.from(nodes.entries());
 
-            // Sort: priority branches first, then folders, then other branches alphabetically
-            entries.sort(([aKey, aNode], [bKey, bNode]) => {
-                const aIsPriority = aNode.isLeaf && PRIORITY_BRANCHES.includes(aKey.toLowerCase());
-                const bIsPriority = bNode.isLeaf && PRIORITY_BRANCHES.includes(bKey.toLowerCase());
+                // Sort: priority branches first, then folders, then other branches alphabetically
+                entries.sort(([aKey, aNode], [bKey, bNode]) => {
+                    const aIsPriority = aNode.isLeaf && PRIORITY_BRANCHES.includes(aKey.toLowerCase());
+                    const bIsPriority = bNode.isLeaf && PRIORITY_BRANCHES.includes(bKey.toLowerCase());
 
-                // Priority branches always come first
-                if (aIsPriority && !bIsPriority) return -1;
-                if (!aIsPriority && bIsPriority) return 1;
+                    // Priority branches always come first
+                    if (aIsPriority && !bIsPriority) return -1;
+                    if (!aIsPriority && bIsPriority) return 1;
 
-                // Among priority branches, sort by defined order
-                if (aIsPriority && bIsPriority) {
-                    return PRIORITY_BRANCHES.indexOf(aKey.toLowerCase()) - PRIORITY_BRANCHES.indexOf(bKey.toLowerCase());
-                }
+                    // Among priority branches, sort by defined order
+                    if (aIsPriority && bIsPriority) {
+                        return (
+                            PRIORITY_BRANCHES.indexOf(aKey.toLowerCase()) -
+                            PRIORITY_BRANCHES.indexOf(bKey.toLowerCase())
+                        );
+                    }
 
-                // Folders before non-priority branches
-                if (!aNode.isLeaf && bNode.isLeaf) return -1;
-                if (aNode.isLeaf && !bNode.isLeaf) return 1;
+                    // Folders before non-priority branches
+                    if (!aNode.isLeaf && bNode.isLeaf) return -1;
+                    if (aNode.isLeaf && !bNode.isLeaf) return 1;
 
-                return aKey.localeCompare(bKey);
-            });
+                    return aKey.localeCompare(bKey);
+                });
 
-            return entries.map(([, node]) => {
-                const nodeId = `${idPrefix}/${node.path}`;
-                const fullPath = type === 'remote' && remoteName
-                    ? `${remoteName}/${node.path}`
-                    : node.path;
+                return entries.map(([, node]) => {
+                    const nodeId = `${idPrefix}/${node.path}`;
+                    const fullPath = type === 'remote' && remoteName ? `${remoteName}/${node.path}` : node.path;
 
-                if (node.isLeaf) {
-                    const branchInfo = type === 'local' ? getBranchInfo(node.path) : undefined;
-                    const upstreamInfo = branchInfo?.upstream ? ` → ${branchInfo.upstream}` : '';
-                    return {
-                        id: nodeId,
-                        label: node.name,
-                        title: `${fullPath}${upstreamInfo}`,
-                        icon: type === 'tag' ? 'tag' : 'git-branch',
-                        data: {
-                            type,
-                            fullPath,
-                            branchInfo
-                        }
-                    };
-                } else {
-                    return {
-                        id: nodeId,
-                        label: node.name,
-                        icon: 'folder',
-                        children: convertToTreeNodes(node.children, depth + 1),
-                        data: {
-                            type: 'folder' as const,
-                            fullPath
-                        }
-                    };
-                }
-            });
-        };
+                    if (node.isLeaf) {
+                        const branchInfo = type === 'local' ? getBranchInfo(node.path) : undefined;
+                        const upstreamInfo = branchInfo?.upstream ? ` → ${branchInfo.upstream}` : '';
+                        return {
+                            id: nodeId,
+                            label: node.name,
+                            title: `${fullPath}${upstreamInfo}`,
+                            icon: type === 'tag' ? 'tag' : 'git-branch',
+                            data: {
+                                type,
+                                fullPath,
+                                branchInfo,
+                            },
+                        };
+                    } else {
+                        return {
+                            id: nodeId,
+                            label: node.name,
+                            icon: 'folder',
+                            children: convertToTreeNodes(node.children, depth + 1),
+                            data: {
+                                type: 'folder' as const,
+                                fullPath,
+                            },
+                        };
+                    }
+                });
+            };
 
-        return convertToTreeNodes(root, 0);
-    }, [getBranchInfo]);
+            return convertToTreeNodes(root, 0);
+        },
+        [getBranchInfo]
+    );
 
     // Build complete tree structure
     const treeNodes = useMemo((): TreeNode<BranchNodeData>[] => {
@@ -213,7 +229,7 @@ export const BranchListPanel: React.FC<BranchListPanelProps> = ({ data, isLoadin
             id: 'head',
             label: `${t('HEAD')} (${data.currentBranch})`,
             icon: 'target',
-            data: { type: 'head', fullPath: 'HEAD' }
+            data: { type: 'head', fullPath: 'HEAD' },
         });
 
         // Local Branches
@@ -223,7 +239,7 @@ export const BranchListPanel: React.FC<BranchListPanelProps> = ({ data, isLoadin
             id: 'local',
             label: t('Local'),
             children: localChildren,
-            data: { type: 'folder', fullPath: '' }
+            data: { type: 'folder', fullPath: '' },
         });
 
         // Remote Branches
@@ -232,35 +248,40 @@ export const BranchListPanel: React.FC<BranchListPanelProps> = ({ data, isLoadin
             const filteredBranches = filterItems(branches, filterText);
             if (filteredBranches.length === 0 && filterText) continue;
 
-            const remoteBranchNodes = buildBranchTree(sortBranchNames(filteredBranches), `remote/${remote}`, 'remote', remote);
+            const remoteBranchNodes = buildBranchTree(
+                sortBranchNames(filteredBranches),
+                `remote/${remote}`,
+                'remote',
+                remote
+            );
             remoteChildren.push({
                 id: `remote/${remote}`,
                 label: remote,
                 icon: 'cloud',
                 children: remoteBranchNodes,
-                data: { type: 'folder', fullPath: remote }
+                data: { type: 'folder', fullPath: remote },
             });
         }
         nodes.push({
             id: 'remote',
             label: t('Remote'),
             children: remoteChildren,
-            data: { type: 'folder', fullPath: '' }
+            data: { type: 'folder', fullPath: '' },
         });
 
         // Tags
         const filteredTags = filterItems(data.tags, filterText);
-        const tagNodes = filteredTags.map(tag => ({
+        const tagNodes = filteredTags.map((tag) => ({
             id: `tag/${tag}`,
             label: tag,
             icon: 'tag',
-            data: { type: 'tag' as const, fullPath: `tag/${tag}` }
+            data: { type: 'tag' as const, fullPath: `tag/${tag}` },
         }));
         nodes.push({
             id: 'tags',
             label: t('Tags'),
             children: tagNodes,
-            data: { type: 'folder', fullPath: '' }
+            data: { type: 'folder', fullPath: '' },
         });
 
         return nodes;
@@ -286,31 +307,38 @@ export const BranchListPanel: React.FC<BranchListPanelProps> = ({ data, isLoadin
     }, [filterText, expandedIds, treeNodes]);
 
     // Render label with highlight
-    const renderLabel = useCallback((node: TreeNode<BranchNodeData>) => {
-        if (!filterText || !node.label.toLowerCase().includes(filterText.toLowerCase())) {
-            return node.label;
-        }
-
-        const parts: React.ReactNode[] = [];
-        const regex = new RegExp(`(${filterText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
-
-        let lastIndex = 0;
-        let match;
-
-        while ((match = regex.exec(node.label)) !== null) {
-            if (match.index > lastIndex) {
-                parts.push(node.label.substring(lastIndex, match.index));
+    const renderLabel = useCallback(
+        (node: TreeNode<BranchNodeData>) => {
+            if (!filterText || !node.label.toLowerCase().includes(filterText.toLowerCase())) {
+                return node.label;
             }
-            parts.push(<span key={match.index} className={treeStyles.highlight}>{match[0]}</span>);
-            lastIndex = match.index + match[0].length;
-        }
 
-        if (lastIndex < node.label.length) {
-            parts.push(node.label.substring(lastIndex));
-        }
+            const parts: React.ReactNode[] = [];
+            const regex = new RegExp(`(${filterText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
 
-        return <>{parts}</>;
-    }, [filterText]);
+            let lastIndex = 0;
+            let match;
+
+            while ((match = regex.exec(node.label)) !== null) {
+                if (match.index > lastIndex) {
+                    parts.push(node.label.substring(lastIndex, match.index));
+                }
+                parts.push(
+                    <span key={match.index} className={treeStyles.highlight}>
+                        {match[0]}
+                    </span>
+                );
+                lastIndex = match.index + match[0].length;
+            }
+
+            if (lastIndex < node.label.length) {
+                parts.push(node.label.substring(lastIndex));
+            }
+
+            return <>{parts}</>;
+        },
+        [filterText]
+    );
 
     // Render trailing (ahead/behind indicator)
     const renderTrailing = useCallback((node: TreeNode<BranchNodeData>) => {
@@ -319,47 +347,48 @@ export const BranchListPanel: React.FC<BranchListPanelProps> = ({ data, isLoadin
             return null;
         }
 
-        return (
-            <BranchStatus ahead={info.ahead} behind={info.behind} />
-        );
+        return <BranchStatus ahead={info.ahead} behind={info.behind} />;
     }, []);
 
     // Get context data for context menu
-    const getContextData = useCallback((node: TreeNode<BranchNodeData>) => {
-        if (!node.data || node.data.type === 'folder') return undefined;
+    const getContextData = useCallback(
+        (node: TreeNode<BranchNodeData>) => {
+            if (!node.data || node.data.type === 'folder') return undefined;
 
-        if (node.data.type === 'local') {
-            const upstream = node.data.branchInfo?.upstream;
-            // Check if upstream remote branch actually exists
-            let hasUpstream = false;
-            if (upstream && data?.remoteBranches) {
-                const [remote, ...branchParts] = upstream.split('/');
-                const branchName = branchParts.join('/');
-                const remoteBranchList = data.remoteBranches[remote];
-                hasUpstream = remoteBranchList?.includes(branchName) ?? false;
+            if (node.data.type === 'local') {
+                const upstream = node.data.branchInfo?.upstream;
+                // Check if upstream remote branch actually exists
+                let hasUpstream = false;
+                if (upstream && data?.remoteBranches) {
+                    const [remote, ...branchParts] = upstream.split('/');
+                    const branchName = branchParts.join('/');
+                    const remoteBranchList = data.remoteBranches[remote];
+                    hasUpstream = remoteBranchList?.includes(branchName) ?? false;
+                }
+                return {
+                    webviewSection: 'localBranch',
+                    branchName: node.data.fullPath,
+                    fullBranchName: node.data.fullPath,
+                    hasUpstream,
+                };
             }
-            return {
-                webviewSection: 'localBranch',
-                branchName: node.data.fullPath,
-                fullBranchName: node.data.fullPath,
-                hasUpstream
-            };
-        }
-        if (node.data.type === 'remote') {
-            return {
-                webviewSection: 'remoteBranch',
-                branchName: node.data.fullPath,
-                fullBranchName: node.data.fullPath
-            };
-        }
-        if (node.data.type === 'tag') {
-            return {
-                webviewSection: 'tag',
-                tagName: node.data.fullPath.replace('tag/', '')
-            };
-        }
-        return undefined;
-    }, [data]);
+            if (node.data.type === 'remote') {
+                return {
+                    webviewSection: 'remoteBranch',
+                    branchName: node.data.fullPath,
+                    fullBranchName: node.data.fullPath,
+                };
+            }
+            if (node.data.type === 'tag') {
+                return {
+                    webviewSection: 'tag',
+                    tagName: node.data.fullPath.replace('tag/', ''),
+                };
+            }
+            return undefined;
+        },
+        [data]
+    );
     const renderTreeContent = () => {
         if (isLoading && !hasBranchData) {
             return null;

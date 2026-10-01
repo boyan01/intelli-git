@@ -44,17 +44,19 @@ function buildIconContribution(icons) {
             description: icon.description,
             default: {
                 fontPath: `resources/${fontName}.woff`,
-                fontCharacter: formatCodepoint(icon.codepoint)
-            }
+                fontCharacter: formatCodepoint(icon.codepoint),
+            },
         };
         return result;
     }, {});
 }
 
 function buildCss(icons) {
-    const classes = icons.map(icon => {
-        return `.intelli-git-icon-${icon.name}::before {\n    content: "${formatCodepoint(icon.codepoint)}";\n}`;
-    }).join('\n\n');
+    const classes = icons
+        .map((icon) => {
+            return `.intelli-git-icon-${icon.name}::before {\n    content: "${formatCodepoint(icon.codepoint)}";\n}`;
+        })
+        .join('\n\n');
 
     return `@font-face {
     font-family: "IntelliGitIcons";
@@ -125,7 +127,7 @@ async function generateIconFont(icons) {
             }, {}),
             fontHeight: 1000,
             descent: 0,
-            normalize: true
+            normalize: true,
         });
 
         const generatedFont = await fs.readFile(path.join(outputDir, `${fontName}.woff`));
@@ -150,7 +152,7 @@ async function main() {
     await updatePackageJson(icons);
 }
 
-main().catch(error => {
+main().catch((error) => {
     console.error(error);
     process.exitCode = 1;
 });

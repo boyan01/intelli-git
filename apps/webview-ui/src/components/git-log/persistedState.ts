@@ -29,7 +29,7 @@ export const gitLogStateDefaults: GitLogPersistedStateSchema = {
         localBranches: [],
         localBranchesInfo: [],
         remoteBranches: {},
-        tags: []
+        tags: [],
     },
     'branchList.expandedIds': new Set(['local']),
     'branchList.selectedId': null,
@@ -48,5 +48,5 @@ export const gitLogStateDefaults: GitLogPersistedStateSchema = {
     'gitLog.selectedHashes': [],
     'gitLog.branchSplitRatio': 0.2,
     'gitLog.detailsSplitRatio': 0.7,
-    'gitLog.commitDetailsSplitRatio': 0.6
+    'gitLog.commitDetailsSplitRatio': 0.6,
 };

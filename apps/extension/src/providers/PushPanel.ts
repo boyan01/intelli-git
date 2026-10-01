@@ -6,10 +6,7 @@ export class PushPanel extends BaseWebviewProvider {
     private readonly _panel: vscode.WebviewPanel;
     private _disposed: boolean = false;
 
-    private constructor(
-        panel: vscode.WebviewPanel,
-        options: WebviewProviderOptions
-    ) {
+    private constructor(panel: vscode.WebviewPanel, options: WebviewProviderOptions) {
         super(options);
         this._panel = panel;
 
@@ -42,12 +39,12 @@ export class PushPanel extends BaseWebviewProvider {
             'Push Commits',
             {
                 viewColumn: vscode.ViewColumn.Active,
-                preserveFocus: false
+                preserveFocus: false,
             },
             {
                 enableScripts: true,
                 localResourceRoots: [options.extensionUri],
-                retainContextWhenHidden: true
+                retainContextWhenHidden: true,
             }
         );
 

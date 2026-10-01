@@ -6,7 +6,7 @@ import {
     DEFAULT_CUSTOM_OPENAI_API_URL,
     DEFAULT_CUSTOM_OPENAI_MODEL,
     DEFAULT_GOOGLE_API_URL,
-    DEFAULT_GOOGLE_MODEL
+    DEFAULT_GOOGLE_MODEL,
 } from '../services/ai';
 import { getAiApiKey, setAiApiKey, type SecretBackedAiProvider } from '../utils/aiSecrets';
 import { listCodexModels, type CodexModel } from '../services/CodexCliService';
@@ -28,7 +28,14 @@ interface ProviderPickItem extends vscode.QuickPickItem {
 }
 
 interface ProviderActionPickItem extends vscode.QuickPickItem {
-    action: 'changeExecutable' | 'setCurrent' | 'setApiKey' | 'clearApiKey' | 'changeModel' | 'changeApiUrl' | 'openSettingsJson';
+    action:
+        | 'changeExecutable'
+        | 'setCurrent'
+        | 'setApiKey'
+        | 'clearApiKey'
+        | 'changeModel'
+        | 'changeApiUrl'
+        | 'openSettingsJson';
 }
 
 const SECRET_BACKED_PROVIDERS: SecretBackedAiProvider[] = ['anthropic', 'google', 'custom'];
@@ -80,21 +87,23 @@ export function registerAiCommands(context: vscode.ExtensionContext, commitViewP
                 return;
             }
 
-            const currentModel = vscode.workspace.getConfiguration('intelli-git.ai.copilot').get<string>('model', DEFAULT_COPILOT_MODEL);
+            const currentModel = vscode.workspace
+                .getConfiguration('intelli-git.ai.copilot')
+                .get<string>('model', DEFAULT_COPILOT_MODEL);
             const normalizedCurrentModel = currentModel.trim().toLowerCase();
 
-            const items: CopilotModelPickItem[] = copilotModels.map(model => {
+            const items: CopilotModelPickItem[] = copilotModels.map((model) => {
                 const details = [model.id, model.family].filter(Boolean).join(' • ');
                 const isCurrent = [model.id, model.name, model.family]
                     .filter(Boolean)
-                    .some(value => value.trim().toLowerCase() === normalizedCurrentModel);
+                    .some((value) => value.trim().toLowerCase() === normalizedCurrentModel);
 
                 return {
                     label: model.name || model.id,
                     description: isCurrent ? i18n.t('extension.current') : undefined,
                     iconPath: isCurrent ? new vscode.ThemeIcon('check') : undefined,
                     detail: details,
-                    model
+                    model,
                 };
             });
 
@@ -102,18 +111,16 @@ export function registerAiCommands(context: vscode.ExtensionContext, commitViewP
                 title: i18n.t('extension.selectCopilotModel'),
                 placeHolder: i18n.t('extension.chooseCopilotModelForCommitGen'),
                 matchOnDescription: true,
-                matchOnDetail: true
+                matchOnDetail: true,
             });
 
             if (!selected) {
                 return;
             }
 
-            await vscode.workspace.getConfiguration('intelli-git.ai.copilot').update(
-                'model',
-                selected.model.id,
-                vscode.ConfigurationTarget.Global
-            );
+            await vscode.workspace
+                .getConfiguration('intelli-git.ai.copilot')
+                .update('model', selected.model.id, vscode.ConfigurationTarget.Global);
 
             vscode.window.showInformationMessage(
                 i18n.t('extension.copilotModelSetTo', selected.model.name || selected.model.id)
@@ -126,7 +133,7 @@ async function showCopilotModelQuickPick(
     items: CopilotModelPickItem[],
     options: vscode.QuickPickOptions
 ): Promise<CopilotModelPickItem | undefined> {
-    const currentItem = items.find(item => item.description === i18n.t('extension.current'));
+    const currentItem = items.find((item) => item.description === i18n.t('extension.current'));
     const quickPick = vscode.window.createQuickPick<CopilotModelPickItem>();
 
     quickPick.title = options.title;
@@ -138,7 +145,7 @@ async function showCopilotModelQuickPick(
         quickPick.activeItems = [currentItem];
     }
 
-    return new Promise(resolve => {
+    return new Promise((resolve) => {
         const disposables: vscode.Disposable[] = [];
         disposables.push(
             quickPick.onDidAccept(() => {
@@ -193,7 +200,7 @@ async function configureAiProvider(context: vscode.ExtensionContext): Promise<vo
             title: i18n.t('extension.codexExecutable'),
             prompt: i18n.t('extension.codexExecutablePrompt'),
             value: config.get<string>('path', 'codex'),
-            ignoreFocusOut: true
+            ignoreFocusOut: true,
         });
         if (executable !== undefined) {
             await config.update('path', executable.trim() || 'codex', vscode.ConfigurationTarget.Global);
@@ -223,15 +230,15 @@ async function pickConfigurableProvider(context: vscode.ExtensionContext): Promi
             label: getProviderLabel(AiProvider.Copilot),
             description: currentProvider === AiProvider.Copilot ? i18n.t('extension.current') : undefined,
             detail: i18n.t('extension.aiProviderCopilotStatus', getProviderModel(AiProvider.Copilot)),
-            id: AiProvider.Copilot
-        }
+            id: AiProvider.Copilot,
+        },
     ];
 
     items.push({
         label: 'Codex CLI',
         description: currentProvider === AiProvider.Codex ? i18n.t('extension.current') : undefined,
         detail: getCodexConfigurationSummary(),
-        id: AiProvider.Codex
+        id: AiProvider.Codex,
     });
 
     for (const provider of SECRET_BACKED_PROVIDERS) {
@@ -242,10 +249,12 @@ async function pickConfigurableProvider(context: vscode.ExtensionContext): Promi
             label: getProviderLabel(provider),
             description: [
                 isCurrent ? i18n.t('extension.current') : undefined,
-                hasApiKey ? i18n.t('extension.configured') : i18n.t('extension.apiKeyMissing')
-            ].filter(Boolean).join(' • '),
+                hasApiKey ? i18n.t('extension.configured') : i18n.t('extension.apiKeyMissing'),
+            ]
+                .filter(Boolean)
+                .join(' • '),
             detail: getSecretBackedProviderDetail(provider),
-            id: provider
+            id: provider,
         });
     }
 
@@ -253,7 +262,7 @@ async function pickConfigurableProvider(context: vscode.ExtensionContext): Promi
         title: i18n.t('extension.configureAiProvider'),
         placeHolder: i18n.t('extension.chooseAiProviderToConfigure'),
         matchOnDescription: true,
-        matchOnDetail: true
+        matchOnDetail: true,
     });
 
     return selected?.id;
@@ -269,7 +278,7 @@ async function pickProviderAction(
     if (!isCurrent) {
         actions.push({
             label: i18n.t('extension.setAsCurrentProvider'),
-            action: 'setCurrent'
+            action: 'setCurrent',
         });
     }
 
@@ -277,12 +286,22 @@ async function pickProviderAction(
         actions.push({
             label: i18n.t('extension.changeModel'),
             detail: getProviderModel(provider),
-            action: 'changeModel'
+            action: 'changeModel',
         });
     } else if (provider === AiProvider.Codex) {
         actions.push(
-            { label: i18n.t('extension.codexExecutable'), detail: vscode.workspace.getConfiguration('intelli-git.ai.codex').get<string>('path', 'codex').trim() || 'codex', action: 'changeExecutable' },
-            { label: i18n.t('extension.codexModelAndEffort'), detail: getCodexConfigurationSummary(), action: 'changeModel' }
+            {
+                label: i18n.t('extension.codexExecutable'),
+                detail:
+                    vscode.workspace.getConfiguration('intelli-git.ai.codex').get<string>('path', 'codex').trim() ||
+                    'codex',
+                action: 'changeExecutable',
+            },
+            {
+                label: i18n.t('extension.codexModelAndEffort'),
+                detail: getCodexConfigurationSummary(),
+                action: 'changeModel',
+            }
         );
     } else {
         const hasApiKey = Boolean(await getAiApiKey(context, provider));
@@ -290,13 +309,13 @@ async function pickProviderAction(
         actions.push({
             label: hasApiKey ? i18n.t('extension.replaceApiKey') : i18n.t('extension.setApiKey'),
             detail: hasApiKey ? i18n.t('extension.apiKeyConfigured') : i18n.t('extension.apiKeyMissing'),
-            action: 'setApiKey'
+            action: 'setApiKey',
         });
 
         if (hasApiKey) {
             actions.push({
                 label: i18n.t('extension.clearApiKey'),
-                action: 'clearApiKey'
+                action: 'clearApiKey',
             });
         }
 
@@ -304,12 +323,12 @@ async function pickProviderAction(
             {
                 label: i18n.t('extension.changeModel'),
                 detail: getProviderModel(provider) || i18n.t('extension.notSet'),
-                action: 'changeModel'
+                action: 'changeModel',
             },
             {
                 label: i18n.t('extension.changeApiUrl'),
                 detail: getProviderApiUrl(provider) || i18n.t('extension.notSet'),
-                action: 'changeApiUrl'
+                action: 'changeApiUrl',
             }
         );
     }
@@ -317,12 +336,12 @@ async function pickProviderAction(
     actions.push({
         label: i18n.t('extension.openSettingsJson'),
         detail: i18n.t('extension.openSettingsJsonDetail'),
-        action: 'openSettingsJson'
+        action: 'openSettingsJson',
     });
 
     const selected = await vscode.window.showQuickPick(actions, {
         title: i18n.t('extension.configureAiProviderTitle', getProviderLabel(provider)),
-        placeHolder: getProviderActionPlaceholder(provider)
+        placeHolder: getProviderActionPlaceholder(provider),
     });
 
     return selected?.action;
@@ -330,32 +349,31 @@ async function pickProviderAction(
 
 async function pickSecretBackedProvider(context: vscode.ExtensionContext): Promise<SecretBackedAiProvider | undefined> {
     const selected = await vscode.window.showQuickPick<SecretBackedProviderPickItem>(
-        await Promise.all(SECRET_BACKED_PROVIDERS.map(async provider => ({
-            label: getProviderLabel(provider),
-            description: await getAiApiKey(context, provider)
-                ? i18n.t('extension.configured')
-                : i18n.t('extension.apiKeyMissing'),
-            id: provider
-        }))),
+        await Promise.all(
+            SECRET_BACKED_PROVIDERS.map(async (provider) => ({
+                label: getProviderLabel(provider),
+                description: (await getAiApiKey(context, provider))
+                    ? i18n.t('extension.configured')
+                    : i18n.t('extension.apiKeyMissing'),
+                id: provider,
+            }))
+        ),
         {
             title: i18n.t('extension.setAiApiKey'),
-            placeHolder: i18n.t('extension.chooseAiProvider')
+            placeHolder: i18n.t('extension.chooseAiProvider'),
         }
     );
 
     return selected?.id;
 }
 
-async function setProviderApiKey(
-    context: vscode.ExtensionContext,
-    provider: SecretBackedAiProvider
-): Promise<void> {
+async function setProviderApiKey(context: vscode.ExtensionContext, provider: SecretBackedAiProvider): Promise<void> {
     const providerLabel = getProviderLabel(provider);
     const apiKey = await vscode.window.showInputBox({
         title: i18n.t('extension.setAiApiKey'),
         prompt: i18n.t('extension.enterAiApiKey', providerLabel),
         password: true,
-        ignoreFocusOut: true
+        ignoreFocusOut: true,
     });
 
     if (apiKey === undefined) {
@@ -371,11 +389,9 @@ async function setProviderApiKey(
 }
 
 async function setCurrentProvider(provider: ConfigurableAiProvider): Promise<void> {
-    await vscode.workspace.getConfiguration('intelli-git.ai').update(
-        'provider',
-        provider,
-        vscode.ConfigurationTarget.Global
-    );
+    await vscode.workspace
+        .getConfiguration('intelli-git.ai')
+        .update('provider', provider, vscode.ConfigurationTarget.Global);
 
     vscode.window.showInformationMessage(i18n.t('extension.aiProviderSetTo', getProviderLabel(provider)));
 }
@@ -388,7 +404,9 @@ async function changeProviderModel(provider: ConfigurableAiProvider): Promise<vo
 
     if (provider === AiProvider.Codex) {
         const selection = await pickCodexModel();
-        if (!selection) { return; }
+        if (!selection) {
+            return;
+        }
         const config = vscode.workspace.getConfiguration('intelli-git.ai.codex');
         await config.update('reasoningEffort', selection.reasoningEffort, vscode.ConfigurationTarget.Global);
         await config.update('model', selection.model, vscode.ConfigurationTarget.Global);
@@ -399,7 +417,7 @@ async function changeProviderModel(provider: ConfigurableAiProvider): Promise<vo
         title: i18n.t('extension.changeProviderModelTitle', getProviderLabel(provider)),
         prompt: i18n.t('extension.changeProviderModelPrompt'),
         value: getProviderModel(provider),
-        ignoreFocusOut: true
+        ignoreFocusOut: true,
     });
 
     if (model === undefined) {
@@ -420,76 +438,119 @@ async function pickCodexModel(): Promise<{ model: string; reasoningEffort: strin
         let issue: string | undefined;
         let cancelled = false;
         try {
-            models = await vscode.window.withProgress({
-                location: vscode.ProgressLocation.Notification,
-                title: i18n.t('extension.codexLoadingModels'),
-                cancellable: true
-            }, async (_progress, token) => {
-                try { return await listCodexModels(executable, token); }
-                finally { cancelled = token.isCancellationRequested; }
-            });
+            models = await vscode.window.withProgress(
+                {
+                    location: vscode.ProgressLocation.Notification,
+                    title: i18n.t('extension.codexLoadingModels'),
+                    cancellable: true,
+                },
+                async (_progress, token) => {
+                    try {
+                        return await listCodexModels(executable, token);
+                    } finally {
+                        cancelled = token.isCancellationRequested;
+                    }
+                }
+            );
         } catch (error) {
             issue = error instanceof Error ? error.message : String(error);
         }
-        if (cancelled) { return undefined; }
-        const items: (vscode.QuickPickItem & { model?: string; action?: 'manual' | 'retry' })[] = [{
-            label: i18n.t('extension.codexDefaultModel'),
-            description: current === '' ? i18n.t('extension.current') : undefined,
-            model: ''
-        }];
-        items.push(...models.map(model => ({
-            label: model.displayName,
-            description: [model.model, model.model === current ? i18n.t('extension.current') : undefined,
-                model.isDefault ? i18n.t('extension.codexRecommendedModel') : undefined].filter(Boolean).join(' • '),
-            detail: model.description,
-            model: model.model
-        })));
-        if (current && !models.some(model => model.model === current)) {
+        if (cancelled) {
+            return undefined;
+        }
+        const items: (vscode.QuickPickItem & { model?: string; action?: 'manual' | 'retry' })[] = [
+            {
+                label: i18n.t('extension.codexDefaultModel'),
+                description: current === '' ? i18n.t('extension.current') : undefined,
+                model: '',
+            },
+        ];
+        items.push(
+            ...models.map((model) => ({
+                label: model.displayName,
+                description: [
+                    model.model,
+                    model.model === current ? i18n.t('extension.current') : undefined,
+                    model.isDefault ? i18n.t('extension.codexRecommendedModel') : undefined,
+                ]
+                    .filter(Boolean)
+                    .join(' • '),
+                detail: model.description,
+                model: model.model,
+            }))
+        );
+        if (current && !models.some((model) => model.model === current)) {
             items.push({ label: current, description: i18n.t('extension.current'), model: current });
         }
         items.push({ label: i18n.t('extension.codexManualModel'), action: 'manual' });
         if (issue || models.length === 0) {
-            items.push({ label: i18n.t('extension.codexRetryModels'), detail: issue || i18n.t('extension.codexNoModels'), action: 'retry' });
+            items.push({
+                label: i18n.t('extension.codexRetryModels'),
+                detail: issue || i18n.t('extension.codexNoModels'),
+                action: 'retry',
+            });
         }
         const selected = await vscode.window.showQuickPick(items, {
             title: i18n.t('extension.changeProviderModelTitle', 'Codex CLI'),
             placeHolder: issue ? i18n.t('extension.codexModelListFailed') : i18n.t('extension.codexChooseModel'),
             matchOnDescription: true,
-            matchOnDetail: true
+            matchOnDetail: true,
         });
-        if (!selected) { return undefined; }
-        if (selected.action === 'retry') { continue; }
+        if (!selected) {
+            return undefined;
+        }
+        if (selected.action === 'retry') {
+            continue;
+        }
         let selectedModel = selected.model;
         if (selected.action === 'manual') {
             selectedModel = await vscode.window.showInputBox({
                 title: i18n.t('extension.changeProviderModelTitle', 'Codex CLI'),
                 prompt: i18n.t('extension.codexModelPrompt'),
                 value: current,
-                ignoreFocusOut: true
+                ignoreFocusOut: true,
             });
         }
-        if (selectedModel === undefined) { return undefined; }
+        if (selectedModel === undefined) {
+            return undefined;
+        }
         selectedModel = selectedModel.trim();
-        const metadata = selectedModel ? models.find(model => model.model === selectedModel) : models.find(model => model.isDefault);
+        const metadata = selectedModel
+            ? models.find((model) => model.model === selectedModel)
+            : models.find((model) => model.isDefault);
         const currentEffort = config.get<string>('reasoningEffort', '');
-        const efforts = [{
-            label: i18n.t('extension.codexDefaultEffort'),
-            description: metadata?.defaultReasoningEffort,
-            detail: metadata ? undefined : i18n.t('extension.codexUnknownEfforts'),
-            effort: ''
-        }, ...(metadata?.supportedReasoningEfforts || []).map(option => ({
-            label: option.reasoningEffort,
-            description: [option.reasoningEffort === currentEffort ? i18n.t('extension.current') : undefined,
-                option.reasoningEffort === metadata?.defaultReasoningEffort ? i18n.t('extension.codexRecommendedModel') : undefined].filter(Boolean).join(' • '),
-            detail: option.description,
-            effort: option.reasoningEffort
-        }))];
+        const efforts = [
+            {
+                label: i18n.t('extension.codexDefaultEffort'),
+                description: metadata?.defaultReasoningEffort,
+                detail: metadata ? undefined : i18n.t('extension.codexUnknownEfforts'),
+                effort: '',
+            },
+            ...(metadata?.supportedReasoningEfforts || []).map((option) => ({
+                label: option.reasoningEffort,
+                description: [
+                    option.reasoningEffort === currentEffort ? i18n.t('extension.current') : undefined,
+                    option.reasoningEffort === metadata?.defaultReasoningEffort
+                        ? i18n.t('extension.codexRecommendedModel')
+                        : undefined,
+                ]
+                    .filter(Boolean)
+                    .join(' • '),
+                detail: option.description,
+                effort: option.reasoningEffort,
+            })),
+        ];
         const effort = await vscode.window.showQuickPick(efforts, {
-            title: i18n.t('extension.codexChooseEffort', metadata?.displayName || selectedModel || i18n.t('extension.codexDefaultModel')),
+            title: i18n.t(
+                'extension.codexChooseEffort',
+                metadata?.displayName || selectedModel || i18n.t('extension.codexDefaultModel')
+            ),
             placeHolder: i18n.t('extension.codexEffortPrompt'),
-            matchOnDescription: true
+            matchOnDescription: true,
         });
-        if (!effort) { return undefined; }
+        if (!effort) {
+            return undefined;
+        }
         return { model: selectedModel, reasoningEffort: effort.effort };
     }
 }
@@ -499,7 +560,7 @@ async function changeProviderApiUrl(provider: SecretBackedAiProvider): Promise<v
         title: i18n.t('extension.changeProviderApiUrlTitle', getProviderLabel(provider)),
         prompt: i18n.t('extension.changeProviderApiUrlPrompt'),
         value: getProviderApiUrl(provider),
-        ignoreFocusOut: true
+        ignoreFocusOut: true,
     });
 
     if (apiUrl === undefined) {
@@ -513,7 +574,9 @@ async function changeProviderApiUrl(provider: SecretBackedAiProvider): Promise<v
 
 function getCurrentProvider(): ConfigurableAiProvider {
     const provider = vscode.workspace.getConfiguration('intelli-git.ai').get<string>('provider', AiProvider.Copilot);
-    return provider === AiProvider.Copilot || provider === AiProvider.Codex || isSecretBackedAiProvider(provider) ? provider : AiProvider.Copilot;
+    return provider === AiProvider.Copilot || provider === AiProvider.Codex || isSecretBackedAiProvider(provider)
+        ? provider
+        : AiProvider.Copilot;
 }
 
 function getProviderLabel(provider: ConfigurableAiProvider): string {
@@ -577,15 +640,17 @@ function getProviderDefaultApiUrl(provider: SecretBackedAiProvider): string {
 function getSecretBackedProviderDetail(provider: SecretBackedAiProvider): string {
     return [
         i18n.t('extension.providerModelDetail', getProviderModel(provider) || i18n.t('extension.notSet')),
-        i18n.t('extension.providerApiUrlDetail', getProviderApiUrl(provider) || i18n.t('extension.notSet'))
+        i18n.t('extension.providerApiUrlDetail', getProviderApiUrl(provider) || i18n.t('extension.notSet')),
     ].join(' • ');
 }
 
 function getCodexConfigurationSummary(): string {
     const config = vscode.workspace.getConfiguration('intelli-git.ai.codex');
-    return i18n.t('extension.codexConfigurationSummary',
+    return i18n.t(
+        'extension.codexConfigurationSummary',
         config.get<string>('model', '').trim() || i18n.t('extension.codexDefaultModelValue'),
-        config.get<string>('reasoningEffort', '').trim() || i18n.t('extension.codexDefaultEffortValue'));
+        config.get<string>('reasoningEffort', '').trim() || i18n.t('extension.codexDefaultEffortValue')
+    );
 }
 
 function getProviderActionPlaceholder(provider: ConfigurableAiProvider): string {

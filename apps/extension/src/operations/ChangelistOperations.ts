@@ -14,7 +14,7 @@ export interface ChangelistOperationsOptions {
 }
 
 export class ChangelistOperations {
-    constructor(private readonly options: ChangelistOperationsOptions) { }
+    constructor(private readonly options: ChangelistOperationsOptions) {}
 
     public async setMode(mode: ChangelistMode): Promise<void> {
         if (this.options.changelistStateService.getState().mode !== mode) {
@@ -53,11 +53,9 @@ export class ChangelistOperations {
         await this.options.inactiveChangesService.markInactive(uniquePaths);
 
         const status = await this.options.gitService.getStatus();
-        const stagedPaths = Array.from(new Set(
-            status
-                .filter(file => uniquePaths.includes(file.path) && file.staged)
-                .map(file => file.path)
-        ));
+        const stagedPaths = Array.from(
+            new Set(status.filter((file) => uniquePaths.includes(file.path) && file.staged).map((file) => file.path))
+        );
 
         if (stagedPaths.length > 0) {
             await this.options.gitService.unstageFiles(stagedPaths);

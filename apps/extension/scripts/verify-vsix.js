@@ -7,7 +7,7 @@ const REQUIRED_ENTRIES = [
     'extension/package.json',
     'extension/out/extension.js',
     'extension/out/webview/index.html',
-    'extension/out/webview/webview.js'
+    'extension/out/webview/webview.js',
 ];
 const BLOCKED_ENTRIES = [
     { pattern: /^extension\/(?:\.agent|\.agents|\.codex|\.claude)\//, reason: 'development notes must not ship' },
@@ -15,7 +15,10 @@ const BLOCKED_ENTRIES = [
     { pattern: /^extension\/.*\.vsix$/, reason: 'previous VSIX packages must not ship' },
     { pattern: /^extension\/(?:.*\/)?\.env(?:\..*)?$/, reason: 'env files must not ship' },
     { pattern: /^extension\/(?:.*\/)?\.npmrc$/, reason: 'npm auth config must not ship' },
-    { pattern: /^extension\/.*(?:id_rsa|id_ed25519|private-key|private_key|\.pem|\.key)$/, reason: 'private key files must not ship' }
+    {
+        pattern: /^extension\/.*(?:id_rsa|id_ed25519|private-key|private_key|\.pem|\.key)$/,
+        reason: 'private key files must not ship',
+    },
 ];
 
 try {
@@ -24,14 +27,17 @@ try {
         throw new Error('Usage: node scripts/verify-vsix.js <file.vsix> --version <expected-version>');
     }
     const vsix = path.resolve(file);
-    const unzip = args => execFileSync('unzip', args, {
-        encoding: 'utf8', maxBuffer: 50 * 1024 * 1024
-    });
+    const unzip = (args) =>
+        execFileSync('unzip', args, {
+            encoding: 'utf8',
+            maxBuffer: 50 * 1024 * 1024,
+        });
     const entries = unzip(['-Z1', vsix]).split(/\r?\n/).filter(Boolean);
-    const issues = REQUIRED_ENTRIES.filter(entry => !entries.includes(entry))
-        .map(entry => `Missing required file: ${entry}`);
+    const issues = REQUIRED_ENTRIES.filter((entry) => !entries.includes(entry)).map(
+        (entry) => `Missing required file: ${entry}`
+    );
     for (const entry of entries) {
-        const blocked = BLOCKED_ENTRIES.find(rule => rule.pattern.test(entry));
+        const blocked = BLOCKED_ENTRIES.find((rule) => rule.pattern.test(entry));
         if (blocked) {
             issues.push(`${entry}: ${blocked.reason}`);
         }

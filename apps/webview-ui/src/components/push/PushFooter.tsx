@@ -44,44 +44,48 @@ export const PushFooter: React.FC<PushFooterProps> = ({
     const [options, setOptions] = useState<PushOptions>({
         force: false,
         tags: false,
-        noVerify: false
+        noVerify: false,
     });
     const dropdownRef = useRef<HTMLDivElement>(null);
 
     const getPushErrorState = (descriptor: PushErrorDescriptor): PushErrorState => {
         if (descriptor.kind === 'behind') {
             return {
-                message: descriptor.behindCount && descriptor.behindCount > 0
-                    ? t('Push blocked: remote branch is ahead by {{count}} commit. Pull first to reconcile changes.', { count: descriptor.behindCount })
-                    : t('Push blocked: remote branch has new commits. Pull first to reconcile changes.'),
-                canPull: true
+                message:
+                    descriptor.behindCount && descriptor.behindCount > 0
+                        ? t(
+                              'Push blocked: remote branch is ahead by {{count}} commit. Pull first to reconcile changes.',
+                              { count: descriptor.behindCount }
+                          )
+                        : t('Push blocked: remote branch has new commits. Pull first to reconcile changes.'),
+                canPull: true,
             };
         }
         if (descriptor.kind === 'auth-failed') {
             return {
                 message: t('Push failed: authentication failed. Check your remote credentials and try again.'),
                 details: descriptor.message,
-                canPull: false
+                canPull: false,
             };
         }
         if (descriptor.kind === 'network') {
             return {
                 message: t('Push failed: network error. Check your connection and try again.'),
                 details: descriptor.message,
-                canPull: false
+                canPull: false,
             };
         }
         if (descriptor.kind === 'rejected') {
             return {
                 message: t('Push rejected by remote. Review the remote response and try again.'),
                 details: descriptor.message,
-                canPull: false
+                canPull: false,
             };
         }
 
         return {
             message: t('Push failed: {{message}}', { message: descriptor.message }),
-            canPull: false
+            canPull: false,
         };
     };
 
@@ -96,7 +100,7 @@ export const PushFooter: React.FC<PushFooterProps> = ({
     };
 
     const toggleOption = (key: keyof PushOptions) => {
-        setOptions(prev => ({ ...prev, [key]: !prev[key] }));
+        setOptions((prev) => ({ ...prev, [key]: !prev[key] }));
     };
 
     const handlePush = async () => {
@@ -111,7 +115,7 @@ export const PushFooter: React.FC<PushFooterProps> = ({
                 noVerify: options.noVerify,
                 remote: selectedRemote,
                 branch: selectedRemoteBranch,
-                commitCount
+                commitCount,
             });
             if (!result.ok) {
                 showPushFailure(result);
@@ -151,7 +155,7 @@ export const PushFooter: React.FC<PushFooterProps> = ({
                 remote: selectedRemote,
                 baseBranch: selectedRemoteBranch,
                 commitCount,
-                noVerify: options.noVerify
+                noVerify: options.noVerify,
             });
             if (result) {
                 setPushStatus('success');
@@ -171,40 +175,41 @@ export const PushFooter: React.FC<PushFooterProps> = ({
             return {
                 text: t('Push Completed'),
                 variant: 'success' as const,
-                icon: 'codicon-check'
+                icon: 'codicon-check',
             };
         }
         if (commitCount === 0) {
             return {
                 text: t('Everything up to date'),
                 variant: 'secondary' as const,
-                icon: 'codicon-check'
+                icon: 'codicon-check',
             };
         }
         if (options.force) {
             return {
                 text: t('Force Push'),
                 variant: 'danger' as const,
-                icon: 'codicon-warning'
+                icon: 'codicon-warning',
             };
         }
         if (options.tags) {
             return {
                 text: t('Push with Tags'),
                 variant: 'primary' as const,
-                icon: 'codicon-tag'
+                icon: 'codicon-tag',
             };
         }
         return {
             text: t('Push {{count}} Commits', { count: commitCount }),
             variant: 'primary' as const,
-            icon: 'codicon-repo-push'
+            icon: 'codicon-repo-push',
         };
     };
 
     const btnState = getButtonState();
     const isPushing = pushStatus === 'pushing';
-    const isDisabled = isPushing || isPulling || isPublishingReviewBranch || pushStatus === 'success' || commitCount === 0;
+    const isDisabled =
+        isPushing || isPulling || isPublishingReviewBranch || pushStatus === 'success' || commitCount === 0;
 
     return (
         <div className={styles.footer}>
@@ -222,15 +227,13 @@ export const PushFooter: React.FC<PushFooterProps> = ({
                             disabled={isPulling}
                             title={t('Pull latest changes from remote')}
                         >
-                            <i className={`codicon ${isPulling ? 'codicon-loading codicon-modifier-spin' : 'codicon-arrow-down'}`} />
+                            <i
+                                className={`codicon ${isPulling ? 'codicon-loading codicon-modifier-spin' : 'codicon-arrow-down'}`}
+                            />
                             <span>{isPulling ? t('Pulling...') : t('Pull Now')}</span>
                         </button>
                     )}
-                    <button
-                        className={styles.dismissBtn}
-                        onClick={onDismissError}
-                        title={t('Dismiss')}
-                    >
+                    <button className={styles.dismissBtn} onClick={onDismissError} title={t('Dismiss')}>
                         <i className="codicon codicon-close" />
                     </button>
                 </div>
@@ -238,7 +241,11 @@ export const PushFooter: React.FC<PushFooterProps> = ({
             {options.force && commitCount > 0 && pushStatus !== 'success' && (
                 <div className={styles.forceWarning}>
                     <i className="codicon codicon-warning" />
-                    <span>{t('Force Push uses --force-with-lease and can rewrite remote history. You will be asked to confirm before pushing.')}</span>
+                    <span>
+                        {t(
+                            'Force Push uses --force-with-lease and can rewrite remote history. You will be asked to confirm before pushing.'
+                        )}
+                    </span>
                 </div>
             )}
             {!options.force && isProtectedTarget && commitCount > 0 && pushStatus !== 'success' && (
@@ -246,13 +253,20 @@ export const PushFooter: React.FC<PushFooterProps> = ({
                     <i className="codicon codicon-warning" />
                     <span>
                         <strong>{t('Protected branch')}</strong>
-                        <span>{t('You are about to push {{count}} commits directly to {{target}}.', { count: commitCount, target: `${selectedRemote}/${selectedRemoteBranch}` })}</span>
+                        <span>
+                            {t('You are about to push {{count}} commits directly to {{target}}.', {
+                                count: commitCount,
+                                target: `${selectedRemote}/${selectedRemoteBranch}`,
+                            })}
+                        </span>
                         <button
                             className={styles.inlineAction}
                             onClick={() => void handleCreateReviewBranch()}
                             disabled={commitCount === 0 || isPublishingReviewBranch}
                         >
-                            <i className={`codicon ${isPublishingReviewBranch ? 'codicon-sync codicon-modifier-spin' : 'codicon-git-pull-request-create'}`} />
+                            <i
+                                className={`codicon ${isPublishingReviewBranch ? 'codicon-sync codicon-modifier-spin' : 'codicon-git-pull-request-create'}`}
+                            />
                             <span>{t('Create Review Branch...')}</span>
                         </button>
                     </span>
@@ -291,15 +305,10 @@ export const PushFooter: React.FC<PushFooterProps> = ({
                 {/* Dropdown menu */}
                 {isOpen && (
                     <div className={styles.dropdown}>
-                        <div className={styles.dropdownHeader}>
-                            {t('Push Options')}
-                        </div>
+                        <div className={styles.dropdownHeader}>{t('Push Options')}</div>
 
                         {/* Option: Push Tags */}
-                        <button
-                            className={styles.dropdownItem}
-                            onClick={() => toggleOption('tags')}
-                        >
+                        <button className={styles.dropdownItem} onClick={() => toggleOption('tags')}>
                             <div className={styles.itemContent}>
                                 <i className="codicon codicon-tag" />
                                 <span>{t('Include Tags')}</span>
@@ -308,10 +317,7 @@ export const PushFooter: React.FC<PushFooterProps> = ({
                         </button>
 
                         {/* Option: No Verify */}
-                        <button
-                            className={styles.dropdownItem}
-                            onClick={() => toggleOption('noVerify')}
-                        >
+                        <button className={styles.dropdownItem} onClick={() => toggleOption('noVerify')}>
                             <div className={styles.itemContent}>
                                 <span className={styles.ciLabel}>{t('CI')}</span>
                                 <span>{t('Skip CI Verification')}</span>

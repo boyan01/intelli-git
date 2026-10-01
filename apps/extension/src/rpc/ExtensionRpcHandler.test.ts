@@ -35,7 +35,7 @@ function createTextStream(text: string): AsyncIterable<string> {
     return {
         async *[Symbol.asyncIterator]() {
             yield text;
-        }
+        },
     };
 }
 
@@ -47,9 +47,7 @@ class TestMemento {
     }
 
     get<T>(key: string, defaultValue?: T): T | undefined {
-        return Object.prototype.hasOwnProperty.call(this.values, key)
-            ? this.values[key] as T
-            : defaultValue;
+        return Object.prototype.hasOwnProperty.call(this.values, key) ? (this.values[key] as T) : defaultValue;
     }
 
     async update(key: string, value: unknown): Promise<void> {
@@ -74,13 +72,16 @@ function createStagedChangelistState(): ChangelistState {
         activeListId: 'changes',
         lists: [
             { id: 'changes', name: 'Changes', isDefault: true, isActive: true },
-            { id: 'inactive-changes', name: 'Inactive Changes', isDefault: true, isActive: false }
+            { id: 'inactive-changes', name: 'Inactive Changes', isDefault: true, isActive: false },
         ],
-        assignments: {}
+        assignments: {},
     };
 }
 
-function createHandler(gitService: Partial<GitService>, context: Partial<vscode.ExtensionContext> = {}): ExtensionRpcHandler {
+function createHandler(
+    gitService: Partial<GitService>,
+    context: Partial<vscode.ExtensionContext> = {}
+): ExtensionRpcHandler {
     // Add getActiveService to the gitService mock or wrap it
     const gitServiceMock = gitService as GitService;
     if (!gitServiceMock.getWorkspaceRoot) {
@@ -88,12 +89,13 @@ function createHandler(gitService: Partial<GitService>, context: Partial<vscode.
     }
     // We mock properties accessed via get inactiveChangesService / changelistStateService
     Object.defineProperty(gitServiceMock, 'inactiveChangesService', {
-        get: () => ({} as InactiveChangesService)
+        get: () => ({}) as InactiveChangesService,
     });
     Object.defineProperty(gitServiceMock, 'changelistStateService', {
-        get: () => ({
-            getState: () => createStagedChangelistState()
-        } as ChangelistStateService)
+        get: () =>
+            ({
+                getState: () => createStagedChangelistState(),
+            }) as ChangelistStateService,
     });
 
     return new ExtensionRpcHandler({
@@ -117,7 +119,7 @@ describe('ExtensionRpcHandler commit', () => {
         await handler.commit({
             message: 'Commit partial staging',
             amend: false,
-            files: ['partial.txt']
+            files: ['partial.txt'],
         });
 
         expect(commit).toHaveBeenCalledWith('Commit partial staging', undefined);
@@ -130,7 +132,7 @@ describe('ExtensionRpcHandler commit', () => {
         await handler.commit({
             message: 'Amend partial staging',
             amend: true,
-            files: ['partial.txt']
+            files: ['partial.txt'],
         });
 
         expect(commitAmend).toHaveBeenCalledWith('Amend partial staging', undefined);
@@ -141,21 +143,22 @@ describe('ExtensionRpcHandler commit', () => {
         const commitB = vi.fn().mockResolvedValue(undefined);
         const serviceA = {
             commit: commitA,
-            getWorkspaceRoot: () => '/workspace/a'
+            getWorkspaceRoot: () => '/workspace/a',
         } as Partial<GitService>;
         const serviceB = {
             commit: commitB,
-            getWorkspaceRoot: () => '/workspace/b'
+            getWorkspaceRoot: () => '/workspace/b',
         } as Partial<GitService>;
 
         for (const service of [serviceA, serviceB]) {
             Object.defineProperty(service, 'inactiveChangesService', {
-                get: () => ({} as InactiveChangesService)
+                get: () => ({}) as InactiveChangesService,
             });
             Object.defineProperty(service, 'changelistStateService', {
-                get: () => ({
-                    getState: () => createStagedChangelistState()
-                } as ChangelistStateService)
+                get: () =>
+                    ({
+                        getState: () => createStagedChangelistState(),
+                    }) as ChangelistStateService,
             });
         }
 
@@ -163,12 +166,27 @@ describe('ExtensionRpcHandler commit', () => {
             context: {} as vscode.ExtensionContext,
             repositoryManager: {
                 getActiveService: () => serviceA as GitService,
-                getService: (repoPath: string) => repoPath === '/workspace/b' ? serviceB as GitService : serviceA as GitService,
+                getService: (repoPath: string) =>
+                    repoPath === '/workspace/b' ? (serviceB as GitService) : (serviceA as GitService),
                 getRepositories: () => [
-                    { name: 'a', repoPath: '/workspace/a', path: '/workspace/a', workspaceRoot: '/workspace/a', gitRoot: '/workspace/a', isSubmodule: false },
-                    { name: 'b', repoPath: '/workspace/b', path: '/workspace/b', workspaceRoot: '/workspace/b', gitRoot: '/workspace/b', isSubmodule: false }
-                ]
-            } as any
+                    {
+                        name: 'a',
+                        repoPath: '/workspace/a',
+                        path: '/workspace/a',
+                        workspaceRoot: '/workspace/a',
+                        gitRoot: '/workspace/a',
+                        isSubmodule: false,
+                    },
+                    {
+                        name: 'b',
+                        repoPath: '/workspace/b',
+                        path: '/workspace/b',
+                        workspaceRoot: '/workspace/b',
+                        gitRoot: '/workspace/b',
+                        isSubmodule: false,
+                    },
+                ],
+            } as any,
         });
 
         await handler.commit({
@@ -176,8 +194,8 @@ describe('ExtensionRpcHandler commit', () => {
             amend: false,
             files: [
                 { repoPath: '/workspace/a', path: 'a.txt' },
-                { repoPath: '/workspace/b', path: 'b.txt' }
-            ]
+                { repoPath: '/workspace/b', path: 'b.txt' },
+            ],
         });
 
         expect(commitA).toHaveBeenCalledWith('Commit workspace changes', undefined);
@@ -188,12 +206,14 @@ describe('ExtensionRpcHandler commit', () => {
         const commit = vi.fn().mockResolvedValue(undefined);
         const handler = createHandler({ commit });
 
-        await expect(handler.commit({
-            message: 'Commit and push',
-            amend: false,
-            files: ['file.txt'],
-            push: true
-        })).rejects.toThrow('Commit & Push requires a confirmed push target.');
+        await expect(
+            handler.commit({
+                message: 'Commit and push',
+                amend: false,
+                files: ['file.txt'],
+                push: true,
+            })
+        ).rejects.toThrow('Commit & Push requires a confirmed push target.');
 
         expect(commit).not.toHaveBeenCalled();
     });
@@ -204,7 +224,7 @@ describe('ExtensionRpcHandler commit', () => {
             getBranches: vi.fn().mockResolvedValue({ current: 'feature', all: ['feature'] }),
             getUpstreamBranch: vi.fn().mockResolvedValue(undefined),
             push: vi.fn().mockResolvedValue(undefined),
-            setUpstreamBranch: vi.fn().mockResolvedValue(undefined)
+            setUpstreamBranch: vi.fn().mockResolvedValue(undefined),
         };
         const handler = createHandler({
             commit,
@@ -214,21 +234,21 @@ describe('ExtensionRpcHandler commit', () => {
                 shortHash: 'abcdef1',
                 subject: 'Commit and push',
                 message: 'Commit and push',
-                files: []
-            })
+                files: [],
+            }),
         } as unknown as Partial<GitService>);
 
         await handler.commit({
             message: 'Commit and push',
             amend: false,
             files: ['file.txt'],
-            pushTarget: { remote: 'fork', branch: 'review/feature' }
+            pushTarget: { remote: 'fork', branch: 'review/feature' },
         });
 
         expect(commit).toHaveBeenCalledWith('Commit and push', undefined);
         expect(branchRemote.push).toHaveBeenCalledWith('fork', 'feature:review/feature', {
             noVerify: undefined,
-            setUpstream: true
+            setUpstream: true,
         });
         expect(branchRemote.setUpstreamBranch).not.toHaveBeenCalled();
     });
@@ -240,7 +260,7 @@ describe('ExtensionRpcHandler commit', () => {
             getUpstreamBranch: vi.fn().mockResolvedValue('origin/feature'),
             push: vi.fn().mockRejectedValue(new Error('remote rejected')),
             fetch: vi.fn().mockResolvedValue(undefined),
-            getBranchStatus: vi.fn().mockResolvedValue({ ahead: 1, behind: 0 })
+            getBranchStatus: vi.fn().mockResolvedValue({ ahead: 1, behind: 0 }),
         };
         const handler = createHandler({
             commit,
@@ -250,21 +270,23 @@ describe('ExtensionRpcHandler commit', () => {
                 shortHash: 'abcdef1',
                 subject: 'Commit and push',
                 message: 'Commit and push',
-                files: []
-            })
+                files: [],
+            }),
         } as unknown as Partial<GitService>);
 
-        await expect(handler.commit({
-            message: 'Commit and push',
-            amend: false,
-            files: ['file.txt'],
-            pushTarget: { remote: 'fork', branch: 'feature' }
-        })).rejects.toThrow('workspace: Commit abcdef1 succeeded; push to fork/feature failed: remote rejected');
+        await expect(
+            handler.commit({
+                message: 'Commit and push',
+                amend: false,
+                files: ['file.txt'],
+                pushTarget: { remote: 'fork', branch: 'feature' },
+            })
+        ).rejects.toThrow('workspace: Commit abcdef1 succeeded; push to fork/feature failed: remote rejected');
 
         expect(commit).toHaveBeenCalledWith('Commit and push', undefined);
         expect(branchRemote.push).toHaveBeenCalledWith('fork', 'feature:feature', {
             noVerify: undefined,
-            setUpstream: false
+            setUpstream: false,
         });
     });
 });
@@ -276,52 +298,58 @@ describe('ExtensionRpcHandler push', () => {
         const branchRemote = {
             getBranches: vi.fn().mockResolvedValue({ current: 'main', all: ['main'] }),
             getUpstreamBranch: vi.fn().mockResolvedValue('origin/main'),
-            forcePush: vi.fn().mockResolvedValue(undefined)
+            forcePush: vi.fn().mockResolvedValue(undefined),
         };
         const handler = createHandler({
-            branchRemote
+            branchRemote,
         } as unknown as Partial<GitService>);
 
-        await expect(handler.push({
-            force: true,
-            pushTags: false,
-            remote: 'origin',
-            branch: 'main',
-            commitCount: 3
-        })).resolves.toEqual({
+        await expect(
+            handler.push({
+                force: true,
+                pushTags: false,
+                remote: 'origin',
+                branch: 'main',
+                commitCount: 3,
+            })
+        ).resolves.toEqual({
             ok: true,
             remote: 'origin',
             branch: 'main',
-            commitCount: 3
+            commitCount: 3,
         });
 
-        expect(vscodeTestMock.__getWarningMessages()[0].message).toBe('Force push to origin/main? This can overwrite remote commits. Intelli Git will use --force-with-lease to avoid overwriting newer remote updates.');
+        expect(vscodeTestMock.__getWarningMessages()[0].message).toBe(
+            'Force push to origin/main? This can overwrite remote commits. Intelli Git will use --force-with-lease to avoid overwriting newer remote updates.'
+        );
         expect(branchRemote.forcePush).toHaveBeenCalledWith('origin', 'main:main', {
             noVerify: undefined,
-            setUpstream: false
+            setUpstream: false,
         });
     });
 
     it('cancels force pushes when confirmation is declined', async () => {
         vscodeTestMock.__resetWindowMessages();
         const branchRemote = {
-            forcePush: vi.fn().mockResolvedValue(undefined)
+            forcePush: vi.fn().mockResolvedValue(undefined),
         };
         const handler = createHandler({
-            branchRemote
+            branchRemote,
         } as unknown as Partial<GitService>);
 
-        await expect(handler.push({
-            force: true,
-            pushTags: false,
-            remote: 'origin',
-            branch: 'main'
-        })).resolves.toEqual({
+        await expect(
+            handler.push({
+                force: true,
+                pushTags: false,
+                remote: 'origin',
+                branch: 'main',
+            })
+        ).resolves.toEqual({
             ok: false,
             code: 'cancelled',
             remote: 'origin',
             branch: 'main',
-            message: 'Force push cancelled.'
+            message: 'Force push cancelled.',
         });
 
         expect(branchRemote.forcePush).not.toHaveBeenCalled();
@@ -333,29 +361,33 @@ describe('ExtensionRpcHandler push', () => {
         const branchRemote = {
             getBranches: vi.fn().mockResolvedValue({ current: 'main', all: ['main'] }),
             getUpstreamBranch: vi.fn().mockResolvedValue('origin/main'),
-            push: vi.fn().mockResolvedValue(undefined)
+            push: vi.fn().mockResolvedValue(undefined),
         };
         const handler = createHandler({
-            branchRemote
+            branchRemote,
         } as unknown as Partial<GitService>);
 
-        await expect(handler.push({
-            force: false,
-            pushTags: false,
-            remote: 'origin',
-            branch: 'main',
-            commitCount: 3
-        })).resolves.toEqual({
+        await expect(
+            handler.push({
+                force: false,
+                pushTags: false,
+                remote: 'origin',
+                branch: 'main',
+                commitCount: 3,
+            })
+        ).resolves.toEqual({
             ok: true,
             remote: 'origin',
             branch: 'main',
-            commitCount: 3
+            commitCount: 3,
         });
 
-        expect(vscodeTestMock.__getWarningMessages()[0].message).toBe('Push directly to origin/main? This target is a protected branch. Make sure these commits are intended for the main line.');
+        expect(vscodeTestMock.__getWarningMessages()[0].message).toBe(
+            'Push directly to origin/main? This target is a protected branch. Make sure these commits are intended for the main line.'
+        );
         expect(branchRemote.push).toHaveBeenCalledWith('origin', 'main:main', {
             noVerify: undefined,
-            setUpstream: false
+            setUpstream: false,
         });
     });
 
@@ -363,23 +395,25 @@ describe('ExtensionRpcHandler push', () => {
         vscodeTestMock.__resetWindowMessages();
         const branchRemote = {
             getBranches: vi.fn().mockResolvedValue({ current: 'main', all: ['main'] }),
-            push: vi.fn().mockResolvedValue(undefined)
+            push: vi.fn().mockResolvedValue(undefined),
         };
         const handler = createHandler({
-            branchRemote
+            branchRemote,
         } as unknown as Partial<GitService>);
 
-        await expect(handler.push({
-            force: false,
-            pushTags: false,
-            remote: 'origin',
-            branch: 'main'
-        })).resolves.toEqual({
+        await expect(
+            handler.push({
+                force: false,
+                pushTags: false,
+                remote: 'origin',
+                branch: 'main',
+            })
+        ).resolves.toEqual({
             ok: false,
             code: 'cancelled',
             remote: 'origin',
             branch: 'main',
-            message: 'Protected branch push cancelled.'
+            message: 'Protected branch push cancelled.',
         });
 
         expect(branchRemote.push).not.toHaveBeenCalled();
@@ -391,29 +425,31 @@ describe('ExtensionRpcHandler push', () => {
         const branchRemote = {
             getBranches: vi.fn().mockResolvedValue({ current: 'main', all: ['main'] }),
             getUpstreamBranch: vi.fn().mockResolvedValue('origin/main'),
-            push: vi.fn().mockResolvedValue(undefined)
+            push: vi.fn().mockResolvedValue(undefined),
         };
         const handler = createHandler({
-            branchRemote
+            branchRemote,
         } as unknown as Partial<GitService>);
 
-        await expect(handler.push({
-            force: false,
-            pushTags: false,
-            remote: 'origin',
-            branch: 'main',
-            commitCount: 1
-        })).resolves.toEqual({
+        await expect(
+            handler.push({
+                force: false,
+                pushTags: false,
+                remote: 'origin',
+                branch: 'main',
+                commitCount: 1,
+            })
+        ).resolves.toEqual({
             ok: true,
             remote: 'origin',
             branch: 'main',
-            commitCount: 1
+            commitCount: 1,
         });
 
         expect(vscodeTestMock.__getWarningMessages()).toHaveLength(0);
         expect(branchRemote.push).toHaveBeenCalledWith('origin', 'main:main', {
             noVerify: undefined,
-            setUpstream: false
+            setUpstream: false,
         });
     });
 
@@ -423,29 +459,31 @@ describe('ExtensionRpcHandler push', () => {
             getUpstreamBranch: vi.fn().mockResolvedValue('origin/feature'),
             push: vi.fn().mockRejectedValue(new Error('non-fast-forward')),
             fetch: vi.fn().mockResolvedValue(undefined),
-            getBranchStatus: vi.fn().mockResolvedValue({ ahead: 0, behind: 2 })
+            getBranchStatus: vi.fn().mockResolvedValue({ ahead: 0, behind: 2 }),
         };
         const handler = createHandler({
-            branchRemote
+            branchRemote,
         } as unknown as Partial<GitService>);
 
-        await expect(handler.push({
-            force: false,
-            pushTags: false,
-            remote: 'origin',
-            branch: 'feature'
-        })).resolves.toEqual({
+        await expect(
+            handler.push({
+                force: false,
+                pushTags: false,
+                remote: 'origin',
+                branch: 'feature',
+            })
+        ).resolves.toEqual({
             ok: false,
             code: 'behind',
             remote: 'origin',
             branch: 'feature',
             message: 'Push rejected because the remote branch has new commits.',
-            behindCount: 2
+            behindCount: 2,
         });
 
         expect(branchRemote.push).toHaveBeenCalledWith('origin', 'feature:feature', {
             noVerify: undefined,
-            setUpstream: false
+            setUpstream: false,
         });
         expect(branchRemote.fetch).toHaveBeenCalledOnce();
         expect(branchRemote.getBranchStatus).toHaveBeenCalledOnce();
@@ -455,23 +493,25 @@ describe('ExtensionRpcHandler push', () => {
         const branchRemote = {
             getBranches: vi.fn().mockResolvedValue({ current: 'feature', all: ['feature'] }),
             getUpstreamBranch: vi.fn().mockResolvedValue('origin/feature'),
-            push: vi.fn().mockRejectedValue(new Error('Authentication failed for origin'))
+            push: vi.fn().mockRejectedValue(new Error('Authentication failed for origin')),
         };
         const handler = createHandler({
-            branchRemote
+            branchRemote,
         } as unknown as Partial<GitService>);
 
-        await expect(handler.push({
-            force: false,
-            pushTags: false,
-            remote: 'origin',
-            branch: 'feature'
-        })).resolves.toEqual({
+        await expect(
+            handler.push({
+                force: false,
+                pushTags: false,
+                remote: 'origin',
+                branch: 'feature',
+            })
+        ).resolves.toEqual({
             ok: false,
             code: 'auth-failed',
             remote: 'origin',
             branch: 'feature',
-            message: 'Authentication failed for origin'
+            message: 'Authentication failed for origin',
         });
     });
 
@@ -481,23 +521,25 @@ describe('ExtensionRpcHandler push', () => {
             getUpstreamBranch: vi.fn().mockResolvedValue('origin/feature'),
             push: vi.fn().mockRejectedValue(new Error('! [remote rejected] main -> main (pre-receive hook declined)')),
             fetch: vi.fn().mockResolvedValue(undefined),
-            getBranchStatus: vi.fn().mockResolvedValue({ ahead: 0, behind: 2 })
+            getBranchStatus: vi.fn().mockResolvedValue({ ahead: 0, behind: 2 }),
         };
         const handler = createHandler({
-            branchRemote
+            branchRemote,
         } as unknown as Partial<GitService>);
 
-        await expect(handler.push({
-            force: false,
-            pushTags: false,
-            remote: 'origin',
-            branch: 'feature'
-        })).resolves.toEqual({
+        await expect(
+            handler.push({
+                force: false,
+                pushTags: false,
+                remote: 'origin',
+                branch: 'feature',
+            })
+        ).resolves.toEqual({
             ok: false,
             code: 'rejected',
             remote: 'origin',
             branch: 'feature',
-            message: '! [remote rejected] main -> main (pre-receive hook declined)'
+            message: '! [remote rejected] main -> main (pre-receive hook declined)',
         });
         expect(branchRemote.fetch).not.toHaveBeenCalled();
         expect(branchRemote.getBranchStatus).not.toHaveBeenCalled();
@@ -507,23 +549,25 @@ describe('ExtensionRpcHandler push', () => {
         const branchRemote = {
             getBranches: vi.fn().mockResolvedValue({ current: 'feature', all: ['feature'] }),
             getUpstreamBranch: vi.fn().mockResolvedValue('origin/feature'),
-            push: vi.fn().mockRejectedValue(new Error('Could not resolve host: github.com'))
+            push: vi.fn().mockRejectedValue(new Error('Could not resolve host: github.com')),
         };
         const handler = createHandler({
-            branchRemote
+            branchRemote,
         } as unknown as Partial<GitService>);
 
-        await expect(handler.push({
-            force: false,
-            pushTags: false,
-            remote: 'origin',
-            branch: 'feature'
-        })).resolves.toEqual({
+        await expect(
+            handler.push({
+                force: false,
+                pushTags: false,
+                remote: 'origin',
+                branch: 'feature',
+            })
+        ).resolves.toEqual({
             ok: false,
             code: 'network',
             remote: 'origin',
             branch: 'feature',
-            message: 'Could not resolve host: github.com'
+            message: 'Could not resolve host: github.com',
         });
     });
 
@@ -531,23 +575,25 @@ describe('ExtensionRpcHandler push', () => {
         const branchRemote = {
             getBranches: vi.fn().mockResolvedValue({ current: 'feature', all: ['feature'] }),
             getUpstreamBranch: vi.fn().mockResolvedValue('origin/feature'),
-            push: vi.fn().mockRejectedValue(new Error('unexpected push failure'))
+            push: vi.fn().mockRejectedValue(new Error('unexpected push failure')),
         };
         const handler = createHandler({
-            branchRemote
+            branchRemote,
         } as unknown as Partial<GitService>);
 
-        await expect(handler.push({
-            force: false,
-            pushTags: false,
-            remote: 'origin',
-            branch: 'feature'
-        })).resolves.toEqual({
+        await expect(
+            handler.push({
+                force: false,
+                pushTags: false,
+                remote: 'origin',
+                branch: 'feature',
+            })
+        ).resolves.toEqual({
             ok: false,
             code: 'unknown',
             remote: 'origin',
             branch: 'feature',
-            message: 'unexpected push failure'
+            message: 'unexpected push failure',
         });
     });
 });
@@ -556,19 +602,19 @@ describe('ExtensionRpcHandler conflict resolver', () => {
     it('pins a resolver opened without repoPath to the current repository', async () => {
         const openConflictResolver = vi.fn();
         const gitService = {
-            getWorkspaceRoot: () => '/workspace/repository'
+            getWorkspaceRoot: () => '/workspace/repository',
         } as Partial<GitService>;
         const handler = new ExtensionRpcHandler({
             context: {} as vscode.ExtensionContext,
             repositoryManager: { getActiveService: () => gitService as GitService } as any,
-            openConflictResolver
+            openConflictResolver,
         });
 
         await handler.openConflictResolver({ path: 'conflict.txt' });
 
         expect(openConflictResolver).toHaveBeenCalledWith({
             path: 'conflict.txt',
-            repoPath: '/workspace/repository'
+            repoPath: '/workspace/repository',
         });
     });
 
@@ -580,12 +626,12 @@ describe('ExtensionRpcHandler conflict resolver', () => {
             path: 'conflict.txt',
             side: 'ours',
             stageSignature: 'stage-signature',
-            resultFingerprint: 'result-fingerprint'
+            resultFingerprint: 'result-fingerprint',
         });
 
         expect(resolveConflict).toHaveBeenCalledWith('conflict.txt', 'ours', {
             stageSignature: 'stage-signature',
-            resultFingerprint: 'result-fingerprint'
+            resultFingerprint: 'result-fingerprint',
         });
     });
 
@@ -596,10 +642,13 @@ describe('ExtensionRpcHandler conflict resolver', () => {
 
         await expect(handler.confirmConflictResolverRestart()).resolves.toBe(true);
 
-        expect(vscodeTestMock.__getWarningMessages()).toEqual([{
-            message: 'Changing whitespace comparison requires restarting the merge. Reviewed changes and result edits will be discarded.',
-            args: [{ modal: true }, 'Discard Changes and Restart']
-        }]);
+        expect(vscodeTestMock.__getWarningMessages()).toEqual([
+            {
+                message:
+                    'Changing whitespace comparison requires restarting the merge. Reviewed changes and result edits will be discarded.',
+                args: [{ modal: true }, 'Discard Changes and Restart'],
+            },
+        ]);
     });
 });
 
@@ -609,30 +658,33 @@ describe('ExtensionRpcHandler review branch', () => {
         const workspaceState = new TestMemento({
             [storageKey]: {
                 resetBaseBranch: false,
-                generateAiNotes: true
-            }
+                generateAiNotes: true,
+            },
         });
         const branchRemote = {
-            getBranches: vi.fn()
+            getBranches: vi
+                .fn()
                 .mockResolvedValueOnce({ current: 'main', all: ['main'] })
                 .mockResolvedValueOnce({ current: 'main', all: ['main'] })
                 .mockResolvedValue({ current: 'feat/review', all: ['main', 'feat/review'] }),
             getPushCommits: vi.fn().mockResolvedValue({
-                commits: [{
-                    hash: 'abcdef1234567890',
-                    shortHash: 'abcdef1',
-                    subject: 'Improve review branch flow',
-                    authorName: 'User',
-                    authorEmail: 'user@example.com',
-                    date: '2026-06-10T00:00:00Z',
-                    body: '',
-                    files: [{ path: 'src/file.ts', status: 'M' }],
-                    stats: { additions: 1, deletions: 0 },
-                    parentHashes: [],
-                    containingBranches: [],
-                    refs: [],
-                    filteredAncestors: []
-                }]
+                commits: [
+                    {
+                        hash: 'abcdef1234567890',
+                        shortHash: 'abcdef1',
+                        subject: 'Improve review branch flow',
+                        authorName: 'User',
+                        authorEmail: 'user@example.com',
+                        date: '2026-06-10T00:00:00Z',
+                        body: '',
+                        files: [{ path: 'src/file.ts', status: 'M' }],
+                        stats: { additions: 1, deletions: 0 },
+                        parentHashes: [],
+                        containingBranches: [],
+                        refs: [],
+                        filteredAncestors: [],
+                    },
+                ],
             }),
             validateBranchName: vi.fn().mockResolvedValue(undefined),
             localBranchExists: vi.fn().mockResolvedValue(false),
@@ -641,38 +693,43 @@ describe('ExtensionRpcHandler review branch', () => {
             getUpstreamBranch: vi.fn().mockResolvedValue(undefined),
             push: vi.fn().mockResolvedValue(undefined),
             resetLocalBranchToRemote: vi.fn().mockResolvedValue(undefined),
-            getRemoteCompareUrlForRemote: vi.fn().mockResolvedValue(undefined)
+            getRemoteCompareUrlForRemote: vi.fn().mockResolvedValue(undefined),
         };
-        const handler = createHandler({
-            branchRemote,
-            getWorkspaceRoot: () => '/workspace/repo'
-        } as unknown as Partial<GitService>, {
-            workspaceState: workspaceState as unknown as vscode.Memento
-        });
+        const handler = createHandler(
+            {
+                branchRemote,
+                getWorkspaceRoot: () => '/workspace/repo',
+            } as unknown as Partial<GitService>,
+            {
+                workspaceState: workspaceState as unknown as vscode.Memento,
+            }
+        );
 
         vscodeTestMock.__setInputBoxResponse('feat/review');
         vscodeTestMock.__setQuickPickResponse([{ id: 'reset-base' }]);
 
-        await expect(handler.publishReviewBranch({
-            remote: 'origin',
-            baseBranch: 'main',
-            commitCount: 1,
-            noVerify: true
-        })).resolves.toMatchObject({
+        await expect(
+            handler.publishReviewBranch({
+                remote: 'origin',
+                baseBranch: 'main',
+                commitCount: 1,
+                noVerify: true,
+            })
+        ).resolves.toMatchObject({
             branchName: 'feat/review',
-            baseBranchReset: true
+            baseBranchReset: true,
         });
 
         const items = vscodeTestMock.__getQuickPickCalls()[0].items as Array<{ id: string; picked?: boolean }>;
-        expect(items.find(item => item.id === 'reset-base')?.picked).toBe(false);
-        expect(items.find(item => item.id === 'ai-notes')?.picked).toBe(true);
+        expect(items.find((item) => item.id === 'reset-base')?.picked).toBe(false);
+        expect(items.find((item) => item.id === 'ai-notes')?.picked).toBe(true);
         expect(workspaceState.values[storageKey]).toEqual({
             resetBaseBranch: true,
-            generateAiNotes: false
+            generateAiNotes: false,
         });
         expect(branchRemote.push).toHaveBeenCalledWith('origin', 'feat/review:feat/review', {
             noVerify: true,
-            setUpstream: true
+            setUpstream: true,
         });
         expect(branchRemote.resetLocalBranchToRemote).toHaveBeenCalledWith('main', 'origin', 'main');
     });
@@ -686,7 +743,7 @@ describe('ExtensionRpcHandler no repository state', () => {
         await expect(handler.getCommitViewState()).resolves.toMatchObject({
             files: [],
             workspaceRoot: '',
-            hasRepository: false
+            hasRepository: false,
         });
         await expect(readHandler.getStashList()).resolves.toEqual([]);
         await expect(readHandler.getBranchListData()).resolves.toEqual({
@@ -695,7 +752,7 @@ describe('ExtensionRpcHandler no repository state', () => {
             localBranches: [],
             localBranchesInfo: [],
             remoteBranches: {},
-            tags: []
+            tags: [],
         });
         await expect(readHandler.getLog({})).resolves.toEqual([]);
         await expect(readHandler.getWorkspaceRoot()).resolves.toBe('');
@@ -703,7 +760,7 @@ describe('ExtensionRpcHandler no repository state', () => {
             repositoryPath: undefined,
             localBranch: '',
             remotes: [],
-            protectedPushTargets: ['origin/main', 'origin/master']
+            protectedPushTargets: ['origin/main', 'origin/master'],
         });
     });
 
@@ -713,7 +770,7 @@ describe('ExtensionRpcHandler no repository state', () => {
             localBranches: ['main'],
             localBranchesInfo: [],
             remoteBranches: {},
-            tags: []
+            tags: [],
         };
         const repository = {
             name: 'repo',
@@ -721,21 +778,21 @@ describe('ExtensionRpcHandler no repository state', () => {
             path: '/workspace/repo',
             workspaceRoot: '/workspace/repo',
             gitRoot: '/workspace/repo',
-            isSubmodule: false as const
+            isSubmodule: false as const,
         };
         const readHandler = new GitReadRpcHandler({
             getActiveScope: () => repository,
             getActiveService: () => ({
                 branchRemote: {
-                    getBranchListData: vi.fn().mockResolvedValue(branchData)
-                }
-            })
+                    getBranchListData: vi.fn().mockResolvedValue(branchData),
+                },
+            }),
         } as any);
 
         await expect(readHandler.getBranchListData()).resolves.toEqual({
             ...branchData,
             repository,
-            hasRepository: true
+            hasRepository: true,
         });
     });
 
@@ -746,7 +803,7 @@ describe('ExtensionRpcHandler no repository state', () => {
             path: '/workspace/repo-a',
             workspaceRoot: '/workspace/repo-a',
             gitRoot: '/workspace/repo-a',
-            isSubmodule: false as const
+            isSubmodule: false as const,
         };
         const repositoryB = {
             name: 'repo-b',
@@ -754,30 +811,32 @@ describe('ExtensionRpcHandler no repository state', () => {
             path: '/workspace/repo-b',
             workspaceRoot: '/workspace/repo-b',
             gitRoot: '/workspace/repo-b',
-            isSubmodule: false as const
+            isSubmodule: false as const,
         };
         const serviceA = {
             getStatusForView: vi.fn().mockResolvedValue([{ path: 'a.txt', status: 'M', staged: false }]),
-            getWorkspaceRoot: () => '/workspace/repo-a'
+            getWorkspaceRoot: () => '/workspace/repo-a',
         } as Partial<GitService>;
         const serviceB = {
             getStatusForView: vi.fn().mockResolvedValue([{ path: 'b.txt', status: 'M', staged: false }]),
-            getWorkspaceRoot: () => '/workspace/repo-b'
+            getWorkspaceRoot: () => '/workspace/repo-b',
         } as Partial<GitService>;
 
         for (const service of [serviceA, serviceB]) {
             Object.defineProperty(service, 'inactiveChangesService', {
-                get: () => ({
-                    syncWithStatus: vi.fn(),
-                    isInactive: vi.fn().mockReturnValue(false),
-                    getInactiveHunkIds: vi.fn().mockReturnValue([])
-                } as Partial<InactiveChangesService>)
+                get: () =>
+                    ({
+                        syncWithStatus: vi.fn(),
+                        isInactive: vi.fn().mockReturnValue(false),
+                        getInactiveHunkIds: vi.fn().mockReturnValue([]),
+                    }) as Partial<InactiveChangesService>,
             });
             Object.defineProperty(service, 'changelistStateService', {
-                get: () => ({
-                    syncWithStatus: vi.fn(),
-                    getState: () => createStagedChangelistState()
-                } as Partial<ChangelistStateService>)
+                get: () =>
+                    ({
+                        syncWithStatus: vi.fn(),
+                        getState: () => createStagedChangelistState(),
+                    }) as Partial<ChangelistStateService>,
             });
         }
 
@@ -786,23 +845,26 @@ describe('ExtensionRpcHandler no repository state', () => {
             repositoryManager: {
                 getActiveRepoPath: () => repositoryB.repoPath,
                 getActiveService: () => serviceB as GitService,
-                getService: (repoPath: string) => repoPath === repositoryB.repoPath ? serviceB as GitService : serviceA as GitService,
-                getRepositories: () => [repositoryA, repositoryB]
-            } as any
+                getService: (repoPath: string) =>
+                    repoPath === repositoryB.repoPath ? (serviceB as GitService) : (serviceA as GitService),
+                getRepositories: () => [repositoryA, repositoryB],
+            } as any,
         });
 
         const state = await handler.getCommitViewState();
 
         expect(state.activeRepository).toEqual(repositoryB);
-        expect(state.repositories?.map(item => item.repository.repoPath)).toEqual([repositoryB.repoPath]);
-        expect(state.files).toEqual([{
-            path: 'b.txt',
-            status: 'M',
-            staged: false,
-            inactive: false,
-            inactiveHunkIds: [],
-            hasStagedInactive: false
-        }]);
+        expect(state.repositories?.map((item) => item.repository.repoPath)).toEqual([repositoryB.repoPath]);
+        expect(state.files).toEqual([
+            {
+                path: 'b.txt',
+                status: 'M',
+                staged: false,
+                inactive: false,
+                inactiveHunkIds: [],
+                hasStagedInactive: false,
+            },
+        ]);
         expect(serviceA.getStatusForView).not.toHaveBeenCalled();
         expect(serviceB.getStatusForView).toHaveBeenCalledOnce();
     });
@@ -814,15 +876,15 @@ describe('ExtensionRpcHandler no repository state', () => {
             context: {} as vscode.ExtensionContext,
             repositoryManager: {
                 getActiveService: () => undefined,
-                initialize
-            } as any
+                initialize,
+            } as any,
         });
 
         await handler.initializeRepository();
 
         expect(vscodeTestMock.__getExecutedCommands()).toContainEqual({
             command: 'git.init',
-            args: []
+            args: [],
         });
         expect(initialize).toHaveBeenCalledOnce();
     });
@@ -835,7 +897,7 @@ describe('ExtensionRpcHandler no repository state', () => {
 
         expect(vscodeTestMock.__getExecutedCommands()).toContainEqual({
             command: 'intelli-git.ai.configureProvider',
-            args: []
+            args: [],
         });
     });
 
@@ -849,10 +911,10 @@ describe('ExtensionRpcHandler no repository state', () => {
 
         expect(vscodeTestMock.__getExecutedCommands()).toContainEqual({
             command: 'intelli-git.openFeedback',
-            args: []
+            args: [],
         });
-        expect(vscodeTestMock.__getOpenedExternalUris().map(uri => uri.toString())).toEqual([
-            'https://marketplace.visualstudio.com/items?itemName=boyan01.intelli-git'
+        expect(vscodeTestMock.__getOpenedExternalUris().map((uri) => uri.toString())).toEqual([
+            'https://marketplace.visualstudio.com/items?itemName=boyan01.intelli-git',
         ]);
     });
 
@@ -860,21 +922,26 @@ describe('ExtensionRpcHandler no repository state', () => {
         vscodeTestMock.__resetCreatedTerminals();
         const sourceRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'intelli-git-source-'));
         fs.mkdirSync(path.join(sourceRoot, 'apps/extension'), { recursive: true });
-        fs.writeFileSync(path.join(sourceRoot, 'package.json'), JSON.stringify({ name: 'idea-commit-pannel-monorepo' }));
+        fs.writeFileSync(
+            path.join(sourceRoot, 'package.json'),
+            JSON.stringify({ name: 'idea-commit-pannel-monorepo' })
+        );
         fs.writeFileSync(path.join(sourceRoot, 'apps/extension/package.json'), JSON.stringify({ name: 'intelli-git' }));
         vscodeTestMock.__setWorkspaceFolders([sourceRoot]);
         const handler = createNoRepoHandler();
 
         await handler.rebuildDevVsix();
 
-        expect(vscodeTestMock.__getCreatedTerminals()).toEqual([{
-            options: {
-                name: 'Intelli Git Dev Build',
-                cwd: sourceRoot
+        expect(vscodeTestMock.__getCreatedTerminals()).toEqual([
+            {
+                options: {
+                    name: 'Intelli Git Dev Build',
+                    cwd: sourceRoot,
+                },
+                sentText: ['npm run install:extension:dev'],
+                shown: true,
             },
-            sentText: ['npm run install:extension:dev'],
-            shown: true
-        }]);
+        ]);
 
         vscodeTestMock.__setWorkspaceFolders(undefined);
     });
@@ -889,25 +956,27 @@ describe('ExtensionRpcHandler AI provider', () => {
             label: 'Copilot',
             model: 'gpt-5-mini',
             isConfigured: true,
-            canSelectModel: true
+            canSelectModel: true,
         });
     });
 
     it('tests the selected provider with the configured model', async () => {
         const sendRequest = vi.fn().mockResolvedValue({
-            text: createTextStream('OK')
+            text: createTextStream('OK'),
         });
-        vscodeTestMock.__setLanguageModels([{
-            id: 'gpt-5-mini',
-            name: 'GPT-5 mini',
-            family: 'gpt-5-mini',
-            vendor: 'copilot',
-            sendRequest
-        }]);
+        vscodeTestMock.__setLanguageModels([
+            {
+                id: 'gpt-5-mini',
+                name: 'GPT-5 mini',
+                family: 'gpt-5-mini',
+                vendor: 'copilot',
+                sendRequest,
+            },
+        ]);
         const handler = createNoRepoHandler();
 
         await expect(handler.testAIProvider()).resolves.toMatchObject({
-            ok: true
+            ok: true,
         });
         expect(sendRequest).toHaveBeenCalledOnce();
     });
@@ -917,7 +986,7 @@ describe('ExtensionRpcHandler AI provider', () => {
 
         await expect(handler.testAIProvider()).resolves.toMatchObject({
             ok: false,
-            message: 'No GitHub Copilot models are currently available.'
+            message: 'No GitHub Copilot models are currently available.',
         });
     });
 
@@ -930,7 +999,7 @@ describe('ExtensionRpcHandler AI provider', () => {
 
         expect(vscodeTestMock.__getExecutedCommands()).toEqual([
             { command: 'intelli-git.ai.selectCopilotModel', args: [] },
-            { command: 'intelli-git.ai.openCommitPromptSettings', args: [] }
+            { command: 'intelli-git.ai.openCommitPromptSettings', args: [] },
         ]);
     });
 
@@ -941,41 +1010,45 @@ describe('ExtensionRpcHandler AI provider', () => {
             '+++ b/src/file.ts',
             '@@ -1 +1 @@',
             '-old',
-            '+new'
+            '+new',
         ].join('\n');
         const sendRequest = vi.fn().mockResolvedValue({
-            text: createTextStream('Refine AI scoped generation')
+            text: createTextStream('Refine AI scoped generation'),
         });
         const getStagedDiffForFiles = vi.fn().mockResolvedValue(diff);
         const getDiffForFiles = vi.fn();
-        vscodeTestMock.__setLanguageModels([{
-            id: 'gpt-5-mini',
-            name: 'GPT-5 mini',
-            family: 'gpt-5-mini',
-            vendor: 'copilot',
-            sendRequest
-        }]);
+        vscodeTestMock.__setLanguageModels([
+            {
+                id: 'gpt-5-mini',
+                name: 'GPT-5 mini',
+                family: 'gpt-5-mini',
+                vendor: 'copilot',
+                sendRequest,
+            },
+        ]);
         const handler = createHandler({
             getStagedDiffForFiles,
-            getDiffForFiles
+            getDiffForFiles,
         });
 
-        await expect(handler.generateCommitMessage({
-            files: ['src/file.ts'],
-            mode: 'subject',
-            currentMessage: 'Old subject\n\nExisting body',
-            amend: true
-        })).resolves.toEqual({
+        await expect(
+            handler.generateCommitMessage({
+                files: ['src/file.ts'],
+                mode: 'subject',
+                currentMessage: 'Old subject\n\nExisting body',
+                amend: true,
+            })
+        ).resolves.toEqual({
             message: 'Refine AI scoped generation',
             mode: 'subject',
             fileCount: 1,
-            hunkCount: 1
+            hunkCount: 1,
         });
 
         expect(getStagedDiffForFiles).toHaveBeenCalledWith(['src/file.ts']);
         expect(getDiffForFiles).not.toHaveBeenCalled();
         const messages = sendRequest.mock.calls[0][0] as Array<{ content: string }>;
-        const prompt = messages.map(message => message.content).join('\n');
+        const prompt = messages.map((message) => message.content).join('\n');
         expect(prompt).toContain('Generate only the commit subject line for the current amend selection.');
         expect(prompt).toContain('Current commit message:\nOld subject\n\nExisting body');
         expect(prompt).toContain('Diff:\n');
@@ -986,26 +1059,34 @@ describe('ExtensionRpcHandler AI provider', () => {
 describe('ExtensionRpcHandler Codex provider', () => {
     it('routes only the selected staged diff to Codex and exposes the provider status', async () => {
         const original = vscodeMock.workspace.getConfiguration;
-        const configuration = vi.spyOn(vscodeMock.workspace, 'getConfiguration').mockImplementation((section, scope) => {
-            const config = original(section, scope);
-            return section === 'intelli-git.ai' ? {
-                ...config,
-                get: ((key: string, fallback?: unknown) => key === 'provider' ? 'codex' : config.get(key, fallback)) as typeof config.get
-            } : config;
-        });
+        const configuration = vi
+            .spyOn(vscodeMock.workspace, 'getConfiguration')
+            .mockImplementation((section, scope) => {
+                const config = original(section, scope);
+                return section === 'intelli-git.ai'
+                    ? {
+                          ...config,
+                          get: ((key: string, fallback?: unknown) =>
+                              key === 'provider' ? 'codex' : config.get(key, fallback)) as typeof config.get,
+                      }
+                    : config;
+            });
         const sendRequest = vi.spyOn(CodexCliLanguageModel.prototype, 'sendRequest').mockResolvedValue({
             text: createTextStream('Improve the selected change'),
-            stream: (async function* () {})()
+            stream: (async function* () {})(),
         });
         try {
             const diff = 'diff --git a/selected.ts b/selected.ts\n@@ -1 +1 @@\n-old\n+selected';
             const getStagedDiffForFiles = vi.fn().mockResolvedValue(diff);
             const handler = createHandler({ getStagedDiffForFiles });
             await expect(handler.getAIProviderStatus()).resolves.toMatchObject({
-                provider: 'codex', label: 'Codex CLI', isConfigured: true
+                provider: 'codex',
+                label: 'Codex CLI',
+                isConfigured: true,
             });
-            await expect(handler.generateCommitMessage({ files: ['selected.ts'], mode: 'subject' }))
-                .resolves.toMatchObject({ message: 'Improve the selected change', fileCount: 1, hunkCount: 1 });
+            await expect(
+                handler.generateCommitMessage({ files: ['selected.ts'], mode: 'subject' })
+            ).resolves.toMatchObject({ message: 'Improve the selected change', fileCount: 1, hunkCount: 1 });
             expect(getStagedDiffForFiles).toHaveBeenCalledWith(['selected.ts']);
             expect(JSON.stringify(sendRequest.mock.calls[0][0])).toContain('+selected');
         } finally {
@@ -1019,9 +1100,7 @@ describe('ExtensionRpcHandler openDiff', () => {
     it('accepts RpcPeer multi-argument payloads for deleted files', async () => {
         vscodeTestMock.__resetExecutedCommands();
         const handler = createHandler({
-            getStatus: vi.fn().mockResolvedValue([
-                { path: 'src/deleted.txt', status: 'D', staged: false }
-            ])
+            getStatus: vi.fn().mockResolvedValue([{ path: 'src/deleted.txt', status: 'D', staged: false }]),
         });
 
         await handler.openDiff(['src/deleted.txt', false]);

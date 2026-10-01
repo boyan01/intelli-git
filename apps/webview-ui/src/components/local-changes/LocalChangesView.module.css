@@ -42,7 +42,9 @@
     align-items: center;
     justify-content: center;
     position: relative;
-    transition: opacity 0.2s ease, gap 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition:
+        opacity 0.2s ease,
+        gap 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     outline: none;
     gap: 0;
 }
@@ -93,7 +95,9 @@
     bottom: -1px;
     height: 2px;
     background-color: var(--vscode-activityBar-activeBorder, var(--vscode-focusBorder));
-    transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition:
+        left 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+        width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     pointer-events: none;
     z-index: 10;
 }

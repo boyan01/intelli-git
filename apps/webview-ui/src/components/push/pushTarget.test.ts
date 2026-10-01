@@ -7,7 +7,7 @@ const emptySavedSelection: SavedPushBranchSelection = {
     repositoryPath: '',
     localBranch: '',
     remote: '',
-    remoteBranch: ''
+    remoteBranch: '',
 };
 
 function createInitState(overrides: Partial<PushInitState> = {}): PushInitState {
@@ -15,93 +15,86 @@ function createInitState(overrides: Partial<PushInitState> = {}): PushInitState 
         repositoryPath: '/repo',
         localBranch: 'feature',
         remotes: ['origin', 'fork'],
-        ...overrides
+        ...overrides,
     };
 }
 
 describe('resolvePushTarget', () => {
     it('uses the upstream branch as a confirmed target', () => {
-        expect(resolvePushTarget(
-            createInitState({ upstream: 'fork/review/feature' }),
-            emptySavedSelection
-        )).toEqual({
+        expect(resolvePushTarget(createInitState({ upstream: 'fork/review/feature' }), emptySavedSelection)).toEqual({
             remote: 'fork',
             remoteBranch: 'review/feature',
-            confirmation: 'upstream'
+            confirmation: 'upstream',
         });
     });
 
     it('uses saved confirmed target only for the same repository and branch', () => {
-        expect(resolvePushTarget(
-            createInitState(),
-            {
+        expect(
+            resolvePushTarget(createInitState(), {
                 repositoryPath: '/repo',
                 localBranch: 'feature',
                 remote: 'fork',
                 remoteBranch: 'feature',
-                confirmed: true
-            }
-        )).toEqual({
+                confirmed: true,
+            })
+        ).toEqual({
             remote: 'fork',
             remoteBranch: 'feature',
-            confirmation: 'saved'
+            confirmation: 'saved',
         });
     });
 
     it('does not treat a fallback target as confirmed without upstream or saved confirmation', () => {
-        expect(resolvePushTarget(
-            createInitState({ upstream: undefined }),
-            emptySavedSelection
-        )).toEqual({
+        expect(resolvePushTarget(createInitState({ upstream: undefined }), emptySavedSelection)).toEqual({
             remote: 'origin',
             remoteBranch: 'feature',
-            confirmation: 'unconfirmed'
+            confirmation: 'unconfirmed',
         });
     });
 
     it('prefers upstream over an old unconfirmed saved target', () => {
-        expect(resolvePushTarget(
-            createInitState({ upstream: 'origin/feature' }),
-            {
+        expect(
+            resolvePushTarget(createInitState({ upstream: 'origin/feature' }), {
                 repositoryPath: '/repo',
                 localBranch: 'feature',
                 remote: 'fork',
                 remoteBranch: 'feature',
-                confirmed: false
-            }
-        )).toEqual({
+                confirmed: false,
+            })
+        ).toEqual({
             remote: 'origin',
             remoteBranch: 'feature',
-            confirmation: 'upstream'
+            confirmation: 'upstream',
         });
     });
 
     it('ignores saved targets from another repository with the same branch name', () => {
-        expect(resolvePushTarget(
-            createInitState({ upstream: 'origin/feature' }),
-            {
+        expect(
+            resolvePushTarget(createInitState({ upstream: 'origin/feature' }), {
                 repositoryPath: '/other-repo',
                 localBranch: 'feature',
                 remote: 'fork',
                 remoteBranch: 'feature',
-                confirmed: true
-            }
-        )).toEqual({
+                confirmed: true,
+            })
+        ).toEqual({
             remote: 'origin',
             remoteBranch: 'feature',
-            confirmation: 'upstream'
+            confirmation: 'upstream',
         });
     });
 
     it('marks explicit overrides as manually confirmed', () => {
-        expect(resolvePushTarget(
-            createInitState({ upstream: undefined }),
-            emptySavedSelection,
-            { remote: 'fork', remoteBranch: 'feature', confirmed: true }
-        )).toEqual({
+        expect(
+            resolvePushTarget(createInitState({ upstream: undefined }), emptySavedSelection, {
+                remote: 'fork',
+                remoteBranch: 'feature',
+                confirmed: true,
+            })
+        ).toEqual({
             remote: 'fork',
             remoteBranch: 'feature',
-            confirmation: 'manual'
+            confirmation: 'manual',
         });
     });
 });

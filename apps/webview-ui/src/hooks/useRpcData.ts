@@ -38,7 +38,7 @@ export function useRpcData<T, K extends keyof PersistedStateSchema | undefined =
         enabled = true,
         refreshScopes,
         validateCachedValue,
-        maxCacheBytes
+        maxCacheBytes,
     } = options;
     const hasLoadedRef = useRef(false);
     const mountedRef = useRef(false);
@@ -68,82 +68,89 @@ export function useRpcData<T, K extends keyof PersistedStateSchema | undefined =
         fetcherRef.current = fetcher;
     }, [enabled, fetcher]);
 
-    const persistValue = useCallback((value: T) => {
-        if (cacheKey) {
-            const serialized = serializePersistedValue(cacheKey, value as PersistedStateSchema[NonNullable<K>]);
-            if (maxCacheBytes && JSON.stringify(serialized).length > maxCacheBytes) {
-                updateStoredState(cacheKey, null);
-                return;
-            }
-            updateStoredState(cacheKey, serialized);
-        }
-    }, [cacheKey, maxCacheBytes]);
-
-    const updateData = useCallback((action: SetStateAction<T>) => {
-        setData(previous => {
-            const next = typeof action === 'function'
-                ? (action as (value: T) => T)(previous)
-                : action;
-            persistValue(next);
-            return next;
-        });
-    }, [persistValue]);
-
-    const load = useCallback((queueTrailing = true): Promise<void> => {
-        if (!enabledRef.current) {
-            return Promise.resolve();
-        }
-
-        if (inFlightRef.current) {
-            if (queueTrailing || startedFetcherRef.current !== fetcherRef.current) {
-                requestedSequenceRef.current += 1;
-                pendingRef.current = true;
-            }
-            return inFlightRef.current;
-        }
-
-        requestedSequenceRef.current += 1;
-        startedFetcherRef.current = fetcherRef.current;
-        const run = async () => {
-            do {
-                pendingRef.current = false;
-                startedFetcherRef.current = fetcherRef.current;
-                const requestSequence = requestedSequenceRef.current;
-                try {
-                    if (mountedRef.current && (loadingOnRefresh || !hasLoadedRef.current)) {
-                        setLoading(true);
-                    }
-                    if (mountedRef.current) {
-                        setError(null);
-                    }
-                    const result = await fetcherRef.current();
-                    if (mountedRef.current && requestSequence === requestedSequenceRef.current) {
-                        setData(result);
-                        persistValue(result);
-                    }
-                } catch (e) {
-                    if (mountedRef.current && requestSequence === requestedSequenceRef.current) {
-                        setError(e instanceof Error ? e : new Error(String(e)));
-                        console.error('Failed to load data:', e);
-                    }
-                } finally {
-                    hasLoadedRef.current = true;
-                    if (mountedRef.current && requestSequence === requestedSequenceRef.current) {
-                        setLoading(false);
-                    }
+    const persistValue = useCallback(
+        (value: T) => {
+            if (cacheKey) {
+                const serialized = serializePersistedValue(cacheKey, value as PersistedStateSchema[NonNullable<K>]);
+                if (maxCacheBytes && JSON.stringify(serialized).length > maxCacheBytes) {
+                    updateStoredState(cacheKey, null);
+                    return;
                 }
-            } while (pendingRef.current && enabledRef.current);
-        };
-
-        const request = run().finally(() => {
-            inFlightRef.current = null;
-            if (mountedRef.current && !pendingRef.current) {
-                setLoading(false);
+                updateStoredState(cacheKey, serialized);
             }
-        });
-        inFlightRef.current = request;
-        return request;
-    }, [loadingOnRefresh, persistValue]);
+        },
+        [cacheKey, maxCacheBytes]
+    );
+
+    const updateData = useCallback(
+        (action: SetStateAction<T>) => {
+            setData((previous) => {
+                const next = typeof action === 'function' ? (action as (value: T) => T)(previous) : action;
+                persistValue(next);
+                return next;
+            });
+        },
+        [persistValue]
+    );
+
+    const load = useCallback(
+        (queueTrailing = true): Promise<void> => {
+            if (!enabledRef.current) {
+                return Promise.resolve();
+            }
+
+            if (inFlightRef.current) {
+                if (queueTrailing || startedFetcherRef.current !== fetcherRef.current) {
+                    requestedSequenceRef.current += 1;
+                    pendingRef.current = true;
+                }
+                return inFlightRef.current;
+            }
+
+            requestedSequenceRef.current += 1;
+            startedFetcherRef.current = fetcherRef.current;
+            const run = async () => {
+                do {
+                    pendingRef.current = false;
+                    startedFetcherRef.current = fetcherRef.current;
+                    const requestSequence = requestedSequenceRef.current;
+                    try {
+                        if (mountedRef.current && (loadingOnRefresh || !hasLoadedRef.current)) {
+                            setLoading(true);
+                        }
+                        if (mountedRef.current) {
+                            setError(null);
+                        }
+                        const result = await fetcherRef.current();
+                        if (mountedRef.current && requestSequence === requestedSequenceRef.current) {
+                            setData(result);
+                            persistValue(result);
+                        }
+                    } catch (e) {
+                        if (mountedRef.current && requestSequence === requestedSequenceRef.current) {
+                            setError(e instanceof Error ? e : new Error(String(e)));
+                            console.error('Failed to load data:', e);
+                        }
+                    } finally {
+                        hasLoadedRef.current = true;
+                        if (mountedRef.current && requestSequence === requestedSequenceRef.current) {
+                            setLoading(false);
+                        }
+                    }
+                } while (pendingRef.current && enabledRef.current);
+            };
+
+            const request = run().finally(() => {
+                inFlightRef.current = null;
+                if (mountedRef.current && !pendingRef.current) {
+                    setLoading(false);
+                }
+            });
+            inFlightRef.current = request;
+            return request;
+        },
+        [loadingOnRefresh, persistValue]
+    );
 
     useEffect(() => {
         mountedRef.current = true;
@@ -162,8 +169,8 @@ export function useRpcData<T, K extends keyof PersistedStateSchema | undefined =
 
         void load(false);
         if (refreshOnEvent) {
-            return rpcEvents.refresh.subscribe(event => {
-                if (!refreshScopes || event.scopes.some(scope => refreshScopes.includes(scope))) {
+            return rpcEvents.refresh.subscribe((event) => {
+                if (!refreshScopes || event.scopes.some((scope) => refreshScopes.includes(scope))) {
                     void load(true);
                 }
             });

@@ -19,9 +19,9 @@ export const commitStateDefaults: CommitPersistedStateSchema = {
             mode: 'staged',
             activeListId: 'changes',
             lists: [{ id: 'changes', name: 'Changes', isDefault: true, isActive: true }],
-            assignments: {}
+            assignments: {},
         },
         workspaceRoot: '',
-        repositories: []
-    }
+        repositories: [],
+    },
 };

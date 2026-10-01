@@ -1,12 +1,16 @@
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { RepositoryManager } from '../services/RepositoryManager';
-import { getContentPathFromUri, parseRepositoryContentQuery, type RevisionContentQuery } from '../utils/repositoryContentUri';
+import {
+    getContentPathFromUri,
+    parseRepositoryContentQuery,
+    type RevisionContentQuery,
+} from '../utils/repositoryContentUri';
 
 export class RevisionContentProvider implements vscode.TextDocumentContentProvider {
     onDidChange?: vscode.Event<vscode.Uri> | undefined;
 
-    constructor(private readonly repositoryManager: RepositoryManager) { }
+    constructor(private readonly repositoryManager: RepositoryManager) {}
 
     async provideTextDocumentContent(uri: vscode.Uri): Promise<string> {
         // URI format: intelli-git-revision://load/<file-path>?{"ref":"<commit-hash>","repoPath":"<repo-identity>"}

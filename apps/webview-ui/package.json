@@ -8,7 +8,8 @@
     "watch": "vite build --watch",
     "build": "tsc -b && vite build",
     "audit:l10n": "node scripts/audit-l10n.mjs",
-    "lint": "eslint . && npm run audit:l10n",
+    "lint": "eslint . --max-warnings 0 && npm run audit:l10n",
+    "typecheck": "tsc -b",
     "test": "vitest run --config vitest.config.ts",
     "preview": "vite preview"
   },

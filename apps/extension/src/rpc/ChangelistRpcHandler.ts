@@ -1,5 +1,11 @@
 import * as vscode from 'vscode';
-import type { ChangelistInfo, ChangelistMode, ChangelistMoveRequest, FileReferenceInput, RepositoryFileReference } from '@shared/messages';
+import type {
+    ChangelistInfo,
+    ChangelistMode,
+    ChangelistMoveRequest,
+    FileReferenceInput,
+    RepositoryFileReference,
+} from '@shared/messages';
 import { i18n } from '../utils/i18n';
 import type { ChangelistStateService } from '../services/ChangelistStateService';
 import type { ChangelistOperations } from '../operations/ChangelistOperations';
@@ -8,7 +14,7 @@ export class ChangelistRpcHandler {
     constructor(
         private readonly getOperations: (repoPath?: string) => ChangelistOperations | undefined,
         private readonly getChangelistStateService: (repoPath?: string) => ChangelistStateService | undefined
-    ) { }
+    ) {}
 
     private normalizeFileReference(input: FileReferenceInput): RepositoryFileReference {
         return typeof input === 'object' && input !== null
@@ -53,39 +59,47 @@ export class ChangelistRpcHandler {
     };
 
     createChangelist = async (name?: string): Promise<ChangelistInfo | null> => {
-        const changelistName = (name || await vscode.window.showInputBox({
-            prompt: i18n.t('extension.enterChangelistName'),
-            value: i18n.t('Changes')
-        }))?.trim();
+        const changelistName = (
+            name ||
+            (await vscode.window.showInputBox({
+                prompt: i18n.t('extension.enterChangelistName'),
+                value: i18n.t('Changes'),
+            }))
+        )?.trim();
 
         if (!changelistName) {
             return null;
         }
 
-        return await this.getOperations()?.createList(changelistName) || null;
+        return (await this.getOperations()?.createList(changelistName)) || null;
     };
 
     renameChangelist = async (params: { id: string; name?: string }): Promise<ChangelistInfo | null> => {
-        const current = this.getChangelistStateService()?.getState().lists.find(list => list.id === params.id);
+        const current = this.getChangelistStateService()
+            ?.getState()
+            .lists.find((list) => list.id === params.id);
         if (!current) {
             return null;
         }
 
-        const changelistName = (params.name || await vscode.window.showInputBox({
-            prompt: i18n.t('extension.enterChangelistName'),
-            value: current.name
-        }))?.trim();
+        const changelistName = (
+            params.name ||
+            (await vscode.window.showInputBox({
+                prompt: i18n.t('extension.enterChangelistName'),
+                value: current.name,
+            }))
+        )?.trim();
 
         if (!changelistName) {
             return null;
         }
 
-        return await this.getOperations()?.renameList(params.id, changelistName) || null;
+        return (await this.getOperations()?.renameList(params.id, changelistName)) || null;
     };
 
     deleteChangelist = async (id: string): Promise<void> => {
         const service = this.getChangelistStateService();
-        const target = service?.getState().lists.find(list => list.id === id);
+        const target = service?.getState().lists.find((list) => list.id === id);
         if (!target) {
             return;
         }
@@ -117,14 +131,18 @@ export class ChangelistRpcHandler {
     moveFilesToChangelist = async (params: { paths: string[]; targetListId: string }): Promise<void> => {
         await this.getOperations()?.moveChangesToChangelist({
             targetListId: params.targetListId,
-            paths: params.paths
+            paths: params.paths,
         });
     };
 
-    moveHunksToChangelist = async (params: { path: string; hunkIds: string[]; targetListId: string }): Promise<void> => {
+    moveHunksToChangelist = async (params: {
+        path: string;
+        hunkIds: string[];
+        targetListId: string;
+    }): Promise<void> => {
         await this.getOperations()?.moveChangesToChangelist({
             targetListId: params.targetListId,
-            hunksByPath: { [params.path]: params.hunkIds }
+            hunksByPath: { [params.path]: params.hunkIds },
         });
     };
 }

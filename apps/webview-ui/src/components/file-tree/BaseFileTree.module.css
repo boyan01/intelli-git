@@ -238,7 +238,11 @@
     opacity: 0;
     pointer-events: none;
     transform: translateX(2px) scale(0.96);
-    transition: opacity 0.16s ease, transform 0.18s ease, background-color 0.16s ease, border-color 0.16s ease;
+    transition:
+        opacity 0.16s ease,
+        transform 0.18s ease,
+        background-color 0.16s ease,
+        border-color 0.16s ease;
     flex-shrink: 0;
     backdrop-filter: blur(8px);
 }
@@ -274,7 +278,12 @@
     opacity: 0;
     pointer-events: none;
     transform: translateX(2px) scale(0.94);
-    transition: opacity 0.16s ease, transform 0.18s ease, background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease;
+    transition:
+        opacity 0.16s ease,
+        transform 0.18s ease,
+        background-color 0.16s ease,
+        border-color 0.16s ease,
+        color 0.16s ease;
     flex-shrink: 0;
     font-weight: 600;
     line-height: 1;
@@ -310,8 +319,16 @@
 }
 
 .hoverAction[data-action='stage']:hover {
-    background: color-mix(in srgb, var(--vscode-gitDecoration-addedResourceForeground) 12%, var(--vscode-toolbar-hoverBackground));
-    border-color: color-mix(in srgb, var(--vscode-gitDecoration-addedResourceForeground) 36%, var(--vscode-panel-border));
+    background: color-mix(
+        in srgb,
+        var(--vscode-gitDecoration-addedResourceForeground) 12%,
+        var(--vscode-toolbar-hoverBackground)
+    );
+    border-color: color-mix(
+        in srgb,
+        var(--vscode-gitDecoration-addedResourceForeground) 36%,
+        var(--vscode-panel-border)
+    );
 }
 
 .hoverAction[data-action='unstage'] {
@@ -319,8 +336,16 @@
 }
 
 .hoverAction[data-action='unstage']:hover {
-    background: color-mix(in srgb, var(--vscode-gitDecoration-modifiedResourceForeground) 12%, var(--vscode-toolbar-hoverBackground));
-    border-color: color-mix(in srgb, var(--vscode-gitDecoration-modifiedResourceForeground) 34%, var(--vscode-panel-border));
+    background: color-mix(
+        in srgb,
+        var(--vscode-gitDecoration-modifiedResourceForeground) 12%,
+        var(--vscode-toolbar-hoverBackground)
+    );
+    border-color: color-mix(
+        in srgb,
+        var(--vscode-gitDecoration-modifiedResourceForeground) 34%,
+        var(--vscode-panel-border)
+    );
 }
 
 .hoverAction[data-action='stage']:disabled,

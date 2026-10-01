@@ -6,13 +6,10 @@ export type SecretBackedAiProvider = 'anthropic' | 'google' | 'custom';
 const SECRET_KEYS: Record<SecretBackedAiProvider, string> = {
     anthropic: 'intelli-git.ai.anthropic.apiKey',
     google: 'intelli-git.ai.google.apiKey',
-    custom: 'intelli-git.ai.custom.apiKey'
+    custom: 'intelli-git.ai.custom.apiKey',
 };
 
-export async function getAiApiKey(
-    context: vscode.ExtensionContext,
-    provider: SecretBackedAiProvider
-): Promise<string> {
+export async function getAiApiKey(context: vscode.ExtensionContext, provider: SecretBackedAiProvider): Promise<string> {
     const secretKey = SECRET_KEYS[provider];
     const stored = await context.secrets.get(secretKey);
     if (stored) {
@@ -50,7 +47,7 @@ async function clearLegacyApiKey(provider: SecretBackedAiProvider): Promise<void
     const targets = [
         vscode.ConfigurationTarget.Global,
         vscode.ConfigurationTarget.Workspace,
-        vscode.ConfigurationTarget.WorkspaceFolder
+        vscode.ConfigurationTarget.WorkspaceFolder,
     ];
 
     for (const target of targets) {

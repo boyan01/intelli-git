@@ -23,15 +23,15 @@ export interface ConflictInlineDiffRange {
 
 export type ConflictDocumentPart =
     | {
-        type: 'text';
-        id: string;
-        text: string;
-    }
+          type: 'text';
+          id: string;
+          text: string;
+      }
     | {
-        type: 'conflict';
-        id: string;
-        block: ConflictBlock;
-    };
+          type: 'conflict';
+          id: string;
+          block: ConflictBlock;
+      };
 
 export type ConflictResolutionMap = Record<string, string>;
 export type ConflictResolutionState = Record<string, unknown>;
@@ -118,11 +118,7 @@ function isLineBreak(value: string | undefined): boolean {
     return value === '\r' || value === '\n';
 }
 
-function shouldIgnoreInlineToken(
-    tokens: string[],
-    index: number,
-    whitespaceMode: WhitespaceCompareMode
-): boolean {
+function shouldIgnoreInlineToken(tokens: string[], index: number, whitespaceMode: WhitespaceCompareMode): boolean {
     const token = tokens[index];
     if (whitespaceMode === 'ignore') {
         return isWhitespaceToken(token);
@@ -133,8 +129,12 @@ function shouldIgnoreInlineToken(
 
     const previousCharacter = tokens[index - 1]?.at(-1);
     const nextCharacter = tokens[index + 1]?.[0];
-    return previousCharacter === undefined || nextCharacter === undefined ||
-        isLineBreak(previousCharacter) || isLineBreak(nextCharacter);
+    return (
+        previousCharacter === undefined ||
+        nextCharacter === undefined ||
+        isLineBreak(previousCharacter) ||
+        isLineBreak(nextCharacter)
+    );
 }
 
 function computeLcsPairs(left: string[], right: string[]): Array<[number, number]> {
@@ -189,12 +189,12 @@ export function buildInlineDiffSegments(
 
     const indexedTokens = tokens.map((token, index) => ({ token, index }));
     const indexedBaseTokens = baseTokens.map((token, index) => ({ token, index }));
-    const comparableTokens = indexedTokens.filter(({ index }) => (
-        !shouldIgnoreInlineToken(tokens, index, whitespaceMode)
-    ));
-    const comparableBaseTokens = indexedBaseTokens.filter(({ index }) => (
-        !shouldIgnoreInlineToken(baseTokens, index, whitespaceMode)
-    ));
+    const comparableTokens = indexedTokens.filter(
+        ({ index }) => !shouldIgnoreInlineToken(tokens, index, whitespaceMode)
+    );
+    const comparableBaseTokens = indexedBaseTokens.filter(
+        ({ index }) => !shouldIgnoreInlineToken(baseTokens, index, whitespaceMode)
+    );
 
     if (comparableTokens.length * comparableBaseTokens.length > 50_000) {
         return [{ text, changed: false }];
@@ -210,8 +210,7 @@ export function buildInlineDiffSegments(
 
     const segments: InlineDiffSegment[] = [];
     for (let index = 0; index < tokens.length; index++) {
-        const changed = !shouldIgnoreInlineToken(tokens, index, whitespaceMode) &&
-            !unchangedTokenIndexes.has(index);
+        const changed = !shouldIgnoreInlineToken(tokens, index, whitespaceMode) && !unchangedTokenIndexes.has(index);
         const previous = segments[segments.length - 1];
         if (previous?.changed === changed) {
             previous.text += tokens[index];
@@ -251,7 +250,7 @@ function getPositionAtOffset(lineStarts: number[], offset: number): { line: numb
     const lineIndex = Math.max(0, high);
     return {
         line: lineIndex + 1,
-        column: offset - lineStarts[lineIndex] + 1
+        column: offset - lineStarts[lineIndex] + 1,
     };
 }
 
@@ -271,20 +270,17 @@ function splitContentLineSlices(content: string): ContentLineSlice[] {
         lines.push({
             startOffset,
             endOffset: offset,
-            text: content.slice(startOffset, offset)
+            text: content.slice(startOffset, offset),
         });
     }
     return lines;
 }
 
 export function splitContentLines(content: string): string[] {
-    return splitContentLineSlices(content).map(line => line.text.replace(/\r\n$|\r$|\n$/, ''));
+    return splitContentLineSlices(content).map((line) => line.text.replace(/\r\n$|\r$|\n$/, ''));
 }
 
-export function buildLineAlignmentBlocks(
-    referenceLines: string[],
-    resultLines: string[]
-): LineAlignmentBlock[] {
+export function buildLineAlignmentBlocks(referenceLines: string[], resultLines: string[]): LineAlignmentBlock[] {
     let commonPrefixLineCount = 0;
     while (
         commonPrefixLineCount < referenceLines.length &&
@@ -312,12 +308,14 @@ export function buildLineAlignmentBlocks(
     }
 
     if (referenceMiddle.length * resultMiddle.length > 250_000) {
-        return [{
-            referenceStart: commonPrefixLineCount,
-            referenceLineCount: referenceMiddle.length,
-            resultStart: commonPrefixLineCount,
-            resultLineCount: resultMiddle.length
-        }];
+        return [
+            {
+                referenceStart: commonPrefixLineCount,
+                referenceLineCount: referenceMiddle.length,
+                resultStart: commonPrefixLineCount,
+                resultLineCount: resultMiddle.length,
+            },
+        ];
     }
 
     const matchingLines = computeLcsPairs(referenceMiddle, resultMiddle);
@@ -326,9 +324,8 @@ export function buildLineAlignmentBlocks(
     let resultCursor = 0;
 
     for (let index = 0; index <= matchingLines.length; index++) {
-        const [referenceMatch, resultMatch] = index < matchingLines.length
-            ? matchingLines[index]
-            : [referenceMiddle.length, resultMiddle.length];
+        const [referenceMatch, resultMatch] =
+            index < matchingLines.length ? matchingLines[index] : [referenceMiddle.length, resultMiddle.length];
         const referenceLineCount = referenceMatch - referenceCursor;
         const resultLineCount = resultMatch - resultCursor;
         if (referenceLineCount > 0 || resultLineCount > 0) {
@@ -336,7 +333,7 @@ export function buildLineAlignmentBlocks(
                 referenceStart: commonPrefixLineCount + referenceCursor,
                 referenceLineCount,
                 resultStart: commonPrefixLineCount + resultCursor,
-                resultLineCount
+                resultLineCount,
             });
         }
         if (index < matchingLines.length) {
@@ -379,10 +376,13 @@ function changesOverlap(left: ConflictChange, right: ConflictChange): boolean {
     return left.baseStart < rightEnd && right.baseStart < leftEnd;
 }
 
-function buildChangeComponents(leftChanges: ConflictChange[], rightChanges: ConflictChange[]): TaggedConflictChange[][] {
+function buildChangeComponents(
+    leftChanges: ConflictChange[],
+    rightChanges: ConflictChange[]
+): TaggedConflictChange[][] {
     const tagged: TaggedConflictChange[] = [
         ...leftChanges.map((change, index) => ({ side: 'left' as const, change, index })),
-        ...rightChanges.map((change, index) => ({ side: 'right' as const, change, index: leftChanges.length + index }))
+        ...rightChanges.map((change, index) => ({ side: 'right' as const, change, index: leftChanges.length + index })),
     ];
     const parents = tagged.map((_, index) => index);
     const find = (index: number): number => {
@@ -416,8 +416,8 @@ function buildChangeComponents(leftChanges: ConflictChange[], rightChanges: Conf
         components.set(root, component);
     }
     return [...components.values()].sort((left, right) => {
-        const leftStart = Math.min(...left.map(item => item.change.baseStart));
-        const rightStart = Math.min(...right.map(item => item.change.baseStart));
+        const leftStart = Math.min(...left.map((item) => item.change.baseStart));
+        const rightStart = Math.min(...right.map((item) => item.change.baseStart));
         return leftStart - rightStart;
     });
 }
@@ -454,9 +454,9 @@ function normalizeWhitespaceForComparison(content: string, whitespaceMode: White
 
     return normalized
         .split('\n')
-        .map(line => whitespaceMode === 'ignore'
-            ? line.replace(/[^\S\r\n]+/g, '')
-            : line.replace(/^[^\S\r\n]+|[^\S\r\n]+$/g, ''))
+        .map((line) =>
+            whitespaceMode === 'ignore' ? line.replace(/[^\S\r\n]+/g, '') : line.replace(/^[^\S\r\n]+|[^\S\r\n]+$/g, '')
+        )
         .join('\n');
 }
 
@@ -470,13 +470,13 @@ function filterChangesByWhitespaceMode(
         return changes;
     }
 
-    return changes.flatMap(change => {
+    return changes.flatMap((change) => {
         const comparableBaseLines = baseLines
             .slice(change.baseStart, change.baseStart + change.baseLineCount)
-            .map(line => normalizeWhitespaceForComparison(line.text, whitespaceMode));
+            .map((line) => normalizeWhitespaceForComparison(line.text, whitespaceMode));
         const comparableSideLines = sideLines
             .slice(change.sideStart, change.sideStart + change.sideLineCount)
-            .map(line => normalizeWhitespaceForComparison(line.text, whitespaceMode));
+            .map((line) => normalizeWhitespaceForComparison(line.text, whitespaceMode));
 
         if (
             comparableBaseLines.length === comparableSideLines.length &&
@@ -496,9 +496,10 @@ function filterChangesByWhitespaceMode(
         let partIndex = 0;
 
         for (let index = 0; index <= matchingLines.length; index++) {
-            const [baseMatch, sideMatch] = index < matchingLines.length
-                ? matchingLines[index]
-                : [comparableBaseLines.length, comparableSideLines.length];
+            const [baseMatch, sideMatch] =
+                index < matchingLines.length
+                    ? matchingLines[index]
+                    : [comparableBaseLines.length, comparableSideLines.length];
             const baseLineCount = baseMatch - baseCursor;
             const sideLineCount = sideMatch - sideCursor;
             if (baseLineCount > 0 || sideLineCount > 0) {
@@ -507,7 +508,7 @@ function filterChangesByWhitespaceMode(
                     baseStart: change.baseStart + baseCursor,
                     baseLineCount,
                     sideStart: change.sideStart + sideCursor,
-                    sideLineCount
+                    sideLineCount,
                 });
             }
             if (index < matchingLines.length) {
@@ -531,18 +532,8 @@ export function buildMergeSessionDocument(
     const baseLines = splitContentLineSlices(baseContent);
     const leftLines = splitContentLineSlices(leftContent);
     const rightLines = splitContentLineSlices(rightContent);
-    const visibleLeftChanges = filterChangesByWhitespaceMode(
-        baseLines,
-        leftLines,
-        leftChanges,
-        whitespaceMode
-    );
-    const visibleRightChanges = filterChangesByWhitespaceMode(
-        baseLines,
-        rightLines,
-        rightChanges,
-        whitespaceMode
-    );
+    const visibleLeftChanges = filterChangesByWhitespaceMode(baseLines, leftLines, leftChanges, whitespaceMode);
+    const visibleRightChanges = filterChangesByWhitespaceMode(baseLines, rightLines, rightChanges, whitespaceMode);
     const components = buildChangeComponents(visibleLeftChanges, visibleRightChanges);
     const groups: MergeChangeGroup[] = [];
     const reviewRanges: MergeReviewRange[] = [];
@@ -552,27 +543,21 @@ export function buildMergeSessionDocument(
 
     for (let index = 0; index < components.length; index++) {
         const component = components[index];
-        const componentLeftChanges = component
-            .filter(item => item.side === 'left')
-            .map(item => item.change);
-        const componentRightChanges = component
-            .filter(item => item.side === 'right')
-            .map(item => item.change);
-        const allChanges = component.map(item => item.change);
-        const baseStart = Math.min(...allChanges.map(change => change.baseStart));
-        const baseEnd = Math.max(...allChanges.map(change => change.baseStart + change.baseLineCount));
+        const componentLeftChanges = component.filter((item) => item.side === 'left').map((item) => item.change);
+        const componentRightChanges = component.filter((item) => item.side === 'right').map((item) => item.change);
+        const allChanges = component.map((item) => item.change);
+        const baseStart = Math.min(...allChanges.map((change) => change.baseStart));
+        const baseEnd = Math.max(...allChanges.map((change) => change.baseStart + change.baseLineCount));
         const baseLineCount = baseEnd - baseStart;
         const contextLineCount = Math.max(0, baseStart - previousBaseEnd);
         const leftStart = previousLeftEnd + contextLineCount;
         const rightStart = previousRightEnd + contextLineCount;
-        const leftLineCount = baseLineCount + componentLeftChanges.reduce(
-            (total, change) => total + change.sideLineCount - change.baseLineCount,
-            0
-        );
-        const rightLineCount = baseLineCount + componentRightChanges.reduce(
-            (total, change) => total + change.sideLineCount - change.baseLineCount,
-            0
-        );
+        const leftLineCount =
+            baseLineCount +
+            componentLeftChanges.reduce((total, change) => total + change.sideLineCount - change.baseLineCount, 0);
+        const rightLineCount =
+            baseLineCount +
+            componentRightChanges.reduce((total, change) => total + change.sideLineCount - change.baseLineCount, 0);
         const baseText = sliceLineRange(baseContent, baseLines, baseStart, baseLineCount);
         const leftText = applySideChanges(
             baseContent,
@@ -594,9 +579,14 @@ export function buildMergeSessionDocument(
         );
         const hasLeftChange = componentLeftChanges.length > 0;
         const hasRightChange = componentRightChanges.length > 0;
-        const kind = hasLeftChange && hasRightChange
-            ? leftText === rightText ? 'identical' : 'conflict'
-            : hasLeftChange ? 'left-only' : 'right-only';
+        const kind =
+            hasLeftChange && hasRightChange
+                ? leftText === rightText
+                    ? 'identical'
+                    : 'conflict'
+                : hasLeftChange
+                  ? 'left-only'
+                  : 'right-only';
         const id = `change-${index}`;
         groups.push({
             id,
@@ -611,7 +601,7 @@ export function buildMergeSessionDocument(
             rightText,
             hasLeftChange,
             hasRightChange,
-            kind
+            kind,
         });
         reviewRanges.push({
             groupId: id,
@@ -619,7 +609,7 @@ export function buildMergeSessionDocument(
             endOffset: getLineBoundaryOffset(baseLines, baseContent.length, baseEnd),
             leftDecision: hasLeftChange ? 'pending' : null,
             rightDecision: hasRightChange ? 'pending' : null,
-            lastAppliedSide: null
+            lastAppliedSide: null,
         });
         previousBaseEnd = baseEnd;
         previousLeftEnd = leftStart + leftLineCount;
@@ -629,7 +619,7 @@ export function buildMergeSessionDocument(
     return {
         resultText: baseContent,
         groups,
-        reviewRanges
+        reviewRanges,
     };
 }
 
@@ -658,7 +648,7 @@ export function applyMergeGroupDecision(
     side: MergeReviewSide | 'both',
     decision: Exclude<MergeReviewDecision, 'pending'>
 ): { content: string; ranges: MergeReviewRange[] } {
-    const target = ranges.find(range => range.groupId === group.id);
+    const target = ranges.find((range) => range.groupId === group.id);
     if (!target) {
         return { content, ranges };
     }
@@ -669,13 +659,15 @@ export function applyMergeGroupDecision(
         }
         return {
             content,
-            ranges: ranges.map(range => range.groupId === group.id
-                ? {
-                    ...range,
-                    leftDecision: range.leftDecision === 'pending' ? 'manual' : range.leftDecision,
-                    rightDecision: range.rightDecision === 'pending' ? 'manual' : range.rightDecision
-                }
-                : range)
+            ranges: ranges.map((range) =>
+                range.groupId === group.id
+                    ? {
+                          ...range,
+                          leftDecision: range.leftDecision === 'pending' ? 'manual' : range.leftDecision,
+                          rightDecision: range.rightDecision === 'pending' ? 'manual' : range.rightDecision,
+                      }
+                    : range
+            ),
         };
     }
 
@@ -695,12 +687,14 @@ export function applyMergeGroupDecision(
     if (decision === 'applied') {
         const currentText = content.slice(target.startOffset, target.endOffset);
         if (applyMode === 'append') {
-            const lineSeparator = [currentText, sideText, group.baseText]
-                .map(text => text.match(/\r\n|\n|\r/)?.[0])
-                .find((separator): separator is string => Boolean(separator)) ?? '\n';
-            replacement = /[\r\n]$/.test(currentText) || /^[\r\n]/.test(sideText)
-                ? currentText + sideText
-                : currentText + lineSeparator + sideText;
+            const lineSeparator =
+                [currentText, sideText, group.baseText]
+                    .map((text) => text.match(/\r\n|\n|\r/)?.[0])
+                    .find((separator): separator is string => Boolean(separator)) ?? '\n';
+            replacement =
+                /[\r\n]$/.test(currentText) || /^[\r\n]/.test(sideText)
+                    ? currentText + sideText
+                    : currentText + lineSeparator + sideText;
         } else if (applyMode === 'preserve') {
             replacement = currentText;
         } else {
@@ -717,33 +711,32 @@ export function applyMergeGroupDecision(
         }
     }
 
-    const nextContent = replacement === undefined
-        ? content
-        : content.slice(0, target.startOffset) + replacement + content.slice(target.endOffset);
-    const delta = replacement === undefined
-        ? 0
-        : replacement.length - (target.endOffset - target.startOffset);
+    const nextContent =
+        replacement === undefined
+            ? content
+            : content.slice(0, target.startOffset) + replacement + content.slice(target.endOffset);
+    const delta = replacement === undefined ? 0 : replacement.length - (target.endOffset - target.startOffset);
     return {
         content: nextContent,
-        ranges: ranges.map(range => {
+        ranges: ranges.map((range) => {
             if (range.groupId === group.id) {
                 return {
                     ...range,
                     endOffset: replacement === undefined ? range.endOffset : range.startOffset + replacement.length,
                     leftDecision: side === 'left' ? decision : range.leftDecision,
                     rightDecision: side === 'right' ? decision : range.rightDecision,
-                    lastAppliedSide
+                    lastAppliedSide,
                 };
             }
             if (delta !== 0 && range.startOffset >= target.endOffset) {
                 return {
                     ...range,
                     startOffset: range.startOffset + delta,
-                    endOffset: range.endOffset + delta
+                    endOffset: range.endOffset + delta,
                 };
             }
             return range;
-        })
+        }),
     };
 }
 
@@ -751,10 +744,7 @@ export function isMergeReviewRangePending(range: MergeReviewRange): boolean {
     return range.leftDecision === 'pending' || range.rightDecision === 'pending';
 }
 
-function changeTouchesRange(
-    change: { rangeOffset: number; rangeLength: number },
-    range: MergeReviewRange
-): boolean {
+function changeTouchesRange(change: { rangeOffset: number; rangeLength: number }, range: MergeReviewRange): boolean {
     const changeEnd = change.rangeOffset + change.rangeLength;
     if (change.rangeLength === 0) {
         if (range.startOffset === range.endOffset) {
@@ -806,9 +796,9 @@ export function applyMergeContentChanges(
     const changes = [...rawChanges].sort((left, right) => left.rangeOffset - right.rangeOffset);
     const touched = new Set<string>();
     for (const change of changes) {
-        const touchingRanges = ranges.filter(range => changeTouchesRange(change, range));
+        const touchingRanges = ranges.filter((range) => changeTouchesRange(change, range));
         if (change.rangeLength === 0) {
-            const target = touchingRanges.find(range => range.startOffset < range.endOffset) ?? touchingRanges[0];
+            const target = touchingRanges.find((range) => range.startOffset < range.endOffset) ?? touchingRanges[0];
             if (target) {
                 touched.add(target.groupId);
             }
@@ -818,46 +808,37 @@ export function applyMergeContentChanges(
             touched.add(range.groupId);
         }
     }
-    const touchedGroupIds = ranges
-        .filter(range => touched.has(range.groupId))
-        .map(range => range.groupId);
+    const touchedGroupIds = ranges.filter((range) => touched.has(range.groupId)).map((range) => range.groupId);
     return {
-        ranges: ranges.map(range => {
+        ranges: ranges.map((range) => {
             const isTouched = touched.has(range.groupId);
             const isEmpty = range.startOffset === range.endOffset;
             return {
                 ...range,
                 startOffset: transformOffset(range.startOffset, 'start', changes),
-                endOffset: transformOffset(
-                    range.endOffset,
-                    isEmpty && isTouched ? 'empty-end' : 'start',
-                    changes
-                ),
-                leftDecision: isTouched && range.leftDecision !== null
-                    ? 'pending'
-                    : range.leftDecision,
-                rightDecision: isTouched && range.rightDecision !== null
-                    ? 'pending'
-                    : range.rightDecision,
-                lastAppliedSide: isTouched ? null : range.lastAppliedSide
+                endOffset: transformOffset(range.endOffset, isEmpty && isTouched ? 'empty-end' : 'start', changes),
+                leftDecision: isTouched && range.leftDecision !== null ? 'pending' : range.leftDecision,
+                rightDecision: isTouched && range.rightDecision !== null ? 'pending' : range.rightDecision,
+                lastAppliedSide: isTouched ? null : range.lastAppliedSide,
             };
         }),
-        touchedGroupIds
+        touchedGroupIds,
     };
 }
 
 export function getMergeTextRange(content: string, startOffset: number, endOffset: number): MergeTextRange {
     const lineStarts = getLineStartOffsets(content);
-    const visualEndOffset = endOffset > startOffset && /[\r\n]/.test(content[endOffset - 1])
-        ? endOffset - (content[endOffset - 1] === '\n' && content[endOffset - 2] === '\r' ? 2 : 1)
-        : endOffset;
+    const visualEndOffset =
+        endOffset > startOffset && /[\r\n]/.test(content[endOffset - 1])
+            ? endOffset - (content[endOffset - 1] === '\n' && content[endOffset - 2] === '\r' ? 2 : 1)
+            : endOffset;
     const start = getPositionAtOffset(lineStarts, startOffset);
     const end = getPositionAtOffset(lineStarts, Math.max(startOffset, visualEndOffset));
     return {
         startLine: start.line,
         startColumn: start.column,
         endLine: end.line,
-        endColumn: end.column
+        endColumn: end.column,
     };
 }
 
@@ -894,7 +875,7 @@ export function buildMergeSideInlineDiffRanges(
                 startLine: startLine + start.line,
                 startColumn: start.column,
                 endLine: startLine + end.line,
-                endColumn: end.column
+                endColumn: end.column,
             });
         }
     }
@@ -920,13 +901,13 @@ export function buildConflictInlineDiffRanges(
             {
                 side: 'current' as const,
                 text: part.block.currentText,
-                startOffset: part.block.currentStartOffset
+                startOffset: part.block.currentStartOffset,
             },
             {
                 side: 'incoming' as const,
                 text: part.block.incomingText,
-                startOffset: part.block.incomingStartOffset
-            }
+                startOffset: part.block.incomingStartOffset,
+            },
         ];
 
         for (const side of sides) {
@@ -946,7 +927,7 @@ export function buildConflictInlineDiffRanges(
                     startLine: start.line,
                     startColumn: start.column,
                     endLine: end.line,
-                    endColumn: end.column
+                    endColumn: end.column,
                 });
             }
         }
@@ -971,8 +952,7 @@ export function getMergeResultReviewState(
     const conflictMarkerCount = parseConflictBlocks(result).length;
     return {
         conflictMarkerCount,
-        isResolutionConfirmed: conflictMarkerCount === 0 &&
-            (resolutionAcknowledged || result !== originalResult)
+        isResolutionConfirmed: conflictMarkerCount === 0 && (resolutionAcknowledged || result !== originalResult),
     };
 }
 
@@ -994,7 +974,7 @@ export function applyConflictBlockResolution(
     blockId: string,
     choice: ConflictResolutionChoice
 ): string {
-    const block = parseConflictBlocks(content).find(candidate => candidate.id === blockId);
+    const block = parseConflictBlocks(content).find((candidate) => candidate.id === blockId);
     if (!block) {
         return content;
     }
@@ -1009,13 +989,12 @@ function inferBaseTextForConflict(
     conflictIndex: number,
     searchOffset: number
 ): { text: string; nextOffset: number } {
-    const previousText = parts
-        .slice(0, conflictIndex)
-        .reverse()
-        .find(part => part.type === 'text')?.text ?? '';
-    const nextText = parts
-        .slice(conflictIndex + 1)
-        .find(part => part.type === 'text')?.text ?? '';
+    const previousText =
+        parts
+            .slice(0, conflictIndex)
+            .reverse()
+            .find((part) => part.type === 'text')?.text ?? '';
+    const nextText = parts.slice(conflictIndex + 1).find((part) => part.type === 'text')?.text ?? '';
 
     let startOffset = searchOffset;
     if (previousText) {
@@ -1039,18 +1018,20 @@ function inferBaseTextForConflict(
 
     return {
         text: baseContent.slice(startOffset, endOffset),
-        nextOffset: endOffset
+        nextOffset: endOffset,
     };
 }
 
 export function parseConflictDocument(content: string, baseContent = ''): ConflictDocumentPart[] {
     const blocks = parseConflictBlocks(content);
     if (blocks.length === 0) {
-        return [{
-            type: 'text',
-            id: 'text-0',
-            text: content
-        }];
+        return [
+            {
+                type: 'text',
+                id: 'text-0',
+                text: content,
+            },
+        ];
     }
 
     const parts: ConflictDocumentPart[] = [];
@@ -1062,7 +1043,7 @@ export function parseConflictDocument(content: string, baseContent = ''): Confli
             parts.push({
                 type: 'text',
                 id: `text-${textIndex}`,
-                text: content.slice(offset, block.startOffset)
+                text: content.slice(offset, block.startOffset),
             });
             textIndex++;
         }
@@ -1070,7 +1051,7 @@ export function parseConflictDocument(content: string, baseContent = ''): Confli
         parts.push({
             type: 'conflict',
             id: block.id,
-            block
+            block,
         });
         offset = block.endOffset;
     }
@@ -1079,7 +1060,7 @@ export function parseConflictDocument(content: string, baseContent = ''): Confli
         parts.push({
             type: 'text',
             id: `text-${textIndex}`,
-            text: content.slice(offset)
+            text: content.slice(offset),
         });
     }
 
@@ -1114,23 +1095,22 @@ export function getUnresolvedConflictIds(
 ): string[] {
     return parts
         .filter((part): part is Extract<ConflictDocumentPart, { type: 'conflict' }> => part.type === 'conflict')
-        .filter(part => !Object.prototype.hasOwnProperty.call(resolutions, part.id))
-        .map(part => part.id);
+        .filter((part) => !Object.prototype.hasOwnProperty.call(resolutions, part.id))
+        .map((part) => part.id);
 }
 
-export function buildConflictDocumentResult(
-    parts: ConflictDocumentPart[],
-    resolutions: ConflictResolutionMap
-): string {
-    return parts.map(part => {
-        if (part.type === 'text') {
-            return part.text;
-        }
+export function buildConflictDocumentResult(parts: ConflictDocumentPart[], resolutions: ConflictResolutionMap): string {
+    return parts
+        .map((part) => {
+            if (part.type === 'text') {
+                return part.text;
+            }
 
-        if (Object.prototype.hasOwnProperty.call(resolutions, part.id)) {
-            return resolutions[part.id];
-        }
+            if (Object.prototype.hasOwnProperty.call(resolutions, part.id)) {
+                return resolutions[part.id];
+            }
 
-        return part.block.markerText;
-    }).join('');
+            return part.block.markerText;
+        })
+        .join('');
 }

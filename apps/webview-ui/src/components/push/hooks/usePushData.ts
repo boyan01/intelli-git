@@ -30,10 +30,12 @@ function areCommitListsEqual(left: CommitDetails[], right: CommitDetails[]): boo
 
         return leftCommit.files.every((leftFile, fileIndex) => {
             const rightFile = rightCommit.files[fileIndex];
-            return Boolean(rightFile) &&
+            return (
+                Boolean(rightFile) &&
                 leftFile.path === rightFile.path &&
                 leftFile.displayPath === rightFile.displayPath &&
-                leftFile.status === rightFile.status;
+                leftFile.status === rightFile.status
+            );
         });
     });
 }
@@ -46,47 +48,50 @@ export function usePushData(selectedRemote: string, selectedRemoteBranch: string
     const [isLoadingMore, setIsLoadingMore] = useState(false);
     const requestSeqRef = useRef(0);
 
-    const loadCommits = useCallback(async (options: { reset?: boolean } = {}) => {
-        if (!selectedRemote || !selectedRemoteBranch) {
-            setCommits([]);
-            setTotalCommits(0);
-            setHasMore(false);
-            return;
-        }
-
-        const requestSeq = requestSeqRef.current + 1;
-        requestSeqRef.current = requestSeq;
-
-        if (options.reset) {
-            setCommits([]);
-            setTotalCommits(0);
-            setHasMore(false);
-            setIsLoading(true);
-        }
-
-        try {
-            const data = await rpc.getPushCommits({
-                remote: selectedRemote,
-                branch: selectedRemoteBranch,
-                limit: PAGE_SIZE,
-                skip: 0
-            });
-
-            if (requestSeqRef.current !== requestSeq) {
+    const loadCommits = useCallback(
+        async (options: { reset?: boolean } = {}) => {
+            if (!selectedRemote || !selectedRemoteBranch) {
+                setCommits([]);
+                setTotalCommits(0);
+                setHasMore(false);
                 return;
             }
 
-            setCommits(prev => areCommitListsEqual(prev, data.commits) ? prev : data.commits);
-            setHasMore(prev => prev === data.hasMore ? prev : data.hasMore);
-            setTotalCommits(prev => prev === data.totalCount ? prev : data.totalCount);
-        } catch (error) {
-            console.error('Failed to load push commits:', error);
-        } finally {
-            if (requestSeqRef.current === requestSeq) {
-                setIsLoading(false);
+            const requestSeq = requestSeqRef.current + 1;
+            requestSeqRef.current = requestSeq;
+
+            if (options.reset) {
+                setCommits([]);
+                setTotalCommits(0);
+                setHasMore(false);
+                setIsLoading(true);
             }
-        }
-    }, [selectedRemote, selectedRemoteBranch]);
+
+            try {
+                const data = await rpc.getPushCommits({
+                    remote: selectedRemote,
+                    branch: selectedRemoteBranch,
+                    limit: PAGE_SIZE,
+                    skip: 0,
+                });
+
+                if (requestSeqRef.current !== requestSeq) {
+                    return;
+                }
+
+                setCommits((prev) => (areCommitListsEqual(prev, data.commits) ? prev : data.commits));
+                setHasMore((prev) => (prev === data.hasMore ? prev : data.hasMore));
+                setTotalCommits((prev) => (prev === data.totalCount ? prev : data.totalCount));
+            } catch (error) {
+                console.error('Failed to load push commits:', error);
+            } finally {
+                if (requestSeqRef.current === requestSeq) {
+                    setIsLoading(false);
+                }
+            }
+        },
+        [selectedRemote, selectedRemoteBranch]
+    );
 
     // Load commits when branch selection changes
     useEffect(() => {
@@ -94,7 +99,7 @@ export function usePushData(selectedRemote: string, selectedRemoteBranch: string
     }, [loadCommits]);
 
     // Refresh without unmounting the visible list; otherwise expanded commits flicker.
-    useRpcEvent(rpcEvents.refresh, event => {
+    useRpcEvent(rpcEvents.refresh, (event) => {
         if (event.scopes.includes('push')) {
             loadCommits();
         }
@@ -110,10 +115,10 @@ export function usePushData(selectedRemote: string, selectedRemoteBranch: string
                 remote: selectedRemote,
                 branch: selectedRemoteBranch,
                 limit: PAGE_SIZE,
-                skip: currentCount
+                skip: currentCount,
             });
 
-            setCommits(prev => [...prev, ...data.commits]);
+            setCommits((prev) => [...prev, ...data.commits]);
             setHasMore(data.hasMore);
             setTotalCommits(data.totalCount);
         } catch (error) {

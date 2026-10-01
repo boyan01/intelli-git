@@ -7,10 +7,12 @@ const packageRoot = path.resolve(__dirname, '..');
 const originalPackageJsonOnDisk = fs.readFileSync(packageJsonPath, 'utf8');
 const packageData = JSON.parse(originalPackageJsonOnDisk);
 const baseVersion = packageData.version.replace(/(?:-dev\.\d+)+$/, '');
-const originalPackageJson = baseVersion === packageData.version
-    ? originalPackageJsonOnDisk
-    : `${JSON.stringify({ ...packageData, version: baseVersion }, null, 2)}\n`;
-const baseContentUrl = process.env.VSCE_BASE_CONTENT_URL || 'https://raw.githubusercontent.com/boyan01/intelli-git/main';
+const originalPackageJson =
+    baseVersion === packageData.version
+        ? originalPackageJsonOnDisk
+        : `${JSON.stringify({ ...packageData, version: baseVersion }, null, 2)}\n`;
+const baseContentUrl =
+    process.env.VSCE_BASE_CONTENT_URL || 'https://raw.githubusercontent.com/boyan01/intelli-git/main';
 const baseImagesUrl = process.env.VSCE_BASE_IMAGES_URL || 'https://raw.githubusercontent.com/boyan01/intelli-git/main';
 const shouldInstall = process.argv.includes('--install');
 process.env.INTELLI_GIT_BUILD_CHANNEL = 'dev';
@@ -65,22 +67,23 @@ try {
     const outFilePath = path.join(outDir, `${packageData.name}-${newVersion}.vsix`);
     const outFileArg = path.relative(packageRoot, outFilePath);
 
-    execSync(`vsce package --baseContentUrl "${baseContentUrl}" --baseImagesUrl "${baseImagesUrl}" -o "${outFileArg}"`, { stdio: ['ignore', process.stdout, process.stderr] });
+    execSync(
+        `vsce package --baseContentUrl "${baseContentUrl}" --baseImagesUrl "${baseImagesUrl}" -o "${outFileArg}"`,
+        { stdio: ['ignore', process.stdout, process.stderr] }
+    );
 
     console.log(`\nSuccessfully packaged version to: ${outFilePath}`);
-    execFileSync(process.execPath, [
-        path.join(__dirname, 'verify-vsix.js'),
-        outFilePath,
-        '--version',
-        newVersion
-    ], { stdio: ['ignore', process.stdout, process.stderr] });
+    execFileSync(process.execPath, [path.join(__dirname, 'verify-vsix.js'), outFilePath, '--version', newVersion], {
+        stdio: ['ignore', process.stdout, process.stderr],
+    });
 
     if (shouldInstall) {
         console.log(`Installing extension with ${vscodeCli}...`);
-        execFileSync(vscodeCli, ['--install-extension', outFilePath, '--force'], { stdio: ['ignore', process.stdout, process.stderr] });
+        execFileSync(vscodeCli, ['--install-extension', outFilePath, '--force'], {
+            stdio: ['ignore', process.stdout, process.stderr],
+        });
         console.log('Successfully installed extension.');
     }
-
 } catch (error) {
     console.error('Packaging failed:', error);
     process.exitCode = 1;

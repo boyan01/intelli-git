@@ -18,7 +18,7 @@ export abstract class BaseWebviewProvider {
     protected _rpc?: RpcPeer<WebviewMethods, ExtensionMethods>;
     protected _disposables: vscode.Disposable[] = [];
 
-    constructor(protected readonly options: WebviewProviderOptions) { }
+    constructor(protected readonly options: WebviewProviderOptions) {}
 
     /**
      * Sets up the webview with RPC and message handling.
@@ -26,7 +26,7 @@ export abstract class BaseWebviewProvider {
     protected setupWebview(webview: vscode.Webview, onDisposed: () => boolean): void {
         webview.options = {
             enableScripts: true,
-            localResourceRoots: [this.options.extensionUri]
+            localResourceRoots: [this.options.extensionUri],
         };
 
         this._rpc = createRpc({ webview, onDisposed });
@@ -35,7 +35,7 @@ export abstract class BaseWebviewProvider {
             context: this.options.context,
             repositoryManager: this.options.repositoryManager,
             onDispose: this.getOnDispose(),
-            ...this.getRpcHandlerOptions()
+            ...this.getRpcHandlerOptions(),
         });
         handler.registerAll(this._rpc);
 
@@ -52,7 +52,7 @@ export abstract class BaseWebviewProvider {
             extensionUri: this.options.extensionUri,
             title: this.getTitle(),
             initialRoute: this.getInitialRoute(),
-            initialState: this.getInitialState()
+            initialState: this.getInitialState(),
         });
     }
 
@@ -76,7 +76,7 @@ export abstract class BaseWebviewProvider {
     }
 
     public dispose(): void {
-        this._disposables.forEach(d => d.dispose());
+        this._disposables.forEach((d) => d.dispose());
         this._disposables = [];
         this._rpc = undefined;
     }

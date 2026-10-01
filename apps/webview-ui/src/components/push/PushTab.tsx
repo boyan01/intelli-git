@@ -26,7 +26,7 @@ export function PushTab({
     pushBranches,
     reviewingCommitTarget = false,
     onUseTargetForCommit,
-    onCommitTargetChanged
+    onCommitTargetChanged,
 }: PushTabProps) {
     const { t } = useTranslation();
     const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -42,19 +42,14 @@ export function PushTab({
         confirmSelectedTarget,
         isProtectedPushTarget,
         isRemoteBranchesLoading,
-        isInitStateLoading
+        isInitStateLoading,
     } = pushBranches;
 
     // 2. Data State (Commits & Push)
-    const {
-        commits,
-        totalCommits,
-        hasMore,
-        isLoading,
-        isLoadingMore,
-        reload,
-        handleLoadMore
-    } = usePushData(selectedRemote, selectedRemoteBranch);
+    const { commits, totalCommits, hasMore, isLoading, isLoadingMore, reload, handleLoadMore } = usePushData(
+        selectedRemote,
+        selectedRemoteBranch
+    );
 
     // 3. View State
     const [viewMode, setViewMode] = useState<'commits' | 'changes'>('commits');
@@ -73,22 +68,28 @@ export function PushTab({
     }, [activeFile]);
 
     const toggleCommit = useCallback((hash: string) => {
-        setExpandedCommitHash(prev => prev === hash ? null : hash);
+        setExpandedCommitHash((prev) => (prev === hash ? null : hash));
     }, []);
 
-    const handleRemoteChange = useCallback((remote: string) => {
-        setSelectedRemote(remote);
-        if (reviewingCommitTarget) {
-            onCommitTargetChanged?.();
-        }
-    }, [onCommitTargetChanged, reviewingCommitTarget, setSelectedRemote]);
+    const handleRemoteChange = useCallback(
+        (remote: string) => {
+            setSelectedRemote(remote);
+            if (reviewingCommitTarget) {
+                onCommitTargetChanged?.();
+            }
+        },
+        [onCommitTargetChanged, reviewingCommitTarget, setSelectedRemote]
+    );
 
-    const handleRemoteBranchChange = useCallback((branch: string) => {
-        setSelectedRemoteBranch(branch);
-        if (reviewingCommitTarget) {
-            onCommitTargetChanged?.();
-        }
-    }, [onCommitTargetChanged, reviewingCommitTarget, setSelectedRemoteBranch]);
+    const handleRemoteBranchChange = useCallback(
+        (branch: string) => {
+            setSelectedRemoteBranch(branch);
+            if (reviewingCommitTarget) {
+                onCommitTargetChanged?.();
+            }
+        },
+        [onCommitTargetChanged, reviewingCommitTarget, setSelectedRemoteBranch]
+    );
 
     const handleFetch = useCallback(async () => {
         await rpc.fetch();
@@ -114,7 +115,7 @@ export function PushTab({
                 viewMode={viewMode}
                 isLoading={isRemoteBranchesLoading}
                 showTargetPlaceholder={isInitStateLoading && !selectedRemote && !selectedRemoteBranch}
-                onToggleView={() => setViewMode(m => m === 'commits' ? 'changes' : 'commits')}
+                onToggleView={() => setViewMode((m) => (m === 'commits' ? 'changes' : 'commits'))}
                 onRemoteChange={handleRemoteChange}
                 onRemoteBranchChange={handleRemoteBranchChange}
                 showCommitTargetAction={reviewingCommitTarget}
@@ -130,7 +131,9 @@ export function PushTab({
                         <i className={`codicon codicon-check ${styles.emptyIcon}`} />
                         <div className={styles.emptyTitle}>{t('Everything up to date')}</div>
                         <div className={styles.emptyDescription}>
-                            {t('No outgoing commits for {{target}}.', { target: `${selectedRemote}/${selectedRemoteBranch}` })}
+                            {t('No outgoing commits for {{target}}.', {
+                                target: `${selectedRemote}/${selectedRemoteBranch}`,
+                            })}
                         </div>
                         <div className={styles.emptyActions}>
                             <button className={styles.emptyAction} onClick={handleFetch}>
@@ -161,10 +164,7 @@ export function PushTab({
                         ))}
 
                         {hasMore && (
-                            <div
-                                className={styles.loadMoreItem}
-                                onClick={handleLoadMore}
-                            >
+                            <div className={styles.loadMoreItem} onClick={handleLoadMore}>
                                 {isLoadingMore ? (
                                     <>
                                         <span>{t('Loading...')}</span>

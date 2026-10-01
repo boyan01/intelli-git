@@ -9,18 +9,18 @@ describe('ChangelistOperations', () => {
         const gitService = {
             getStatus: vi.fn().mockResolvedValue([
                 { path: 'src/a.ts', status: 'M', staged: true },
-                { path: 'src/b.ts', status: 'M', staged: false }
+                { path: 'src/b.ts', status: 'M', staged: false },
             ]),
-            unstageFiles: vi.fn().mockResolvedValue(undefined)
+            unstageFiles: vi.fn().mockResolvedValue(undefined),
         } as unknown as GitService;
         const inactiveChangesService = {
-            markInactive: vi.fn().mockResolvedValue(undefined)
+            markInactive: vi.fn().mockResolvedValue(undefined),
         } as unknown as InactiveChangesService;
 
         const operations = new ChangelistOperations({
             gitService,
             inactiveChangesService,
-            changelistStateService: {} as ChangelistStateService
+            changelistStateService: {} as ChangelistStateService,
         });
 
         await operations.markFilesInactive(['src/a.ts', 'src/b.ts']);
@@ -33,27 +33,27 @@ describe('ChangelistOperations', () => {
         const refreshDecorations = vi.fn().mockResolvedValue(undefined);
         const inactiveChangesService = {
             markActive: vi.fn().mockResolvedValue(undefined),
-            markHunkActive: vi.fn().mockResolvedValue(undefined)
+            markHunkActive: vi.fn().mockResolvedValue(undefined),
         } as unknown as InactiveChangesService;
         const changelistStateService = {
             moveFiles: vi.fn().mockResolvedValue(undefined),
-            moveHunks: vi.fn().mockResolvedValue(undefined)
+            moveHunks: vi.fn().mockResolvedValue(undefined),
         } as unknown as ChangelistStateService;
 
         const operations = new ChangelistOperations({
             gitService: {} as GitService,
             inactiveChangesService,
             changelistStateService,
-            refreshDecorations
+            refreshDecorations,
         });
 
         await operations.moveChangesToChangelist({
             targetListId: 'review',
             paths: ['src/a.ts'],
             hunksByPath: {
-                'src/b.ts': ['h1', 'h2']
+                'src/b.ts': ['h1', 'h2'],
             },
-            activateInactive: true
+            activateInactive: true,
         });
 
         expect(inactiveChangesService.markActive).toHaveBeenCalledWith(['src/a.ts']);

@@ -19,29 +19,26 @@ export const BranchStatus: React.FC<BranchStatusProps> = ({
     behind,
     repositoryKind,
     repositoryDetached,
-    onPush
+    onPush,
 }) => {
     const { t } = useTranslation();
     const [isLoading, setIsLoading] = useState(false);
     const isSynced = (ahead || 0) === 0 && (behind || 0) === 0;
     const isWorktreeRepository = repositoryKind === 'worktree';
-    const branchIcon = repositoryDetached
-        ? 'codicon-warning'
-        : 'codicon-git-branch';
+    const branchIcon = repositoryDetached ? 'codicon-warning' : 'codicon-git-branch';
     const branchSectionClassName = [
         styles.section,
         isWorktreeRepository ? styles.worktree : '',
-        repositoryDetached ? styles.detached : ''
-    ].filter(Boolean).join(' ');
+        repositoryDetached ? styles.detached : '',
+    ]
+        .filter(Boolean)
+        .join(' ');
     const branchContext = repositoryDetached
         ? t('Detached at {{ref}}', { ref: current })
         : isWorktreeRepository
-            ? t('Worktree: {{branch}}', { branch: current })
-            : undefined;
-    const branchTitle = [
-        t('Switch Branch'),
-        branchContext
-    ].filter(Boolean).join('\n');
+          ? t('Worktree: {{branch}}', { branch: current })
+          : undefined;
+    const branchTitle = [t('Switch Branch'), branchContext].filter(Boolean).join('\n');
 
     return (
         <div className={styles.container}>
@@ -85,7 +82,10 @@ export const BranchStatus: React.FC<BranchStatusProps> = ({
             {(ahead || 0) > 0 && (
                 <div
                     className={`${styles.section} ${styles.ahead}`}
-                    onClick={(e) => { e.stopPropagation(); onPush?.(); }}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onPush?.();
+                    }}
                     title={t('Push {{count}} commits to remote', { count: ahead })}
                 >
                     <div className={styles.statusItem}>
@@ -113,7 +113,9 @@ export const BranchStatus: React.FC<BranchStatusProps> = ({
                     }}
                     title={isLoading ? t('Fetching...') : t('Fetch')}
                 >
-                    <i className={`codicon ${isLoading ? 'codicon-loading codicon-modifier-spin' : 'codicon-refresh'} ${styles.statusIcon}`} />
+                    <i
+                        className={`codicon ${isLoading ? 'codicon-loading codicon-modifier-spin' : 'codicon-refresh'} ${styles.statusIcon}`}
+                    />
                 </div>
             )}
         </div>

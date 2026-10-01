@@ -22,7 +22,10 @@ export interface ResolvedPushTarget {
     confirmation: PushTargetConfirmation;
 }
 
-function parseUpstream(upstream: string | undefined, remotes: string[]): Pick<ResolvedPushTarget, 'remote' | 'remoteBranch'> | undefined {
+function parseUpstream(
+    upstream: string | undefined,
+    remotes: string[]
+): Pick<ResolvedPushTarget, 'remote' | 'remoteBranch'> | undefined {
     if (!upstream) {
         return undefined;
     }
@@ -39,7 +42,7 @@ function parseUpstream(upstream: string | undefined, remotes: string[]): Pick<Re
 
     return {
         remote,
-        remoteBranch: parts.slice(1).join('/')
+        remoteBranch: parts.slice(1).join('/'),
     };
 }
 
@@ -64,7 +67,7 @@ export function resolvePushTarget(
         return {
             remote: '',
             remoteBranch: '',
-            confirmation: 'unconfirmed'
+            confirmation: 'unconfirmed',
         };
     }
 
@@ -73,9 +76,7 @@ export function resolvePushTarget(
     const savedMatchesState = isSavedSelectionForState(savedSelection, initState);
     const savedMatchesRemote = savedSelection.remote !== '' && remotes.includes(savedSelection.remote);
     const savedMatchesBranch = savedSelection.remoteBranch !== '';
-    const savedTarget = savedMatchesState && savedMatchesRemote && savedMatchesBranch
-        ? savedSelection
-        : undefined;
+    const savedTarget = savedMatchesState && savedMatchesRemote && savedMatchesBranch ? savedSelection : undefined;
 
     let remote: string;
     let remoteBranch: string;
@@ -110,6 +111,6 @@ export function resolvePushTarget(
     return {
         remote,
         remoteBranch,
-        confirmation
+        confirmation,
     };
 }

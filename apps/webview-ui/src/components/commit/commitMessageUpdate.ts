@@ -38,7 +38,11 @@ function replaceBody(currentMessage: string, generatedMessage: string): string {
     return `${subject}\n\n${body}`;
 }
 
-function replaceSelection(currentMessage: string, generatedMessage: string, selection?: CommitMessageSelection): string {
+function replaceSelection(
+    currentMessage: string,
+    generatedMessage: string,
+    selection?: CommitMessageSelection
+): string {
     const replacement = generatedMessage.trim();
     if (!replacement || !selection || selection.start === selection.end) {
         return currentMessage;

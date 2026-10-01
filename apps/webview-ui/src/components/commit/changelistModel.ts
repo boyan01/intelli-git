@@ -6,7 +6,7 @@ import type {
     GitHunk,
     RepositoryCommitViewState,
     RepositoryFileReference,
-    RepositoryInfo
+    RepositoryInfo,
 } from '@shared/messages';
 
 export const INACTIVE_CHANGELIST_ID = 'inactive-changes';
@@ -53,11 +53,7 @@ export function getSelectionKey(repoPath: string | undefined, filePath: string):
 }
 
 export function getEquivalentHunkIds(hunkId: string): string[] {
-    return [
-        hunkId,
-        hunkId.replace(':index:', ':worktree:'),
-        hunkId.replace(':worktree:', ':index:')
-    ];
+    return [hunkId, hunkId.replace(':index:', ':worktree:'), hunkId.replace(':worktree:', ':index:')];
 }
 
 export function isInactiveHunkId(hunkId: string, inactiveHunkIds?: string[]): boolean {
@@ -66,10 +62,14 @@ export function isInactiveHunkId(hunkId: string, inactiveHunkIds?: string[]): bo
     }
 
     const inactiveSet = new Set(inactiveHunkIds);
-    return getEquivalentHunkIds(hunkId).some(id => inactiveSet.has(id));
+    return getEquivalentHunkIds(hunkId).some((id) => inactiveSet.has(id));
 }
 
-export function hasOnlyInactiveHunks(file: { inactive?: boolean; hunks?: GitHunk[]; inactiveHunkIds?: string[] }): boolean {
+export function hasOnlyInactiveHunks(file: {
+    inactive?: boolean;
+    hunks?: GitHunk[];
+    inactiveHunkIds?: string[];
+}): boolean {
     if (file.inactive) {
         return true;
     }
@@ -78,12 +78,12 @@ export function hasOnlyInactiveHunks(file: { inactive?: boolean; hunks?: GitHunk
         return false;
     }
 
-    return file.hunks.every(hunk => isInactiveHunkId(hunk.id, file.inactiveHunkIds));
+    return file.hunks.every((hunk) => isInactiveHunkId(hunk.id, file.inactiveHunkIds));
 }
 
 function getAssignedHunkListId(hunkId: string, assignment?: ChangelistAssignment): string | undefined {
     return getEquivalentHunkIds(hunkId)
-        .map(id => assignment?.hunkListIds?.[id])
+        .map((id) => assignment?.hunkListIds?.[id])
         .find((id): id is string => Boolean(id));
 }
 
@@ -92,7 +92,7 @@ function getInactiveHunks(file: { hunks?: GitHunk[]; inactiveHunkIds?: string[] 
         return [];
     }
 
-    return file.hunks.filter(hunk => isInactiveHunkId(hunk.id, file.inactiveHunkIds));
+    return file.hunks.filter((hunk) => isInactiveHunkId(hunk.id, file.inactiveHunkIds));
 }
 
 function getActiveHunks(file: { hunks?: GitHunk[]; inactiveHunkIds?: string[] }): GitHunk[] {
@@ -100,20 +100,20 @@ function getActiveHunks(file: { hunks?: GitHunk[]; inactiveHunkIds?: string[] })
         return [];
     }
 
-    return file.hunks.filter(hunk => !isInactiveHunkId(hunk.id, file.inactiveHunkIds));
+    return file.hunks.filter((hunk) => !isInactiveHunkId(hunk.id, file.inactiveHunkIds));
 }
 
 function getLogicalStatus(entries: FileStatus[]): FileStatus['status'] {
-    if (entries.some(entry => entry.status === 'C' || entry.status === 'U')) {
+    if (entries.some((entry) => entry.status === 'C' || entry.status === 'U')) {
         return 'C';
     }
-    if (entries.some(entry => entry.status === '?')) {
+    if (entries.some((entry) => entry.status === '?')) {
         return '?';
     }
-    if (entries.some(entry => entry.status === 'D')) {
+    if (entries.some((entry) => entry.status === 'D')) {
         return 'D';
     }
-    if (entries.some(entry => entry.status === 'A')) {
+    if (entries.some((entry) => entry.status === 'A')) {
         return 'A';
     }
     return entries[0]?.status || 'M';
@@ -121,28 +121,28 @@ function getLogicalStatus(entries: FileStatus[]): FileStatus['status'] {
 
 function buildLogicalFiles(files: FileStatus[]): LogicalFile[] {
     const grouped = new Map<string, FileStatus[]>();
-    files.forEach(file => {
+    files.forEach((file) => {
         const entries = grouped.get(file.path) || [];
         entries.push(file);
         grouped.set(file.path, entries);
     });
 
     return Array.from(grouped.entries()).map(([path, entries]) => {
-        const hunks = Array.from(new Map(
-            entries.flatMap(entry => (entry.hunks || []).map(hunk => [hunk.id, hunk]))
-        ).values());
-        const inactiveHunkIds = Array.from(new Set(entries.flatMap(entry => entry.inactiveHunkIds || [])));
+        const hunks = Array.from(
+            new Map(entries.flatMap((entry) => (entry.hunks || []).map((hunk) => [hunk.id, hunk]))).values()
+        );
+        const inactiveHunkIds = Array.from(new Set(entries.flatMap((entry) => entry.inactiveHunkIds || [])));
 
         return {
             path,
             status: getLogicalStatus(entries),
             entries,
             hunks,
-            inactive: entries.some(entry => entry.inactive),
+            inactive: entries.some((entry) => entry.inactive),
             inactiveHunkIds,
-            resolvedCandidate: entries.some(entry => entry.resolvedCandidate),
-            error: entries.some(entry => entry.error),
-            hasStagedInactive: entries.some(entry => entry.hasStagedInactive)
+            resolvedCandidate: entries.some((entry) => entry.resolvedCandidate),
+            error: entries.some((entry) => entry.error),
+            hasStagedInactive: entries.some((entry) => entry.hasStagedInactive),
         };
     });
 }
@@ -157,7 +157,7 @@ function toDisplayFile(file: LogicalFile, hunks?: GitHunk[], inactive = file.ina
         inactiveHunkIds: file.inactiveHunkIds,
         resolvedCandidate: file.resolvedCandidate,
         error: file.error,
-        hasStagedInactive: file.hasStagedInactive
+        hasStagedInactive: file.hasStagedInactive,
     };
 }
 
@@ -175,23 +175,27 @@ function toActiveFileStatus(file: FileStatus): FileStatus | undefined {
         return {
             ...file,
             hunks: activeHunks,
-            inactive: false
+            inactive: false,
         };
     }
 
     return file;
 }
 
-export function buildChangelists(files: FileStatus[], changelistState: ChangelistState, t: Translate): ChangelistGroup[] {
+export function buildChangelists(
+    files: FileStatus[],
+    changelistState: ChangelistState,
+    t: Translate
+): ChangelistGroup[] {
     const logicalFiles = buildLogicalFiles(files);
     const changelistGroups = new Map<string, FileStatus[]>();
-    changelistState.lists.forEach(list => changelistGroups.set(list.id, []));
+    changelistState.lists.forEach((list) => changelistGroups.set(list.id, []));
 
     const conflictFiles: FileStatus[] = [];
     const inactiveFiles: FileStatus[] = [];
     const untrackedFiles: FileStatus[] = [];
 
-    logicalFiles.forEach(file => {
+    logicalFiles.forEach((file) => {
         if (file.status === 'C' || file.status === 'U') {
             conflictFiles.push(toDisplayFile(file));
             return;
@@ -243,7 +247,7 @@ export function buildChangelists(files: FileStatus[], changelistState: Changelis
 
             const hunksByList = new Map<string, GitHunk[]>();
 
-            activeHunks.forEach(hunk => {
+            activeHunks.forEach((hunk) => {
                 const listId = getAssignedHunkListId(hunk.id, assignment) || changelistState.activeListId;
                 const group = hunksByList.get(listId) || [];
                 group.push(hunk);
@@ -274,17 +278,17 @@ export function buildChangelists(files: FileStatus[], changelistState: Changelis
             name: t('Conflicting Changes'),
             isDefault: false,
             isActive: false,
-            items: conflictFiles
+            items: conflictFiles,
         });
     }
 
     if (changelistState.mode === 'staged') {
         const stagedFiles = files
-            .filter(file => file.staged && file.status !== '?' && file.status !== 'C' && file.status !== 'U')
+            .filter((file) => file.staged && file.status !== '?' && file.status !== 'C' && file.status !== 'U')
             .map(toActiveFileStatus)
             .filter((file): file is FileStatus => Boolean(file));
         const changesFiles = files
-            .filter(file => !file.staged && file.status !== '?' && file.status !== 'C' && file.status !== 'U')
+            .filter((file) => !file.staged && file.status !== '?' && file.status !== 'C' && file.status !== 'U')
             .map(toActiveFileStatus)
             .filter((file): file is FileStatus => Boolean(file));
 
@@ -293,7 +297,7 @@ export function buildChangelists(files: FileStatus[], changelistState: Changelis
             name: t('Staged Changes'),
             isDefault: false,
             isActive: false,
-            items: stagedFiles
+            items: stagedFiles,
         });
 
         result.push({
@@ -301,16 +305,16 @@ export function buildChangelists(files: FileStatus[], changelistState: Changelis
             name: t('Changes'),
             isDefault: true,
             isActive: true,
-            items: changesFiles
+            items: changesFiles,
         });
     } else {
-        changelistState.lists.forEach(list => {
+        changelistState.lists.forEach((list) => {
             result.push({
                 id: list.id,
                 name: list.name,
                 isDefault: list.isDefault,
                 isActive: list.isActive,
-                items: changelistGroups.get(list.id) || []
+                items: changelistGroups.get(list.id) || [],
             });
         });
     }
@@ -321,7 +325,7 @@ export function buildChangelists(files: FileStatus[], changelistState: Changelis
             name: t('Untracked Changes'),
             isDefault: false,
             isActive: false,
-            items: untrackedFiles
+            items: untrackedFiles,
         });
     }
 
@@ -332,32 +336,39 @@ export function buildChangelists(files: FileStatus[], changelistState: Changelis
             isDefault: false,
             isActive: false,
             items: inactiveFiles,
-            hasWarning: inactiveFiles.some(file => file.hasStagedInactive)
+            hasWarning: inactiveFiles.some((file) => file.hasStagedInactive),
         });
     }
 
     return result;
 }
 
-export function getSelectedFiles(files: FileStatus[], changelists: ChangelistGroup[], changelistState: ChangelistState): Set<string> {
+export function getSelectedFiles(
+    files: FileStatus[],
+    changelists: ChangelistGroup[],
+    changelistState: ChangelistState
+): Set<string> {
     if (changelistState.mode === 'staged') {
-        return new Set(files.filter(file => file.staged && !hasOnlyInactiveHunks(file)).map(file => file.path));
+        return new Set(files.filter((file) => file.staged && !hasOnlyInactiveHunks(file)).map((file) => file.path));
     }
 
-    const activeGroup = changelists.find(group => group.isActive);
-    const next = new Set(activeGroup?.items.map(file => file.path) || []);
-    const untrackedGroup = changelists.find(group => group.id === 'untracked-changes');
-    untrackedGroup?.items.forEach(file => next.add(file.path));
+    const activeGroup = changelists.find((group) => group.isActive);
+    const next = new Set(activeGroup?.items.map((file) => file.path) || []);
+    const untrackedGroup = changelists.find((group) => group.id === 'untracked-changes');
+    untrackedGroup?.items.forEach((file) => next.add(file.path));
     return next;
 }
 
-export function getFileStats(changelists: ChangelistGroup[], selectedFiles: Set<string>): { added: number; modified: number; deleted: number } {
+export function getFileStats(
+    changelists: ChangelistGroup[],
+    selectedFiles: Set<string>
+): { added: number; modified: number; deleted: number } {
     let added = 0;
     let modified = 0;
     let deleted = 0;
 
-    changelists.forEach(group => {
-        group.items.forEach(file => {
+    changelists.forEach((group) => {
+        group.items.forEach((file) => {
             if (!selectedFiles.has(file.path)) {
                 return;
             }
@@ -377,14 +388,21 @@ export function getFileStats(changelists: ChangelistGroup[], selectedFiles: Set<
 }
 
 export function hasTrackedChanges(files: FileStatus[]): boolean {
-    return files.some(file => !hasOnlyInactiveHunks(file) && file.status !== '?' && file.status !== 'C' && file.status !== 'U' && !file.staged);
+    return files.some(
+        (file) =>
+            !hasOnlyInactiveHunks(file) &&
+            file.status !== '?' &&
+            file.status !== 'C' &&
+            file.status !== 'U' &&
+            !file.staged
+    );
 }
 
 export function buildSplitInfoByPath(groups: ChangelistGroup[]): Map<string, SplitFileInfo> {
     const groupNamesByPath = new Map<string, Set<string>>();
 
-    groups.forEach(group => {
-        group.items.forEach(file => {
+    groups.forEach((group) => {
+        group.items.forEach((file) => {
             const groupNames = groupNamesByPath.get(file.path) || new Set<string>();
             groupNames.add(group.name);
             groupNamesByPath.set(file.path, groupNames);
@@ -399,7 +417,7 @@ export function buildSplitInfoByPath(groups: ChangelistGroup[]): Map<string, Spl
 
         result.set(path, {
             groupCount: groupNames.size,
-            groupNames: Array.from(groupNames)
+            groupNames: Array.from(groupNames),
         });
     });
 
@@ -426,16 +444,16 @@ export function buildWorkspaceChangelists(
 ): WorkspaceChangelistGroup[] {
     const groups = new Map<string, WorkspaceChangelistGroup>();
 
-    repositories.forEach(repositoryState => {
+    repositories.forEach((repositoryState) => {
         const repoGroups = buildChangelists(repositoryState.files, repositoryState.changelistState, t);
-        repoGroups.forEach(group => {
+        repoGroups.forEach((group) => {
             const key = getWorkspaceGroupKey(group);
             const existing = groups.get(key);
             const repositoryGroup: RepositoryChangelistGroup = {
                 repository: repositoryState.repository,
                 workspaceRoot: repositoryState.workspaceRoot,
                 changelistState: repositoryState.changelistState,
-                group
+                group,
             };
 
             if (existing) {
@@ -450,17 +468,18 @@ export function buildWorkspaceChangelists(
                 ...group,
                 id: key,
                 items: [...group.items],
-                repositories: [repositoryGroup]
+                repositories: [repositoryGroup],
             });
         });
     });
 
-    return Array.from(groups.values()).filter(group => (
-        group.repositories.some(repoGroup => repoGroup.group.items.length > 0) ||
-        group.id === 'staged-changes' ||
-        group.id === 'changes' ||
-        group.id === INACTIVE_CHANGELIST_ID
-    ));
+    return Array.from(groups.values()).filter(
+        (group) =>
+            group.repositories.some((repoGroup) => repoGroup.group.items.length > 0) ||
+            group.id === 'staged-changes' ||
+            group.id === 'changes' ||
+            group.id === INACTIVE_CHANGELIST_ID
+    );
 }
 
 export function getWorkspaceSelectedFiles(
@@ -469,17 +488,18 @@ export function getWorkspaceSelectedFiles(
 ): Map<string, RepositoryFileSelection> {
     const selected = new Map<string, RepositoryFileSelection>();
 
-    groups.forEach(group => {
-        group.repositories.forEach(repoGroup => {
-            const shouldSelect = changelistState.mode === 'staged'
-                ? repoGroup.group.id === 'staged-changes'
-                : repoGroup.group.isActive || repoGroup.group.id === 'untracked-changes';
+    groups.forEach((group) => {
+        group.repositories.forEach((repoGroup) => {
+            const shouldSelect =
+                changelistState.mode === 'staged'
+                    ? repoGroup.group.id === 'staged-changes'
+                    : repoGroup.group.isActive || repoGroup.group.id === 'untracked-changes';
 
             if (!shouldSelect) {
                 return;
             }
 
-            repoGroup.group.items.forEach(file => {
+            repoGroup.group.items.forEach((file) => {
                 if (hasOnlyInactiveHunks(file)) {
                     return;
                 }
@@ -489,7 +509,7 @@ export function getWorkspaceSelectedFiles(
                     path: file.path,
                     status: file.status,
                     staged: file.staged,
-                    inactive: file.inactive
+                    inactive: file.inactive,
                 });
             });
         });
@@ -506,9 +526,9 @@ export function getWorkspaceFileStats(
     let modified = 0;
     let deleted = 0;
 
-    groups.forEach(group => {
-        group.repositories.forEach(repoGroup => {
-            repoGroup.group.items.forEach(file => {
+    groups.forEach((group) => {
+        group.repositories.forEach((repoGroup) => {
+            repoGroup.group.items.forEach((file) => {
                 if (!selectedFiles.has(getSelectionKey(repoGroup.repository.repoPath, file.path))) {
                     return;
                 }
@@ -529,5 +549,5 @@ export function getWorkspaceFileStats(
 }
 
 export function hasWorkspaceTrackedChanges(repositories: RepositoryCommitViewState[]): boolean {
-    return repositories.some(repository => hasTrackedChanges(repository.files));
+    return repositories.some((repository) => hasTrackedChanges(repository.files));
 }

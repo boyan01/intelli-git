@@ -16,8 +16,7 @@ function normalizeInactivePath(filePath: string): string {
 function isSameOrDescendantPath(filePath: string, inactivePath: string): boolean {
     const normalizedFilePath = normalizeInactivePath(filePath);
     const normalizedInactivePath = normalizeInactivePath(inactivePath);
-    return normalizedFilePath === normalizedInactivePath ||
-        normalizedFilePath.startsWith(`${normalizedInactivePath}/`);
+    return normalizedFilePath === normalizedInactivePath || normalizedFilePath.startsWith(`${normalizedInactivePath}/`);
 }
 
 export class InactiveChangesService {
@@ -47,17 +46,17 @@ export class InactiveChangesService {
 
         // Migrate the old global key only for the repository that previously owned it.
         if (!v2Saved && this.repoPath && this.migrateGlobalState) {
-             const globalV2Saved = this.context.workspaceState.get<InactiveData>(InactiveChangesService.STORAGE_KEY_V2);
-             if (globalV2Saved) {
-                 v2Saved = globalV2Saved;
-             }
+            const globalV2Saved = this.context.workspaceState.get<InactiveData>(InactiveChangesService.STORAGE_KEY_V2);
+            if (globalV2Saved) {
+                v2Saved = globalV2Saved;
+            }
         }
 
         if (v2Saved) {
             this.state = v2Saved;
         } else if (v1Saved && v1Saved.length > 0) {
             // Migrate V1
-            v1Saved.forEach(path => {
+            v1Saved.forEach((path) => {
                 this.state.files[path] = { all: true };
             });
             void this.saveState();
@@ -65,10 +64,7 @@ export class InactiveChangesService {
     }
 
     private async saveState() {
-        await this.context.workspaceState.update(
-            this.storageKey,
-            this.state
-        );
+        await this.context.workspaceState.update(this.storageKey, this.state);
     }
 
     public createSnapshot(): InactiveChangesSnapshot {
@@ -81,7 +77,7 @@ export class InactiveChangesService {
     }
 
     public getInactiveFiles(): string[] {
-        return Object.keys(this.state.files).filter(path => this.state.files[path].all);
+        return Object.keys(this.state.files).filter((path) => this.state.files[path].all);
     }
 
     public getInactiveHunkIds(filePath: string): string[] {
@@ -95,14 +91,14 @@ export class InactiveChangesService {
     }
 
     public async markInactive(files: string[]): Promise<void> {
-        files.forEach(file => {
+        files.forEach((file) => {
             this.state.files[file] = { all: true };
         });
         await this.saveState();
     }
 
     public async markActive(files: string[]): Promise<void> {
-        files.forEach(file => {
+        files.forEach((file) => {
             delete this.state.files[file];
         });
         await this.saveState();
@@ -127,9 +123,9 @@ export class InactiveChangesService {
             const equivalentIds = new Set([
                 hunkId,
                 hunkId.replace(':index:', ':worktree:'),
-                hunkId.replace(':worktree:', ':index:')
+                hunkId.replace(':worktree:', ':index:'),
             ]);
-            fileInfo.hunkIds = fileInfo.hunkIds.filter(id => !equivalentIds.has(id));
+            fileInfo.hunkIds = fileInfo.hunkIds.filter((id) => !equivalentIds.has(id));
             if (fileInfo.hunkIds.length === 0 && !fileInfo.all) {
                 delete this.state.files[path];
             }
@@ -137,7 +133,11 @@ export class InactiveChangesService {
         await this.saveState();
     }
 
-    public async markMatchingHunkActive(path: string, hunkId: string, currentHunks: FileStatus['hunks'] = []): Promise<void> {
+    public async markMatchingHunkActive(
+        path: string,
+        hunkId: string,
+        currentHunks: FileStatus['hunks'] = []
+    ): Promise<void> {
         const fileInfo = this.state.files[path];
         if (!fileInfo) {
             return;
@@ -147,11 +147,11 @@ export class InactiveChangesService {
             const equivalentIds = new Set([
                 hunkId,
                 hunkId.replace(':index:', ':worktree:'),
-                hunkId.replace(':worktree:', ':index:')
+                hunkId.replace(':worktree:', ':index:'),
             ]);
             const remainingInactiveHunkIds = (currentHunks || [])
-                .filter(hunk => !equivalentIds.has(hunk.id))
-                .map(hunk => hunk.id);
+                .filter((hunk) => !equivalentIds.has(hunk.id))
+                .map((hunk) => hunk.id);
 
             if (remainingInactiveHunkIds.length === 0) {
                 delete this.state.files[path];
@@ -174,7 +174,7 @@ export class InactiveChangesService {
             }
         }
 
-        fileInfo.hunkIds = fileInfo.hunkIds.filter(id => !hunkIds.has(id));
+        fileInfo.hunkIds = fileInfo.hunkIds.filter((id) => !hunkIds.has(id));
         if (fileInfo.hunkIds.length === 0) {
             delete this.state.files[path];
         }
@@ -193,17 +193,17 @@ export class InactiveChangesService {
         const validPaths = new Set(grouped.keys());
         let changed = false;
 
-        Object.keys(this.state.files).forEach(path => {
+        Object.keys(this.state.files).forEach((path) => {
             if (validPaths.has(path)) {
                 return;
             }
 
             const fileInfo = this.state.files[path];
             const descendantPaths = fileInfo.all
-                ? Array.from(validPaths).filter(validPath => isSameOrDescendantPath(validPath, path))
+                ? Array.from(validPaths).filter((validPath) => isSameOrDescendantPath(validPath, path))
                 : [];
             if (descendantPaths.length > 0) {
-                descendantPaths.forEach(descendantPath => {
+                descendantPaths.forEach((descendantPath) => {
                     this.state.files[descendantPath] = { all: true };
                 });
             }
@@ -220,15 +220,17 @@ export class InactiveChangesService {
             const entries = grouped.get(path) || [];
             // Untracked files have always had one whole-file hunk. Preserve legacy
             // assignments when status no longer eagerly includes that hunk.
-            if (entries.some(entry => entry.status === '?')) {
+            if (entries.some((entry) => entry.status === '?')) {
                 this.state.files[path] = { all: true };
-                entries.forEach(entry => { entry.inactive = true; });
+                entries.forEach((entry) => {
+                    entry.inactive = true;
+                });
                 changed = true;
                 continue;
             }
-            const hunks = Array.from(new Map(
-                entries.flatMap(entry => (entry.hunks || []).map(hunk => [hunk.id, hunk]))
-            ).values());
+            const hunks = Array.from(
+                new Map(entries.flatMap((entry) => (entry.hunks || []).map((hunk) => [hunk.id, hunk]))).values()
+            );
             const nextHunkIds = remapHunkIdSet(hunks, fileInfo.hunkIds);
 
             if (JSON.stringify(nextHunkIds) !== JSON.stringify(fileInfo.hunkIds)) {

@@ -7,7 +7,7 @@ import type {
     LogCommit,
     LogOptions,
     PushCommitsData,
-    PushInitState
+    PushInitState,
 } from '@shared/messages';
 import type { RepositoryManager } from '../services/RepositoryManager';
 import { getProtectedPushTargets } from '../utils/pushProtection';
@@ -16,68 +16,80 @@ export class GitReadRpcHandler {
     constructor(
         private readonly repositoryManager: RepositoryManager,
         private readonly consumePendingGitLogReveal?: () => GitLogRevealRequest | undefined
-    ) { }
+    ) {}
 
     getPushInitState = async (): Promise<PushInitState> => {
         const protectedPushTargets = getProtectedPushTargets();
         const initState = await this.repositoryManager.getActiveService()?.branchRemote.getPushInitState();
-        return initState ? {
-            ...initState,
-            protectedPushTargets
-        } : {
-            repositoryPath: undefined,
-            localBranch: '',
-            remotes: [],
-            protectedPushTargets
-        };
+        return initState
+            ? {
+                  ...initState,
+                  protectedPushTargets,
+              }
+            : {
+                  repositoryPath: undefined,
+                  localBranch: '',
+                  remotes: [],
+                  protectedPushTargets,
+              };
     };
 
     getRemoteBranches = async (remote: string): Promise<string[]> => {
-        return await this.repositoryManager.getActiveService()?.branchRemote.getRemoteBranchesForRemote(remote) ?? [];
+        return (await this.repositoryManager.getActiveService()?.branchRemote.getRemoteBranchesForRemote(remote)) ?? [];
     };
 
-    getPushCommits = async (params: { remote: string; branch: string; limit?: number; skip?: number }): Promise<PushCommitsData> => {
-        return await this.repositoryManager.getActiveService()?.branchRemote.getPushCommits(params) ?? {
-            commits: [],
-            hasMore: false,
-            totalCount: 0
-        };
+    getPushCommits = async (params: {
+        remote: string;
+        branch: string;
+        limit?: number;
+        skip?: number;
+    }): Promise<PushCommitsData> => {
+        return (
+            (await this.repositoryManager.getActiveService()?.branchRemote.getPushCommits(params)) ?? {
+                commits: [],
+                hasMore: false,
+                totalCount: 0,
+            }
+        );
     };
 
     getCommitFiles = async (hash: string): Promise<CommitFile[]> => {
-        return await this.repositoryManager.getActiveService()?.log.getCommitFiles(hash) ?? [];
+        return (await this.repositoryManager.getActiveService()?.log.getCommitFiles(hash)) ?? [];
     };
 
     getMultiCommitFiles = async (hashes: string[]): Promise<CommitFile[]> => {
-        return await this.repositoryManager.getActiveService()?.log.getMultiCommitFiles(hashes) ?? [];
+        return (await this.repositoryManager.getActiveService()?.log.getMultiCommitFiles(hashes)) ?? [];
     };
 
     getBranchInfo = async (): Promise<BranchInfo> => {
-        const activeScope = typeof this.repositoryManager.getActiveScope === 'function'
-            ? this.repositoryManager.getActiveScope()
-            : undefined;
-        const branchInfo = await this.repositoryManager.getActiveService()?.branchRemote.getRpcBranchInfo() ?? {
+        const activeScope =
+            typeof this.repositoryManager.getActiveScope === 'function'
+                ? this.repositoryManager.getActiveScope()
+                : undefined;
+        const branchInfo = (await this.repositoryManager.getActiveService()?.branchRemote.getRpcBranchInfo()) ?? {
             current: '',
             all: [],
-            rebaseStatus: 'none'
+            rebaseStatus: 'none',
         };
 
         return {
             ...branchInfo,
-            current: branchInfo.current || (activeScope?.isDetached && activeScope.head ? activeScope.head.substring(0, 7) : branchInfo.current),
+            current:
+                branchInfo.current ||
+                (activeScope?.isDetached && activeScope.head ? activeScope.head.substring(0, 7) : branchInfo.current),
             repositoryName: activeScope?.name,
             repositoryKind: activeScope?.kind,
             repositoryDetached: activeScope?.isDetached,
-            repositoryPath: activeScope?.path
+            repositoryPath: activeScope?.path,
         };
     };
 
     getStashList = async () => {
-        return await this.repositoryManager.getActiveService()?.getStashList() ?? [];
+        return (await this.repositoryManager.getActiveService()?.getStashList()) ?? [];
     };
 
     getStashFiles = async (index: number): Promise<CommitFile[]> => {
-        return await this.repositoryManager.getActiveService()?.getStashFilesAsCommitFiles(index) ?? [];
+        return (await this.repositoryManager.getActiveService()?.getStashFilesAsCommitFiles(index)) ?? [];
     };
 
     getBranchListData = async (): Promise<BranchListData> => {
@@ -89,41 +101,44 @@ export class GitReadRpcHandler {
                 localBranches: [],
                 localBranchesInfo: [],
                 remoteBranches: {},
-                tags: []
+                tags: [],
             };
         }
 
-        const activeScope = typeof this.repositoryManager.getActiveScope === 'function'
-            ? this.repositoryManager.getActiveScope()
-            : undefined;
+        const activeScope =
+            typeof this.repositoryManager.getActiveScope === 'function'
+                ? this.repositoryManager.getActiveScope()
+                : undefined;
         const data = await gitService.branchRemote.getBranchListData();
         return {
             ...data,
             ...(activeScope ? { repository: activeScope } : {}),
-            hasRepository: true
+            hasRepository: true,
         };
     };
 
     getLog = async (options: LogOptions): Promise<LogCommit[]> => {
-        return await this.repositoryManager.getActiveService()?.log.getLog(options) ?? [];
+        return (await this.repositoryManager.getActiveService()?.log.getLog(options)) ?? [];
     };
 
     getCommitDetails = async (hash: string): Promise<CommitDetails> => {
-        return await this.repositoryManager.getActiveService()?.log.getCommitDetails(hash) ?? {
-            hash,
-            shortHash: hash.substring(0, 7),
-            subject: '',
-            authorName: '',
-            authorEmail: '',
-            date: '',
-            body: '',
-            files: [],
-            stats: { additions: 0, deletions: 0 },
-            parentHashes: [],
-            containingBranches: [],
-            refs: [],
-            filteredAncestors: []
-        };
+        return (
+            (await this.repositoryManager.getActiveService()?.log.getCommitDetails(hash)) ?? {
+                hash,
+                shortHash: hash.substring(0, 7),
+                subject: '',
+                authorName: '',
+                authorEmail: '',
+                date: '',
+                body: '',
+                files: [],
+                stats: { additions: 0, deletions: 0 },
+                parentHashes: [],
+                containingBranches: [],
+                refs: [],
+                filteredAncestors: [],
+            }
+        );
     };
 
     getPendingGitLogReveal = async (): Promise<GitLogRevealRequest | undefined> => {
@@ -131,11 +146,11 @@ export class GitReadRpcHandler {
     };
 
     getAuthors = async (): Promise<string[]> => {
-        return await this.repositoryManager.getActiveService()?.log.getAuthors() ?? [];
+        return (await this.repositoryManager.getActiveService()?.log.getAuthors()) ?? [];
     };
 
     getCurrentUser = async (): Promise<string> => {
-        return await this.repositoryManager.getActiveService()?.log.getCurrentUser() ?? '';
+        return (await this.repositoryManager.getActiveService()?.log.getCurrentUser()) ?? '';
     };
 
     getWorkspaceRoot = async (): Promise<string> => {
@@ -143,7 +158,7 @@ export class GitReadRpcHandler {
     };
 
     getLastCommitInfo = async () => {
-        return await this.repositoryManager.getActiveService()?.getLastCommitInfo() ?? null;
+        return (await this.repositoryManager.getActiveService()?.getLastCommitInfo()) ?? null;
     };
 
     getUnpushedCommits = async (): Promise<string[]> => {

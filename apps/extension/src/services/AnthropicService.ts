@@ -33,16 +33,18 @@ class AnthropicChatResponse implements vscode.LanguageModelChatResponse {
         return {
             async *[Symbol.asyncIterator]() {
                 yield text;
-            }
+            },
         };
     }
 
-    get stream(): AsyncIterable<vscode.LanguageModelTextPart | vscode.LanguageModelToolCallPart | vscode.LanguageModelToolResultPart | unknown> {
+    get stream(): AsyncIterable<
+        vscode.LanguageModelTextPart | vscode.LanguageModelToolCallPart | vscode.LanguageModelToolResultPart | unknown
+    > {
         const text = this._text;
         return {
             async *[Symbol.asyncIterator]() {
                 yield new vscode.LanguageModelTextPart(text);
-            }
+            },
         };
     }
 }
@@ -79,10 +81,7 @@ export class AnthropicLanguageModel implements vscode.LanguageModelChat {
         return new AnthropicChatResponse(responseText);
     }
 
-    countTokens(
-        _text: string | vscode.LanguageModelChatMessage,
-        _token?: vscode.CancellationToken
-    ): Thenable<number> {
+    countTokens(_text: string | vscode.LanguageModelChatMessage, _token?: vscode.CancellationToken): Thenable<number> {
         // Rough estimation: ~4 chars per token
         const text = typeof _text === 'string' ? _text : this.messageToString(_text);
         return Promise.resolve(Math.ceil(text.length / 4));
@@ -93,7 +92,7 @@ export class AnthropicLanguageModel implements vscode.LanguageModelChat {
             return message.content;
         }
         return message.content
-            .map(part => {
+            .map((part) => {
                 if (part instanceof vscode.LanguageModelTextPart) {
                     return part.value;
                 }
@@ -103,9 +102,9 @@ export class AnthropicLanguageModel implements vscode.LanguageModelChat {
     }
 
     private convertMessages(messages: vscode.LanguageModelChatMessage[]): AnthropicMessage[] {
-        return messages.map(msg => ({
-            role: msg.role === vscode.LanguageModelChatMessageRole.User ? 'user' as const : 'assistant' as const,
-            content: this.messageToString(msg)
+        return messages.map((msg) => ({
+            role: msg.role === vscode.LanguageModelChatMessageRole.User ? ('user' as const) : ('assistant' as const),
+            content: this.messageToString(msg),
         }));
     }
 
@@ -118,7 +117,7 @@ export class AnthropicLanguageModel implements vscode.LanguageModelChat {
             const requestBody = JSON.stringify({
                 model: this.id,
                 max_tokens: 1024,
-                messages
+                messages,
             });
 
             const options: https.RequestOptions = {
@@ -129,8 +128,8 @@ export class AnthropicLanguageModel implements vscode.LanguageModelChat {
                 headers: {
                     'Content-Type': 'application/json',
                     'x-api-key': this.apiKey,
-                    'Content-Length': Buffer.byteLength(requestBody)
-                }
+                    'Content-Length': Buffer.byteLength(requestBody),
+                },
             };
 
             const req = httpModule.request(options, (res) => {
@@ -150,7 +149,7 @@ export class AnthropicLanguageModel implements vscode.LanguageModelChat {
                         }
 
                         if (response.content && response.content.length > 0) {
-                            const textContent = response.content.find(c => c.type === 'text');
+                            const textContent = response.content.find((c) => c.type === 'text');
                             if (textContent) {
                                 resolve(textContent.text);
                                 return;

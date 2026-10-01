@@ -15,14 +15,14 @@ function run(command, args, capture = false, env = process.env) {
         cwd: repoRoot,
         env,
         stdio: capture ? ['ignore', 'pipe', 'pipe'] : 'inherit',
-        encoding: 'utf8'
+        encoding: 'utf8',
     })?.trim();
 }
 
 function changelogFor(version) {
     const text = fs.readFileSync(path.join(repoRoot, 'apps/extension/CHANGELOG.md'), 'utf8');
     const sections = text.split(/^## /m).slice(1);
-    const matches = sections.filter(section => section.split(/\r?\n/, 1)[0] === version);
+    const matches = sections.filter((section) => section.split(/\r?\n/, 1)[0] === version);
     if (matches.length !== 1 || !/^\s*- \S/m.test(matches[0])) {
         throw new Error(`Expected one non-empty changelog section for ${version}.`);
     }
@@ -34,8 +34,10 @@ function metadata(tag) {
         throw new Error('Pass an existing vX.Y.Z release tag.');
     }
     const version = tag.slice(1);
-    if (readJson('apps/extension/package.json').version !== version
-        || readJson('package-lock.json').packages?.['apps/extension']?.version !== version) {
+    if (
+        readJson('apps/extension/package.json').version !== version ||
+        readJson('package-lock.json').packages?.['apps/extension']?.version !== version
+    ) {
         throw new Error('Release tag, extension version and lockfile version must match.');
     }
     changelogFor(version);
@@ -53,11 +55,13 @@ function metadata(tag) {
 }
 
 function releaseNotes(info) {
-    return `${changelogFor(info.version)}\n\n`
-        + `[Install from Marketplace](https://marketplace.visualstudio.com/items?itemName=boyan01.intelli-git) · `
-        + `[Install from Open VSX](https://open-vsx.org/extension/boyan01/intelli-git)\n\n`
-        + `[Source (${info.tag})](https://github.com/${releaseRepository}/tree/${info.tag}) · `
-        + `[Build instructions](https://github.com/${releaseRepository}/blob/${info.tag}/.agents/skills/intelli-git-release/SKILL.md)\n`;
+    return (
+        `${changelogFor(info.version)}\n\n` +
+        `[Install from Marketplace](https://marketplace.visualstudio.com/items?itemName=boyan01.intelli-git) · ` +
+        `[Install from Open VSX](https://open-vsx.org/extension/boyan01/intelli-git)\n\n` +
+        `[Source (${info.tag})](https://github.com/${releaseRepository}/tree/${info.tag}) · ` +
+        `[Build instructions](https://github.com/${releaseRepository}/blob/${info.tag}/.agents/skills/intelli-git-release/SKILL.md)\n`
+    );
 }
 
 function checksum(file) {
@@ -99,19 +103,28 @@ function publish(tag) {
     fs.mkdirSync(directory, { recursive: true });
     const vsix = path.join(directory, info.file);
     const manifestPath = path.join(directory, 'release-manifest.json');
-    const pages = JSON.parse(gh(['api', '--paginate', '--slurp', `repos/${releaseRepository}/releases?per_page=100`], true));
-    const matches = pages.flat().filter(release => release.tag_name === tag);
+    const pages = JSON.parse(
+        gh(['api', '--paginate', '--slurp', `repos/${releaseRepository}/releases?per_page=100`], true)
+    );
+    const matches = pages.flat().filter((release) => release.tag_name === tag);
     if (matches.length > 1) {
         throw new Error('Multiple releases refer to this tag. Resolve them before publishing.');
     }
     const existing = matches[0];
     let manifest;
     if (existing) {
-        const names = new Set(existing.assets.map(asset => asset.name));
+        const names = new Set(existing.assets.map((asset) => asset.name));
         if (!names.has(info.file) || !names.has('release-manifest.json')) {
-            throw new Error('Existing release lacks managed artifacts. Do not rebuild or overwrite it; see the project release skill.');
+            throw new Error(
+                'Existing release lacks managed artifacts. Do not rebuild or overwrite it; see the project release skill.'
+            );
         }
-        for (const name of [info.file, 'release-manifest.json', 'published-marketplace.json', 'published-open-vsx.json']) {
+        for (const name of [
+            info.file,
+            'release-manifest.json',
+            'published-marketplace.json',
+            'published-open-vsx.json',
+        ]) {
             if (names.has(name)) {
                 gh(['release', 'download', tag, '--repo', releaseRepository, '--pattern', name, '--dir', directory]);
             }
@@ -125,7 +138,7 @@ function publish(tag) {
             run('npm', ['run', script], false, {
                 ...process.env,
                 VSCE_BASE_CONTENT_URL: `https://raw.githubusercontent.com/${releaseRepository}/${tag}`,
-                VSCE_BASE_IMAGES_URL: `https://raw.githubusercontent.com/${releaseRepository}/${tag}`
+                VSCE_BASE_IMAGES_URL: `https://raw.githubusercontent.com/${releaseRepository}/${tag}`,
             });
         }
         fs.copyFileSync(path.join(repoRoot, 'out', info.file), vsix);
@@ -134,15 +147,28 @@ function publish(tag) {
         const notesPath = path.join(directory, 'release-notes.md');
         fs.writeFileSync(notesPath, releaseNotes(info));
         assertRemoteTag(info);
-        gh(['release', 'create', tag, '--repo', releaseRepository, '--verify-tag', '--draft',
-            '--title', `Intelli Git ${info.version}`, '--notes-file', notesPath, vsix, manifestPath]);
+        gh([
+            'release',
+            'create',
+            tag,
+            '--repo',
+            releaseRepository,
+            '--verify-tag',
+            '--draft',
+            '--title',
+            `Intelli Git ${info.version}`,
+            '--notes-file',
+            notesPath,
+            vsix,
+            manifestPath,
+        ]);
     }
 
     for (const channel of ['marketplace', 'open-vsx']) {
         const receipt = path.join(directory, `published-${channel}.json`);
         if (fs.existsSync(receipt)) {
             const saved = JSON.parse(fs.readFileSync(receipt, 'utf8'));
-            if (saved.channel !== channel || Object.keys(manifest).some(key => saved[key] !== manifest[key])) {
+            if (saved.channel !== channel || Object.keys(manifest).some((key) => saved[key] !== manifest[key])) {
                 throw new Error(`Invalid publication receipt for ${channel}.`);
             }
             console.log(`${channel}: already published this artifact.`);
@@ -167,8 +193,9 @@ function publish(tag) {
     if (!existing || existing.draft) {
         gh(['release', 'edit', tag, '--repo', releaseRepository, '--draft=false']);
     }
-    const summary = `Released ${tag} from ${info.commit}\n\nSHA-256: ${manifest.sha256}\n\n`
-        + `Marketplace and Open VSX published; [GitHub Release](https://github.com/${releaseRepository}/releases/tag/${tag}).\n`;
+    const summary =
+        `Released ${tag} from ${info.commit}\n\nSHA-256: ${manifest.sha256}\n\n` +
+        `Marketplace and Open VSX published; [GitHub Release](https://github.com/${releaseRepository}/releases/tag/${tag}).\n`;
     console.log(summary);
     if (process.env.GITHUB_STEP_SUMMARY) {
         fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary);

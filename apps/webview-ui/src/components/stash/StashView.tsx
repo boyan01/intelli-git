@@ -18,7 +18,7 @@ export function StashView() {
     const loadStashes = useCallback(() => rpc.getStashList(), []);
     const { data: stashes, loading } = useRpcData(loadStashes, {
         initialValue: [] as StashItem[],
-        refreshScopes: STASH_REFRESH_SCOPES
+        refreshScopes: STASH_REFRESH_SCOPES,
     });
     const [selectedIndex, setSelectedIndex] = usePersistedState('stash.selectedIndex');
     const [viewMode, setViewMode] = usePersistedState('stash.viewMode');
@@ -35,20 +35,18 @@ export function StashView() {
     const loadStashFiles = useCallback(() => rpc.getStashFiles(selectedIndex!), [selectedIndex]);
 
     // Load files for selected stash
-    const { data: files, loading: filesLoading } = useRpcData(
-        loadStashFiles,
-        {
-            initialValue: [] as CommitFile[],
-            refreshScopes: STASH_REFRESH_SCOPES
-        }
+    const { data: files, loading: filesLoading } = useRpcData(loadStashFiles, {
+        initialValue: [] as CommitFile[],
+        refreshScopes: STASH_REFRESH_SCOPES,
+    });
+
+    const handleStashClick = useCallback(
+        (index: number) => {
+            setSelectedIndex(index);
+            setSelectedFile(null);
+        },
+        [setSelectedIndex]
     );
-
-
-
-    const handleStashClick = useCallback((index: number) => {
-        setSelectedIndex(index);
-        setSelectedFile(null);
-    }, [setSelectedIndex]);
 
     const handleExpandAll = useCallback(() => {
         treeRef.current?.expandAll();
@@ -58,28 +56,33 @@ export function StashView() {
         treeRef.current?.collapseAll();
     }, []);
 
-
     const handleFileClick = useCallback((path: string) => {
         setSelectedFile(path);
     }, []);
 
-    const handleFileDoubleClick = useCallback((path: string) => {
-        if (selectedIndex !== null) {
-            rpc.openStashDiff({ index: selectedIndex, path }).catch(e => {
-                console.error('Failed to open stash diff:', e);
-            });
-        }
-    }, [selectedIndex]);
+    const handleFileDoubleClick = useCallback(
+        (path: string) => {
+            if (selectedIndex !== null) {
+                rpc.openStashDiff({ index: selectedIndex, path }).catch((e) => {
+                    console.error('Failed to open stash diff:', e);
+                });
+            }
+        },
+        [selectedIndex]
+    );
 
-    const handleStashDoubleClick = useCallback((index: number) => {
-        if (selectedIndex === index && selectedFile) {
-            rpc.openStashDiff({ index, path: selectedFile });
-        } else if (selectedIndex === index && files.length > 0) {
-            // If no specific file selected, open first
-            rpc.openStashDiff({ index, path: files[0].path });
-            setSelectedFile(files[0].path);
-        }
-    }, [selectedIndex, selectedFile, files]);
+    const handleStashDoubleClick = useCallback(
+        (index: number) => {
+            if (selectedIndex === index && selectedFile) {
+                rpc.openStashDiff({ index, path: selectedFile });
+            } else if (selectedIndex === index && files.length > 0) {
+                // If no specific file selected, open first
+                rpc.openStashDiff({ index, path: files[0].path });
+                setSelectedFile(files[0].path);
+            }
+        },
+        [selectedIndex, selectedFile, files]
+    );
 
     if (loading) return null;
 
@@ -87,11 +90,11 @@ export function StashView() {
         return <div className={styles.emptyState}>{t('No stashed changes')}</div>;
     }
 
-    const fileItems: FileStatus[] = files.map(f => ({
+    const fileItems: FileStatus[] = files.map((f) => ({
         path: f.path,
         displayPath: f.displayPath,
         status: f.status,
-        staged: false
+        staged: false,
     }));
 
     return (
@@ -113,9 +116,7 @@ export function StashView() {
                             onClick={() => handleStashClick(stash.index)}
                             onDoubleClick={() => handleStashDoubleClick(stash.index)}
                         >
-                            <span className={styles.stashItemName}>
-                                {stash.message || `Stash@{${stash.index}}`}
-                            </span>
+                            <span className={styles.stashItemName}>{stash.message || `Stash@{${stash.index}}`}</span>
                             <span className={styles.stashItemBranch}>
                                 <i className="codicon codicon-git-branch" />
                                 {stash.branch || 'HEAD'}
@@ -129,41 +130,33 @@ export function StashView() {
                     <div className={styles.previewHeader}>
                         <span className={styles.previewTitle}>{t('Stored files')}</span>
                         <div className={styles.previewActions}>
-                            <button
-                                className={styles.iconBtn}
-                                title={t('Expand All')}
-                                onClick={handleExpandAll}
-                            >
+                            <button className={styles.iconBtn} title={t('Expand All')} onClick={handleExpandAll}>
                                 <i className="codicon codicon-expand-all" />
                             </button>
-                            <button
-                                className={styles.iconBtn}
-                                title={t('Collapse All')}
-                                onClick={handleCollapseAll}
-                            >
+                            <button className={styles.iconBtn} title={t('Collapse All')} onClick={handleCollapseAll}>
                                 <i className="codicon codicon-collapse-all" />
                             </button>
                             <ViewModeToggle viewMode={viewMode} onChange={setViewMode} />
                         </div>
                     </div>
                     <div className={styles.previewContent}>
-                        {filesLoading ? null : (
-                            fileItems.length > 0 ? (
-                                <BaseFileTree
-                                    ref={treeRef}
-                                    items={fileItems}
-                                    viewMode={viewMode}
-                                    activeFile={selectedFile}
-                                    readonly
-                                    onFileClick={handleFileClick}
-                                    onFileDoubleClick={handleFileDoubleClick}
-                                    stickyHeaders={true}
-                                />
-                            ) : (
-                                <div className={styles.emptyPreview}>
-                                    {selectedIndex !== null ? t('No files in this stash') : t('Select a stash to view files')}
-                                </div>
-                            )
+                        {filesLoading ? null : fileItems.length > 0 ? (
+                            <BaseFileTree
+                                ref={treeRef}
+                                items={fileItems}
+                                viewMode={viewMode}
+                                activeFile={selectedFile}
+                                readonly
+                                onFileClick={handleFileClick}
+                                onFileDoubleClick={handleFileDoubleClick}
+                                stickyHeaders={true}
+                            />
+                        ) : (
+                            <div className={styles.emptyPreview}>
+                                {selectedIndex !== null
+                                    ? t('No files in this stash')
+                                    : t('Select a stash to view files')}
+                            </div>
                         )}
                     </div>
                 </div>

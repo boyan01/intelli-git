@@ -15,7 +15,7 @@ const fileNameLanguages = new Map<string, string>([
     ['go.sum', 'go'],
     ['gemfile', 'ruby'],
     ['rakefile', 'ruby'],
-    ['podfile', 'ruby']
+    ['podfile', 'ruby'],
 ]);
 
 const extensionLanguages = new Map<string, string>([
@@ -73,7 +73,7 @@ const extensionLanguages = new Map<string, string>([
     ['.xml', 'xml'],
     ['.yaml', 'yaml'],
     ['.yml', 'yaml'],
-    ['.zsh', 'shell']
+    ['.zsh', 'shell'],
 ]);
 
 function normalizeFilePath(filePath: string): string {
@@ -133,8 +133,8 @@ export function applyVsCodeMonacoTheme(monaco: MonacoApi) {
             'editor.selectionBackground': getCssVar('--vscode-editor-selectionBackground', '#264f78'),
             'editor.inactiveSelectionBackground': getCssVar('--vscode-editor-inactiveSelectionBackground', '#3a3d41'),
             'editor.lineHighlightBackground': getCssVar('--vscode-editor-lineHighlightBackground', '#2a2d2e'),
-            'editor.lineHighlightBorder': getCssVar('--vscode-editor-lineHighlightBorder', '#00000000')
-        }
+            'editor.lineHighlightBorder': getCssVar('--vscode-editor-lineHighlightBorder', '#00000000'),
+        },
     });
     monaco.editor.setTheme('intelli-git-vscode');
 }

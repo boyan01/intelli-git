@@ -29,15 +29,15 @@ export class BackgroundFetchService implements vscode.Disposable {
 
     constructor(
         private readonly repositoryManager: RepositoryManager,
-        private readonly onRemoteRefsChanged: (scope: RepositoryScope) => void = () => { }
+        private readonly onRemoteRefsChanged: (scope: RepositoryScope) => void = () => {}
     ) {
         this.disposables.push(
-            vscode.window.onDidChangeWindowState(event => {
+            vscode.window.onDidChangeWindowState((event) => {
                 if (event.focused) {
                     void this.fetchDueRepositories('windowFocus');
                 }
             }),
-            vscode.workspace.onDidChangeConfiguration(event => {
+            vscode.workspace.onDidChangeConfiguration((event) => {
                 if (event.affectsConfiguration('intelli-git.backgroundFetch')) {
                     this.cancelActiveFetch('configuration-changed');
                     this.configureSchedule();
@@ -85,9 +85,12 @@ export class BackgroundFetchService implements vscode.Disposable {
             this.startupTimer.unref?.();
         }
 
-        this.timer = setInterval(() => {
-            void this.fetchDueRepositories('interval');
-        }, config.intervalMinutes * 60 * 1000);
+        this.timer = setInterval(
+            () => {
+                void this.fetchDueRepositories('interval');
+            },
+            config.intervalMinutes * 60 * 1000
+        );
         this.timer.unref?.();
     }
 
@@ -110,8 +113,11 @@ export class BackgroundFetchService implements vscode.Disposable {
             onStartup: config.get<boolean>('onStartup', true),
             intervalMinutes: Math.min(
                 MAX_INTERVAL_MINUTES,
-                Math.max(MIN_INTERVAL_MINUTES, Math.floor(Number.isFinite(intervalMinutes) ? intervalMinutes : DEFAULT_INTERVAL_MINUTES))
-            )
+                Math.max(
+                    MIN_INTERVAL_MINUTES,
+                    Math.floor(Number.isFinite(intervalMinutes) ? intervalMinutes : DEFAULT_INTERVAL_MINUTES)
+                )
+            ),
         };
     }
 
@@ -189,13 +195,13 @@ export class BackgroundFetchService implements vscode.Disposable {
         try {
             const remotes = (await this.runGit(scope.gitRoot, ['remote'], controller.signal))
                 .split(/\r?\n/)
-                .map(remote => remote.trim())
+                .map((remote) => remote.trim())
                 .filter(Boolean);
             if (!remotes.includes(ORIGIN_REMOTE)) {
                 logger.debug('Background fetch skipped missing remote', {
                     repoPath: scope.repoPath,
                     remote: ORIGIN_REMOTE,
-                    reason
+                    reason,
                 });
                 return true;
             }
@@ -203,12 +209,7 @@ export class BackgroundFetchService implements vscode.Disposable {
             const remoteRefPrefix = `refs/remotes/${ORIGIN_REMOTE}/`;
             const refsArgs = ['for-each-ref', '--format=%(refname):%(objectname)', remoteRefPrefix];
             const before = await this.runGit(scope.gitRoot, refsArgs, controller.signal);
-            await this.runGit(
-                scope.gitRoot,
-                ['fetch', '--no-tags', '--quiet', ORIGIN_REMOTE],
-                controller.signal,
-                true
-            );
+            await this.runGit(scope.gitRoot, ['fetch', '--no-tags', '--quiet', ORIGIN_REMOTE], controller.signal, true);
             const after = await this.runGit(scope.gitRoot, refsArgs, controller.signal);
             const changed = before !== after;
             if (changed) {
@@ -219,7 +220,7 @@ export class BackgroundFetchService implements vscode.Disposable {
                 remote: ORIGIN_REMOTE,
                 reason,
                 changed,
-                fetchMs: Date.now() - startedAt
+                fetchMs: Date.now() - startedAt,
             });
             return true;
         } catch (error) {
@@ -228,7 +229,7 @@ export class BackgroundFetchService implements vscode.Disposable {
                     repoPath: scope.repoPath,
                     remote: ORIGIN_REMOTE,
                     reason,
-                    fetchMs: Date.now() - startedAt
+                    fetchMs: Date.now() - startedAt,
                 };
                 if (timedOut) {
                     logger.warn('Background fetch timed out', details);
@@ -242,7 +243,7 @@ export class BackgroundFetchService implements vscode.Disposable {
                 remote: ORIGIN_REMOTE,
                 reason,
                 fetchMs: Date.now() - startedAt,
-                error: formatError(error)
+                error: formatError(error),
             });
             return false;
         } finally {
@@ -257,7 +258,7 @@ export class BackgroundFetchService implements vscode.Disposable {
                 cwd,
                 env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
                 signal,
-                stdio: ['ignore', 'pipe', 'pipe']
+                stdio: ['ignore', 'pipe', 'pipe'],
             });
             if (lowPriority && child.pid) {
                 try {
@@ -275,10 +276,10 @@ export class BackgroundFetchService implements vscode.Disposable {
                 }
                 return `${current}${chunk.toString('utf8')}`;
             };
-            child.stdout.on('data', chunk => {
+            child.stdout.on('data', (chunk) => {
                 stdout = appendOutput(stdout, chunk);
             });
-            child.stderr.on('data', chunk => {
+            child.stderr.on('data', (chunk) => {
                 stderr = appendOutput(stderr, chunk);
             });
 
@@ -288,14 +289,16 @@ export class BackgroundFetchService implements vscode.Disposable {
                 settled = true;
                 callback();
             };
-            child.once('error', error => finish(() => reject(error)));
-            child.once('close', code => finish(() => {
-                if (code === 0) {
-                    resolve(stdout);
-                    return;
-                }
-                reject(new Error(stderr.trim() || `git ${args[0]} exited with code ${code}`));
-            }));
+            child.once('error', (error) => finish(() => reject(error)));
+            child.once('close', (code) =>
+                finish(() => {
+                    if (code === 0) {
+                        resolve(stdout);
+                        return;
+                    }
+                    reject(new Error(stderr.trim() || `git ${args[0]} exited with code ${code}`));
+                })
+            );
         });
     }
 }

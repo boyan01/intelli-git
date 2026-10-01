@@ -9,7 +9,17 @@ import { usePersistedState } from '../../hooks/usePersistedState';
 import { useRpcData } from '../../hooks/useRpcData';
 import styles from './CommitView.module.css';
 import { rpc, rpcEvents } from '../../lib/rpc_client';
-import type { BranchInfo, ChangelistState, CommitViewState, FileDiagnosticsChange, FileStatus, LastCommitInfo, RepositoryCommitViewState, RepositoryFileReference, RefreshScope } from '@shared/messages';
+import type {
+    BranchInfo,
+    ChangelistState,
+    CommitViewState,
+    FileDiagnosticsChange,
+    FileStatus,
+    LastCommitInfo,
+    RepositoryCommitViewState,
+    RepositoryFileReference,
+    RefreshScope,
+} from '@shared/messages';
 import type { ChangelistBackgroundContext } from '@shared/webviewContext';
 import type { CommitOptions } from './CommitForm';
 import {
@@ -18,7 +28,7 @@ import {
     getWorkspaceSelectedFiles,
     hasWorkspaceTrackedChanges,
     INACTIVE_CHANGELIST_ID,
-    type WorkspaceChangelistGroup
+    type WorkspaceChangelistGroup,
 } from './changelistModel';
 
 interface CommitViewProps {
@@ -43,13 +53,16 @@ interface CommitViewInitialState {
 }
 
 function applyFileDiagnosticsChange(state: CommitViewState, change: FileDiagnosticsChange): CommitViewState {
-    const updates = new Map(change.files.map(file => [file.path, file.error]));
-    const updateFiles = (files: FileStatus[]) => files.map(file => {
-        const error = updates.get(file.path);
-        return error === undefined || error === Boolean(file.error) ? file : { ...file, error };
-    });
-    const activeRepoPath = state.activeRepository?.repoPath
-        || state.repositories?.find(repository => repository.repository.repoPath === change.repoPath)?.repository.repoPath;
+    const updates = new Map(change.files.map((file) => [file.path, file.error]));
+    const updateFiles = (files: FileStatus[]) =>
+        files.map((file) => {
+            const error = updates.get(file.path);
+            return error === undefined || error === Boolean(file.error) ? file : { ...file, error };
+        });
+    const activeRepoPath =
+        state.activeRepository?.repoPath ||
+        state.repositories?.find((repository) => repository.repository.repoPath === change.repoPath)?.repository
+            .repoPath;
 
     if (activeRepoPath !== change.repoPath) {
         return state;
@@ -58,18 +71,20 @@ function applyFileDiagnosticsChange(state: CommitViewState, change: FileDiagnost
     return {
         ...state,
         files: updateFiles(state.files),
-        repositories: state.repositories?.map(repository => repository.repository.repoPath === change.repoPath
-            ? { ...repository, files: updateFiles(repository.files) }
-            : repository)
+        repositories: state.repositories?.map((repository) =>
+            repository.repository.repoPath === change.repoPath
+                ? { ...repository, files: updateFiles(repository.files) }
+                : repository
+        ),
     };
 }
 
 function getActiveChangelistName(changelistState: ChangelistState): string | undefined {
-    return changelistState.lists.find(list => list.id === changelistState.activeListId)?.name;
+    return changelistState.lists.find((list) => list.id === changelistState.activeListId)?.name;
 }
 
 function hasDisplayableChanges(changelists: WorkspaceChangelistGroup[]): boolean {
-    return changelists.some(group => group.repositories.some(repoGroup => repoGroup.group.items.length > 0));
+    return changelists.some((group) => group.repositories.some((repoGroup) => repoGroup.group.items.length > 0));
 }
 
 interface EmptyAction {
@@ -96,7 +111,7 @@ function CommitViewStatePanel({ icon, title, description, detail, actions = [] }
             {detail && <div className={styles.stateDetail}>{detail}</div>}
             {actions.length > 0 && (
                 <div className={styles.stateActions}>
-                    {actions.map(action => (
+                    {actions.map((action) => (
                         <button
                             key={action.label}
                             className={styles.stateButton}
@@ -120,49 +135,67 @@ export function CommitView({
     isPushTargetLoading = false,
     commitOptions,
     onReviewPushTarget,
-    onCommitOptionsChange
+    onCommitOptionsChange,
 }: CommitViewProps) {
     const { t } = useTranslation();
     const commitViewInitialState = window.initialState as CommitViewInitialState | null;
     const activeRepoPath = commitViewInitialState?.activeRepoPath;
     const cacheSessionId = commitViewInitialState?.cacheSessionId;
-    const loadCommitViewState = useCallback(async () => ({
-        ...await rpc.getCommitViewState(),
-        cacheSessionId
-    }), [cacheSessionId]);
-    const validateCachedCommitViewState = useCallback((state: CommitViewState) => {
-        if (!cacheSessionId || state.cacheSessionId !== cacheSessionId) {
-            return false;
-        }
-        if (!activeRepoPath) {
-            return state.hasRepository === false;
-        }
-        return state.activeRepository?.repoPath === activeRepoPath
-            || state.repositories?.some(repository => repository.repository.repoPath === activeRepoPath) === true;
-    }, [activeRepoPath, cacheSessionId]);
-    const initialChangelistState = useMemo(() => ({
-        mode: 'staged',
-        activeListId: 'changes',
-        lists: [
-            { id: 'changes', name: t('Changes'), isDefault: true, isActive: true },
-            { id: INACTIVE_CHANGELIST_ID, name: t('Inactive Changes'), isDefault: true, isActive: false }
-        ],
-        assignments: {}
-    } as ChangelistState), [t]);
+    const loadCommitViewState = useCallback(
+        async () => ({
+            ...(await rpc.getCommitViewState()),
+            cacheSessionId,
+        }),
+        [cacheSessionId]
+    );
+    const validateCachedCommitViewState = useCallback(
+        (state: CommitViewState) => {
+            if (!cacheSessionId || state.cacheSessionId !== cacheSessionId) {
+                return false;
+            }
+            if (!activeRepoPath) {
+                return state.hasRepository === false;
+            }
+            return (
+                state.activeRepository?.repoPath === activeRepoPath ||
+                state.repositories?.some((repository) => repository.repository.repoPath === activeRepoPath) === true
+            );
+        },
+        [activeRepoPath, cacheSessionId]
+    );
+    const initialChangelistState = useMemo(
+        () =>
+            ({
+                mode: 'staged',
+                activeListId: 'changes',
+                lists: [
+                    { id: 'changes', name: t('Changes'), isDefault: true, isActive: true },
+                    { id: INACTIVE_CHANGELIST_ID, name: t('Inactive Changes'), isDefault: true, isActive: false },
+                ],
+                assignments: {},
+            }) as ChangelistState,
+        [t]
+    );
 
-    const { data: commitViewState, loading, error, reload, updateData } = useRpcData(loadCommitViewState, {
+    const {
+        data: commitViewState,
+        loading,
+        error,
+        reload,
+        updateData,
+    } = useRpcData(loadCommitViewState, {
         initialValue: {
             files: [] as FileStatus[],
             changelistState: initialChangelistState,
             workspaceRoot: '',
             hasRepository: true,
-            repositories: [] as RepositoryCommitViewState[]
+            repositories: [] as RepositoryCommitViewState[],
         },
         loadingOnRefresh: true,
         cacheKey: 'commit.viewState',
         maxCacheBytes: MAX_COMMIT_VIEW_CACHE_BYTES,
         refreshScopes: COMMIT_REFRESH_SCOPES,
-        validateCachedValue: validateCachedCommitViewState
+        validateCachedValue: validateCachedCommitViewState,
     });
     const files = commitViewState.files;
     const changelistState = commitViewState.changelistState;
@@ -177,20 +210,22 @@ export function CommitView({
             return [] as RepositoryCommitViewState[];
         }
 
-        return [{
-            repository: commitViewState.activeRepository || {
-                name: workspaceRoot.split('/').pop() || workspaceRoot,
-                path: workspaceRoot,
-                repoPath: workspaceRoot,
+        return [
+            {
+                repository: commitViewState.activeRepository || {
+                    name: workspaceRoot.split('/').pop() || workspaceRoot,
+                    path: workspaceRoot,
+                    repoPath: workspaceRoot,
+                    workspaceRoot,
+                    gitRoot: workspaceRoot,
+                    isSubmodule: false,
+                    kind: 'workspace',
+                },
+                files,
+                changelistState,
                 workspaceRoot,
-                gitRoot: workspaceRoot,
-                isSubmodule: false,
-                kind: 'workspace'
             },
-            files,
-            changelistState,
-            workspaceRoot
-        }] as RepositoryCommitViewState[];
+        ] as RepositoryCommitViewState[];
     }, [commitViewState.repositories, commitViewState.activeRepository, files, changelistState, workspaceRoot]);
 
     const changelists = useMemo(() => buildWorkspaceChangelists(repositoryStates, t), [repositoryStates, t]);
@@ -217,23 +252,37 @@ export function CommitView({
         return rpcEvents.activeFileChange.subscribe(handleActiveFile);
     }, []);
 
-    useEffect(() => rpcEvents.fileDiagnosticsChange.subscribe(change => {
-        updateData(state => applyFileDiagnosticsChange(state, change));
-    }), [updateData]);
+    useEffect(
+        () =>
+            rpcEvents.fileDiagnosticsChange.subscribe((change) => {
+                updateData((state) => applyFileDiagnosticsChange(state, change));
+            }),
+        [updateData]
+    );
 
-    const selectedFileMap = useMemo(() => getWorkspaceSelectedFiles(changelists, changelistState), [changelists, changelistState]);
+    const selectedFileMap = useMemo(
+        () => getWorkspaceSelectedFiles(changelists, changelistState),
+        [changelists, changelistState]
+    );
     const selectedFiles = useMemo(() => new Set(selectedFileMap.keys()), [selectedFileMap]);
-    const selectedFileRefs = useMemo(() => Array.from(selectedFileMap.values()).map(file => ({
-        repoPath: file.repoPath,
-        path: file.path
-    } satisfies RepositoryFileReference)), [selectedFileMap]);
+    const selectedFileRefs = useMemo(
+        () =>
+            Array.from(selectedFileMap.values()).map(
+                (file) =>
+                    ({
+                        repoPath: file.repoPath,
+                        path: file.path,
+                    }) satisfies RepositoryFileReference
+            ),
+        [selectedFileMap]
+    );
 
     useEffect(() => {
         const requestId = ++lastCommitInfoRequestRef.current;
 
         if (amend) {
             savedMessageRef.current = currentCommitMessageRef.current;
-            rpc.getLastCommitInfo().then(info => {
+            rpc.getLastCommitInfo().then((info) => {
                 if (requestId !== lastCommitInfoRequestRef.current) {
                     return;
                 }
@@ -252,26 +301,32 @@ export function CommitView({
         }
     }, [amend, setCommitMessage]);
 
-    const handleToggle = useCallback((id: string, expanded: boolean) => {
-        setExpandedIds(prev => {
-            const next = new Set(prev);
-            if (expanded) {
-                next.add(id);
-            } else {
-                next.delete(id);
-            }
-            return next;
-        });
-    }, [setExpandedIds]);
+    const handleToggle = useCallback(
+        (id: string, expanded: boolean) => {
+            setExpandedIds((prev) => {
+                const next = new Set(prev);
+                if (expanded) {
+                    next.add(id);
+                } else {
+                    next.delete(id);
+                }
+                return next;
+            });
+        },
+        [setExpandedIds]
+    );
 
-    const fileStats = useMemo(() => getWorkspaceFileStats(changelists, selectedFileMap), [changelists, selectedFileMap]);
+    const fileStats = useMemo(
+        () => getWorkspaceFileStats(changelists, selectedFileMap),
+        [changelists, selectedFileMap]
+    );
 
     const hasTracked = useMemo(() => hasWorkspaceTrackedChanges(repositoryStates), [repositoryStates]);
     const hasChanges = useMemo(() => hasDisplayableChanges(changelists), [changelists]);
     const changedRepositoryCount = useMemo(() => {
         const repoPaths = new Set<string>();
-        changelists.forEach(group => {
-            group.repositories.forEach(repoGroup => {
+        changelists.forEach((group) => {
+            group.repositories.forEach((repoGroup) => {
                 if (repoGroup.group.items.length > 0) {
                     repoPaths.add(repoGroup.repository.repoPath);
                 }
@@ -303,9 +358,13 @@ export function CommitView({
         void rpc.openConflictResolver(file);
     }, []);
 
-    const hasUnresolvedConflicts = useMemo(() => changelists.some(group => (
-        group.items.some(file => (file.status === 'C' || file.status === 'U') && !file.resolvedCandidate)
-    )), [changelists]);
+    const hasUnresolvedConflicts = useMemo(
+        () =>
+            changelists.some((group) =>
+                group.items.some((file) => (file.status === 'C' || file.status === 'U') && !file.resolvedCandidate)
+            ),
+        [changelists]
+    );
 
     const isInitialCommitViewLoading = loading && hasRepository && files.length === 0 && !workspaceRoot && !error;
     const loadingIndicator = <LoadingProgressBar active={loading} ariaLabel={t('Loading...')} />;
@@ -321,8 +380,8 @@ export function CommitView({
                         {
                             label: t('Try Again'),
                             icon: 'codicon-refresh',
-                            onClick: reload
-                        }
+                            onClick: reload,
+                        },
                     ]}
                 />
             );
@@ -333,23 +392,25 @@ export function CommitView({
                 <CommitViewStatePanel
                     icon="codicon-source-control"
                     title={t('No Git repository found')}
-                    description={t('Open a folder that contains a Git repository, or initialize one in the current workspace.')}
+                    description={t(
+                        'Open a folder that contains a Git repository, or initialize one in the current workspace.'
+                    )}
                     actions={[
                         {
                             label: t('Open Folder'),
                             icon: 'codicon-folder-opened',
-                            onClick: handleOpenFolder
+                            onClick: handleOpenFolder,
                         },
                         {
                             label: t('Initialize Repository'),
                             icon: 'codicon-repo-create',
-                            onClick: handleInitializeRepository
+                            onClick: handleInitializeRepository,
                         },
                         {
                             label: t('Configure AI Provider'),
                             icon: 'codicon-sparkle',
-                            onClick: handleConfigureAIProvider
-                        }
+                            onClick: handleConfigureAIProvider,
+                        },
                     ]}
                 />
             );
@@ -360,12 +421,16 @@ export function CommitView({
                 <CommitViewStatePanel
                     icon="codicon-check"
                     title={t('Working tree clean')}
-                    description={changelistState.mode === 'changes' && activeChangelistName
-                        ? t('No commit-ready changes in {{name}}.', { name: activeChangelistName })
-                        : t('No staged or unstaged changes in this repository.')}
-                    detail={changelistState.mode === 'changes' && activeChangelistName
-                        ? t('Active changelist: {{name}}', { name: activeChangelistName })
-                        : undefined}
+                    description={
+                        changelistState.mode === 'changes' && activeChangelistName
+                            ? t('No commit-ready changes in {{name}}.', { name: activeChangelistName })
+                            : t('No staged or unstaged changes in this repository.')
+                    }
+                    detail={
+                        changelistState.mode === 'changes' && activeChangelistName
+                            ? t('Active changelist: {{name}}', { name: activeChangelistName })
+                            : undefined
+                    }
                 />
             );
         }
@@ -378,19 +443,17 @@ export function CommitView({
         return (
             <div className={styles.commitView}>
                 {loadingIndicator}
-                <div className={styles.fileListContainer}>
-                    {statePanel}
-                </div>
+                <div className={styles.fileListContainer}>{statePanel}</div>
             </div>
         );
     }
 
     const backgroundContext: ChangelistBackgroundContext | undefined = hasRepository
         ? {
-            webviewSection: 'changelistBackground',
-            changelistMode: changelistState.mode,
-            preventDefaultContextMenuItems: true
-        }
+              webviewSection: 'changelistBackground',
+              changelistMode: changelistState.mode,
+              preventDefaultContextMenuItems: true,
+          }
         : undefined;
 
     return (
@@ -403,12 +466,12 @@ export function CommitView({
                 onViewModeChange={setViewMode}
                 onExpandAll={() => {
                     const allIds = new Set(expandedIds);
-                    changelists.forEach(group => allIds.add(`__root__${group.id}`));
+                    changelists.forEach((group) => allIds.add(`__root__${group.id}`));
                     setExpandedIds(allIds);
                 }}
                 onCollapseAll={() => {
                     const nextIds = new Set(expandedIds);
-                    changelists.forEach(group => nextIds.delete(`__root__${group.id}`));
+                    changelists.forEach((group) => nextIds.delete(`__root__${group.id}`));
                     setExpandedIds(nextIds);
                 }}
             />
@@ -419,21 +482,23 @@ export function CommitView({
                 className={styles.fileListContainer}
                 {...(backgroundContext ? { 'data-vscode-context': JSON.stringify(backgroundContext) } : {})}
             >
-                {isInitialCommitViewLoading ? null : statePanel || (
-                    <ChangelistTree
-                        groups={changelists}
-                        changelistState={changelistState}
-                        viewMode={viewMode}
-                        selectedFiles={selectedFiles}
-                        expandedIds={expandedIds}
-                        activeFile={activeFile}
-                        onToggle={handleToggle}
-                        workspaceRoot={workspaceRoot}
-                        showRepositoryRoots={changedRepositoryCount > 1}
-                        amendCommit={lastCommitInfo}
-                        onOpenConflict={handleOpenConflict}
-                    />
-                )}
+                {isInitialCommitViewLoading
+                    ? null
+                    : statePanel || (
+                          <ChangelistTree
+                              groups={changelists}
+                              changelistState={changelistState}
+                              viewMode={viewMode}
+                              selectedFiles={selectedFiles}
+                              expandedIds={expandedIds}
+                              activeFile={activeFile}
+                              onToggle={handleToggle}
+                              workspaceRoot={workspaceRoot}
+                              showRepositoryRoots={changedRepositoryCount > 1}
+                              amendCommit={lastCommitInfo}
+                              onOpenConflict={handleOpenConflict}
+                          />
+                      )}
             </div>
 
             {rebaseStatus && rebaseStatus !== 'none' ? (
@@ -445,17 +510,19 @@ export function CommitView({
                     deletedCount={fileStats.deleted}
                     disableContinue={hasUnresolvedConflicts}
                     onMessageChange={setCommitMessage}
-                    onContinue={() => rpc.continueRebase({
-                        message: commitMessage,
-                        files: selectedFileRefs.map(file => file.path)
-                    })}
+                    onContinue={() =>
+                        rpc.continueRebase({
+                            message: commitMessage,
+                            files: selectedFileRefs.map((file) => file.path),
+                        })
+                    }
                 />
             ) : (
                 <CommitForm
                     message={commitMessage}
                     amend={amend}
                     selectedFiles={selectedFileRefs}
-                    repositories={repositoryStates.map(state => state.repository)}
+                    repositories={repositoryStates.map((state) => state.repository)}
                     addedCount={fileStats.added}
                     modifiedCount={fileStats.modified}
                     deletedCount={fileStats.deleted}

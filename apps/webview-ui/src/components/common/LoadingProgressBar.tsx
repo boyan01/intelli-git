@@ -14,7 +14,7 @@ export function LoadingProgressBar({
     active,
     ariaLabel,
     delayMs = DEFAULT_DELAY_MS,
-    className = ''
+    className = '',
 }: LoadingProgressBarProps) {
     const [visible, setVisible] = useState(false);
 
@@ -33,13 +33,7 @@ export function LoadingProgressBar({
 
     return (
         <div className={`${styles.slot} ${className}`}>
-            {visible ? (
-                <div
-                    className={styles.indicator}
-                    role="progressbar"
-                    aria-label={ariaLabel}
-                />
-            ) : null}
+            {visible ? <div className={styles.indicator} role="progressbar" aria-label={ariaLabel} /> : null}
         </div>
     );
 }

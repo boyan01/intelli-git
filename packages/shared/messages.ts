@@ -100,11 +100,7 @@ export interface RepositoryFileReference {
 export type ConflictResolverOpenRequest = RepositoryFileReference;
 
 export type ConflictResolverContextAction =
-    | 'acceptLeft'
-    | 'cancelLeft'
-    | 'acceptRight'
-    | 'cancelRight'
-    | 'markReviewed';
+    'acceptLeft' | 'cancelLeft' | 'acceptRight' | 'cancelRight' | 'markReviewed';
 
 export interface ConflictResolverContextActionRequest extends RepositoryFileReference {
     groupId: string;
@@ -376,7 +372,12 @@ export interface ExtensionMethods {
     log(params: { message: string; type?: 'info' | 'error' | 'warn' | 'debug' }): Promise<void>;
     getPushInitState: () => Promise<PushInitState>;
     getRemoteBranches: (remote: string) => Promise<string[]>;
-    getPushCommits: (params: { remote: string; branch: string; limit?: number; skip?: number }) => Promise<PushCommitsData>;
+    getPushCommits: (params: {
+        remote: string;
+        branch: string;
+        limit?: number;
+        skip?: number;
+    }) => Promise<PushCommitsData>;
     getCommitFiles: (hash: string) => Promise<CommitFile[]>;
     getMultiCommitFiles: (hashes: string[]) => Promise<CommitFile[]>;
     push: (params: PushRequest) => Promise<PushResult>;
@@ -384,7 +385,12 @@ export interface ExtensionMethods {
     confirmForcePush: (params: { remote: string; branch: string }) => Promise<boolean>;
     openDiff: (path: string | { path: string; repoPath?: string; staged?: boolean }, staged?: boolean) => Promise<void>;
     closeWebView: () => Promise<void>;
-    openCommitDiff: (params: { path: string; leftRef: string; rightRef: string; preserveFocus?: boolean }) => Promise<void>;
+    openCommitDiff: (params: {
+        path: string;
+        leftRef: string;
+        rightRef: string;
+        preserveFocus?: boolean;
+    }) => Promise<void>;
     getStatus: () => Promise<FileStatus[]>;
     getChangelistState: () => Promise<ChangelistState>;
     getCommitViewState: () => Promise<CommitViewState>;
@@ -392,7 +398,13 @@ export interface ExtensionMethods {
     getBranchInfo: () => Promise<BranchInfo>;
     getStashList: () => Promise<StashItem[]>;
     getStashFiles: (index: number) => Promise<CommitFile[]>;
-    commit: (params: { message: string; amend: boolean; files: FileReferenceInput[]; push?: boolean; pushTarget?: PushTarget }) => Promise<void>;
+    commit: (params: {
+        message: string;
+        amend: boolean;
+        files: FileReferenceInput[];
+        push?: boolean;
+        pushTarget?: PushTarget;
+    }) => Promise<void>;
     stage: (path: FileReferenceInput) => Promise<void>;
     stageFiles: (paths: FileReferenceInput[]) => Promise<void>;
     unstage: (path: FileReferenceInput) => Promise<void>;
@@ -457,7 +469,6 @@ export interface ExtensionMethods {
     setActiveChangelistFile: (params: ChangelistFileSelection | null) => Promise<void>;
     setChangelistTreeFocus: (focused: boolean) => Promise<void>;
 }
-
 
 export interface PushInitState {
     repositoryPath?: string;

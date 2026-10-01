@@ -159,4 +159,3 @@ interface AiPreCommitReview {
 - Blocking findings prevent default one-click commit but allow confirmed override.
 - Dismissed findings stay dismissed until diff/message changes.
 - Missing l10n and conflict files are caught without relying only on AI.
-

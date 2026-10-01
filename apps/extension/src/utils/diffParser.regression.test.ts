@@ -23,10 +23,10 @@ test('parseDiffToFileHunks keeps multi-file hunks under the correct path with st
         '+++ b/src/beta.ts',
         '@@ -5 +5 @@',
         '-old beta',
-        '+new beta'
+        '+new beta',
     ].join('\n');
 
-    const hunksByPath = parseDiffToFileHunks(diff, repoPath => repoPath, { idPrefix: 'worktree' });
+    const hunksByPath = parseDiffToFileHunks(diff, (repoPath) => repoPath, { idPrefix: 'worktree' });
 
     assert.deepEqual([...hunksByPath.keys()], ['src/alpha.ts', 'src/beta.ts']);
 

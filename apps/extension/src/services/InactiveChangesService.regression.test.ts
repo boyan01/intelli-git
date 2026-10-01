@@ -73,8 +73,8 @@ test('InactiveChangesService treats inactive untracked directories as inactive c
             path: 'docs/gdxg/1241241.dart',
             status: '?',
             staged: false,
-            hunks: [createHunk('docs/gdxg/1241241.dart:worktree:0:0:1:1:new', 0, 1, 0, 1)]
-        }
+            hunks: [createHunk('docs/gdxg/1241241.dart:worktree:0:0:1:1:new', 0, 1, 0, 1)],
+        },
     ]);
 
     assert.equal(service.isInactive('docs/gdxg/1241241.dart'), true);
@@ -85,8 +85,8 @@ test('InactiveChangesService does not copy global state into repo-specific state
     const context = createExtensionContext();
     await context.workspaceState.update('ideaCommitPanel.inactiveChangesV2', {
         files: {
-            'README.md': { all: true }
-        }
+            'README.md': { all: true },
+        },
     });
 
     const service = new InactiveChangesService(context as never, '/workspace/second');
@@ -98,8 +98,8 @@ test('InactiveChangesService migrates global state only when explicitly requeste
     const context = createExtensionContext();
     await context.workspaceState.update('ideaCommitPanel.inactiveChangesV2', {
         files: {
-            'README.md': { all: true }
-        }
+            'README.md': { all: true },
+        },
     });
 
     const service = new InactiveChangesService(context as never, '/workspace/first', true);

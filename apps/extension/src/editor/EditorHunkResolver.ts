@@ -71,8 +71,14 @@ function scoreHunkLineChange(hunk: GitHunk, lineChange: LineChangeLike | undefin
         );
     }
 
-    const [oldStart, oldLineEnd] = normalizeLineRange(lineChange.originalStartLineNumber, lineChange.originalEndLineNumber);
-    const [newStart, newLineEnd] = normalizeLineRange(lineChange.modifiedStartLineNumber, lineChange.modifiedEndLineNumber);
+    const [oldStart, oldLineEnd] = normalizeLineRange(
+        lineChange.originalStartLineNumber,
+        lineChange.originalEndLineNumber
+    );
+    const [newStart, newLineEnd] = normalizeLineRange(
+        lineChange.modifiedStartLineNumber,
+        lineChange.modifiedEndLineNumber
+    );
 
     return Math.min(
         lineRangeDistance(oldStart, oldLineEnd, hunk.oldStart, oldEnd),
@@ -99,19 +105,19 @@ export function findBestHunkMatch(
 
     for (const fileStatus of fileStatuses) {
         for (const hunk of fileStatus.hunks || []) {
-            const score = side ? scoreHunkLine(hunk, fallbackLine, side) : scoreHunkLineChange(hunk, lineChange, fallbackLine);
+            const score = side
+                ? scoreHunkLine(hunk, fallbackLine, side)
+                : scoreHunkLineChange(hunk, lineChange, fallbackLine);
             if (score > 1) {
                 continue;
             }
 
             if (
                 score < bestScore ||
-                (
-                    score === bestScore &&
+                (score === bestScore &&
                     preferStaged !== undefined &&
                     fileStatus.staged === preferStaged &&
-                    bestMatch?.fileStatus.staged !== preferStaged
-                )
+                    bestMatch?.fileStatus.staged !== preferStaged)
             ) {
                 bestScore = score;
                 bestMatch = { fileStatus, hunk };
@@ -123,11 +129,7 @@ export function findBestHunkMatch(
 }
 
 function getEquivalentHunkIds(hunkId: string): string[] {
-    return [
-        hunkId,
-        hunkId.replace(':index:', ':worktree:'),
-        hunkId.replace(':worktree:', ':index:')
-    ];
+    return [hunkId, hunkId.replace(':index:', ':worktree:'), hunkId.replace(':worktree:', ':index:')];
 }
 
 export class EditorHunkResolver {
@@ -137,7 +139,7 @@ export class EditorHunkResolver {
         private readonly gitService: GitService,
         private readonly inactiveChangesService: InactiveChangesService,
         private readonly changelistStateService: ChangelistStateService
-    ) { }
+    ) {}
 
     public invalidate(): void {
         this.statusCache = undefined;
@@ -207,7 +209,10 @@ export class EditorHunkResolver {
         return info;
     }
 
-    public async resolveTargetAt(document: vscode.TextDocument, line: number): Promise<EditorHunkMatchTarget | undefined> {
+    public async resolveTargetAt(
+        document: vscode.TextDocument,
+        line: number
+    ): Promise<EditorHunkMatchTarget | undefined> {
         const target = this.getDocumentTarget(document);
         if (!target) {
             return undefined;
@@ -231,7 +236,7 @@ export class EditorHunkResolver {
         return {
             ...this.createHunkInfo(target.relativePath, target.side, match.fileStatus, match.hunk),
             matchingFiles,
-            targetLine: line
+            targetLine: line,
         };
     }
 
@@ -247,9 +252,8 @@ export class EditorHunkResolver {
         const result: EditorHunkDecoration[] = [];
 
         for (const fileStatus of matchingFiles) {
-            const allowStagedWholeFileInWorktreeEditor = target.preferStaged === false &&
-                fileStatus.staged &&
-                this.isWholeFileStatus(fileStatus.status);
+            const allowStagedWholeFileInWorktreeEditor =
+                target.preferStaged === false && fileStatus.staged && this.isWholeFileStatus(fileStatus.status);
 
             if (
                 mode === 'staged' &&
@@ -276,7 +280,7 @@ export class EditorHunkResolver {
                     ...info,
                     startLine: line,
                     endLine: end,
-                    label
+                    label,
                 });
             }
         }
@@ -301,12 +305,17 @@ export class EditorHunkResolver {
         const state = this.changelistStateService.getState();
         const assignment = state.assignments[path];
         const equivalentHunkIds = getEquivalentHunkIds(hunk.id);
-        const inactiveHunkIds = new Set(fileStatus.inactiveHunkIds || this.inactiveChangesService.getInactiveHunkIds(path));
-        const inactive = !!fileStatus.inactive || equivalentHunkIds.some(hunkId => inactiveHunkIds.has(hunkId));
-        const listId = equivalentHunkIds
-            .map(hunkId => assignment?.hunkListIds?.[hunkId])
-            .find((id): id is string => Boolean(id)) || assignment?.fileListId || state.activeListId;
-        const changelist = state.lists.find(list => list.id === listId);
+        const inactiveHunkIds = new Set(
+            fileStatus.inactiveHunkIds || this.inactiveChangesService.getInactiveHunkIds(path)
+        );
+        const inactive = !!fileStatus.inactive || equivalentHunkIds.some((hunkId) => inactiveHunkIds.has(hunkId));
+        const listId =
+            equivalentHunkIds
+                .map((hunkId) => assignment?.hunkListIds?.[hunkId])
+                .find((id): id is string => Boolean(id)) ||
+            assignment?.fileListId ||
+            state.activeListId;
+        const changelist = state.lists.find((list) => list.id === listId);
         const isDefaultChangelist = !changelist || changelist.id === 'changes';
         const isActiveChangelist = listId === state.activeListId;
 
@@ -319,7 +328,7 @@ export class EditorHunkResolver {
             changelist,
             isDefaultChangelist,
             isActiveChangelist,
-            mode: state.mode
+            mode: state.mode,
         };
     }
 

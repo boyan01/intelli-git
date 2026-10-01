@@ -27,17 +27,17 @@ export function createRpc(options: RpcHelperOptions): RpcPeer<WebviewMethods, Ex
                         logger.error('Failed to post message to webview:', error);
                     }
                 }
-            }
+            },
         },
         {
-            trace: event => {
+            trace: (event) => {
                 if (event.elapsedMs === undefined) {
                     return;
                 }
 
                 const log = event.ok === false ? logger.warn : logger.debug;
                 log('[rpc]', event);
-            }
+            },
         }
     );
 

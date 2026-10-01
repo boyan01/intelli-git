@@ -12,7 +12,7 @@ const vscodeMockPath = resolve(extensionRoot, 'src/testSupport/vscodeMock.ts');
 
 function findRegressionTests(dir) {
     const entries = readdirSync(dir, { withFileTypes: true });
-    return entries.flatMap(entry => {
+    return entries.flatMap((entry) => {
         const path = join(dir, entry.name);
         if (entry.isDirectory()) {
             return findRegressionTests(path);
@@ -25,14 +25,14 @@ const vscodeMockPlugin = {
     name: 'vscode-mock',
     setup(build) {
         build.onResolve({ filter: /^vscode$/ }, () => ({ path: vscodeMockPath }));
-    }
+    },
 };
 
 async function main() {
     try {
         const testImports = findRegressionTests(resolve(extensionRoot, 'src'))
             .sort()
-            .map(path => `import ${JSON.stringify(path)};`)
+            .map((path) => `import ${JSON.stringify(path)};`)
             .join('\n');
 
         await esbuild.build({
@@ -44,7 +44,7 @@ async function main() {
                 contents: testImports,
                 loader: 'ts',
                 resolveDir: repoRoot,
-                sourcefile: 'regression-entry.ts'
+                sourcefile: 'regression-entry.ts',
             },
             logLevel: 'info',
             outfile: bundlePath,
@@ -52,12 +52,12 @@ async function main() {
             plugins: [vscodeMockPlugin],
             sourcemap: 'inline',
             target: 'node20',
-            tsconfig: resolve(extensionRoot, 'tsconfig.json')
+            tsconfig: resolve(extensionRoot, 'tsconfig.json'),
         });
 
         const result = spawnSync(process.execPath, ['--test', bundlePath], {
             cwd: repoRoot,
-            stdio: 'inherit'
+            stdio: 'inherit',
         });
 
         if (result.error) {
@@ -70,7 +70,7 @@ async function main() {
     }
 }
 
-main().catch(error => {
+main().catch((error) => {
     console.error(error);
     process.exitCode = 1;
 });

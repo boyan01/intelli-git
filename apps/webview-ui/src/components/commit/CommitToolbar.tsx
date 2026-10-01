@@ -21,7 +21,7 @@ export function CommitToolbar({
     hasTrackedChanges,
     onViewModeChange,
     onExpandAll,
-    onCollapseAll
+    onCollapseAll,
 }: CommitToolbarProps) {
     const { t } = useTranslation();
 

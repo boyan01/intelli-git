@@ -19,10 +19,10 @@ export const WEBVIEW_CONTEXT_SECTIONS = [
     'worktreeItem',
     'mergeEditorLeft',
     'mergeEditorResult',
-    'mergeEditorRight'
+    'mergeEditorRight',
 ] as const;
 
-export type WebviewContextSection = typeof WEBVIEW_CONTEXT_SECTIONS[number];
+export type WebviewContextSection = (typeof WEBVIEW_CONTEXT_SECTIONS)[number];
 
 interface BaseWebviewContext {
     webviewSection: WebviewContextSection;

@@ -4,7 +4,7 @@ import { EventEmitter } from '../test/mocks/vscode';
 import type { RepositoryManager, RepositoryScope } from './RepositoryManager';
 import {
     findMissingParentGitRoots,
-    ParentRepositoryScmIntegrationService
+    ParentRepositoryScmIntegrationService,
 } from './ParentRepositoryScmIntegrationService';
 
 function createScope(workspaceRoot: string, gitRoot: string): RepositoryScope {
@@ -15,7 +15,7 @@ function createScope(workspaceRoot: string, gitRoot: string): RepositoryScope {
         workspaceRoot,
         gitRoot,
         isSubmodule: false,
-        kind: 'workspace'
+        kind: 'workspace',
     };
 }
 
@@ -25,34 +25,30 @@ function createRepositoryManager(scopes: RepositoryScope[]): RepositoryManager {
     return {
         getRepositories: () => scopes,
         onDidChangeRepositories: repositoriesEmitter.event as Event<void>,
-        onDidChangeActiveRepo: activeRepoEmitter.event as Event<string | undefined>
+        onDidChangeActiveRepo: activeRepoEmitter.event as Event<string | undefined>,
     } as RepositoryManager;
 }
 
 describe('findMissingParentGitRoots', () => {
     it('skips repositories opened at their git root', () => {
-        expect(findMissingParentGitRoots([
-            createScope('/repo', '/repo')
-        ], [])).toEqual([]);
+        expect(findMissingParentGitRoots([createScope('/repo', '/repo')], [])).toEqual([]);
     });
 
     it('returns parent git roots that VS Code Git has not opened', () => {
-        expect(findMissingParentGitRoots([
-            createScope('/repo/backend', '/repo')
-        ], [])).toEqual(['/repo']);
+        expect(findMissingParentGitRoots([createScope('/repo/backend', '/repo')], [])).toEqual(['/repo']);
     });
 
     it('does not return parent git roots already opened by VS Code Git', () => {
-        expect(findMissingParentGitRoots([
-            createScope('/repo/backend', '/repo')
-        ], ['/repo'])).toEqual([]);
+        expect(findMissingParentGitRoots([createScope('/repo/backend', '/repo')], ['/repo'])).toEqual([]);
     });
 
     it('deduplicates multiple opened folders under the same parent root', () => {
-        expect(findMissingParentGitRoots([
-            createScope('/repo/backend', '/repo'),
-            createScope('/repo/frontend', '/repo')
-        ], [])).toEqual(['/repo']);
+        expect(
+            findMissingParentGitRoots(
+                [createScope('/repo/backend', '/repo'), createScope('/repo/frontend', '/repo')],
+                []
+            )
+        ).toEqual(['/repo']);
     });
 });
 
@@ -70,7 +66,7 @@ describe('ParentRepositoryScmIntegrationService', () => {
                 },
                 executeCommand: async (command, ...args) => {
                     commands.push({ command, args });
-                }
+                },
             }
         );
 
@@ -92,16 +88,18 @@ describe('ParentRepositoryScmIntegrationService', () => {
                 showWarningMessage: async (_message, ...items) => items[1],
                 executeCommand: async (command, ...args) => {
                     commands.push({ command, args });
-                }
+                },
             }
         );
 
         await service.checkNow();
 
-        expect(commands).toEqual([{
-            command: 'workbench.action.openSettings',
-            args: ['git.openRepositoryInParentFolders']
-        }]);
+        expect(commands).toEqual([
+            {
+                command: 'workbench.action.openSettings',
+                args: ['git.openRepositoryInParentFolders'],
+            },
+        ]);
         service.dispose();
     });
 
@@ -114,7 +112,7 @@ describe('ParentRepositoryScmIntegrationService', () => {
                 showWarningMessage: async () => {
                     promptCount += 1;
                     return undefined;
-                }
+                },
             }
         );
 
@@ -133,7 +131,7 @@ describe('ParentRepositoryScmIntegrationService', () => {
                 showWarningMessage: async () => {
                     promptCount += 1;
                     return undefined;
-                }
+                },
             }
         );
 

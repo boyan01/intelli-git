@@ -32,7 +32,7 @@ export function SplitPane({
     onRatioChange,
     minSize = 50,
     maxSize,
-    className = ''
+    className = '',
 }: SplitPaneProps) {
     const containerRef = useRef<HTMLDivElement>(null);
     // Store ratio (0-1) instead of pixel size
@@ -41,20 +41,21 @@ export function SplitPane({
         if (defaultRatio !== undefined) return defaultRatio;
         return null;
     });
-    const ratio = (controlledRatio !== undefined && controlledRatio > 0) ? controlledRatio : internalRatio;
-    const setRatio = useCallback((newRatio: number) => {
-        setInternalRatio(newRatio);
-        onRatioChange?.(newRatio);
-    }, [onRatioChange]);
+    const ratio = controlledRatio !== undefined && controlledRatio > 0 ? controlledRatio : internalRatio;
+    const setRatio = useCallback(
+        (newRatio: number) => {
+            setInternalRatio(newRatio);
+            onRatioChange?.(newRatio);
+        },
+        [onRatioChange]
+    );
     const isDragging = useRef(false);
     const startPos = useRef(0);
     const startRatio = useRef(0);
 
     const getContainerSize = useCallback(() => {
         if (!containerRef.current) return 0;
-        return direction === 'horizontal'
-            ? containerRef.current.clientWidth
-            : containerRef.current.clientHeight;
+        return direction === 'horizontal' ? containerRef.current.clientWidth : containerRef.current.clientHeight;
     }, [direction]);
 
     // Calculate initial ratio from defaultSize or secondDefaultSize once the container is measured.
@@ -88,13 +89,16 @@ export function SplitPane({
         };
     }, [ratio, getContainerSize, secondDefaultSize, defaultSize, minSize, setRatio]);
 
-    const handleMouseDown = useCallback((e: React.MouseEvent) => {
-        isDragging.current = true;
-        startPos.current = direction === 'horizontal' ? e.clientX : e.clientY;
-        startRatio.current = ratio ?? 0.5;
-        document.body.style.cursor = direction === 'horizontal' ? 'col-resize' : 'row-resize';
-        document.body.style.userSelect = 'none';
-    }, [ratio, direction]);
+    const handleMouseDown = useCallback(
+        (e: React.MouseEvent) => {
+            isDragging.current = true;
+            startPos.current = direction === 'horizontal' ? e.clientX : e.clientY;
+            startRatio.current = ratio ?? 0.5;
+            document.body.style.cursor = direction === 'horizontal' ? 'col-resize' : 'row-resize';
+            document.body.style.userSelect = 'none';
+        },
+        [ratio, direction]
+    );
 
     useEffect(() => {
         const handleMouseMove = (e: MouseEvent) => {
@@ -129,12 +133,9 @@ export function SplitPane({
     }, [direction, minSize, maxSize, getContainerSize, setRatio]);
 
     const isHorizontal = direction === 'horizontal';
-    const firstPaneStyle = ratio !== null
-        ? { flex: `0 0 calc(${ratio * 100}% - ${RESIZER_SIZE / 2}px)` }
-        : { flex: 1 };
-    const secondPaneStyle = ratio !== null
-        ? { flex: `0 0 calc(${(1 - ratio) * 100}% - ${RESIZER_SIZE / 2}px)` }
-        : { flex: 1 };
+    const firstPaneStyle = ratio !== null ? { flex: `0 0 calc(${ratio * 100}% - ${RESIZER_SIZE / 2}px)` } : { flex: 1 };
+    const secondPaneStyle =
+        ratio !== null ? { flex: `0 0 calc(${(1 - ratio) * 100}% - ${RESIZER_SIZE / 2}px)` } : { flex: 1 };
 
     return (
         <div

@@ -28,7 +28,7 @@ export async function handleCheckoutWorktreeConflict(options: CheckoutWorktreeCo
                     'Branch "{0}" is already checked out in another worktree:\n\n{1}',
                     usage.branch,
                     usage.path
-                )
+                ),
             },
             openWorktree,
             revealInFileManager,
@@ -36,7 +36,9 @@ export async function handleCheckoutWorktreeConflict(options: CheckoutWorktreeCo
         );
 
         if (action === openWorktree) {
-            await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(usage.path), { forceNewWindow: true });
+            await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(usage.path), {
+                forceNewWindow: true,
+            });
         } else if (action === revealInFileManager) {
             await vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(usage.path));
         }
@@ -54,7 +56,7 @@ export async function handleCheckoutWorktreeConflict(options: CheckoutWorktreeCo
                 'Branch "{0}" is still registered to a missing worktree path:\n\n{1}',
                 usage.branch,
                 usage.path
-            )
+            ),
         },
         pruneAndRetry,
         cancel

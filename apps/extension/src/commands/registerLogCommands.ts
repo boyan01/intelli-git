@@ -8,10 +8,7 @@ function formatSampleFiles(files: string[]): string[] {
         return [];
     }
 
-    return [
-        vscode.l10n.t('Sample files:'),
-        ...files.map(file => `- ${file}`)
-    ];
+    return [vscode.l10n.t('Sample files:'), ...files.map((file) => `- ${file}`)];
 }
 
 function createResetHardPreviewMessage(hash: string, preview: LocalChangePreview): string {
@@ -24,7 +21,7 @@ function createResetHardPreviewMessage(hash: string, preview: LocalChangePreview
             ? vscode.l10n.t('Untracked files are not removed by reset --hard: {0} file(s).', preview.untrackedCount)
             : undefined,
         ...formatSampleFiles(preview.sampleFiles),
-        vscode.l10n.t('Recovery: use Git reflog to find the previous HEAD.')
+        vscode.l10n.t('Recovery: use Git reflog to find the previous HEAD.'),
     ];
 
     return lines.filter(Boolean).join('\n');
@@ -50,29 +47,26 @@ function getRemoteProviderLabel(provider: RemoteProvider): string {
     return vscode.l10n.t('remote provider');
 }
 
-export function registerLogCommands(
-    context: vscode.ExtensionContext,
-    gitService: GitService
-) {
+export function registerLogCommands(context: vscode.ExtensionContext, gitService: GitService) {
     const commitMessageEditorFiles = new Set<string>();
     context.subscriptions.push(
-        vscode.languages.registerCodeLensProvider({ scheme: 'file' }, {
-            provideCodeLenses(document) {
-                if (!commitMessageEditorFiles.has(document.uri.fsPath)) {
-                    return [];
-                }
+        vscode.languages.registerCodeLensProvider(
+            { scheme: 'file' },
+            {
+                provideCodeLenses(document) {
+                    if (!commitMessageEditorFiles.has(document.uri.fsPath)) {
+                        return [];
+                    }
 
-                return [
-                    new vscode.CodeLens(
-                        new vscode.Range(0, 0, 0, 0),
-                        {
+                    return [
+                        new vscode.CodeLens(new vscode.Range(0, 0, 0, 0), {
                             title: vscode.l10n.t('Save (Cmd+S) to apply · Close to cancel'),
-                            command: 'workbench.action.files.save'
-                        }
-                    )
-                ];
+                            command: 'workbench.action.files.save',
+                        }),
+                    ];
+                },
             }
-        })
+        )
     );
 
     const getCommitHash = (arg: any): string | undefined => {
@@ -93,7 +87,12 @@ export function registerLogCommands(
         vscode.commands.registerCommand('intelli-git.log.resetSoft', async (arg) => {
             const hash = getCommitHash(arg);
             if (!hash) return;
-            if (await confirmAction(vscode.l10n.t('Reset current branch to {0} (Soft)?\nChanges will be staged.', hash), vscode.l10n.t('Reset'))) {
+            if (
+                await confirmAction(
+                    vscode.l10n.t('Reset current branch to {0} (Soft)?\nChanges will be staged.', hash),
+                    vscode.l10n.t('Reset')
+                )
+            ) {
                 try {
                     await gitService.branchRemote.reset('soft', hash);
                     vscode.window.showInformationMessage(vscode.l10n.t('Soft reset successful.'));
@@ -105,7 +104,12 @@ export function registerLogCommands(
         vscode.commands.registerCommand('intelli-git.log.resetMixed', async (arg) => {
             const hash = getCommitHash(arg);
             if (!hash) return;
-            if (await confirmAction(vscode.l10n.t('Reset current branch to {0} (Mixed)?\nChanges will be unstaged.', hash), vscode.l10n.t('Reset'))) {
+            if (
+                await confirmAction(
+                    vscode.l10n.t('Reset current branch to {0} (Mixed)?\nChanges will be unstaged.', hash),
+                    vscode.l10n.t('Reset')
+                )
+            ) {
                 try {
                     await gitService.branchRemote.reset('mixed', hash);
                     vscode.window.showInformationMessage(vscode.l10n.t('Mixed reset successful.'));
@@ -134,7 +138,12 @@ export function registerLogCommands(
         vscode.commands.registerCommand('intelli-git.log.checkout', async (arg) => {
             const hash = getCommitHash(arg);
             if (!hash) return;
-            if (await confirmAction(vscode.l10n.t('Checkout commit {0}? You will be in detached HEAD state.', hash), vscode.l10n.t('Checkout'))) {
+            if (
+                await confirmAction(
+                    vscode.l10n.t('Checkout commit {0}? You will be in detached HEAD state.', hash),
+                    vscode.l10n.t('Checkout')
+                )
+            ) {
                 try {
                     await gitService.branchRemote.checkoutCommit(hash);
                     vscode.window.showInformationMessage(vscode.l10n.t('Checked out {0}', hash));
@@ -155,13 +164,17 @@ export function registerLogCommands(
             providerLabel = getRemoteProviderLabel(remoteLink.provider);
             const commitUrl = await gitService.branchRemote.getRemoteCommitUrl(hash);
             if (!commitUrl) {
-                vscode.window.showInformationMessage(vscode.l10n.t('No supported remote commit link found for this repository.'));
+                vscode.window.showInformationMessage(
+                    vscode.l10n.t('No supported remote commit link found for this repository.')
+                );
                 return;
             }
 
             await vscode.env.openExternal(vscode.Uri.parse(commitUrl));
         } catch (e: any) {
-            vscode.window.showErrorMessage(vscode.l10n.t('Failed to open commit on {0}: {1}', providerLabel, e.message));
+            vscode.window.showErrorMessage(
+                vscode.l10n.t('Failed to open commit on {0}: {1}', providerLabel, e.message)
+            );
         }
     };
 
@@ -180,7 +193,7 @@ export function registerLogCommands(
 
             const branchName = await vscode.window.showInputBox({
                 prompt: vscode.l10n.t('Create new branch at {0}', hash),
-                placeHolder: vscode.l10n.t('Branch name')
+                placeHolder: vscode.l10n.t('Branch name'),
             });
 
             if (branchName) {
@@ -238,19 +251,26 @@ export function registerLogCommands(
             const isPushed = await gitService.branchRemote.isCommitPushed(hash);
             if (isPushed) {
                 vscode.window.showWarningMessage(
-                    vscode.l10n.t('Cannot undo commit {0}: it has already been pushed to remote. Use Revert to create a safe inverse commit.', hash)
+                    vscode.l10n.t(
+                        'Cannot undo commit {0}: it has already been pushed to remote. Use Revert to create a safe inverse commit.',
+                        hash
+                    )
                 );
                 return;
             }
 
-            if (await confirmAction(
-                vscode.l10n.t('Undo commit {0}?\n\nThe changes will be kept in your working directory.', hash),
-                vscode.l10n.t('Undo Commit')
-            )) {
+            if (
+                await confirmAction(
+                    vscode.l10n.t('Undo commit {0}?\n\nThe changes will be kept in your working directory.', hash),
+                    vscode.l10n.t('Undo Commit')
+                )
+            ) {
                 try {
                     // Reset to parent commit, keeping changes staged
                     await gitService.branchRemote.reset('soft', `${hash}~1`);
-                    vscode.window.showInformationMessage(vscode.l10n.t('Commit {0} undone. Changes are now staged.', hash));
+                    vscode.window.showInformationMessage(
+                        vscode.l10n.t('Commit {0} undone. Changes are now staged.', hash)
+                    );
                 } catch (e: any) {
                     vscode.window.showErrorMessage(vscode.l10n.t('Undo commit failed: {0}', e.message));
                 }
@@ -283,7 +303,7 @@ export function registerLogCommands(
 
             let applied = false;
 
-            const saveDisposable = vscode.workspace.onDidSaveTextDocument(async savedDoc => {
+            const saveDisposable = vscode.workspace.onDidSaveTextDocument(async (savedDoc) => {
                 if (savedDoc.uri.fsPath !== tempFile || applied) return;
 
                 const newMessage = savedDoc.getText().trim();
@@ -306,13 +326,17 @@ export function registerLogCommands(
                 }
             });
 
-            const closeDisposable = vscode.workspace.onDidCloseTextDocument(closedDoc => {
+            const closeDisposable = vscode.workspace.onDidCloseTextDocument((closedDoc) => {
                 if (closedDoc.uri.fsPath !== tempFile) return;
 
                 saveDisposable.dispose();
                 closeDisposable.dispose();
                 commitMessageEditorFiles.delete(tempFile);
-                try { fs.unlinkSync(tempFile); } catch { /* ignore */ }
+                try {
+                    fs.unlinkSync(tempFile);
+                } catch {
+                    /* ignore */
+                }
             });
 
             context.subscriptions.push(saveDisposable, closeDisposable);

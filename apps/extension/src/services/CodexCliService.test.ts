@@ -8,12 +8,18 @@ import { logger } from '../utils/logger';
 import { CodexCliLanguageModel, listCodexModels } from './CodexCliService';
 
 vi.mock('node:child_process', () => ({ spawn: vi.fn() }));
-vi.mock('vscode', async importOriginal => {
+vi.mock('vscode', async (importOriginal) => {
     const actual = await importOriginal<typeof import('vscode')>();
     return { ...actual, workspace: { ...actual.workspace, isTrusted: true } };
 });
 
-let child: EventEmitter & { pid: number; stdin: PassThrough; stdout: PassThrough; stderr: PassThrough; kill: ReturnType<typeof vi.fn> };
+let child: EventEmitter & {
+    pid: number;
+    stdin: PassThrough;
+    stdout: PassThrough;
+    stderr: PassThrough;
+    kill: ReturnType<typeof vi.fn>;
+};
 let args: string[];
 let directory: string;
 let input: string;
@@ -26,9 +32,15 @@ beforeEach(() => {
     dispose = vi.fn();
     Object.assign(vscode.workspace, { isTrusted: true });
     child = Object.assign(new EventEmitter(), {
-        pid: 99999, stdin: new PassThrough(), stdout: new PassThrough(), stderr: new PassThrough(), kill: vi.fn()
+        pid: 99999,
+        stdin: new PassThrough(),
+        stdout: new PassThrough(),
+        stderr: new PassThrough(),
+        kill: vi.fn(),
     });
-    child.stdin.on('data', chunk => { input += chunk.toString(); });
+    child.stdin.on('data', (chunk) => {
+        input += chunk.toString();
+    });
     vi.mocked(spawn).mockImplementation(((_executable: string, supplied: string[], options: { cwd: string }) => {
         args = supplied;
         directory = options.cwd;
@@ -38,13 +50,18 @@ beforeEach(() => {
         queueMicrotask(() => child.emit('close', null));
         return true;
     });
-    vi.spyOn(vscode.window, 'withProgress').mockImplementation(async (_options, task) => task(
-        { report() {} },
-        { isCancellationRequested: false, onCancellationRequested: listener => {
-            cancel = () => listener(undefined);
-            return { dispose };
-        } }
-    ));
+    vi.spyOn(vscode.window, 'withProgress').mockImplementation(async (_options, task) =>
+        task(
+            { report() {} },
+            {
+                isCancellationRequested: false,
+                onCancellationRequested: (listener) => {
+                    cancel = () => listener(undefined);
+                    return { dispose };
+                },
+            }
+        )
+    );
 });
 
 afterEach(() => {
@@ -54,15 +71,17 @@ afterEach(() => {
 });
 
 function generate(model = '') {
-    return new CodexCliLanguageModel('/opt/codex bin/codex', model).sendRequest([
-        vscode.LanguageModelChatMessage.User('Diff:\n+literal $(touch unsafe); `command`\n+中文')
-    ], {}, {
-        isCancellationRequested: false,
-        onCancellationRequested: listener => {
-            cancel = () => listener(undefined);
-            return { dispose };
+    return new CodexCliLanguageModel('/opt/codex bin/codex', model).sendRequest(
+        [vscode.LanguageModelChatMessage.User('Diff:\n+literal $(touch unsafe); `command`\n+中文')],
+        {},
+        {
+            isCancellationRequested: false,
+            onCancellationRequested: (listener) => {
+                cancel = () => listener(undefined);
+                return { dispose };
+            },
         }
-    });
+    );
 }
 
 async function started() {
@@ -83,13 +102,18 @@ describe('Codex CLI generation', () => {
         expect(args).toContain('--ignore-user-config');
         expect(args).toContain('read-only');
         expect(args.slice(-3)).toEqual(['--model', 'test-model', '-']);
-        expect(spawn).toHaveBeenCalledWith('/opt/codex bin/codex', args,
-            expect.objectContaining({ shell: false, cwd: directory }));
+        expect(spawn).toHaveBeenCalledWith(
+            '/opt/codex bin/codex',
+            args,
+            expect.objectContaining({ shell: false, cwd: directory })
+        );
         child.stderr.write('Progress and reasoning must not become the commit message');
         await finish();
         const result = await pending;
         let text = '';
-        for await (const part of result.text) { text += part; }
+        for await (const part of result.text) {
+            text += part;
+        }
         expect(text).toBe('Improve commit generation\n\n- Preserve the selected diff.');
         await expect(access(directory)).rejects.toThrow();
         expect(dispose).toHaveBeenCalledOnce();
@@ -151,14 +175,13 @@ describe('Codex CLI generation', () => {
     });
 });
 
-
 function discover() {
     return listCodexModels('/opt/codex bin/codex', {
         isCancellationRequested: false,
-        onCancellationRequested: listener => {
+        onCancellationRequested: (listener) => {
             cancel = () => listener(undefined);
             return { dispose };
-        }
+        },
     });
 }
 
@@ -175,18 +198,48 @@ describe('Codex model discovery', () => {
         expect(args.slice(0, 3)).toEqual(['app-server', '--listen', 'stdio://']);
         expect(JSON.parse(input).method).toBe('initialize');
         reply(0, { userAgent: 'codex' });
-        let requests = input.trim().split('\n').map(line => JSON.parse(line));
-        expect(requests.map(request => request.method)).toEqual(['initialize', 'initialized', 'model/list']);
-        reply(1, { data: [
-            { model: 'first', displayName: 'First Model', description: 'First description', isDefault: true, defaultReasoningEffort: 'low', supportedReasoningEfforts: [{ reasoningEffort: 'low', description: 'Fast' }] },
-            { model: 'hidden', hidden: true }
-        ], nextCursor: 'page-2' });
-        requests = input.trim().split('\n').map(line => JSON.parse(line));
+        let requests = input
+            .trim()
+            .split('\n')
+            .map((line) => JSON.parse(line));
+        expect(requests.map((request) => request.method)).toEqual(['initialize', 'initialized', 'model/list']);
+        reply(1, {
+            data: [
+                {
+                    model: 'first',
+                    displayName: 'First Model',
+                    description: 'First description',
+                    isDefault: true,
+                    defaultReasoningEffort: 'low',
+                    supportedReasoningEfforts: [{ reasoningEffort: 'low', description: 'Fast' }],
+                },
+                { model: 'hidden', hidden: true },
+            ],
+            nextCursor: 'page-2',
+        });
+        requests = input
+            .trim()
+            .split('\n')
+            .map((line) => JSON.parse(line));
         expect(requests.at(-1).params.cursor).toBe('page-2');
         reply(2, { data: [{ model: 'second', displayName: 'Second Model' }], nextCursor: null });
         await expect(pending).resolves.toEqual([
-            { model: 'first', displayName: 'First Model', description: 'First description', isDefault: true, defaultReasoningEffort: 'low', supportedReasoningEfforts: [{ reasoningEffort: 'low', description: 'Fast' }] },
-            { model: 'second', displayName: 'Second Model', description: '', isDefault: false, defaultReasoningEffort: '', supportedReasoningEfforts: [] }
+            {
+                model: 'first',
+                displayName: 'First Model',
+                description: 'First description',
+                isDefault: true,
+                defaultReasoningEffort: 'low',
+                supportedReasoningEfforts: [{ reasoningEffort: 'low', description: 'Fast' }],
+            },
+            {
+                model: 'second',
+                displayName: 'Second Model',
+                description: '',
+                isDefault: false,
+                defaultReasoningEffort: '',
+                supportedReasoningEfforts: [],
+            },
         ]);
         expect(input).not.toContain('thread/start');
         expect(process.kill).toHaveBeenCalledWith(-99999, 'SIGKILL');
@@ -241,11 +294,11 @@ describe('Codex model discovery', () => {
     });
 });
 
-
 describe('Codex generation reasoning effort', () => {
     it('passes an explicit effort to exec as a config argument', async () => {
-        const pending = new CodexCliLanguageModel('/opt/codex', 'test-model', 'high')
-            .sendRequest([vscode.LanguageModelChatMessage.User('Generate a commit subject')]);
+        const pending = new CodexCliLanguageModel('/opt/codex', 'test-model', 'high').sendRequest([
+            vscode.LanguageModelChatMessage.User('Generate a commit subject'),
+        ]);
         await started();
         const index = args.indexOf('model_reasoning_effort="high"');
         expect(index).toBeGreaterThan(0);
@@ -257,12 +310,11 @@ describe('Codex generation reasoning effort', () => {
     it('does not override reasoning effort when using the model default', async () => {
         const pending = generate();
         await started();
-        expect(args.some(arg => arg.startsWith('model_reasoning_effort='))).toBe(false);
+        expect(args.some((arg) => arg.startsWith('model_reasoning_effort='))).toBe(false);
         await finish();
         await pending;
     });
 });
-
 
 describe('Codex generation logs', () => {
     it('records progress and elapsed time without logging the prompt or generated text', async () => {
@@ -271,9 +323,17 @@ describe('Codex generation logs', () => {
         const pending = generate('test-model');
         await started();
         child.stdout.write(JSON.stringify({ type: 'turn.started' }) + '\n');
-        child.stdout.write(JSON.stringify({ type: 'item.completed', item: { type: 'agent_message', text: 'private generated content' } }) + '\n');
+        child.stdout.write(
+            JSON.stringify({
+                type: 'item.completed',
+                item: { type: 'agent_message', text: 'private generated content' },
+            }) + '\n'
+        );
         await vi.advanceTimersByTimeAsync(15000);
-        expect(info).toHaveBeenCalledWith('[codex-cli] waiting', expect.objectContaining({ lastEvent: 'item.completed' }));
+        expect(info).toHaveBeenCalledWith(
+            '[codex-cli] waiting',
+            expect.objectContaining({ lastEvent: 'item.completed' })
+        );
         await finish('private generated content');
         await pending;
         expect(info).toHaveBeenCalledWith('[codex-cli] completed', expect.objectContaining({ outputBytes: 25 }));

@@ -11,11 +11,7 @@ interface AuthorInputPopupProps {
     allAuthors: string[];
 }
 
-const AuthorInputPopup: React.FC<AuthorInputPopupProps> = ({
-    initialValue,
-    onApply,
-    allAuthors
-}) => {
+const AuthorInputPopup: React.FC<AuthorInputPopupProps> = ({ initialValue, onApply, allAuthors }) => {
     const { t } = useTranslation();
     const [value, setValue] = useState(initialValue);
     const [activeIndex, setActiveIndex] = useState(0);
@@ -26,9 +22,7 @@ const AuthorInputPopup: React.FC<AuthorInputPopupProps> = ({
     const lastLine = lines[lines.length - 1].trim().toLowerCase();
     const currentLineInput = lastLine;
 
-    const suggestions = lastLine ? allAuthors.filter(a =>
-        a.toLowerCase().includes(lastLine)
-    ) : [];
+    const suggestions = lastLine ? allAuthors.filter((a) => a.toLowerCase().includes(lastLine)) : [];
 
     useEffect(() => {
         inputRef.current?.focus();
@@ -49,7 +43,7 @@ const AuthorInputPopup: React.FC<AuthorInputPopupProps> = ({
 
         return {
             top: paddingTop + (currentLineNumber + 1) * lineHeight,
-            left: paddingLeft
+            left: paddingLeft,
         };
     };
 
@@ -82,10 +76,10 @@ const AuthorInputPopup: React.FC<AuthorInputPopupProps> = ({
             }
         } else if (e.key === 'ArrowDown' && hasSuggestions) {
             e.preventDefault();
-            setActiveIndex(prev => (prev + 1) % suggestions.length);
+            setActiveIndex((prev) => (prev + 1) % suggestions.length);
         } else if (e.key === 'ArrowUp' && hasSuggestions) {
             e.preventDefault();
-            setActiveIndex(prev => (prev - 1 + suggestions.length) % suggestions.length);
+            setActiveIndex((prev) => (prev - 1 + suggestions.length) % suggestions.length);
         }
     };
 
@@ -110,10 +104,7 @@ const AuthorInputPopup: React.FC<AuthorInputPopupProps> = ({
                     onClick={updateCaretPosition}
                 />
                 {showSuggestions && (
-                    <div
-                        className={styles.suggestionList}
-                        style={{ top: suggestionPos.top, left: suggestionPos.left }}
-                    >
+                    <div className={styles.suggestionList} style={{ top: suggestionPos.top, left: suggestionPos.left }}>
                         {suggestions.slice(0, 8).map((author, idx) => (
                             <div
                                 key={author}
@@ -128,7 +119,9 @@ const AuthorInputPopup: React.FC<AuthorInputPopupProps> = ({
             </div>
             <div className={sharedStyles.popupButtonRow}>
                 <span className={styles.hint}>{t('Press Enter to apply, Ctrl+Enter to force apply')}</span>
-                <button className={sharedStyles.primaryButton} onClick={handleApply}>{t('Apply')}</button>
+                <button className={sharedStyles.primaryButton} onClick={handleApply}>
+                    {t('Apply')}
+                </button>
             </div>
         </div>
     );
@@ -152,14 +145,14 @@ export const UserFilter: React.FC<UserFilterProps> = ({ onChange, initialAuthors
     const [currentUser, setCurrentUser] = useState('');
 
     useEffect(() => {
-        rpc.getCurrentUser().then(user => {
+        rpc.getCurrentUser().then((user) => {
             setCurrentUser(user);
         });
     }, []);
 
     useEffect(() => {
         if (showPopup && allAuthors.length === 0) {
-            rpc.getAuthors().then(authors => {
+            rpc.getAuthors().then((authors) => {
                 setAllAuthors(authors);
             });
         }
@@ -181,7 +174,10 @@ export const UserFilter: React.FC<UserFilterProps> = ({ onChange, initialAuthors
 
     const handleApply = (value: string) => {
         setAppliedValue(value);
-        const authors = value.split('\n').map(s => s.trim()).filter(s => !!s);
+        const authors = value
+            .split('\n')
+            .map((s) => s.trim())
+            .filter((s) => !!s);
         if (authors.length > 0) {
             onChange(authors);
         } else {
@@ -195,7 +191,7 @@ export const UserFilter: React.FC<UserFilterProps> = ({ onChange, initialAuthors
         if (filterType === 'all') return t('Author');
         if (filterType === 'me') return t('Me');
         if (appliedValue) {
-            const lines = appliedValue.split('\n').filter(l => l.trim());
+            const lines = appliedValue.split('\n').filter((l) => l.trim());
             if (lines.length > 1) return `${lines[0]} +${lines.length - 1}`;
             return lines[0] || t('Author');
         }
@@ -207,14 +203,18 @@ export const UserFilter: React.FC<UserFilterProps> = ({ onChange, initialAuthors
             id: 'custom',
             label: t('Custom...'),
             checked: filterType === 'custom',
-            onSelect: handleSelectCustom
+            onSelect: handleSelectCustom,
         },
-        ...(currentUser ? [{
-            id: 'me',
-            label: `${t('Me')} (${currentUser})`,
-            checked: filterType === 'me',
-            onSelect: handleSelectMe
-        }] : [])
+        ...(currentUser
+            ? [
+                  {
+                      id: 'me',
+                      label: `${t('Me')} (${currentUser})`,
+                      checked: filterType === 'me',
+                      onSelect: handleSelectMe,
+                  },
+              ]
+            : []),
     ];
 
     return (
@@ -232,11 +232,7 @@ export const UserFilter: React.FC<UserFilterProps> = ({ onChange, initialAuthors
             setShowPopup={setShowPopup}
             dropdownItems={dropdownItems}
             popupContent={
-                <AuthorInputPopup
-                    initialValue={appliedValue}
-                    onApply={handleApply}
-                    allAuthors={allAuthors}
-                />
+                <AuthorInputPopup initialValue={appliedValue} onApply={handleApply} allAuthors={allAuthors} />
             }
             ariaLabel={t('Author')}
         />

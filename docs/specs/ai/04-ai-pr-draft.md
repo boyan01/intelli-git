@@ -168,4 +168,3 @@ interface AiPrDraft {
 - Provider capability determines available action.
 - Created PR URL is displayed and openable.
 - Draft body includes Summary, Tests, Risks, and Review Focus.
-

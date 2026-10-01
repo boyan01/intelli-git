@@ -156,4 +156,3 @@ interface AiCommitPlan {
 - Applying as changelists preserves exactly one active changelist.
 - Commit execution shows exact files/message before creating a commit.
 - Conflicts and inactive changes are visible in excluded summary.
-

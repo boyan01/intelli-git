@@ -10,11 +10,7 @@ interface ViewModeToggleProps {
     className?: string;
 }
 
-export const ViewModeToggle: React.FC<ViewModeToggleProps> = ({
-    viewMode,
-    onChange,
-    className
-}) => {
+export const ViewModeToggle: React.FC<ViewModeToggleProps> = ({ viewMode, onChange, className }) => {
     const { t } = useTranslation();
 
     const handleClick = () => {

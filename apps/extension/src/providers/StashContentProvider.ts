@@ -5,7 +5,7 @@ import { parseRepositoryContentQuery, type StashContentQuery } from '../utils/re
 export class StashContentProvider implements vscode.TextDocumentContentProvider {
     onDidChange?: vscode.Event<vscode.Uri> | undefined;
 
-    constructor(private readonly repositoryManager: RepositoryManager) { }
+    constructor(private readonly repositoryManager: RepositoryManager) {}
 
     async provideTextDocumentContent(uri: vscode.Uri): Promise<string> {
         // URI format: intelli-git-stash://load/<stash-ref>/<file-path>?{"repoPath":"<repo-identity>"}
@@ -22,7 +22,7 @@ export class StashContentProvider implements vscode.TextDocumentContentProvider 
             const gitService = query.repoPath
                 ? this.repositoryManager.getService(query.repoPath)
                 : this.repositoryManager.getActiveService();
-            return await gitService?.getFileContent(ref, path) || '';
+            return (await gitService?.getFileContent(ref, path)) || '';
         } catch {
             return '';
         }

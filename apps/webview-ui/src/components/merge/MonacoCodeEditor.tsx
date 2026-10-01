@@ -105,7 +105,7 @@ function getEditorOptions(
         readOnly,
         scrollBeyondLastLine: false,
         theme: 'intelli-git-vscode',
-        useShadowDOM: false
+        useShadowDOM: false,
     };
 }
 
@@ -129,7 +129,7 @@ function getEditorDecorations(
     decorations: CodeDecoration[] | undefined
 ): Monaco.editor.IModelDeltaDecoration[] {
     const lineCount = model.getLineCount();
-    return (decorations ?? []).map(decoration => {
+    return (decorations ?? []).map((decoration) => {
         const startLine = Math.max(1, Math.min(decoration.startLine, lineCount));
         const endLine = Math.max(startLine, Math.min(decoration.endLine, lineCount));
         const startColumn = decoration.isWholeLine
@@ -137,7 +137,10 @@ function getEditorDecorations(
             : Math.max(1, Math.min(decoration.startColumn ?? 1, model.getLineMaxColumn(startLine)));
         const endColumn = decoration.isWholeLine
             ? model.getLineMaxColumn(endLine)
-            : Math.max(1, Math.min(decoration.endColumn ?? model.getLineMaxColumn(endLine), model.getLineMaxColumn(endLine)));
+            : Math.max(
+                  1,
+                  Math.min(decoration.endColumn ?? model.getLineMaxColumn(endLine), model.getLineMaxColumn(endLine))
+              );
 
         return {
             range: new monaco.Range(startLine, startColumn, endLine, endColumn),
@@ -149,30 +152,28 @@ function getEditorDecorations(
                 marginClassName: decoration.marginClassName,
                 overviewRuler: decoration.overviewRulerType
                     ? {
-                        color: getOverviewRulerColor(decoration.overviewRulerType),
-                        position: monaco.editor.OverviewRulerLane.Right
-                    }
-                    : undefined
-            }
+                          color: getOverviewRulerColor(decoration.overviewRulerType),
+                          position: monaco.editor.OverviewRulerLane.Right,
+                      }
+                    : undefined,
+            },
         };
     });
 }
 
 function isClickableLineTarget(monaco: MonacoApi, targetType: Monaco.editor.MouseTargetType): boolean {
-    return targetType === monaco.editor.MouseTargetType.CONTENT_TEXT ||
+    return (
+        targetType === monaco.editor.MouseTargetType.CONTENT_TEXT ||
         targetType === monaco.editor.MouseTargetType.CONTENT_EMPTY ||
         targetType === monaco.editor.MouseTargetType.GUTTER_LINE_NUMBERS ||
-        targetType === monaco.editor.MouseTargetType.GUTTER_LINE_DECORATIONS;
+        targetType === monaco.editor.MouseTargetType.GUTTER_LINE_DECORATIONS
+    );
 }
 
-function replaceViewZones(
-    editor: MonacoEditor,
-    currentIds: string[],
-    zones: CodeViewZone[] | undefined
-): string[] {
+function replaceViewZones(editor: MonacoEditor, currentIds: string[], zones: CodeViewZone[] | undefined): string[] {
     const nextIds: string[] = [];
-    editor.changeViewZones(accessor => {
-        currentIds.forEach(id => accessor.removeZone(id));
+    editor.changeViewZones((accessor) => {
+        currentIds.forEach((id) => accessor.removeZone(id));
         for (const zone of zones ?? []) {
             if (zone.heightInLines <= 0) {
                 continue;
@@ -183,35 +184,40 @@ function replaceViewZones(
                 domNode.className = zone.className;
                 marginDomNode.className = zone.className;
             }
-            nextIds.push(accessor.addZone({
-                afterLineNumber: Math.max(0, zone.afterLineNumber),
-                heightInLines: zone.heightInLines,
-                domNode,
-                marginDomNode,
-                suppressMouseDown: true
-            }));
+            nextIds.push(
+                accessor.addZone({
+                    afterLineNumber: Math.max(0, zone.afterLineNumber),
+                    heightInLines: zone.heightInLines,
+                    domNode,
+                    marginDomNode,
+                    suppressMouseDown: true,
+                })
+            );
         }
     });
     return nextIds;
 }
 
-export const MonacoCodeEditor = forwardRef<MonacoCodeEditorHandle, MonacoCodeEditorProps>(function MonacoCodeEditor({
-    value,
-    ariaLabel,
-    filePath,
-    readOnly = false,
-    disabled = false,
-    className,
-    decorations,
-    viewZones,
-    contextData,
-    revealLine,
-    scrollTop,
-    scrollLeft,
-    onChange,
-    onLineClick,
-    onScroll
-}, ref) {
+export const MonacoCodeEditor = forwardRef<MonacoCodeEditorHandle, MonacoCodeEditorProps>(function MonacoCodeEditor(
+    {
+        value,
+        ariaLabel,
+        filePath,
+        readOnly = false,
+        disabled = false,
+        className,
+        decorations,
+        viewZones,
+        contextData,
+        revealLine,
+        scrollTop,
+        scrollLeft,
+        onChange,
+        onLineClick,
+        onScroll,
+    },
+    ref
+) {
     const hostRef = useRef<HTMLDivElement | null>(null);
     const editorRef = useRef<WheelDelegatingMonacoEditor | null>(null);
     const decorationsRef = useRef<DecorationCollection | null>(null);
@@ -228,11 +234,15 @@ export const MonacoCodeEditor = forwardRef<MonacoCodeEditorHandle, MonacoCodeEdi
     const onLineClickRef = useRef(onLineClick);
     const onScrollRef = useRef(onScroll);
 
-    useImperativeHandle(ref, () => ({
-        delegateScrollFromWheelEvent(event) {
-            editorRef.current?.delegateScrollFromMouseWheelEvent(event);
-        }
-    }), []);
+    useImperativeHandle(
+        ref,
+        () => ({
+            delegateScrollFromWheelEvent(event) {
+                editorRef.current?.delegateScrollFromMouseWheelEvent(event);
+            },
+        }),
+        []
+    );
 
     useEffect(() => {
         latestValueRef.current = value;
@@ -299,19 +309,19 @@ export const MonacoCodeEditor = forwardRef<MonacoCodeEditorHandle, MonacoCodeEdi
             }
             onScrollRef.current?.(nextEditor.getScrollTop(), nextEditor.getScrollLeft());
 
-            contentSubscription = nextEditor.onDidChangeModelContent(event => {
+            contentSubscription = nextEditor.onDidChangeModelContent((event) => {
                 if (!applyingExternalValueRef.current) {
                     onChangeRef.current?.(
                         nextEditor.getValue(),
-                        event.changes.map(change => ({
+                        event.changes.map((change) => ({
                             rangeOffset: change.rangeOffset,
                             rangeLength: change.rangeLength,
-                            text: change.text
+                            text: change.text,
                         }))
                     );
                 }
             });
-            mouseSubscription = nextEditor.onMouseDown(event => {
+            mouseSubscription = nextEditor.onMouseDown((event) => {
                 if (!isClickableLineTarget(monaco, event.target.type)) {
                     return;
                 }
@@ -320,7 +330,7 @@ export const MonacoCodeEditor = forwardRef<MonacoCodeEditorHandle, MonacoCodeEdi
                     onLineClickRef.current?.(lineNumber);
                 }
             });
-            scrollSubscription = nextEditor.onDidScrollChange(event => {
+            scrollSubscription = nextEditor.onDidScrollChange((event) => {
                 if (!applyingExternalScrollRef.current && (event.scrollTopChanged || event.scrollLeftChanged)) {
                     onScrollRef.current?.(
                         event.scrollTopChanged ? event.scrollTop : undefined,
@@ -347,24 +357,26 @@ export const MonacoCodeEditor = forwardRef<MonacoCodeEditorHandle, MonacoCodeEdi
         });
         resizeObserver.observe(host);
 
-        void loadMonaco().then(monaco => {
-            if (disposed) {
-                return;
-            }
+        void loadMonaco()
+            .then((monaco) => {
+                if (disposed) {
+                    return;
+                }
 
-            monacoApi = monaco;
-            const dimension = getElementDimension(host);
-            if (dimension) {
-                createEditor(monaco, languageId, dimension);
-            }
-        }).catch(error => {
-            console.error('Failed to initialize Monaco code editor.', error);
-            if (!disposed) {
-                window.setTimeout(() => {
-                    throw error;
-                });
-            }
-        });
+                monacoApi = monaco;
+                const dimension = getElementDimension(host);
+                if (dimension) {
+                    createEditor(monaco, languageId, dimension);
+                }
+            })
+            .catch((error) => {
+                console.error('Failed to initialize Monaco code editor.', error);
+                if (!disposed) {
+                    window.setTimeout(() => {
+                        throw error;
+                    });
+                }
+            });
 
         return () => {
             disposed = true;
@@ -387,7 +399,7 @@ export const MonacoCodeEditor = forwardRef<MonacoCodeEditorHandle, MonacoCodeEdi
 
     useEffect(() => {
         editorRef.current?.updateOptions({
-            readOnly: readOnly || disabled
+            readOnly: readOnly || disabled,
         });
     }, [disabled, readOnly]);
 
@@ -411,7 +423,7 @@ export const MonacoCodeEditor = forwardRef<MonacoCodeEditorHandle, MonacoCodeEdi
 
     useEffect(() => {
         let cancelled = false;
-        void loadMonaco().then(monaco => {
+        void loadMonaco().then((monaco) => {
             if (cancelled) {
                 return;
             }

@@ -12,10 +12,10 @@ describe('webview HTML', () => {
         const html = getWebviewHtml({
             webview: {
                 cspSource: 'https://webview.test',
-                asWebviewUri: value => value
+                asWebviewUri: (value) => value,
             } as vscode.Webview,
             extensionUri: vscode.Uri.parse('file:///extension'),
-            title: 'Test'
+            title: 'Test',
         });
 
         expect(html).toContain("style-src https://webview.test; style-src-attr 'unsafe-inline';");

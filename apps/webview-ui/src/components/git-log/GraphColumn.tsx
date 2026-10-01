@@ -44,7 +44,7 @@ export const GraphColumn: React.FC<GraphColumnProps> = ({
     isSelected = false,
     isHovered = false,
     hasFocus = false,
-    isExpanded = false
+    isExpanded = false,
 }) => {
     const svgHeight = graphHeight ?? rowHeight;
     const dotY = rowHeight / 2;
@@ -142,12 +142,7 @@ export const GraphColumn: React.FC<GraphColumnProps> = ({
                     pointerEvents="all"
                 />
                 {/* Filled triangle arrow */}
-                <path
-                    d={arrowPath}
-                    fill={line.color}
-                    stroke="none"
-                    pointerEvents="none"
-                />
+                <path d={arrowPath} fill={line.color} stroke="none" pointerEvents="none" />
             </g>
         );
     };
@@ -164,7 +159,9 @@ export const GraphColumn: React.FC<GraphColumnProps> = ({
                     pointerEvents="none"
                     strokeLinecap={line.isDashed ? 'butt' : 'round'}
                     strokeDasharray={line.isDashed ? '2 3' : undefined}
-                    strokeDashoffset={line.isDashed ? ((rowTop ?? rowIndex * rowHeight) + getY(line.y1)) % 5 : undefined}
+                    strokeDashoffset={
+                        line.isDashed ? ((rowTop ?? rowIndex * rowHeight) + getY(line.y1)) % 5 : undefined
+                    }
                 />
             ))}
             <circle

@@ -13,16 +13,10 @@ export function useRpcEvent<T>(eventStream: EventStream<T>, initialValue: T): T;
 export function useRpcEvent<T>(eventStream: EventStream<T>, initialValue: null): T | null;
 
 // Mode 2: Side effect
-export function useRpcEvent<T>(
-    eventStream: EventStream<T>,
-    handler: (data: T) => void
-): void;
+export function useRpcEvent<T>(eventStream: EventStream<T>, handler: (data: T) => void): void;
 
 // Implementation
-export function useRpcEvent<T>(
-    eventStream: EventStream<T>,
-    arg2: T | ((data: T) => void) | null
-): T | null | void {
+export function useRpcEvent<T>(eventStream: EventStream<T>, arg2: T | ((data: T) => void) | null): T | null | void {
     // If arg2 is a function, we assume it's a handler (Side effect mode)
     // Note: This assumes T is not a function type, which is true for RPC data.
     const isHandler = typeof arg2 === 'function';
@@ -31,7 +25,7 @@ export function useRpcEvent<T>(
     const [state, setState] = useState<T | null>(!isHandler ? (arg2 as T | null) : null);
 
     // Ref for handler (Side effect mode)
-    const handlerRef = useRef<(data: T) => void>(isHandler ? (arg2 as (data: T) => void) : () => { });
+    const handlerRef = useRef<(data: T) => void>(isHandler ? (arg2 as (data: T) => void) : () => {});
 
     useEffect(() => {
         if (isHandler) {

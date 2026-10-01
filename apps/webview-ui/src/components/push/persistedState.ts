@@ -16,15 +16,15 @@ export const pushStateDefaults: PushPersistedStateSchema = {
         localBranch: '',
         remote: '',
         remoteBranch: '',
-        confirmed: false
+        confirmed: false,
     },
     'push.initState': {
         repositoryPath: '',
         localBranch: '',
-        remotes: []
+        remotes: [],
     },
     'push.remoteBranches': {
         remote: '',
-        branches: []
-    }
+        branches: [],
+    },
 };

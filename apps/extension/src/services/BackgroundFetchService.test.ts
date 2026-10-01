@@ -15,7 +15,7 @@ async function waitForFile(filePath: string): Promise<void> {
         if (Date.now() >= deadline) {
             throw new Error(`Timed out waiting for ${filePath}`);
         }
-        await new Promise(resolve => setTimeout(resolve, 10));
+        await new Promise((resolve) => setTimeout(resolve, 10));
     }
 }
 
@@ -64,16 +64,16 @@ describe('BackgroundFetchService', () => {
                 gitRoot: worktreePath,
                 isSubmodule: false,
                 kind: 'workspace',
-                branch
+                branch,
             },
             worktreePath,
-            helperPath
+            helperPath,
         };
     }
 
     function createManager(scope: RepositoryScope): RepositoryManager {
         return {
-            getRepositories: () => [scope]
+            getRepositories: () => [scope],
         } as unknown as RepositoryManager;
     }
 
@@ -85,10 +85,10 @@ describe('BackgroundFetchService', () => {
             workspaceRoot: tempDir,
             gitRoot: tempDir,
             isSubmodule: false,
-            kind: 'workspace'
+            kind: 'workspace',
         } satisfies RepositoryScope;
         const changed: RepositoryScope[] = [];
-        const service = new BackgroundFetchService(createManager(scope), repo => changed.push(repo));
+        const service = new BackgroundFetchService(createManager(scope), (repo) => changed.push(repo));
 
         await service.refreshRepositories();
 
@@ -103,13 +103,16 @@ describe('BackgroundFetchService', () => {
         const markerPath = path.join(tempDir, 'upload-pack-started');
         const releasePath = path.join(tempDir, 'upload-pack-release');
         const uploadPackPath = path.join(tempDir, 'slow-upload-pack.sh');
-        fs.writeFileSync(uploadPackPath, [
-            '#!/bin/sh',
-            `touch '${markerPath}'`,
-            `while [ ! -f '${releasePath}' ]; do sleep 0.05; done`,
-            'exec git-upload-pack "$@"',
-            ''
-        ].join('\n'));
+        fs.writeFileSync(
+            uploadPackPath,
+            [
+                '#!/bin/sh',
+                `touch '${markerPath}'`,
+                `while [ ! -f '${releasePath}' ]; do sleep 0.05; done`,
+                'exec git-upload-pack "$@"',
+                '',
+            ].join('\n')
+        );
         fs.chmodSync(uploadPackPath, 0o755);
         execFileSync('git', ['config', 'remote.origin.uploadpack', uploadPackPath], { cwd: worktreePath });
 
@@ -119,10 +122,14 @@ describe('BackgroundFetchService', () => {
         const fetchPromise = service.refreshRepositories();
         await waitForFile(markerPath);
 
-        await expect(Promise.race([
-            interactiveGit.getStatusForView(),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('Interactive Git queue was blocked')), 500))
-        ])).resolves.toEqual([]);
+        await expect(
+            Promise.race([
+                interactiveGit.getStatusForView(),
+                new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error('Interactive Git queue was blocked')), 500)
+                ),
+            ])
+        ).resolves.toEqual([]);
 
         fs.writeFileSync(releasePath, 'release\n');
         await fetchPromise;
@@ -144,13 +151,16 @@ describe('BackgroundFetchService', () => {
         const markerPath = path.join(tempDir, 'receive-pack-started');
         const releasePath = path.join(tempDir, 'receive-pack-release');
         const receivePackPath = path.join(tempDir, 'slow-receive-pack.sh');
-        fs.writeFileSync(receivePackPath, [
-            '#!/bin/sh',
-            `touch '${markerPath}'`,
-            `while [ ! -f '${releasePath}' ]; do sleep 0.05; done`,
-            'exec git-receive-pack "$@"',
-            ''
-        ].join('\n'));
+        fs.writeFileSync(
+            receivePackPath,
+            [
+                '#!/bin/sh',
+                `touch '${markerPath}'`,
+                `while [ ! -f '${releasePath}' ]; do sleep 0.05; done`,
+                'exec git-receive-pack "$@"',
+                '',
+            ].join('\n')
+        );
         fs.chmodSync(receivePackPath, 0o755);
         execFileSync('git', ['config', 'remote.origin.receivepack', receivePackPath], { cwd: worktreePath });
 
@@ -158,10 +168,14 @@ describe('BackgroundFetchService', () => {
         const pushPromise = interactiveGit.branchRemote.push('origin', scope.branch!);
         await waitForFile(markerPath);
 
-        await expect(Promise.race([
-            interactiveGit.getStatusForView(),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('Local Git read was blocked by push')), 500))
-        ])).resolves.toEqual([]);
+        await expect(
+            Promise.race([
+                interactiveGit.getStatusForView(),
+                new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error('Local Git read was blocked by push')), 500)
+                ),
+            ])
+        ).resolves.toEqual([]);
 
         fs.writeFileSync(releasePath, 'release\n');
         await pushPromise;
@@ -180,7 +194,7 @@ describe('BackgroundFetchService', () => {
 
         __setBackgroundFetchConfig({ enabled: true });
         const changed: RepositoryScope[] = [];
-        const service = new BackgroundFetchService(createManager(scope), repo => changed.push(repo));
+        const service = new BackgroundFetchService(createManager(scope), (repo) => changed.push(repo));
 
         await service.refreshRepositories();
 

@@ -6,7 +6,7 @@ import {
     DEFAULT_CUSTOM_OPENAI_API_URL,
     DEFAULT_CUSTOM_OPENAI_MODEL,
     DEFAULT_GOOGLE_API_URL,
-    DEFAULT_GOOGLE_MODEL
+    DEFAULT_GOOGLE_MODEL,
 } from './ai';
 
 describe('AI provider defaults', () => {

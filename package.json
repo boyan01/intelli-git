@@ -16,12 +16,17 @@
     "package:extension:dev": "INTELLI_GIT_BUILD_CHANNEL=dev MODE=dev npm run package:dev --workspace=intelli-git",
     "install:extension:dev": "INTELLI_GIT_BUILD_CHANNEL=dev MODE=dev npm run package:dev --workspace=intelli-git -- --install",
     "lint": "npm run lint --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "format": "prettier . --write",
+    "format:check": "prettier . --check",
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm run test && npm run test:release",
     "test": "npm run test --workspaces --if-present",
     "test:release": "node --test scripts/release.test.js"
   },
   "devDependencies": {
     "@rollup/plugin-replace": "^6.0.3",
     "esbuild": "^0.28.0",
+    "prettier": "3.9.9",
     "vite": "^8.0.3"
   },
   "engines": {

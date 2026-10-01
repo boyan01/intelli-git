@@ -2,10 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import { RpcPeer } from '@shared/rpc';
-import {
-    AI_COPILOT_MODEL_UNAVAILABLE_CODE,
-    AI_PROVIDER_SETUP_REQUIRED_CODE
-} from '@shared/messages';
+import { AI_COPILOT_MODEL_UNAVAILABLE_CODE, AI_PROVIDER_SETUP_REQUIRED_CODE } from '@shared/messages';
 import type {
     WebviewMethods,
     ExtensionMethods,
@@ -33,7 +30,7 @@ import type {
     ConflictFileContent,
     ResolveConflictRequest,
     SaveConflictResolutionRequest,
-    PublishReviewBranchRequest
+    PublishReviewBranchRequest,
 } from '@shared/messages';
 import { GitService } from '../services/GitService';
 import { RepositoryManager } from '../services/RepositoryManager';
@@ -53,7 +50,7 @@ import {
     DEFAULT_GOOGLE_API_URL,
     DEFAULT_GOOGLE_MODEL,
     DEFAULT_PULL_REQUEST_BODY_PROMPT,
-    DEFAULT_PULL_REQUEST_TITLE_PROMPT
+    DEFAULT_PULL_REQUEST_TITLE_PROMPT,
 } from '../services/ai';
 import { logger } from '../utils/logger';
 import { getAiApiKey } from '../utils/aiSecrets';
@@ -169,7 +166,7 @@ interface ReviewBranchOptions {
 
 const DEFAULT_REVIEW_BRANCH_OPTIONS: ReviewBranchOptions = {
     resetBaseBranch: true,
-    generateAiNotes: false
+    generateAiNotes: false,
 };
 const REVIEW_BRANCH_OPTIONS_STORAGE_KEY = 'ideaCommitPanel.reviewBranchOptions.v1';
 
@@ -186,11 +183,14 @@ function isExtensionSourceRoot(candidate: string | undefined): candidate is stri
     }
 
     try {
-        const rootPackageJson = JSON.parse(fs.readFileSync(path.join(candidate, 'package.json'), 'utf8')) as { name?: string };
-        const extensionPackageJson = JSON.parse(fs.readFileSync(path.join(candidate, 'apps/extension/package.json'), 'utf8')) as { name?: string };
+        const rootPackageJson = JSON.parse(fs.readFileSync(path.join(candidate, 'package.json'), 'utf8')) as {
+            name?: string;
+        };
+        const extensionPackageJson = JSON.parse(
+            fs.readFileSync(path.join(candidate, 'apps/extension/package.json'), 'utf8')
+        ) as { name?: string };
 
-        return rootPackageJson.name === 'idea-commit-pannel-monorepo'
-            && extensionPackageJson.name === 'intelli-git';
+        return rootPackageJson.name === 'idea-commit-pannel-monorepo' && extensionPackageJson.name === 'intelli-git';
     } catch {
         return false;
     }
@@ -249,22 +249,22 @@ export class ExtensionRpcHandler {
     constructor(options: ExtensionRpcHandlerOptions) {
         this.context = options.context;
         this.repositoryManager = options.repositoryManager;
-        this.onDispose = options.onDispose || (() => { });
+        this.onDispose = options.onDispose || (() => {});
         this.onChangelistSelectionChange = options.onChangelistSelectionChange;
         this.onChangelistFocusChange = options.onChangelistFocusChange;
         this.openConflictResolverPanel = options.openConflictResolver;
         this.updateConflictResolverPanelTitle = options.updateConflictResolverTitle;
         this.gitReadRpcHandler = new GitReadRpcHandler(this.repositoryManager, options.consumePendingGitLogReveal);
         this.changelistRpcHandler = new ChangelistRpcHandler(
-            repoPath => this.getChangelistOperationsForRepo(repoPath),
-            repoPath => repoPath ? this.getChangelistStateServiceForRepo(repoPath) : this.changelistStateService
+            (repoPath) => this.getChangelistOperationsForRepo(repoPath),
+            (repoPath) => (repoPath ? this.getChangelistStateServiceForRepo(repoPath) : this.changelistStateService)
         );
     }
 
     private get gitService(): GitService {
         const service = this.repositoryManager.getActiveService();
         if (!service) {
-            throw new Error("No active repository");
+            throw new Error('No active repository');
         }
         return service;
     }
@@ -284,9 +284,7 @@ export class ExtensionRpcHandler {
     }
 
     private normalizeFileReference(input: FileReferenceInput): RepositoryFileReference {
-        return isRepositoryFileReference(input)
-            ? { repoPath: input.repoPath, path: input.path }
-            : { path: input };
+        return isRepositoryFileReference(input) ? { repoPath: input.repoPath, path: input.path } : { path: input };
     }
 
     private groupFileReferences(inputs: FileReferenceInput[]): Map<string | undefined, string[]> {
@@ -302,10 +300,14 @@ export class ExtensionRpcHandler {
     }
 
     private getRepositoryName(repoPath: string | undefined, gitService: GitService): string {
-        const repositories = typeof this.repositoryManager.getRepositories === 'function'
-            ? this.repositoryManager.getRepositories()
-            : [];
-        return repositories.find(repo => repo.repoPath === repoPath)?.name || path.basename(gitService.getWorkspaceRoot());
+        const repositories =
+            typeof this.repositoryManager.getRepositories === 'function'
+                ? this.repositoryManager.getRepositories()
+                : [];
+        return (
+            repositories.find((repo) => repo.repoPath === repoPath)?.name ||
+            path.basename(gitService.getWorkspaceRoot())
+        );
     }
 
     private get inactiveChangesService(): InactiveChangesService | undefined {
@@ -317,7 +319,9 @@ export class ExtensionRpcHandler {
     }
 
     private getChangelistOperationsForRepo(repoPath?: string): ChangelistOperations | undefined {
-        const gitService = repoPath ? this.repositoryManager.getService(repoPath) : this.repositoryManager.getActiveService();
+        const gitService = repoPath
+            ? this.repositoryManager.getService(repoPath)
+            : this.repositoryManager.getActiveService();
         const inactiveChangesService = gitService?.inactiveChangesService;
         const changelistStateService = gitService?.changelistStateService;
         if (!gitService || !inactiveChangesService || !changelistStateService) {
@@ -328,11 +332,11 @@ export class ExtensionRpcHandler {
             gitService,
             inactiveChangesService,
             changelistStateService,
-            refreshDecorations: createDefaultRefreshDecorations()
+            refreshDecorations: createDefaultRefreshDecorations(),
         });
     }
 
-    log = (params: { message: string, type?: 'info' | 'error' | 'warn' | 'debug' }): Promise<void> => {
+    log = (params: { message: string; type?: 'info' | 'error' | 'warn' | 'debug' }): Promise<void> => {
         const type = params.type || 'info';
         if (logger[type]) {
             logger[type](params.message);
@@ -358,7 +362,7 @@ export class ExtensionRpcHandler {
         const error = new Error(i18n.t('Push rejected because the remote branch has new commits.'));
         return Object.assign(error, {
             code: 'behind' as const,
-            data: { behind }
+            data: { behind },
         });
     }
 
@@ -385,9 +389,10 @@ export class ExtensionRpcHandler {
     }
 
     private getPushBehindCount(error: unknown): number | undefined {
-        const data = typeof error === 'object' && error !== null && 'data' in error
-            ? (error as { data?: unknown }).data
-            : undefined;
+        const data =
+            typeof error === 'object' && error !== null && 'data' in error
+                ? (error as { data?: unknown }).data
+                : undefined;
         if (typeof data !== 'object' || data === null || !('behind' in data)) {
             return undefined;
         }
@@ -446,7 +451,7 @@ export class ExtensionRpcHandler {
             code,
             remote: params.remote,
             branch: params.branch,
-            message
+            message,
         };
         const behindCount = code === 'behind' ? this.getPushBehindCount(error) : undefined;
         if (behindCount !== undefined) {
@@ -478,12 +483,16 @@ export class ExtensionRpcHandler {
         const setUpstreamWithPush = !hadUpstream && options.setUpstreamToTarget;
         const pushOptions = {
             noVerify: options.noVerify,
-            setUpstream: setUpstreamWithPush
+            setUpstream: setUpstreamWithPush,
         };
 
         try {
             if (options.force) {
-                await gitService.branchRemote.forcePush(target.remote, `${currentBranch}:${target.branch}`, pushOptions);
+                await gitService.branchRemote.forcePush(
+                    target.remote,
+                    `${currentBranch}:${target.branch}`,
+                    pushOptions
+                );
             } else {
                 await gitService.branchRemote.push(target.remote, `${currentBranch}:${target.branch}`, pushOptions);
             }
@@ -536,7 +545,7 @@ export class ExtensionRpcHandler {
             canSelectFiles: false,
             canSelectFolders: true,
             canSelectMany: false,
-            openLabel: i18n.t('Add Repository')
+            openLabel: i18n.t('Add Repository'),
         });
 
         const folder = selected?.[0]?.fsPath;
@@ -559,17 +568,17 @@ export class ExtensionRpcHandler {
         }
 
         const selected = await vscode.window.showQuickPick(
-            candidates.map(repo => ({
+            candidates.map((repo) => ({
                 label: repo.name,
                 description: repo.branch,
                 detail: repo.path,
-                repo
+                repo,
             })),
             {
                 canPickMany: true,
                 matchOnDescription: true,
                 matchOnDetail: true,
-                placeHolder: i18n.t('Select repositories to add')
+                placeHolder: i18n.t('Select repositories to add'),
             }
         );
 
@@ -601,7 +610,9 @@ export class ExtensionRpcHandler {
 
     setActiveWorktree = async (worktreePath: string) => {
         const normalizedPath = normalizeExistingPath(worktreePath);
-        const repo = this.repositoryManager.getRepositories().find(item => normalizeExistingPath(item.repoPath) === normalizedPath);
+        const repo = this.repositoryManager
+            .getRepositories()
+            .find((item) => normalizeExistingPath(item.repoPath) === normalizedPath);
         if (!repo) {
             return false;
         }
@@ -609,7 +620,9 @@ export class ExtensionRpcHandler {
     };
 
     openWorktree = async (worktreePath: string) => {
-        await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(worktreePath), { forceNewWindow: true });
+        await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(worktreePath), {
+            forceNewWindow: true,
+        });
     };
 
     revealWorktree = async (worktreePath: string) => {
@@ -625,112 +638,110 @@ export class ExtensionRpcHandler {
     };
 
     registerAll(rpc: RpcPeer<WebviewMethods, ExtensionMethods>) {
-        rpc.registerAll(
-            {
-                getRepositories: this.getRepositories,
-                getActiveRepository: this.getActiveRepository,
-                setActiveRepository: this.setActiveRepository,
-                addRepository: this.addRepository,
-                scanWorkspaceRepositories: this.scanWorkspaceRepositories,
-                removeRepository: this.removeRepository,
-                getWorktrees: this.getWorktrees,
-                setActiveWorktree: this.setActiveWorktree,
-                openWorktree: this.openWorktree,
-                revealWorktree: this.revealWorktree,
-                pruneWorktrees: this.pruneWorktrees,
-                removeWorktree: this.removeWorktree,
-                log: this.log,
-                getPushInitState: this.gitReadRpcHandler.getPushInitState,
-                getRemoteBranches: this.gitReadRpcHandler.getRemoteBranches,
-                getPushCommits: this.gitReadRpcHandler.getPushCommits,
-                getCommitFiles: this.gitReadRpcHandler.getCommitFiles,
-                getMultiCommitFiles: this.gitReadRpcHandler.getMultiCommitFiles,
-                push: this.push,
-                publishReviewBranch: this.publishReviewBranch,
-                confirmForcePush: this.confirmForcePush,
-                openDiff: this.openDiff,
-                closeWebView: this.closeWebView,
-                openCommitDiff: this.openCommitDiff,
-                getStatus: this.getStatus,
-                getChangelistState: this.getChangelistState,
-                getCommitViewState: this.getCommitViewState,
-                invalidateCommitViewState: this.invalidateCommitViewState,
-                getBranchInfo: this.gitReadRpcHandler.getBranchInfo,
-                getStashList: this.gitReadRpcHandler.getStashList,
-                getStashFiles: this.gitReadRpcHandler.getStashFiles,
-                commit: this.commit,
-                stage: this.stage,
-                stageFiles: this.stageFiles,
-                unstage: this.unstage,
-                unstageFiles: this.unstageFiles,
-                stageAll: this.stageAll,
-                unstageAll: this.unstageAll,
-                stageTracked: this.stageTracked,
-                getAIProviderStatus: this.getAIProviderStatus,
-                generateCommitMessage: this.generateCommitMessage,
-                testAIProvider: this.testAIProvider,
-                selectCopilotModel: this.selectCopilotModel,
-                openCommitPromptSettings: this.openCommitPromptSettings,
-                stash: this.stash,
-                deleteFiles: this.deleteFiles,
-                rollback: this.rollback,
-                switchBranch: this.switchBranch,
-                pull: this.pull,
-                fetch: this.fetch,
-                focusGitLog: this.focusGitLog,
-                switchRepository: this.switchRepository,
-                openFolder: this.openFolder,
-                openFeedback: this.openFeedback,
-                openLatestRelease: this.openLatestRelease,
-                rebuildDevVsix: this.rebuildDevVsix,
-                initializeRepository: this.initializeRepository,
-                configureAIProvider: this.configureAIProvider,
-                pickBranch: this.pickBranch,
-                continueRebase: this.continueRebase,
-                abortRebase: this.abortRebase,
-                openConflictResolver: this.openConflictResolver,
-                updateConflictResolverTitle: this.updateConflictResolverTitle,
-                getConflictFileContent: this.getConflictFileContent,
-                confirmConflictResolverRestart: this.confirmConflictResolverRestart,
-                saveConflictResolution: this.saveConflictResolution,
-                resolveConflict: this.resolveConflict,
-                openFile: this.openFile,
-                openStashDiff: this.openStashDiff,
-                getBranchListData: this.gitReadRpcHandler.getBranchListData,
-                getLog: this.gitReadRpcHandler.getLog,
-                getCommitDetails: this.gitReadRpcHandler.getCommitDetails,
-                getPendingGitLogReveal: this.gitReadRpcHandler.getPendingGitLogReveal,
-                pickBranchForFilter: this.pickBranchForFilter,
-                pickPaths: this.pickPaths,
-                getAuthors: this.gitReadRpcHandler.getAuthors,
-                getCurrentUser: this.gitReadRpcHandler.getCurrentUser,
-                getUnpushedCommits: this.gitReadRpcHandler.getUnpushedCommits,
-                getWorkspaceRoot: this.gitReadRpcHandler.getWorkspaceRoot,
-                getLastCommitInfo: this.gitReadRpcHandler.getLastCommitInfo,
-                showErrorMessage: this.showErrorMessage,
-                markHunkInactive: this.changelistRpcHandler.markHunkInactive,
-                markHunkActive: this.changelistRpcHandler.markHunkActive,
-                markFilesInactive: this.changelistRpcHandler.markFilesInactive,
-                markFilesActive: this.changelistRpcHandler.markFilesActive,
-                setChangelistMode: this.changelistRpcHandler.setChangelistMode,
-                createChangelist: this.changelistRpcHandler.createChangelist,
-                renameChangelist: this.changelistRpcHandler.renameChangelist,
-                deleteChangelist: this.changelistRpcHandler.deleteChangelist,
-                setActiveChangelist: this.changelistRpcHandler.setActiveChangelist,
-                moveChangesToChangelist: this.changelistRpcHandler.moveChangesToChangelist,
-                moveFilesToChangelist: this.changelistRpcHandler.moveFilesToChangelist,
-                moveHunksToChangelist: this.changelistRpcHandler.moveHunksToChangelist,
-                setActiveChangelistFile: this.setActiveChangelistFile,
-                setChangelistTreeFocus: this.setChangelistTreeFocus
-            }
-        )
+        rpc.registerAll({
+            getRepositories: this.getRepositories,
+            getActiveRepository: this.getActiveRepository,
+            setActiveRepository: this.setActiveRepository,
+            addRepository: this.addRepository,
+            scanWorkspaceRepositories: this.scanWorkspaceRepositories,
+            removeRepository: this.removeRepository,
+            getWorktrees: this.getWorktrees,
+            setActiveWorktree: this.setActiveWorktree,
+            openWorktree: this.openWorktree,
+            revealWorktree: this.revealWorktree,
+            pruneWorktrees: this.pruneWorktrees,
+            removeWorktree: this.removeWorktree,
+            log: this.log,
+            getPushInitState: this.gitReadRpcHandler.getPushInitState,
+            getRemoteBranches: this.gitReadRpcHandler.getRemoteBranches,
+            getPushCommits: this.gitReadRpcHandler.getPushCommits,
+            getCommitFiles: this.gitReadRpcHandler.getCommitFiles,
+            getMultiCommitFiles: this.gitReadRpcHandler.getMultiCommitFiles,
+            push: this.push,
+            publishReviewBranch: this.publishReviewBranch,
+            confirmForcePush: this.confirmForcePush,
+            openDiff: this.openDiff,
+            closeWebView: this.closeWebView,
+            openCommitDiff: this.openCommitDiff,
+            getStatus: this.getStatus,
+            getChangelistState: this.getChangelistState,
+            getCommitViewState: this.getCommitViewState,
+            invalidateCommitViewState: this.invalidateCommitViewState,
+            getBranchInfo: this.gitReadRpcHandler.getBranchInfo,
+            getStashList: this.gitReadRpcHandler.getStashList,
+            getStashFiles: this.gitReadRpcHandler.getStashFiles,
+            commit: this.commit,
+            stage: this.stage,
+            stageFiles: this.stageFiles,
+            unstage: this.unstage,
+            unstageFiles: this.unstageFiles,
+            stageAll: this.stageAll,
+            unstageAll: this.unstageAll,
+            stageTracked: this.stageTracked,
+            getAIProviderStatus: this.getAIProviderStatus,
+            generateCommitMessage: this.generateCommitMessage,
+            testAIProvider: this.testAIProvider,
+            selectCopilotModel: this.selectCopilotModel,
+            openCommitPromptSettings: this.openCommitPromptSettings,
+            stash: this.stash,
+            deleteFiles: this.deleteFiles,
+            rollback: this.rollback,
+            switchBranch: this.switchBranch,
+            pull: this.pull,
+            fetch: this.fetch,
+            focusGitLog: this.focusGitLog,
+            switchRepository: this.switchRepository,
+            openFolder: this.openFolder,
+            openFeedback: this.openFeedback,
+            openLatestRelease: this.openLatestRelease,
+            rebuildDevVsix: this.rebuildDevVsix,
+            initializeRepository: this.initializeRepository,
+            configureAIProvider: this.configureAIProvider,
+            pickBranch: this.pickBranch,
+            continueRebase: this.continueRebase,
+            abortRebase: this.abortRebase,
+            openConflictResolver: this.openConflictResolver,
+            updateConflictResolverTitle: this.updateConflictResolverTitle,
+            getConflictFileContent: this.getConflictFileContent,
+            confirmConflictResolverRestart: this.confirmConflictResolverRestart,
+            saveConflictResolution: this.saveConflictResolution,
+            resolveConflict: this.resolveConflict,
+            openFile: this.openFile,
+            openStashDiff: this.openStashDiff,
+            getBranchListData: this.gitReadRpcHandler.getBranchListData,
+            getLog: this.gitReadRpcHandler.getLog,
+            getCommitDetails: this.gitReadRpcHandler.getCommitDetails,
+            getPendingGitLogReveal: this.gitReadRpcHandler.getPendingGitLogReveal,
+            pickBranchForFilter: this.pickBranchForFilter,
+            pickPaths: this.pickPaths,
+            getAuthors: this.gitReadRpcHandler.getAuthors,
+            getCurrentUser: this.gitReadRpcHandler.getCurrentUser,
+            getUnpushedCommits: this.gitReadRpcHandler.getUnpushedCommits,
+            getWorkspaceRoot: this.gitReadRpcHandler.getWorkspaceRoot,
+            getLastCommitInfo: this.gitReadRpcHandler.getLastCommitInfo,
+            showErrorMessage: this.showErrorMessage,
+            markHunkInactive: this.changelistRpcHandler.markHunkInactive,
+            markHunkActive: this.changelistRpcHandler.markHunkActive,
+            markFilesInactive: this.changelistRpcHandler.markFilesInactive,
+            markFilesActive: this.changelistRpcHandler.markFilesActive,
+            setChangelistMode: this.changelistRpcHandler.setChangelistMode,
+            createChangelist: this.changelistRpcHandler.createChangelist,
+            renameChangelist: this.changelistRpcHandler.renameChangelist,
+            deleteChangelist: this.changelistRpcHandler.deleteChangelist,
+            setActiveChangelist: this.changelistRpcHandler.setActiveChangelist,
+            moveChangesToChangelist: this.changelistRpcHandler.moveChangesToChangelist,
+            moveFilesToChangelist: this.changelistRpcHandler.moveFilesToChangelist,
+            moveHunksToChangelist: this.changelistRpcHandler.moveHunksToChangelist,
+            setActiveChangelistFile: this.setActiveChangelistFile,
+            setChangelistTreeFocus: this.setChangelistTreeFocus,
+        });
     }
 
     push = async (params: PushRequest): Promise<PushResult> => {
         if (params.force) {
             const confirmed = await this.confirmForcePush({
                 remote: params.remote,
-                branch: params.branch
+                branch: params.branch,
             });
             if (!confirmed) {
                 return {
@@ -738,7 +749,7 @@ export class ExtensionRpcHandler {
                     code: 'cancelled',
                     remote: params.remote,
                     branch: params.branch,
-                    message: i18n.t('Force push cancelled.')
+                    message: i18n.t('Force push cancelled.'),
                 };
             }
         }
@@ -753,7 +764,7 @@ export class ExtensionRpcHandler {
                 ok: true,
                 remote: params.remote,
                 branch: params.branch,
-                commitCount: params.commitCount ?? 0
+                commitCount: params.commitCount ?? 0,
             };
         } catch (error) {
             return this.createPushFailureResult(error, params);
@@ -763,7 +774,11 @@ export class ExtensionRpcHandler {
     confirmForcePush = async (params: { remote: string; branch: string }): Promise<boolean> => {
         const action = i18n.t('Force Push');
         const selected = await vscode.window.showWarningMessage(
-            i18n.t('Force push to {0}/{1}? This can overwrite remote commits. Intelli Git will use --force-with-lease to avoid overwriting newer remote updates.', params.remote, params.branch),
+            i18n.t(
+                'Force push to {0}/{1}? This can overwrite remote commits. Intelli Git will use --force-with-lease to avoid overwriting newer remote updates.',
+                params.remote,
+                params.branch
+            ),
             { modal: true },
             action
         );
@@ -774,7 +789,9 @@ export class ExtensionRpcHandler {
     confirmConflictResolverRestart = async (): Promise<boolean> => {
         const action = i18n.t('Discard Changes and Restart');
         const selected = await vscode.window.showWarningMessage(
-            i18n.t('Changing whitespace comparison requires restarting the merge. Reviewed changes and result edits will be discarded.'),
+            i18n.t(
+                'Changing whitespace comparison requires restarting the merge. Reviewed changes and result edits will be discarded.'
+            ),
             { modal: true },
             action
         );
@@ -785,7 +802,11 @@ export class ExtensionRpcHandler {
     private confirmProtectedBranchPush = async (params: { remote: string; branch: string }): Promise<boolean> => {
         const action = i18n.t('Push Anyway');
         const selected = await vscode.window.showWarningMessage(
-            i18n.t('Push directly to {0}/{1}? This target is a protected branch. Make sure these commits are intended for the main line.', params.remote, params.branch),
+            i18n.t(
+                'Push directly to {0}/{1}? This target is a protected branch. Make sure these commits are intended for the main line.',
+                params.remote,
+                params.branch
+            ),
             { modal: true },
             action
         );
@@ -794,17 +815,21 @@ export class ExtensionRpcHandler {
     };
 
     private getPullRequestTitlePrompt(): string {
-        return vscode.workspace
-            .getConfiguration('intelli-git.ai')
-            .get<string>('pullRequestTitlePrompt', DEFAULT_PULL_REQUEST_TITLE_PROMPT)
-            .trim() || DEFAULT_PULL_REQUEST_TITLE_PROMPT;
+        return (
+            vscode.workspace
+                .getConfiguration('intelli-git.ai')
+                .get<string>('pullRequestTitlePrompt', DEFAULT_PULL_REQUEST_TITLE_PROMPT)
+                .trim() || DEFAULT_PULL_REQUEST_TITLE_PROMPT
+        );
     }
 
     private getPullRequestBodyPrompt(): string {
-        return vscode.workspace
-            .getConfiguration('intelli-git.ai')
-            .get<string>('pullRequestBodyPrompt', DEFAULT_PULL_REQUEST_BODY_PROMPT)
-            .trim() || DEFAULT_PULL_REQUEST_BODY_PROMPT;
+        return (
+            vscode.workspace
+                .getConfiguration('intelli-git.ai')
+                .get<string>('pullRequestBodyPrompt', DEFAULT_PULL_REQUEST_BODY_PROMPT)
+                .trim() || DEFAULT_PULL_REQUEST_BODY_PROMPT
+        );
     }
 
     private async createPullRequestContext(
@@ -831,32 +856,31 @@ export class ExtensionRpcHandler {
         const data = await gitService.branchRemote.getPushCommits({
             remote,
             branch: baseBranch,
-            limit
+            limit,
         });
         const commits = data.commits;
         if (commits.length === 0) {
             throw new Error(i18n.t('No outgoing commits found for {0}/{1}.', remote, baseBranch));
         }
 
-        const changedFiles = Array.from(new Set(
-            commits.flatMap(commit => commit.files.map(file => file.displayPath || file.path))
-        )).sort();
+        const changedFiles = Array.from(
+            new Set(commits.flatMap((commit) => commit.files.map((file) => file.displayPath || file.path)))
+        ).sort();
         const commitsText = commits
             .map((commit, index) => {
                 const body = commit.body ? `\n${truncateValue(commit.body, 500)}` : '';
                 return `${index + 1}. ${commit.shortHash} ${commit.subject}${body}`;
             })
             .join('\n\n');
-        const changedFilesText = changedFiles.length > 0
-            ? changedFiles.map(file => `- ${file}`).join('\n')
-            : '- No file list available';
+        const changedFilesText =
+            changedFiles.length > 0 ? changedFiles.map((file) => `- ${file}`).join('\n') : '- No file list available';
         const fallbackTitle = commits[0]?.subject || i18n.t('Update project files');
         const fallbackBody = [
             '## Summary',
-            ...commits.map(commit => `- ${commit.subject}`),
+            ...commits.map((commit) => `- ${commit.subject}`),
             '',
             '## Testing',
-            '- Not run (not provided).'
+            '- Not run (not provided).',
         ].join('\n');
 
         return {
@@ -866,7 +890,7 @@ export class ExtensionRpcHandler {
             commitsText,
             changedFilesText,
             fallbackTitle,
-            fallbackBody
+            fallbackBody,
         };
     }
 
@@ -886,23 +910,29 @@ export class ExtensionRpcHandler {
             headBranch: context.headBranch,
             commitCount: context.commitCount,
             commits: context.commitsText,
-            changedFiles: context.changedFilesText
+            changedFiles: context.changedFilesText,
         });
         const model = await this.getAIModel();
-        const response = await model.sendRequest([
-            vscode.LanguageModelChatMessage.User(renderedPrompt),
-            vscode.LanguageModelChatMessage.User([
-                `Base branch: ${context.baseBranch}`,
-                `Head branch: ${context.headBranch}`,
-                `Commit count: ${context.commitCount}`,
-                '',
-                'Commits:',
-                context.commitsText,
-                '',
-                'Changed files:',
-                context.changedFilesText
-            ].join('\n'))
-        ], {}, token);
+        const response = await model.sendRequest(
+            [
+                vscode.LanguageModelChatMessage.User(renderedPrompt),
+                vscode.LanguageModelChatMessage.User(
+                    [
+                        `Base branch: ${context.baseBranch}`,
+                        `Head branch: ${context.headBranch}`,
+                        `Commit count: ${context.commitCount}`,
+                        '',
+                        'Commits:',
+                        context.commitsText,
+                        '',
+                        'Changed files:',
+                        context.changedFilesText,
+                    ].join('\n')
+                ),
+            ],
+            {},
+            token
+        );
 
         let text = '';
         for await (const fragment of response.text) {
@@ -914,8 +944,16 @@ export class ExtensionRpcHandler {
         return cleanAiText(text);
     }
 
-    private async getPullRequestCompareUrl(remote: string, baseBranch: string, headBranch: string): Promise<string | undefined> {
-        const compareUrl = await this.gitService.branchRemote.getRemoteCompareUrlForRemote(remote, baseBranch, headBranch);
+    private async getPullRequestCompareUrl(
+        remote: string,
+        baseBranch: string,
+        headBranch: string
+    ): Promise<string | undefined> {
+        const compareUrl = await this.gitService.branchRemote.getRemoteCompareUrlForRemote(
+            remote,
+            baseBranch,
+            headBranch
+        );
         return compareUrl ? `${compareUrl}?expand=1` : undefined;
     }
 
@@ -938,7 +976,7 @@ export class ExtensionRpcHandler {
 
         return {
             ...DEFAULT_REVIEW_BRANCH_OPTIONS,
-            ...saved
+            ...saved,
         };
     }
 
@@ -964,7 +1002,7 @@ export class ExtensionRpcHandler {
                 prompt: i18n.t('Enter the new branch name to push for review.'),
                 value: createBranchNameFromTitle(title),
                 ignoreFocusOut: true,
-                validateInput: value => value.trim() ? undefined : i18n.t('Branch name is required.')
+                validateInput: (value) => (value.trim() ? undefined : i18n.t('Branch name is required.')),
             });
             if (!branchName) {
                 return null;
@@ -976,30 +1014,32 @@ export class ExtensionRpcHandler {
 
             const resetOption: ReviewBranchOption = {
                 id: 'reset-base',
-                label: i18n.t('Reset {0} to {1}/{2} after push', context.sourceBranch, params.remote, params.baseBranch),
-                picked: savedOptions.resetBaseBranch
+                label: i18n.t(
+                    'Reset {0} to {1}/{2} after push',
+                    context.sourceBranch,
+                    params.remote,
+                    params.baseBranch
+                ),
+                picked: savedOptions.resetBaseBranch,
             };
             const aiOption: ReviewBranchOption = {
                 id: 'ai-notes',
                 label: i18n.t('Generate PR notes with AI'),
                 description: i18n.t('Optional'),
-                picked: savedOptions.generateAiNotes
+                picked: savedOptions.generateAiNotes,
             };
-            const selectedOptions = await vscode.window.showQuickPick<ReviewBranchOption>(
-                [resetOption, aiOption],
-                {
-                    title: i18n.t('Create Review Branch'),
-                    placeHolder: i18n.t('Select review branch options'),
-                    canPickMany: true,
-                    ignoreFocusOut: true
-                }
-            );
+            const selectedOptions = await vscode.window.showQuickPick<ReviewBranchOption>([resetOption, aiOption], {
+                title: i18n.t('Create Review Branch'),
+                placeHolder: i18n.t('Select review branch options'),
+                canPickMany: true,
+                ignoreFocusOut: true,
+            });
             if (!selectedOptions) {
                 return null;
             }
 
-            const resetBaseBranch = selectedOptions.some(option => option.id === 'reset-base');
-            const generateAiNotes = selectedOptions.some(option => option.id === 'ai-notes');
+            const resetBaseBranch = selectedOptions.some((option) => option.id === 'reset-base');
+            const generateAiNotes = selectedOptions.some((option) => option.id === 'ai-notes');
             await this.saveReviewBranchOptions(gitService, { resetBaseBranch, generateAiNotes });
 
             if (generateAiNotes) {
@@ -1009,7 +1049,7 @@ export class ExtensionRpcHandler {
                         {
                             location: vscode.ProgressLocation.Notification,
                             title: i18n.t('Generating PR notes...'),
-                            cancellable: true
+                            cancellable: true,
                         },
                         async (_progress, token) => {
                             token.onCancellationRequested(() => {
@@ -1020,11 +1060,11 @@ export class ExtensionRpcHandler {
                                 headBranch: context.sourceBranch,
                                 commitCount: context.commits.length,
                                 commitsText: context.commitsText,
-                                changedFilesText: context.changedFilesText
+                                changedFilesText: context.changedFilesText,
                             };
                             const [generatedTitle, generatedBody] = await Promise.all([
                                 this.generatePullRequestText(this.getPullRequestTitlePrompt(), draftContext, token),
-                                this.generatePullRequestText(this.getPullRequestBodyPrompt(), draftContext, token)
+                                this.generatePullRequestText(this.getPullRequestBodyPrompt(), draftContext, token),
                             ]);
                             title = generatedTitle || title;
                             body = generatedBody || body;
@@ -1038,7 +1078,9 @@ export class ExtensionRpcHandler {
                         return null;
                     }
                     logger.warn('Failed to generate pull request notes with AI:', error);
-                    vscode.window.showWarningMessage(i18n.t('AI draft generation failed. Intelli Git used a commit-based fallback.'));
+                    vscode.window.showWarningMessage(
+                        i18n.t('AI draft generation failed. Intelli Git used a commit-based fallback.')
+                    );
                 }
             }
 
@@ -1046,15 +1088,16 @@ export class ExtensionRpcHandler {
                 {
                     location: vscode.ProgressLocation.Notification,
                     title: i18n.t('Creating review branch {0}...', branchName.trim()),
-                    cancellable: false
+                    cancellable: false,
                 },
-                async () => this.publishReviewBranchInternal({
-                    remote: params.remote,
-                    baseBranch: params.baseBranch,
-                    branchName: branchName.trim(),
-                    resetBaseBranch,
-                    noVerify: params.noVerify
-                })
+                async () =>
+                    this.publishReviewBranchInternal({
+                        remote: params.remote,
+                        baseBranch: params.baseBranch,
+                        branchName: branchName.trim(),
+                        resetBaseBranch,
+                        noVerify: params.noVerify,
+                    })
             );
 
             if (result.resetWarning) {
@@ -1086,7 +1129,9 @@ export class ExtensionRpcHandler {
         }
     };
 
-    private publishReviewBranchInternal = async (params: PublishReviewBranchInternalRequest): Promise<PublishReviewBranchResult> => {
+    private publishReviewBranchInternal = async (
+        params: PublishReviewBranchInternalRequest
+    ): Promise<PublishReviewBranchResult> => {
         const gitService = this.gitService;
         const branchName = params.branchName.trim();
         if (!branchName) {
@@ -1122,7 +1167,12 @@ export class ExtensionRpcHandler {
                 baseBranchReset = true;
             } catch (error) {
                 logger.warn('Failed to reset source branch after PR branch publish:', error);
-                resetWarning = i18n.t('Branch was pushed, but {0} could not be reset to {1}/{2}.', sourceBranch, params.remote, params.baseBranch);
+                resetWarning = i18n.t(
+                    'Branch was pushed, but {0} could not be reset to {1}/{2}.',
+                    sourceBranch,
+                    params.remote,
+                    params.baseBranch
+                );
             }
         }
 
@@ -1134,7 +1184,7 @@ export class ExtensionRpcHandler {
             branchName,
             compareUrl,
             baseBranchReset,
-            resetWarning
+            resetWarning,
         };
 
         return result;
@@ -1142,7 +1192,7 @@ export class ExtensionRpcHandler {
 
     private async getStatusWithState(): Promise<FileStatus[]> {
         return this.getStatusWithStateForService(this.repositoryManager.getActiveService());
-    };
+    }
 
     private async getStatusWithStateForService(gitService: GitService | undefined): Promise<FileStatus[]> {
         if (!gitService) {
@@ -1154,7 +1204,7 @@ export class ExtensionRpcHandler {
         gitService.changelistStateService?.syncWithStatus(status);
 
         return this.decorateStatus(status, gitService.inactiveChangesService);
-    };
+    }
 
     getStatus = async (): Promise<FileStatus[]> => {
         return this.getStatusWithState();
@@ -1173,30 +1223,35 @@ export class ExtensionRpcHandler {
 
     getCommitViewState = async () => {
         const startedAt = Date.now();
-        const repositories = typeof this.repositoryManager.getRepositories === 'function'
-            ? this.repositoryManager.getRepositories()
-            : [];
+        const repositories =
+            typeof this.repositoryManager.getRepositories === 'function'
+                ? this.repositoryManager.getRepositories()
+                : [];
         if (repositories.length === 0) {
             return {
                 files: [],
                 changelistState: this.getCurrentChangelistState(),
                 workspaceRoot: '',
                 hasRepository: false,
-                repositories: []
+                repositories: [],
             };
         }
 
         const activeRepoPath = this.repositoryManager.getActiveRepoPath();
-        const activeRepository = repositories.find(repository => repository.repoPath === activeRepoPath) || repositories[0];
-        const activeService = activeRepository ? this.repositoryManager.getService(activeRepository.repoPath) : undefined;
-        const activeRepositoryState: RepositoryCommitViewState | undefined = activeRepository && activeService
-            ? {
-                repository: activeRepository,
-                files: await this.getStatusWithStateForService(activeService),
-                changelistState: this.getCurrentChangelistState(activeService),
-                workspaceRoot: activeService.getWorkspaceRoot()
-            }
+        const activeRepository =
+            repositories.find((repository) => repository.repoPath === activeRepoPath) || repositories[0];
+        const activeService = activeRepository
+            ? this.repositoryManager.getService(activeRepository.repoPath)
             : undefined;
+        const activeRepositoryState: RepositoryCommitViewState | undefined =
+            activeRepository && activeService
+                ? {
+                      repository: activeRepository,
+                      files: await this.getStatusWithStateForService(activeService),
+                      changelistState: this.getCurrentChangelistState(activeService),
+                      workspaceRoot: activeService.getWorkspaceRoot(),
+                  }
+                : undefined;
         const repositoryStates = activeRepositoryState ? [activeRepositoryState] : [];
         const files = activeRepositoryState?.files || [];
         const changelistState = activeRepositoryState?.changelistState || this.getCurrentChangelistState();
@@ -1207,8 +1262,11 @@ export class ExtensionRpcHandler {
             elapsedMs,
             repositories: repositoryStates.length,
             files: repositoryStates.reduce((sum, state) => sum + state.files.length, 0),
-            hunkFiles: repositoryStates.reduce((sum, state) => sum + state.files.filter(file => file.hunks && file.hunks.length > 0).length, 0),
-            mode: changelistState.mode
+            hunkFiles: repositoryStates.reduce(
+                (sum, state) => sum + state.files.filter((file) => file.hunks && file.hunks.length > 0).length,
+                0
+            ),
+            mode: changelistState.mode,
         });
 
         return {
@@ -1217,7 +1275,7 @@ export class ExtensionRpcHandler {
             workspaceRoot: activeRepositoryState?.workspaceRoot || '',
             hasRepository: true,
             repositories: repositoryStates,
-            activeRepository: activeRepositoryState?.repository
+            activeRepository: activeRepositoryState?.repository,
         };
     };
 
@@ -1226,43 +1284,49 @@ export class ExtensionRpcHandler {
     };
 
     private getCurrentChangelistState(gitService?: GitService): ChangelistState {
-        return (gitService?.changelistStateService || this.changelistStateService)?.getState() || {
-            mode: 'staged',
-            activeListId: 'changes',
-            lists: [{ id: 'changes', name: 'Changes', isDefault: true, isActive: true }],
-            assignments: {}
-        };
+        return (
+            (gitService?.changelistStateService || this.changelistStateService)?.getState() || {
+                mode: 'staged',
+                activeListId: 'changes',
+                lists: [{ id: 'changes', name: 'Changes', isDefault: true, isActive: true }],
+                assignments: {},
+            }
+        );
     }
 
     private decorateStatus(status: FileStatus[], inactiveChangesService = this.inactiveChangesService): FileStatus[] {
-        return status.map(file => {
+        return status.map((file) => {
             const isFileInactive = !!inactiveChangesService?.isInactive(file.path);
             const inactiveHunkIds = inactiveChangesService?.getInactiveHunkIds(file.path) || [];
             const inactiveHunkIdSet = new Set(inactiveHunkIds);
-            const hasStagedInactive = file.staged && (
-                isFileInactive ||
-                file.hunks?.some(hunk =>
-                    inactiveHunkIdSet.has(hunk.id) ||
-                    inactiveHunkIdSet.has(hunk.id.replace(':index:', ':worktree:')) ||
-                    inactiveHunkIdSet.has(hunk.id.replace(':worktree:', ':index:'))
-                )
-            );
+            const hasStagedInactive =
+                file.staged &&
+                (isFileInactive ||
+                    file.hunks?.some(
+                        (hunk) =>
+                            inactiveHunkIdSet.has(hunk.id) ||
+                            inactiveHunkIdSet.has(hunk.id.replace(':index:', ':worktree:')) ||
+                            inactiveHunkIdSet.has(hunk.id.replace(':worktree:', ':index:'))
+                    ));
 
             return {
                 ...file,
                 inactive: isFileInactive,
                 inactiveHunkIds,
-                hasStagedInactive
+                hasStagedInactive,
             };
         });
     }
 
-    openDiff = async (filePathOrArgs: string | [string, boolean?] | { path: string; repoPath?: string; staged?: boolean }, staged?: boolean): Promise<void> => {
+    openDiff = async (
+        filePathOrArgs: string | [string, boolean?] | { path: string; repoPath?: string; staged?: boolean },
+        staged?: boolean
+    ): Promise<void> => {
         const [filePath, effectiveStaged, repoPath] = Array.isArray(filePathOrArgs)
             ? [filePathOrArgs[0], filePathOrArgs[1], undefined]
             : typeof filePathOrArgs === 'object'
-                ? [filePathOrArgs.path, filePathOrArgs.staged, filePathOrArgs.repoPath]
-                : [filePathOrArgs, staged, undefined];
+              ? [filePathOrArgs.path, filePathOrArgs.staged, filePathOrArgs.repoPath]
+              : [filePathOrArgs, staged, undefined];
         const gitService = this.getServiceForRepo(repoPath);
 
         if (effectiveStaged) {
@@ -1273,10 +1337,15 @@ export class ExtensionRpcHandler {
             await vscode.commands.executeCommand('vscode.diff', leftUri, rightUri, title);
         } else {
             const status = await gitService.getStatus();
-            const target = status.find(file => file.path === filePath && !file.staged) || status.find(file => file.path === filePath);
+            const target =
+                status.find((file) => file.path === filePath && !file.staged) ||
+                status.find((file) => file.path === filePath);
             if (target?.status === 'D') {
                 const leftUri = createRevisionContentUri(gitService, filePath, { ref: 'HEAD', preferStaged: false });
-                const rightUri = createRevisionContentUri(gitService, filePath, { ref: 'WORKTREE', preferStaged: false });
+                const rightUri = createRevisionContentUri(gitService, filePath, {
+                    ref: 'WORKTREE',
+                    preferStaged: false,
+                });
                 await vscode.commands.executeCommand('vscode.diff', leftUri, rightUri, path.basename(filePath));
                 return;
             }
@@ -1302,12 +1371,23 @@ export class ExtensionRpcHandler {
         this.onDispose();
     };
 
-    openCommitDiff = async (params: { path: string; leftRef: string; rightRef: string; preserveFocus?: boolean }): Promise<void> => {
-        const leftUri = createRevisionContentUri(this.gitService, params.path, { ref: params.leftRef, pathKind: 'repo' });
-        const rightUri = createRevisionContentUri(this.gitService, params.path, { ref: params.rightRef, pathKind: 'repo' });
+    openCommitDiff = async (params: {
+        path: string;
+        leftRef: string;
+        rightRef: string;
+        preserveFocus?: boolean;
+    }): Promise<void> => {
+        const leftUri = createRevisionContentUri(this.gitService, params.path, {
+            ref: params.leftRef,
+            pathKind: 'repo',
+        });
+        const rightUri = createRevisionContentUri(this.gitService, params.path, {
+            ref: params.rightRef,
+            pathKind: 'repo',
+        });
         const title = `${path.basename(params.path)} (${params.leftRef.substring(0, 7)} ↔ ${params.rightRef.substring(0, 7)})`;
         vscode.commands.executeCommand('vscode.diff', leftUri, rightUri, title, {
-            preserveFocus: params.preserveFocus ?? false
+            preserveFocus: params.preserveFocus ?? false,
         });
     };
 
@@ -1323,7 +1403,7 @@ export class ExtensionRpcHandler {
             canSelectFolders: true,
             canSelectMany: true,
             openLabel: i18n.t('extension.selectPath'),
-            defaultUri: vscode.Uri.file(workspaceRoot)
+            defaultUri: vscode.Uri.file(workspaceRoot),
         });
 
         if (!result || result.length === 0) {
@@ -1349,9 +1429,10 @@ export class ExtensionRpcHandler {
         }
 
         if (invalidPaths.length > 0) {
-            const msg = invalidPaths.length === 1
-                ? i18n.t('extension.pathNotInWorkspace', invalidPaths[0])
-                : i18n.t('extension.pathsNotInWorkspace', invalidPaths.length);
+            const msg =
+                invalidPaths.length === 1
+                    ? i18n.t('extension.pathNotInWorkspace', invalidPaths[0])
+                    : i18n.t('extension.pathsNotInWorkspace', invalidPaths.length);
             vscode.window.showWarningMessage(msg);
         }
 
@@ -1383,21 +1464,21 @@ export class ExtensionRpcHandler {
             items.push({
                 label: `${icon} ${branch}`,
                 description,
-                branch
+                branch,
             });
         };
 
         items.push({
             label: `$(git-branch) ${i18n.t('extension.all')}`,
             branch: 'all',
-            kind: vscode.QuickPickItemKind.Default
+            kind: vscode.QuickPickItemKind.Default,
         });
         addedBranches.add('all');
 
         items.push({
             label: i18n.t('extension.common'),
             kind: vscode.QuickPickItemKind.Separator,
-            branch: ''
+            branch: '',
         });
 
         addBranch('HEAD', '$(symbol-reference)', i18n.t('extension.currentHead'));
@@ -1421,7 +1502,7 @@ export class ExtensionRpcHandler {
         items.push({
             label: i18n.t('extension.localBranches'),
             kind: vscode.QuickPickItemKind.Separator,
-            branch: ''
+            branch: '',
         });
 
         for (const branch of branchData.localBranches) {
@@ -1432,7 +1513,7 @@ export class ExtensionRpcHandler {
             items.push({
                 label: remote,
                 kind: vscode.QuickPickItemKind.Separator,
-                branch: ''
+                branch: '',
             });
 
             for (const branch of branches) {
@@ -1443,18 +1524,24 @@ export class ExtensionRpcHandler {
         const selected = await vscode.window.showQuickPick(items, {
             placeHolder: i18n.t('extension.selectBranchFilter'),
             matchOnDescription: true,
-            canPickMany: true
+            canPickMany: true,
         });
 
         if (!selected || selected.length === 0) {
             return undefined;
         }
 
-        const branches = selected.map(s => s.branch).filter(b => b);
+        const branches = selected.map((s) => s.branch).filter((b) => b);
         return branches.length === 1 ? branches[0] : branches.join(',');
     };
 
-    commit = async (params: { message: string; amend: boolean; files: FileReferenceInput[]; push?: boolean; pushTarget?: PushTarget }): Promise<void> => {
+    commit = async (params: {
+        message: string;
+        amend: boolean;
+        files: FileReferenceInput[];
+        push?: boolean;
+        pushTarget?: PushTarget;
+    }): Promise<void> => {
         if (params.push && !params.pushTarget) {
             throw new Error(i18n.t('Commit & Push requires a confirmed push target.'));
         }
@@ -1463,7 +1550,8 @@ export class ExtensionRpcHandler {
         }
 
         const groups = this.groupFileReferences(params.files || []);
-        const entries = groups.size > 0 ? Array.from(groups.entries()) : [[undefined, []] as [string | undefined, string[]]];
+        const entries =
+            groups.size > 0 ? Array.from(groups.entries()) : [[undefined, []] as [string | undefined, string[]]];
         if (params.amend && entries.length > 1) {
             throw new Error('Amend supports one repository at a time');
         }
@@ -1504,12 +1592,28 @@ export class ExtensionRpcHandler {
                     const lastCommit = await gitService.getLastCommitInfo();
                     committedHash = lastCommit?.shortHash || lastCommit?.hash.substring(0, 7);
                     try {
-                        await this.pushCurrentBranchToTarget(gitService, params.pushTarget, { setUpstreamToTarget: true });
+                        await this.pushCurrentBranchToTarget(gitService, params.pushTarget, {
+                            setUpstreamToTarget: true,
+                        });
                     } catch (pushError) {
                         const pushMessage = pushError instanceof Error ? pushError.message : String(pushError);
-                        throw new Error(committedHash
-                            ? i18n.t('Commit {0} succeeded; push to {1}/{2} failed: {3}', committedHash, params.pushTarget.remote, params.pushTarget.branch, pushMessage)
-                            : i18n.t('Commit succeeded; push to {0}/{1} failed: {2}', params.pushTarget.remote, params.pushTarget.branch, pushMessage), { cause: pushError });
+                        throw new Error(
+                            committedHash
+                                ? i18n.t(
+                                      'Commit {0} succeeded; push to {1}/{2} failed: {3}',
+                                      committedHash,
+                                      params.pushTarget.remote,
+                                      params.pushTarget.branch,
+                                      pushMessage
+                                  )
+                                : i18n.t(
+                                      'Commit succeeded; push to {0}/{1} failed: {2}',
+                                      params.pushTarget.remote,
+                                      params.pushTarget.branch,
+                                      pushMessage
+                                  ),
+                            { cause: pushError }
+                        );
                     }
                 }
             } catch (e) {
@@ -1518,9 +1622,11 @@ export class ExtensionRpcHandler {
         }
 
         if (failures.length > 0) {
-            throw new Error(failures.length === entries.length
-                ? failures.join('\n')
-                : `Workspace commit completed with failures:\n${failures.join('\n')}`);
+            throw new Error(
+                failures.length === entries.length
+                    ? failures.join('\n')
+                    : `Workspace commit completed with failures:\n${failures.join('\n')}`
+            );
         }
     };
 
@@ -1569,7 +1675,7 @@ export class ExtensionRpcHandler {
             let message = params.message;
             if (!message) {
                 message = await vscode.window.showInputBox({
-                    placeHolder: i18n.t('extension.stashPlaceholder')
+                    placeHolder: i18n.t('extension.stashPlaceholder'),
                 });
             }
             for (const [repoPath, files] of this.groupFileReferences(params.files)) {
@@ -1596,7 +1702,6 @@ export class ExtensionRpcHandler {
                         await vscode.workspace.fs.delete(uri, { recursive: false, useTrash: true });
                     }
                 }
-
             } catch (e) {
                 vscode.window.showErrorMessage(i18n.t('extension.deleteFailed', `${e}`));
             }
@@ -1614,7 +1719,6 @@ export class ExtensionRpcHandler {
                 for (const [repoPath, repoFiles] of this.groupFileReferences(files)) {
                     await this.getServiceForRepo(repoPath).rollbackFiles(repoFiles);
                 }
-
             } catch (e) {
                 vscode.window.showErrorMessage(i18n.t('extension.rollbackFailed', `${e}`));
             }
@@ -1629,16 +1733,16 @@ export class ExtensionRpcHandler {
         try {
             await vscode.workspace.fs.stat(uri);
             await vscode.commands.executeCommand('vscode.open', uri, {
-                preserveFocus: params.preserveFocus ?? false
+                preserveFocus: params.preserveFocus ?? false,
             });
         } catch {
             const status = await gitService.getStatus();
-            const deleted = status.some(file => file.path === params.path && file.status === 'D');
+            const deleted = status.some((file) => file.path === params.path && file.status === 'D');
             if (deleted) {
                 await this.openDiff({
                     path: params.path,
                     repoPath: params.repoPath,
-                    staged: status.find(file => file.path === params.path && file.status === 'D')?.staged
+                    staged: status.find((file) => file.path === params.path && file.status === 'D')?.staged,
                 });
             }
         }
@@ -1655,24 +1759,25 @@ export class ExtensionRpcHandler {
         const title = `${path.basename(filePath)} (Stash@{${params.index}})`;
         await vscode.commands.executeCommand('vscode.diff', leftUri, rightUri, title, {
             preview: true,
-            viewColumn: vscode.ViewColumn.Active
+            viewColumn: vscode.ViewColumn.Active,
         });
     };
 
     switchBranch = async (branch: string): Promise<void> => {
         try {
             await this.gitService.branchRemote.switchBranch(branch);
-
         } catch (e) {
-            if (await handleCheckoutWorktreeConflict({
-                gitService: this.gitService,
-                branch,
-                error: e,
-                retry: async () => {
-                    await this.gitService.branchRemote.switchBranch(branch);
-                    vscode.commands.executeCommand('intelli-git.refresh');
-                }
-            })) {
+            if (
+                await handleCheckoutWorktreeConflict({
+                    gitService: this.gitService,
+                    branch,
+                    error: e,
+                    retry: async () => {
+                        await this.gitService.branchRemote.switchBranch(branch);
+                        vscode.commands.executeCommand('intelli-git.refresh');
+                    },
+                })
+            ) {
                 return;
             }
             vscode.window.showErrorMessage(i18n.t('extension.switchBranchFailed', `${e}`));
@@ -1722,7 +1827,7 @@ export class ExtensionRpcHandler {
         const extensionPathCandidate = this.context.extensionPath
             ? path.resolve(this.context.extensionPath, '../..')
             : undefined;
-        const workspaceCandidates = vscode.workspace.workspaceFolders?.map(folder => folder.uri.fsPath) || [];
+        const workspaceCandidates = vscode.workspace.workspaceFolders?.map((folder) => folder.uri.fsPath) || [];
 
         return [extensionPathCandidate, ...workspaceCandidates].find(isExtensionSourceRoot);
     }
@@ -1736,7 +1841,7 @@ export class ExtensionRpcHandler {
 
         const terminal = vscode.window.createTerminal({
             name: i18n.t('Intelli Git Dev Build'),
-            cwd: sourceRoot
+            cwd: sourceRoot,
         });
         terminal.show();
         terminal.sendText('npm run install:extension:dev');
@@ -1771,7 +1876,7 @@ export class ExtensionRpcHandler {
         try {
             const currentStatus = await this.getStatus();
             const unresolvedFiles = currentStatus.filter(
-                file => (file.status === 'C' || file.status === 'U') && !file.resolvedCandidate
+                (file) => (file.status === 'C' || file.status === 'U') && !file.resolvedCandidate
             );
 
             if (unresolvedFiles.length > 0) {
@@ -1784,8 +1889,8 @@ export class ExtensionRpcHandler {
             // During merge/rebase continue, once no unmerged entries remain,
             // auto-stage tracked unresolved->resolved files so Git can continue.
             currentStatus
-                .filter(file => !file.inactive && !file.staged && file.status !== '?')
-                .forEach(file => filesToStage.add(file.path));
+                .filter((file) => !file.inactive && !file.staged && file.status !== '?')
+                .forEach((file) => filesToStage.add(file.path));
 
             for (const file of filesToStage) {
                 await this.gitService.stageFile(file);
@@ -1793,7 +1898,6 @@ export class ExtensionRpcHandler {
 
             await this.gitService.branchRemote.continueRebase(params.message);
             vscode.window.showInformationMessage(i18n.t('extension.rebaseContinued'));
-
         } catch (e) {
             const errorMessage = `${e}`;
             if (
@@ -1813,16 +1917,13 @@ export class ExtensionRpcHandler {
         try {
             await this.gitService.branchRemote.abortRebase();
             vscode.window.showInformationMessage(i18n.t('extension.rebaseAborted'));
-
         } catch (e) {
             vscode.window.showErrorMessage(i18n.t('extension.abortRebaseFailed', `${e}`));
         }
     };
 
     openConflictResolver = async (params: ConflictResolverOpenRequest): Promise<void> => {
-        const request = params.repoPath
-            ? params
-            : { ...params, repoPath: this.gitService.getWorkspaceRoot() };
+        const request = params.repoPath ? params : { ...params, repoPath: this.gitService.getWorkspaceRoot() };
         if (this.openConflictResolverPanel) {
             this.openConflictResolverPanel(request);
             return;
@@ -1834,7 +1935,7 @@ export class ExtensionRpcHandler {
     updateConflictResolverTitle = async (params: { path: string; repoPath?: string }): Promise<void> => {
         this.updateConflictResolverPanelTitle?.({
             path: params.path,
-            repoPath: params.repoPath
+            repoPath: params.repoPath,
         });
     };
 
@@ -1842,16 +1943,21 @@ export class ExtensionRpcHandler {
         const content = await this.getServiceForRepo(params.repoPath).getConflictFileContent(params.path);
         return {
             ...content,
-            repoPath: params.repoPath
+            repoPath: params.repoPath,
         };
     };
 
     saveConflictResolution = async (params: SaveConflictResolutionRequest): Promise<void> => {
         try {
-            await this.getServiceForRepo(params.repoPath).saveConflictResolution(params.path, params.content, {
-                stageSignature: params.stageSignature,
-                resultFingerprint: params.resultFingerprint
-            }, params.resultExists);
+            await this.getServiceForRepo(params.repoPath).saveConflictResolution(
+                params.path,
+                params.content,
+                {
+                    stageSignature: params.stageSignature,
+                    resultFingerprint: params.resultFingerprint,
+                },
+                params.resultExists
+            );
             await vscode.commands.executeCommand('intelli-git.refresh');
         } catch (e) {
             vscode.window.showErrorMessage(i18n.t('extension.resolveConflictFailed', `${e}`));
@@ -1863,7 +1969,7 @@ export class ExtensionRpcHandler {
         try {
             await this.getServiceForRepo(params.repoPath).resolveConflict(params.path, params.side, {
                 stageSignature: params.stageSignature,
-                resultFingerprint: params.resultFingerprint
+                resultFingerprint: params.resultFingerprint,
             });
             await vscode.commands.executeCommand('intelli-git.refresh');
         } catch (e) {
@@ -1883,7 +1989,7 @@ export class ExtensionRpcHandler {
             model,
             isConfigured: !configurationIssue,
             canSelectModel: provider === AiProvider.Copilot,
-            detail: configurationIssue
+            detail: configurationIssue,
         };
     };
 
@@ -1892,7 +1998,11 @@ export class ExtensionRpcHandler {
             const status = await this.getAIProviderStatus();
             const model = await this.getAIModel();
             const response = await model.sendRequest(
-                [vscode.LanguageModelChatMessage.User('Reply with OK to confirm Intelli Git can reach this AI provider.')],
+                [
+                    vscode.LanguageModelChatMessage.User(
+                        'Reply with OK to confirm Intelli Git can reach this AI provider.'
+                    ),
+                ],
                 {},
                 new vscode.CancellationTokenSource().token
             );
@@ -1903,17 +2013,19 @@ export class ExtensionRpcHandler {
 
             return {
                 ok: true,
-                message: i18n.t('extension.aiProviderTestSucceeded', status.label, model.name || model.id)
+                message: i18n.t('extension.aiProviderTestSucceeded', status.label, model.name || model.id),
             };
         } catch (e: any) {
             return {
                 ok: false,
-                message: e?.message || String(e)
+                message: e?.message || String(e),
             };
         }
     };
 
-    generateCommitMessage = async (request?: CommitMessageGenerationRequest): Promise<CommitMessageGenerationResult> => {
+    generateCommitMessage = async (
+        request?: CommitMessageGenerationRequest
+    ): Promise<CommitMessageGenerationResult> => {
         try {
             let diff = '';
             const files = request?.files;
@@ -1957,18 +2069,21 @@ export class ExtensionRpcHandler {
                     message: '',
                     mode,
                     fileCount: 0,
-                    hunkCount: 0
+                    hunkCount: 0,
                 };
             }
 
             const model = await this.getAIModel();
-            const commitPrompt = vscode.workspace
-                .getConfiguration('intelli-git.ai')
-                .get<string>('commitPrompt', DEFAULT_COMMIT_MESSAGE_PROMPT)
-                .trim() || DEFAULT_COMMIT_MESSAGE_PROMPT;
+            const commitPrompt =
+                vscode.workspace
+                    .getConfiguration('intelli-git.ai')
+                    .get<string>('commitPrompt', DEFAULT_COMMIT_MESSAGE_PROMPT)
+                    .trim() || DEFAULT_COMMIT_MESSAGE_PROMPT;
 
             const messages = [
-                vscode.LanguageModelChatMessage.User(createCommitMessageGenerationPrompt(commitPrompt, mode, request?.amend))
+                vscode.LanguageModelChatMessage.User(
+                    createCommitMessageGenerationPrompt(commitPrompt, mode, request?.amend)
+                ),
             ];
             const selectedText = request?.selectedText?.trim();
             const currentMessage = request?.currentMessage?.trim();
@@ -1981,7 +2096,12 @@ export class ExtensionRpcHandler {
 
             messages.push(vscode.LanguageModelChatMessage.User(`Diff:\n${diff}`));
 
-            logger.info('Generating commit message', { provider: model.vendor, model: model.id, mode, diffBytes: Buffer.byteLength(diff) });
+            logger.info('Generating commit message', {
+                provider: model.vendor,
+                model: model.id,
+                mode,
+                diffBytes: Buffer.byteLength(diff),
+            });
             const response = await model.sendRequest(messages, {}, new vscode.CancellationTokenSource().token);
             logger.info('Commit message provider responded', { provider: model.vendor, model: model.id });
 
@@ -1994,7 +2114,7 @@ export class ExtensionRpcHandler {
                 message: fullMessage.trim(),
                 mode,
                 fileCount: countDiffFiles(diff),
-                hunkCount: countDiffHunks(diff)
+                hunkCount: countDiffHunks(diff),
             };
         } catch (e) {
             logger.error('Error generating commit message:', e);
@@ -2003,7 +2123,9 @@ export class ExtensionRpcHandler {
     };
 
     private getCurrentAiProvider(): AiProviderId {
-        const provider = vscode.workspace.getConfiguration('intelli-git.ai').get<string>('provider', AiProvider.Copilot);
+        const provider = vscode.workspace
+            .getConfiguration('intelli-git.ai')
+            .get<string>('provider', AiProvider.Copilot);
         if (
             provider === AiProvider.Copilot ||
             provider === AiProvider.Codex ||
@@ -2039,10 +2161,14 @@ export class ExtensionRpcHandler {
 
     private getAiProviderModel(provider: AiProviderId): string {
         if (provider === AiProvider.Copilot) {
-            return vscode.workspace.getConfiguration('intelli-git.ai.copilot').get<string>('model', DEFAULT_COPILOT_MODEL);
+            return vscode.workspace
+                .getConfiguration('intelli-git.ai.copilot')
+                .get<string>('model', DEFAULT_COPILOT_MODEL);
         }
 
-        const configuredModel = vscode.workspace.getConfiguration(`intelli-git.ai.${provider}`).get<string>('model', '');
+        const configuredModel = vscode.workspace
+            .getConfiguration(`intelli-git.ai.${provider}`)
+            .get<string>('model', '');
         if (configuredModel) {
             return configuredModel;
         }
@@ -2063,7 +2189,9 @@ export class ExtensionRpcHandler {
             return '';
         }
 
-        const configuredApiUrl = vscode.workspace.getConfiguration(`intelli-git.ai.${provider}`).get<string>('apiUrl', '');
+        const configuredApiUrl = vscode.workspace
+            .getConfiguration(`intelli-git.ai.${provider}`)
+            .get<string>('apiUrl', '');
         if (configuredApiUrl) {
             return configuredApiUrl;
         }
@@ -2125,11 +2253,10 @@ export class ExtensionRpcHandler {
             const apiKey = await getAiApiKey(this.context, 'google');
             const model = new GoogleAiService().getModel(apiKey);
             if (!model) {
-                throw createRpcError(
-                    i18n.t('extension.googleApiKeyMissing'),
-                    AI_PROVIDER_SETUP_REQUIRED_CODE,
-                    { provider, action: 'configure' }
-                );
+                throw createRpcError(i18n.t('extension.googleApiKeyMissing'), AI_PROVIDER_SETUP_REQUIRED_CODE, {
+                    provider,
+                    action: 'configure',
+                });
             }
             return model;
         }
@@ -2138,11 +2265,10 @@ export class ExtensionRpcHandler {
             const apiKey = await getAiApiKey(this.context, 'custom');
             const model = new OpenAiService().getModel(apiKey);
             if (!model) {
-                throw createRpcError(
-                    i18n.t('extension.noAIModel'),
-                    AI_PROVIDER_SETUP_REQUIRED_CODE,
-                    { provider, action: 'configure' }
-                );
+                throw createRpcError(i18n.t('extension.noAIModel'), AI_PROVIDER_SETUP_REQUIRED_CODE, {
+                    provider,
+                    action: 'configure',
+                });
             }
             return model;
         }
@@ -2153,11 +2279,11 @@ export class ExtensionRpcHandler {
         );
 
         const copilotModels = await vscode.lm.selectChatModels({ vendor: 'copilot' });
-        let model = copilotModels.find(candidate => {
+        let model = copilotModels.find((candidate) => {
             const identifiers = [
                 this.normalizeModelIdentifier(candidate.id),
                 this.normalizeModelIdentifier(candidate.name),
-                this.normalizeModelIdentifier(candidate.family)
+                this.normalizeModelIdentifier(candidate.family),
             ];
 
             return identifiers.includes(preferredCopilotModel);
@@ -2172,16 +2298,14 @@ export class ExtensionRpcHandler {
         }
 
         if (!model) {
-            throw createRpcError(
-                i18n.t('extension.noCopilotModelsAvailable'),
-                AI_PROVIDER_SETUP_REQUIRED_CODE,
-                { provider, action: 'configure' }
-            );
+            throw createRpcError(i18n.t('extension.noCopilotModelsAvailable'), AI_PROVIDER_SETUP_REQUIRED_CODE, {
+                provider,
+                action: 'configure',
+            });
         }
 
         logger.info('Using copilot AI model:', model.id, model.name, model.vendor);
 
         return model;
     }
-
 }

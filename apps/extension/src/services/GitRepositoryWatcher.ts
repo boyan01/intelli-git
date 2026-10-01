@@ -65,7 +65,7 @@ export class VSCodeGitWatcher implements vscode.Disposable {
 
             // Watch for new repositories
             this.disposables.push(
-                api.onDidOpenRepository(repo => {
+                api.onDidOpenRepository((repo) => {
                     this.disposables.push(repo.state.onDidChange(() => this.scheduleRefresh('state')));
                     this.scheduleRefresh('repositories');
                 })
@@ -95,7 +95,7 @@ export class VSCodeGitWatcher implements vscode.Disposable {
     }
 
     dispose() {
-        this.disposables.forEach(d => d.dispose());
+        this.disposables.forEach((d) => d.dispose());
         this.disposables = [];
         if (this.refreshTimeout) {
             clearTimeout(this.refreshTimeout);
@@ -115,7 +115,7 @@ class CompositeGitWatcher implements vscode.Disposable {
         this.disposables.push(this.onChangeEmitter);
         for (const watcher of watchers) {
             this.disposables.push(
-                watcher.onChange(change => this.scheduleRefresh(change)),
+                watcher.onChange((change) => this.scheduleRefresh(change)),
                 watcher
             );
         }
@@ -136,7 +136,7 @@ class CompositeGitWatcher implements vscode.Disposable {
     }
 
     dispose() {
-        this.disposables.forEach(d => d.dispose());
+        this.disposables.forEach((d) => d.dispose());
         this.disposables = [];
         if (this.refreshTimeout) {
             clearTimeout(this.refreshTimeout);
@@ -157,9 +157,10 @@ export class FileSystemGitWatcher implements vscode.Disposable {
     public readonly onChange = this.onChangeEmitter.event;
 
     constructor(workspaceRoots: string[]) {
-        const patterns = workspaceRoots.length > 0
-            ? workspaceRoots.map(root => new vscode.RelativePattern(root, '**/*'))
-            : ['**/*'];
+        const patterns =
+            workspaceRoots.length > 0
+                ? workspaceRoots.map((root) => new vscode.RelativePattern(root, '**/*'))
+                : ['**/*'];
 
         for (const pattern of patterns) {
             const watcher = vscode.workspace.createFileSystemWatcher(pattern);
@@ -204,7 +205,7 @@ export class FileSystemGitWatcher implements vscode.Disposable {
     }
 
     dispose() {
-        this.disposables.forEach(d => d.dispose());
+        this.disposables.forEach((d) => d.dispose());
         this.disposables = [];
         if (this.refreshTimeout) {
             clearTimeout(this.refreshTimeout);
@@ -224,14 +225,11 @@ export async function createGitWatcher(
     const vsCodeWatcher = new VSCodeGitWatcher();
 
     // Wait a bit for async initialization
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise((resolve) => setTimeout(resolve, 100));
 
     if (vsCodeWatcher.isActive) {
         if (additionalRoots.length > 0) {
-            return new CompositeGitWatcher([
-                vsCodeWatcher,
-                new FileSystemGitWatcher(additionalRoots)
-            ]);
+            return new CompositeGitWatcher([vsCodeWatcher, new FileSystemGitWatcher(additionalRoots)]);
         }
         return vsCodeWatcher;
     }

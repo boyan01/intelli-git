@@ -38,15 +38,23 @@ function getShortHead(head?: string): string {
 }
 
 function getWorktreeRef(worktree: WorktreeInfo, t: (key: string, options?: Record<string, string>) => string): string {
-    return worktree.branch || (worktree.isDetached ? t('Detached at {{ref}}', { ref: getShortHead(worktree.head) }) : getShortHead(worktree.head));
+    return (
+        worktree.branch ||
+        (worktree.isDetached
+            ? t('Detached at {{ref}}', { ref: getShortHead(worktree.head) })
+            : getShortHead(worktree.head))
+    );
 }
 
-function getWorktreeState(worktree: WorktreeInfo, t: (key: string, options?: Record<string, string>) => string): WorktreeState {
+function getWorktreeState(
+    worktree: WorktreeInfo,
+    t: (key: string, options?: Record<string, string>) => string
+): WorktreeState {
     if (!worktree.pathExists) {
         return {
             label: t('Missing'),
             icon: 'codicon-warning',
-            className: styles.missingState
+            className: styles.missingState,
         };
     }
 
@@ -54,51 +62,63 @@ function getWorktreeState(worktree: WorktreeInfo, t: (key: string, options?: Rec
         return {
             label: t('Dirty'),
             icon: 'codicon-circle-filled',
-            className: styles.dirtyState
+            className: styles.dirtyState,
         };
     }
 
     return {
         label: t('Checked out'),
         icon: 'codicon-git-branch',
-        className: styles.normalState
+        className: styles.normalState,
     };
 }
 
 export function WorktreeDrawer({ open, worktrees, loading, onClose }: WorktreeDrawerProps) {
     const { t } = useTranslation();
-    const sortedWorktrees = useMemo(() => [...worktrees].sort((a, b) => {
-        if (a.pathExists !== b.pathExists) {
-            return a.pathExists ? -1 : 1;
-        }
-        return a.path.localeCompare(b.path);
-    }), [worktrees]);
+    const sortedWorktrees = useMemo(
+        () =>
+            [...worktrees].sort((a, b) => {
+                if (a.pathExists !== b.pathExists) {
+                    return a.pathExists ? -1 : 1;
+                }
+                return a.path.localeCompare(b.path);
+            }),
+        [worktrees]
+    );
 
-    const nodes = useMemo<TreeNode<WorktreeNodeData>[]>(() => sortedWorktrees.map(worktree => {
-        const state = getWorktreeState(worktree, t);
-        const ref = getWorktreeRef(worktree, t);
+    const nodes = useMemo<TreeNode<WorktreeNodeData>[]>(
+        () =>
+            sortedWorktrees.map((worktree) => {
+                const state = getWorktreeState(worktree, t);
+                const ref = getWorktreeRef(worktree, t);
 
-        // Show detailed multiline information on hover for rich context
-        const tooltip = [
-            worktree.branch ? `${t('Branch')}: ${worktree.branch}` : `${t('Detached HEAD')}: ${getShortHead(worktree.head)}`,
-            `${t('Status')}: ${state.label}`,
-            `${t('Path')}: ${worktree.path}`
-        ].join('\n');
+                // Show detailed multiline information on hover for rich context
+                const tooltip = [
+                    worktree.branch
+                        ? `${t('Branch')}: ${worktree.branch}`
+                        : `${t('Detached HEAD')}: ${getShortHead(worktree.head)}`,
+                    `${t('Status')}: ${state.label}`,
+                    `${t('Path')}: ${worktree.path}`,
+                ].join('\n');
 
-        return {
-            id: worktree.path,
-            label: ref,
-            title: tooltip,
-            data: { worktree, state }
-        };
-    }), [sortedWorktrees, t]);
+                return {
+                    id: worktree.path,
+                    label: ref,
+                    title: tooltip,
+                    data: { worktree, state },
+                };
+            }),
+        [sortedWorktrees, t]
+    );
 
     const selectedId = useMemo(() => {
-        return sortedWorktrees.find(worktree => worktree.isActiveRepository)?.path
-            ?? sortedWorktrees.find(worktree => worktree.isCurrent)?.path;
+        return (
+            sortedWorktrees.find((worktree) => worktree.isActiveRepository)?.path ??
+            sortedWorktrees.find((worktree) => worktree.isCurrent)?.path
+        );
     }, [sortedWorktrees]);
     const hasStaleWorktrees = useMemo(() => {
-        return worktrees.some(worktree => worktree.isPrunable || !worktree.pathExists);
+        return worktrees.some((worktree) => worktree.isPrunable || !worktree.pathExists);
     }, [worktrees]);
 
     const handleWorktreeClick = useCallback(async (worktree: WorktreeInfo) => {
@@ -113,12 +133,15 @@ export function WorktreeDrawer({ open, worktrees, loading, onClose }: WorktreeDr
         emitRefresh(['commit', 'branch', 'push', 'worktrees'], 'worktree-opened');
     }, []);
 
-    const handleNodeSelect = useCallback((node: TreeNode<WorktreeNodeData>) => {
-        if (!node.data) {
-            return;
-        }
-        void handleWorktreeClick(node.data.worktree);
-    }, [handleWorktreeClick]);
+    const handleNodeSelect = useCallback(
+        (node: TreeNode<WorktreeNodeData>) => {
+            if (!node.data) {
+                return;
+            }
+            void handleWorktreeClick(node.data.worktree);
+        },
+        [handleWorktreeClick]
+    );
 
     const getContextData = useCallback((node: TreeNode<WorktreeNodeData>): Record<string, unknown> | undefined => {
         const worktree = node.data?.worktree;
@@ -135,7 +158,7 @@ export function WorktreeDrawer({ open, worktrees, loading, onClose }: WorktreeDr
             isActiveRepository: worktree.isActiveRepository,
             isDirty: worktree.isDirty,
             isPrunable: worktree.isPrunable,
-            preventDefaultContextMenuItems: true
+            preventDefaultContextMenuItems: true,
         } satisfies WorktreeItemContext;
     }, []);
 

@@ -1,0 +1,11 @@
+# Lockfiles and generated assets
+package-lock.json
+apps/*/package-lock.json
+apps/extension/media/intelli-git-icons.css
+apps/extension/resources/icons/*.svg
+apps/extension/resources/intelli-git-icons.woff
+
+# Agent instructions are maintained separately from application code
+AGENTS.md
+.agent/
+.agents/

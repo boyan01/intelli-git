@@ -20,7 +20,9 @@ describe('webview context menu contract', () => {
         }
 
         expect(Array.from(menuSections).sort()).toEqual(
-            Array.from(menuSections).filter(section => knownSections.has(section)).sort()
+            Array.from(menuSections)
+                .filter((section) => knownSections.has(section))
+                .sort()
         );
     });
 });

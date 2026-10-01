@@ -16,7 +16,7 @@ describe('parseDiffToHunks', () => {
             ' line four',
             '@@ -10 +11 @@',
             '-old',
-            '+new'
+            '+new',
         ].join('\n');
 
         const hunks = parseDiffToHunks(diff, 'src/file.ts');
@@ -27,20 +27,22 @@ describe('parseDiffToHunks', () => {
             oldStart: 2,
             oldLineCount: 1,
             newStart: 2,
-            newLineCount: 2
+            newLineCount: 2,
         });
         expect(hunks[0].id).toMatch(/^src\/file\.ts:2:1:2:2:/);
-        expect(hunks[0].fileHeader).toBe([
-            'diff --git a/src/file.ts b/src/file.ts',
-            'index 1111111..2222222 100644',
-            '--- a/src/file.ts',
-            '+++ b/src/file.ts'
-        ].join('\n'));
+        expect(hunks[0].fileHeader).toBe(
+            [
+                'diff --git a/src/file.ts b/src/file.ts',
+                'index 1111111..2222222 100644',
+                '--- a/src/file.ts',
+                '+++ b/src/file.ts',
+            ].join('\n')
+        );
         expect(hunks[0].content).toContain('+line two changed');
         expect(hunks[1]).toMatchObject({
             lineRange: 'L10-10 / L11-11',
             oldLineCount: 1,
-            newLineCount: 1
+            newLineCount: 1,
         });
         expect(hunks[1].id).toMatch(/^src\/file\.ts:10:1:11:1:/);
     });
@@ -54,7 +56,7 @@ describe('parseDiffToHunks', () => {
             '+++ b/new.txt',
             '@@ -0,0 +1,2 @@',
             '+first',
-            '+second'
+            '+second',
         ].join('\n');
 
         const hunks = parseDiffToHunks(diff, 'new.txt');
@@ -65,7 +67,7 @@ describe('parseDiffToHunks', () => {
             oldStart: 0,
             oldLineCount: 0,
             newStart: 1,
-            newLineCount: 2
+            newLineCount: 2,
         });
         expect(hunks[0].id).toMatch(/^new\.txt:0:0:1:2:/);
     });
@@ -84,17 +86,13 @@ describe('parseDiffToHunks', () => {
             ' main-second-line',
             '+',
             '+2',
-            '+12'
+            '+12',
         ].join('\n');
 
         const hunks = parseDiffToHunks(diff, 'docs/shared.txt', { idPrefix: 'worktree' });
 
         expect(hunks).toHaveLength(3);
-        expect(hunks.map(hunk => hunk.lineRange)).toEqual([
-            'L1-1 / L1-2',
-            'L2-2 / L4-4',
-            'L3-3 / L6-8'
-        ]);
+        expect(hunks.map((hunk) => hunk.lineRange)).toEqual(['L1-1 / L1-2', 'L2-2 / L4-4', 'L3-3 / L6-8']);
         expect(hunks[2].id).toMatch(/^docs\/shared\.txt:worktree:3:0:6:3:/);
         expect(hunks[2].content).toContain(' main-second-line');
         expect(hunks[2].content).toContain('+12');

@@ -25,8 +25,8 @@ export function createRevisionContentUri(
         query: JSON.stringify({
             ...query,
             repoPath: gitService.getWorkspaceRoot(),
-            pathKind: query.pathKind || 'workspace'
-        } satisfies RevisionContentQuery)
+            pathKind: query.pathKind || 'workspace',
+        } satisfies RevisionContentQuery),
     });
 }
 
@@ -35,8 +35,8 @@ export function createStashContentUri(gitService: GitService, ref: string, fileP
         query: JSON.stringify({
             ref,
             path: filePath,
-            repoPath: gitService.getWorkspaceRoot()
-        } satisfies StashContentQuery)
+            repoPath: gitService.getWorkspaceRoot(),
+        } satisfies StashContentQuery),
     });
 }
 
@@ -47,7 +47,7 @@ export function parseRepositoryContentQuery<T extends object>(uri: vscode.Uri): 
 
     try {
         const parsed = JSON.parse(uri.query);
-        return parsed && typeof parsed === 'object' ? parsed as Partial<T> : {};
+        return parsed && typeof parsed === 'object' ? (parsed as Partial<T>) : {};
     } catch {
         return {};
     }
@@ -59,15 +59,21 @@ export function getContentPathFromUri(uri: vscode.Uri): string {
 }
 
 function encodePath(filePath: string): string {
-    return filePath.split('/').map(segment => encodeURIComponent(segment)).join('/');
+    return filePath
+        .split('/')
+        .map((segment) => encodeURIComponent(segment))
+        .join('/');
 }
 
 function decodePath(filePath: string): string {
-    return filePath.split('/').map(segment => {
-        try {
-            return decodeURIComponent(segment);
-        } catch {
-            return segment;
-        }
-    }).join('/');
+    return filePath
+        .split('/')
+        .map((segment) => {
+            try {
+                return decodeURIComponent(segment);
+            } catch {
+                return segment;
+            }
+        })
+        .join('/');
 }

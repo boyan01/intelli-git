@@ -57,11 +57,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({ items, position, onClo
     }, [position]);
 
     return (
-        <div
-            ref={menuRef}
-            className={styles.contextMenu}
-            style={{ left: position.x, top: position.y }}
-        >
+        <div ref={menuRef} className={styles.contextMenu} style={{ left: position.x, top: position.y }}>
             {items.map((item, index) => {
                 if (item.separator) {
                     return <div key={index} className={styles.contextMenuSeparator} />;

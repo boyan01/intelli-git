@@ -3,7 +3,7 @@ import {
     deserializePersistedValue,
     legacyPersistedKeys,
     persistedKeys,
-    serializePersistedValue
+    serializePersistedValue,
 } from './persistedStateRegistry';
 
 describe('persistedStateRegistry', () => {

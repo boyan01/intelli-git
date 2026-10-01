@@ -29,7 +29,7 @@ export const PushHeader: React.FC<PushHeaderProps> = ({
     onToggleView,
     onRemoteChange,
     onRemoteBranchChange,
-    onUseTargetForCommit
+    onUseTargetForCommit,
 }) => {
     const { t } = useTranslation();
 
@@ -84,9 +84,7 @@ export const PushHeader: React.FC<PushHeaderProps> = ({
     const targetBranch = isEditingBranch ? editValue : selectedRemoteBranch;
     const isNewBranch = !isLoading && targetBranch.trim() !== '' && !remoteBranches.includes(targetBranch);
 
-    const filteredBranches = remoteBranches.filter(b =>
-        b.toLowerCase().includes(editValue.toLowerCase())
-    );
+    const filteredBranches = remoteBranches.filter((b) => b.toLowerCase().includes(editValue.toLowerCase()));
 
     const handleRemoteSelect = (remote: string) => {
         onRemoteChange(remote);
@@ -97,14 +95,12 @@ export const PushHeader: React.FC<PushHeaderProps> = ({
         if (e.key === 'ArrowDown') {
             e.preventDefault();
             if (showSuggestions && filteredBranches.length > 0) {
-                setHighlightedIndex(prev =>
-                    prev < filteredBranches.length - 1 ? prev + 1 : prev
-                );
+                setHighlightedIndex((prev) => (prev < filteredBranches.length - 1 ? prev + 1 : prev));
             }
         } else if (e.key === 'ArrowUp') {
             e.preventDefault();
             if (showSuggestions && filteredBranches.length > 0) {
-                setHighlightedIndex(prev => prev > 0 ? prev - 1 : 0);
+                setHighlightedIndex((prev) => (prev > 0 ? prev - 1 : 0));
             }
         } else if (e.key === 'Enter') {
             e.preventDefault();
@@ -165,10 +161,7 @@ export const PushHeader: React.FC<PushHeaderProps> = ({
                     {showTargetPlaceholder ? (
                         <div className={styles.targetPlaceholder} />
                     ) : !isEditingBranch ? (
-                        <div
-                            className={styles.remoteDisplay}
-                            ref={remoteRef}
-                        >
+                        <div className={styles.remoteDisplay} ref={remoteRef}>
                             <span
                                 className={styles.remotePart}
                                 onClick={() => setIsRemoteDropdownOpen(!isRemoteDropdownOpen)}
@@ -189,7 +182,7 @@ export const PushHeader: React.FC<PushHeaderProps> = ({
 
                             {isRemoteDropdownOpen && (
                                 <div className={styles.remoteDropdown}>
-                                    {remotes.map(remote => (
+                                    {remotes.map((remote) => (
                                         <div
                                             key={remote}
                                             className={`${styles.suggestionItem} ${remote === selectedRemote ? styles.suggestionItemSelected : ''}`}
@@ -245,9 +238,7 @@ export const PushHeader: React.FC<PushHeaderProps> = ({
                             </div>
                         </div>
                     )}
-                    {isNewBranch && (
-                        <span className={styles.newBadge}>{t('New remote branch')}</span>
-                    )}
+                    {isNewBranch && <span className={styles.newBadge}>{t('New remote branch')}</span>}
                 </div>
             </div>
         </div>

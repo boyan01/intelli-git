@@ -9,7 +9,7 @@ import {
     type AiProviderStatus,
     type CommitMessageGenerationMode,
     type RepositoryFileReference,
-    type RepositoryInfo
+    type RepositoryInfo,
 } from '@shared/messages';
 import type { CommitAiContext } from '@shared/webviewContext';
 import { applyGeneratedCommitMessage, type CommitMessageSelection } from './commitMessageUpdate';
@@ -61,7 +61,7 @@ export const CommitForm: React.FC<CommitFormProps> = ({
     onMessageChange,
     onAmendChange,
     onOptionsChange,
-    onCommitSuccess
+    onCommitSuccess,
 }) => {
     const { t } = useTranslation();
     const [isGenerating, setIsGenerating] = useState(false);
@@ -79,7 +79,7 @@ export const CommitForm: React.FC<CommitFormProps> = ({
     const dropdownRef = useRef<HTMLDivElement>(null);
 
     const toggleOption = (key: keyof CommitOptions) => {
-        onOptionsChange(prev => ({ ...prev, [key]: !prev[key] }));
+        onOptionsChange((prev) => ({ ...prev, [key]: !prev[key] }));
     };
 
     const loadAIProviderStatus = useCallback(async () => {
@@ -218,7 +218,7 @@ export const CommitForm: React.FC<CommitFormProps> = ({
                 mode,
                 currentMessage: requestMessage,
                 selectedText,
-                amend
+                amend,
             });
             if (!result.message.trim()) {
                 setError(t('Select changes to generate a commit message.'));
@@ -232,7 +232,7 @@ export const CommitForm: React.FC<CommitFormProps> = ({
             setAiScope({
                 fileCount: result.fileCount,
                 hunkCount: result.hunkCount,
-                amend
+                amend,
             });
         } catch (e) {
             const errMsg = e instanceof Error ? e.message : String(e);
@@ -256,7 +256,7 @@ export const CommitForm: React.FC<CommitFormProps> = ({
     };
 
     useEffect(() => {
-        return rpcEvents.commitAiAction.subscribe(action => {
+        return rpcEvents.commitAiAction.subscribe((action) => {
             if (action === 'generateMessage') {
                 void handleGenerateMessage('full');
                 return;
@@ -297,7 +297,7 @@ export const CommitForm: React.FC<CommitFormProps> = ({
         if (files.length === 0 && !amend) {
             return;
         }
-        const repoCount = new Set(files.map(file => file.repoPath || '')).size;
+        const repoCount = new Set(files.map((file) => file.repoPath || '')).size;
         if (options.push && repoCount > 1) {
             setError(t('Commit & Push supports one repository at a time.'));
             return;
@@ -317,9 +317,10 @@ export const CommitForm: React.FC<CommitFormProps> = ({
                 message: options.signOff ? `${message}\n\nSigned-off-by: ` : message,
                 files,
                 amend: amend,
-                pushTarget: options.push && pushTarget?.isConfirmed
-                    ? { remote: pushTarget.remote, branch: pushTarget.branch }
-                    : undefined
+                pushTarget:
+                    options.push && pushTarget?.isConfirmed
+                        ? { remote: pushTarget.remote, branch: pushTarget.branch }
+                        : undefined,
             });
             onMessageChange('');
             onCommitSuccess?.();
@@ -333,78 +334,88 @@ export const CommitForm: React.FC<CommitFormProps> = ({
     };
 
     const getButtonState = () => {
-        const repoCount = new Set(selectedFiles.map(file => file.repoPath || '')).size;
+        const repoCount = new Set(selectedFiles.map((file) => file.repoPath || '')).size;
         if (amend && options.push) {
             return {
                 text: t('Amend & Push'),
                 variant: 'primary' as const,
-                icon: 'codicon-repo-push'
+                icon: 'codicon-repo-push',
             };
         }
         if (amend) {
             return {
                 text: t('Amend'),
                 variant: 'secondary' as const,
-                icon: 'codicon-edit'
+                icon: 'codicon-edit',
             };
         }
         if (options.push) {
             return {
-                text: repoCount > 1
-                    ? t('Commit {{count}} Repositories & Push', { count: repoCount })
-                    : t('Commit & Push'),
+                text:
+                    repoCount > 1
+                        ? t('Commit {{count}} Repositories & Push', { count: repoCount })
+                        : t('Commit & Push'),
                 variant: 'primary' as const,
-                icon: 'codicon-repo-push'
+                icon: 'codicon-repo-push',
             };
         }
         return {
-            text: repoCount > 1
-                ? t('Commit {{count}} Repositories', { count: repoCount })
-                : t('Commit'),
+            text: repoCount > 1 ? t('Commit {{count}} Repositories', { count: repoCount }) : t('Commit'),
             variant: 'primary' as const,
-            icon: 'codicon-check'
+            icon: 'codicon-check',
         };
     };
 
     const btnState = getButtonState();
     const isDisabled = (selectedFiles.length === 0 && !amend) || !message.trim();
-    const planItems = Array.from(selectedFiles.reduce((map, file) => {
-        const key = file.repoPath || '';
-        map.set(key, (map.get(key) || 0) + 1);
-        return map;
-    }, new Map<string, number>()).entries()).map(([repoPath, count]) => ({
-        repo: repositories.find(repo => repo.repoPath === repoPath),
+    const planItems = Array.from(
+        selectedFiles
+            .reduce((map, file) => {
+                const key = file.repoPath || '';
+                map.set(key, (map.get(key) || 0) + 1);
+                return map;
+            }, new Map<string, number>())
+            .entries()
+    ).map(([repoPath, count]) => ({
+        repo: repositories.find((repo) => repo.repoPath === repoPath),
         repoPath,
-        count
+        count,
     }));
-    const repoCount = planItems.length || new Set(selectedFiles.map(file => file.repoPath || '')).size;
-    const pushTargetLabel = pushTarget?.remote && pushTarget.branch
-        ? `${pushTarget.remote}/${pushTarget.branch}`
-        : t('No push target');
+    const repoCount = planItems.length || new Set(selectedFiles.map((file) => file.repoPath || '')).size;
+    const pushTargetLabel =
+        pushTarget?.remote && pushTarget.branch ? `${pushTarget.remote}/${pushTarget.branch}` : t('No push target');
     const pushTargetNeedsReview = !pushTarget?.isConfirmed;
-    const aiScopeLabel = selectedFiles.length > 0
-        ? aiScope
-            ? aiScope.amend
-                ? t('Amend AI scope: {{files}} files, {{hunks}} change blocks', { files: aiScope.fileCount, hunks: aiScope.hunkCount })
-                : t('AI scope: {{files}} files, {{hunks}} change blocks', { files: aiScope.fileCount, hunks: aiScope.hunkCount })
-            : amend
-                ? t('Amend AI scope: {{files}} selected files', { files: selectedFiles.length })
-                : t('AI scope: {{files}} selected files', { files: selectedFiles.length })
-        : null;
+    const aiScopeLabel =
+        selectedFiles.length > 0
+            ? aiScope
+                ? aiScope.amend
+                    ? t('Amend AI scope: {{files}} files, {{hunks}} change blocks', {
+                          files: aiScope.fileCount,
+                          hunks: aiScope.hunkCount,
+                      })
+                    : t('AI scope: {{files}} files, {{hunks}} change blocks', {
+                          files: aiScope.fileCount,
+                          hunks: aiScope.hunkCount,
+                      })
+                : amend
+                  ? t('Amend AI scope: {{files}} selected files', { files: selectedFiles.length })
+                  : t('AI scope: {{files}} selected files', { files: selectedFiles.length })
+            : null;
     const hasCommitMessageSelection = commitMessageSelection.end > commitMessageSelection.start;
-    const aiButtonLabel = selectedFiles.length > 0
-        ? aiScopeLabel
-            ? `${t('Generate')}. ${aiScopeLabel}`
-            : amend
-                ? `${t('Generate')}. ${t('Amend AI scope: {{files}} selected files', { files: selectedFiles.length })}`
-                : `${t('Generate')}. ${t('AI scope: {{files}} selected files', { files: selectedFiles.length })}`
-        : t('Select changes to generate a commit message.');
+    const aiButtonLabel =
+        selectedFiles.length > 0
+            ? aiScopeLabel
+                ? `${t('Generate')}. ${aiScopeLabel}`
+                : amend
+                  ? `${t('Generate')}. ${t('Amend AI scope: {{files}} selected files', { files: selectedFiles.length })}`
+                  : `${t('Generate')}. ${t('AI scope: {{files}} selected files', { files: selectedFiles.length })}`
+            : t('Select changes to generate a commit message.');
     const commitAiContext = (webviewSection: CommitAiContext['webviewSection']): CommitAiContext => ({
         webviewSection,
         hasSelectedChanges: selectedFiles.length > 0,
         hasCommitMessageSelection,
         canSelectCopilotModel: Boolean(aiProviderStatus?.canSelectModel),
-        preventDefaultContextMenuItems: false
+        preventDefaultContextMenuItems: false,
     });
 
     return (
@@ -434,16 +445,28 @@ export const CommitForm: React.FC<CommitFormProps> = ({
                             aria-label={aiButtonLabel}
                             data-vscode-context={JSON.stringify(commitAiContext('commitGenerateButton'))}
                         >
-                            <i className={`codicon ${isGenerating ? 'codicon-loading codicon-modifier-spin' : 'codicon-sparkle'}`}></i>
+                            <i
+                                className={`codicon ${isGenerating ? 'codicon-loading codicon-modifier-spin' : 'codicon-sparkle'}`}
+                            ></i>
                         </button>
                     </div>
                 </div>
 
                 {(addedCount > 0 || modifiedCount > 0 || deletedCount > 0) && (
                     <div className={styles.stats}>
-                        {addedCount > 0 && <span className={styles.statAdded}>{t('{{count}} Added', { count: addedCount })}</span>}
-                        {modifiedCount > 0 && <span className={styles.statModified}>{t('{{count}} Modified', { count: modifiedCount })}</span>}
-                        {deletedCount > 0 && <span className={styles.statDeleted}>{t('{{count}} Deleted', { count: deletedCount })}</span>}
+                        {addedCount > 0 && (
+                            <span className={styles.statAdded}>{t('{{count}} Added', { count: addedCount })}</span>
+                        )}
+                        {modifiedCount > 0 && (
+                            <span className={styles.statModified}>
+                                {t('{{count}} Modified', { count: modifiedCount })}
+                            </span>
+                        )}
+                        {deletedCount > 0 && (
+                            <span className={styles.statDeleted}>
+                                {t('{{count}} Deleted', { count: deletedCount })}
+                            </span>
+                        )}
                     </div>
                 )}
             </div>
@@ -465,7 +488,7 @@ export const CommitForm: React.FC<CommitFormProps> = ({
             {planItems.length > 1 && (
                 <div className={styles.commitPlan}>
                     <div className={styles.commitPlanTitle}>{t('Commit Plan')}</div>
-                    {planItems.map(item => (
+                    {planItems.map((item) => (
                         <div className={styles.commitPlanItem} key={item.repoPath || 'active'}>
                             <span>
                                 {item.repo?.name || item.repoPath || t('Current Repository')}
@@ -478,26 +501,26 @@ export const CommitForm: React.FC<CommitFormProps> = ({
             )}
 
             {options.push && (
-                <div className={`${styles.pushTargetRow} ${pushTargetNeedsReview || repoCount > 1 ? styles.pushTargetWarning : ''}`}>
+                <div
+                    className={`${styles.pushTargetRow} ${pushTargetNeedsReview || repoCount > 1 ? styles.pushTargetWarning : ''}`}
+                >
                     <div className={styles.pushTargetInfo}>
-                        <i className={`codicon ${pushTargetNeedsReview || repoCount > 1 ? 'codicon-warning' : 'codicon-repo-push'}`} />
+                        <i
+                            className={`codicon ${pushTargetNeedsReview || repoCount > 1 ? 'codicon-warning' : 'codicon-repo-push'}`}
+                        />
                         <span className={styles.pushTargetLabel}>{t('Push target:')}</span>
                         <span className={styles.pushTargetValue}>
                             {repoCount > 1
                                 ? t('Select one repository to push after commit')
                                 : isPushTargetLoading
-                                    ? t('Loading...')
-                                    : pushTargetNeedsReview
-                                        ? t('Review target before pushing')
-                                        : pushTargetLabel}
+                                  ? t('Loading...')
+                                  : pushTargetNeedsReview
+                                    ? t('Review target before pushing')
+                                    : pushTargetLabel}
                         </span>
                     </div>
                     {repoCount <= 1 && (
-                        <button
-                            type="button"
-                            className={styles.pushTargetButton}
-                            onClick={onReviewPushTarget}
-                        >
+                        <button type="button" className={styles.pushTargetButton} onClick={onReviewPushTarget}>
                             {pushTargetNeedsReview ? t('Review...') : t('Change...')}
                         </button>
                     )}
@@ -515,14 +538,12 @@ export const CommitForm: React.FC<CommitFormProps> = ({
                     )}
                     {errorAction && (
                         <button className={styles.errorActionBtn} onClick={handleErrorAction}>
-                            {errorAction === 'selectCopilotModel' ? t('Select Copilot Model') : t('Configure AI Provider')}
+                            {errorAction === 'selectCopilotModel'
+                                ? t('Select Copilot Model')
+                                : t('Configure AI Provider')}
                         </button>
                     )}
-                    <button
-                        className={styles.dismissBtn}
-                        onClick={clearError}
-                        title={t('Dismiss')}
-                    >
+                    <button className={styles.dismissBtn} onClick={clearError} title={t('Dismiss')}>
                         <i className="codicon codicon-close"></i>
                     </button>
                 </div>
@@ -532,11 +553,7 @@ export const CommitForm: React.FC<CommitFormProps> = ({
                 <div className={`${styles.aiNotice} ${aiNotice.ok ? styles.aiNoticeSuccess : styles.aiNoticeError}`}>
                     <i className={`codicon ${aiNotice.ok ? 'codicon-check' : 'codicon-warning'}`} />
                     <span>{aiNotice.message}</span>
-                    <button
-                        className={styles.dismissBtn}
-                        onClick={() => setAiNotice(null)}
-                        title={t('Dismiss')}
-                    >
+                    <button className={styles.dismissBtn} onClick={() => setAiNotice(null)} title={t('Dismiss')}>
                         <i className="codicon codicon-close"></i>
                     </button>
                 </div>
@@ -566,19 +583,16 @@ export const CommitForm: React.FC<CommitFormProps> = ({
                         onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                         aria-label={t('Commit Options')}
                     >
-                        <i className={`codicon codicon-chevron-up ${styles.chevron} ${isDropdownOpen ? styles.chevronOpen : ''}`} />
+                        <i
+                            className={`codicon codicon-chevron-up ${styles.chevron} ${isDropdownOpen ? styles.chevronOpen : ''}`}
+                        />
                     </button>
 
                     {isDropdownOpen && (
                         <div className={styles.dropdown}>
-                            <div className={styles.dropdownHeader}>
-                                {t('Commit Options')}
-                            </div>
+                            <div className={styles.dropdownHeader}>{t('Commit Options')}</div>
 
-                            <button
-                                className={styles.dropdownItem}
-                                onClick={() => toggleOption('push')}
-                            >
+                            <button className={styles.dropdownItem} onClick={() => toggleOption('push')}>
                                 <div className={styles.itemContent}>
                                     <i className="codicon codicon-repo-push" />
                                     <span>{t('Push after Commit')}</span>
@@ -588,10 +602,7 @@ export const CommitForm: React.FC<CommitFormProps> = ({
                                 </span>
                             </button>
 
-                            <button
-                                className={styles.dropdownItem}
-                                onClick={() => toggleOption('signOff')}
-                            >
+                            <button className={styles.dropdownItem} onClick={() => toggleOption('signOff')}>
                                 <div className={styles.itemContent}>
                                     <i className="codicon codicon-verified" />
                                     <span>{t('Sign Off')}</span>

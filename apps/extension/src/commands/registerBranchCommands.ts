@@ -9,20 +9,22 @@ function formatCommitSamples(commits: CommitDetails[]): string[] {
         return [];
     }
 
-    return [
-        vscode.l10n.t('Sample commits:'),
-        ...commits.map(commit => `- ${commit.shortHash} ${commit.subject}`)
-    ];
+    return [vscode.l10n.t('Sample commits:'), ...commits.map((commit) => `- ${commit.shortHash} ${commit.subject}`)];
 }
 
-function createForceUpdatePreviewMessage(branch: string, remote: string, commitCount: number, sampleCommits: CommitDetails[]): string {
+function createForceUpdatePreviewMessage(
+    branch: string,
+    remote: string,
+    commitCount: number,
+    sampleCommits: CommitDetails[]
+): string {
     const lines = [
         vscode.l10n.t('Branch {0} has diverged from {1}/{0}.', branch, remote),
         commitCount > 0
             ? vscode.l10n.t('Force update will discard {0} local commit(s).', commitCount)
             : vscode.l10n.t('Force update may discard local commits.'),
         ...formatCommitSamples(sampleCommits),
-        vscode.l10n.t('Recovery: use Git reflog for branch {0} to find the previous HEAD.', branch)
+        vscode.l10n.t('Recovery: use Git reflog for branch {0} to find the previous HEAD.', branch),
     ];
 
     return lines.join('\n');
@@ -85,13 +87,15 @@ export function registerBranchCommands(
             try {
                 await checkout();
             } catch (error: any) {
-                if (await handleCheckoutWorktreeConflict({
-                    gitService,
-                    branch,
-                    isRemote,
-                    error,
-                    retry: checkout
-                })) {
+                if (
+                    await handleCheckoutWorktreeConflict({
+                        gitService,
+                        branch,
+                        isRemote,
+                        error,
+                        retry: checkout,
+                    })
+                ) {
                     return;
                 }
                 vscode.window.showErrorMessage(vscode.l10n.t('Failed to checkout {0}: {1}', branch, error.message));
@@ -105,7 +109,7 @@ export function registerBranchCommands(
 
             const newBranchName = await vscode.window.showInputBox({
                 prompt: vscode.l10n.t('Create new branch from {0}', sourceBranch),
-                placeHolder: vscode.l10n.t('New branch name')
+                placeHolder: vscode.l10n.t('New branch name'),
             });
 
             if (!newBranchName) return;
@@ -147,7 +151,7 @@ export function registerBranchCommands(
 
             const newName = await vscode.window.showInputBox({
                 prompt: vscode.l10n.t('Rename branch {0} to', oldName),
-                value: oldName
+                value: oldName,
             });
 
             if (!newName || newName === oldName) return;
@@ -182,9 +186,13 @@ export function registerBranchCommands(
 
             try {
                 await gitService.branchRemote.rebaseOnto(branchToRebaseOnto);
-                vscode.window.showInformationMessage(vscode.l10n.t('Rebased current branch onto {0}', branchToRebaseOnto));
+                vscode.window.showInformationMessage(
+                    vscode.l10n.t('Rebased current branch onto {0}', branchToRebaseOnto)
+                );
             } catch (error: any) {
-                vscode.window.showErrorMessage(vscode.l10n.t('Failed to rebase onto {0}: {1}', branchToRebaseOnto, error.message));
+                vscode.window.showErrorMessage(
+                    vscode.l10n.t('Failed to rebase onto {0}: {1}', branchToRebaseOnto, error.message)
+                );
             }
         })
     );
@@ -249,7 +257,7 @@ export function registerBranchCommands(
                         const remote = remotes.length > 0 ? remotes[0] : 'origin';
                         const [commitCount, sampleCommits] = await Promise.all([
                             gitService.branchRemote.getCommitsToPushCount(branch, remote, branch),
-                            gitService.branchRemote.getCommitsToPush(branch, remote, branch, { maxCount: 5 })
+                            gitService.branchRemote.getCommitsToPush(branch, remote, branch, { maxCount: 5 }),
                         ]);
                         const confirm = await vscode.window.showWarningMessage(
                             createForceUpdatePreviewMessage(branch, remote, commitCount, sampleCommits),

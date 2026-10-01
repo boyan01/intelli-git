@@ -1,22 +1,24 @@
 import { commitStateDefaults, type CommitPersistedStateSchema } from '../components/commit/persistedState';
 import { gitLogStateDefaults, type GitLogPersistedStateSchema } from '../components/git-log/persistedState';
-import { localChangesStateDefaults, type LocalChangesPersistedStateSchema } from '../components/local-changes/persistedState';
+import {
+    localChangesStateDefaults,
+    type LocalChangesPersistedStateSchema,
+} from '../components/local-changes/persistedState';
 import { pushStateDefaults, type PushPersistedStateSchema } from '../components/push/persistedState';
 import { stashStateDefaults, type StashPersistedStateSchema } from '../components/stash/persistedState';
 
-export type PersistedStateSchema =
-    CommitPersistedStateSchema
-    & LocalChangesPersistedStateSchema
-    & PushPersistedStateSchema
-    & StashPersistedStateSchema
-    & GitLogPersistedStateSchema;
+export type PersistedStateSchema = CommitPersistedStateSchema &
+    LocalChangesPersistedStateSchema &
+    PushPersistedStateSchema &
+    StashPersistedStateSchema &
+    GitLogPersistedStateSchema;
 
 export const stateDefaults: PersistedStateSchema = {
     ...commitStateDefaults,
     ...localChangesStateDefaults,
     ...pushStateDefaults,
     ...stashStateDefaults,
-    ...gitLogStateDefaults
+    ...gitLogStateDefaults,
 };
 
 export const persistedKeys = Object.keys(stateDefaults) as Array<keyof PersistedStateSchema>;
@@ -30,7 +32,7 @@ export const legacyPersistedKeys = [
     'push.details.splitSize',
     'stash.splitSize',
     'branchList.expandedGroups',
-    'branchList.selectedBranch'
+    'branchList.selectedBranch',
 ] as const;
 
 export function serializePersistedValue<K extends keyof PersistedStateSchema>(

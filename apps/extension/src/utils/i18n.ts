@@ -12,10 +12,7 @@ function hasMessage(messages: MessageMap, key: string): boolean {
 }
 
 function formatMessage(message: string, args: (string | number | boolean)[]): string {
-    return args.reduce<string>(
-        (result, value, index) => result.replaceAll(`{${index}}`, String(value)),
-        message
-    );
+    return args.reduce<string>((result, value, index) => result.replaceAll(`{${index}}`, String(value)), message);
 }
 
 function getKeyedLocalizedMessage(key: string): string | undefined {
@@ -36,5 +33,5 @@ export const i18n = {
         }
 
         return vscode.l10n.t(key, ...args);
-    }
+    },
 };

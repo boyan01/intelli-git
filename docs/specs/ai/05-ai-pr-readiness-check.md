@@ -137,4 +137,3 @@ interface PrReadinessResult {
 - Readiness check can run without creating PR.
 - PR Draft integrates readiness result before creation.
 - AI findings never override deterministic Git facts.
-

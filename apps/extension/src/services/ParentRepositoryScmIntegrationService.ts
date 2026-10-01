@@ -97,8 +97,9 @@ export class ParentRepositoryScmIntegrationService implements vscode.Disposable 
             return;
         }
 
-        const missingRoots = findMissingParentGitRoots(this.repositoryManager.getRepositories(), vsCodeGitRoots)
-            .filter(root => !this.promptedRoots.has(root) && !this.pendingRoots.has(root));
+        const missingRoots = findMissingParentGitRoots(this.repositoryManager.getRepositories(), vsCodeGitRoots).filter(
+            (root) => !this.promptedRoots.has(root) && !this.pendingRoots.has(root)
+        );
         if (missingRoots.length === 0) {
             return;
         }
@@ -109,9 +110,14 @@ export class ParentRepositoryScmIntegrationService implements vscode.Disposable 
 
         const openAction = vscode.l10n.t('Open Parent Repository');
         const settingsAction = vscode.l10n.t('Open Git Setting');
-        const message = missingRoots.length === 1
-            ? vscode.l10n.t('Intelli Git detected a Git repository in a parent folder, but VS Code Git has not opened it. Open it to enable Source Control decorations.')
-            : vscode.l10n.t('Intelli Git detected Git repositories in parent folders, but VS Code Git has not opened them. Open them to enable Source Control decorations.');
+        const message =
+            missingRoots.length === 1
+                ? vscode.l10n.t(
+                      'Intelli Git detected a Git repository in a parent folder, but VS Code Git has not opened it. Open it to enable Source Control decorations.'
+                  )
+                : vscode.l10n.t(
+                      'Intelli Git detected Git repositories in parent folders, but VS Code Git has not opened them. Open them to enable Source Control decorations.'
+                  );
 
         try {
             const selected = await this.showWarningMessage(message, openAction, settingsAction);
@@ -140,7 +146,7 @@ export class ParentRepositoryScmIntegrationService implements vscode.Disposable 
             const git = gitExtension.isActive ? gitExtension.exports : await gitExtension.activate();
             const api = git.getAPI(1);
             return api.repositories
-                .map(repository => repository.rootUri?.fsPath)
+                .map((repository) => repository.rootUri?.fsPath)
                 .filter((root): root is string => Boolean(root));
         } catch (error) {
             logger.debug('Failed to read VS Code Git repositories', error);

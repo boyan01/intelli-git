@@ -20,39 +20,40 @@ export const PushChangesView: React.FC<PushChangesViewProps> = ({
     commits,
     changesViewMode,
     setChangesViewMode,
-    activeFile
+    activeFile,
 }) => {
     const { t } = useTranslation();
     const treeRef = useRef<BaseFileTreeRef>(null);
 
-    const handleOpenFile = useCallback((path: string, preserveFocus: boolean) => {
-        if (commits.length === 0) return;
+    const handleOpenFile = useCallback(
+        (path: string, preserveFocus: boolean) => {
+            if (commits.length === 0) return;
 
-        const firstCommit = commits[commits.length - 1];
-        const lastCommit = commits[0];
+            const firstCommit = commits[commits.length - 1];
+            const lastCommit = commits[0];
 
-        const firstParent = firstCommit.parentHashes.length > 0
-            ? firstCommit.parentHashes[0]
-            : '';
+            const firstParent = firstCommit.parentHashes.length > 0 ? firstCommit.parentHashes[0] : '';
 
-        rpc.openCommitDiff({
-            path,
-            leftRef: firstParent,
-            rightRef: lastCommit.hash,
-            preserveFocus
-        });
-    }, [commits]);
+            rpc.openCommitDiff({
+                path,
+                leftRef: firstParent,
+                rightRef: lastCommit.hash,
+                preserveFocus,
+            });
+        },
+        [commits]
+    );
 
     // Memoize aggregated files
     const allFiles = useMemo(() => {
         const fileMap = new Map<string, FileStatus>();
-        commits.forEach(commit => {
-            commit.files.forEach(f => {
-                fileMap.set(f.path, { 
-                    path: f.path, 
+        commits.forEach((commit) => {
+            commit.files.forEach((f) => {
+                fileMap.set(f.path, {
+                    path: f.path,
                     displayPath: f.displayPath,
-                    status: f.status, 
-                    staged: false 
+                    status: f.status,
+                    staged: false,
                 });
             });
         });
@@ -67,9 +68,7 @@ export const PushChangesView: React.FC<PushChangesViewProps> = ({
                 </span>
             </div>
             <div className={styles.filesHeader}>
-                <span className={styles.filesCount}>
-                    {t('{{count}} files', { count: allFiles.length })}
-                </span>
+                <span className={styles.filesCount}>{t('{{count}} files', { count: allFiles.length })}</span>
                 <div className={styles.filesActions}>
                     <ViewModeToggle viewMode={changesViewMode} onChange={setChangesViewMode} />
                     <button
@@ -97,7 +96,7 @@ export const PushChangesView: React.FC<PushChangesViewProps> = ({
                     onFileClick={(path) => handleOpenFile(path, true)}
                     selectedFiles={EMPTY_SELECTED_FILES}
                     activeFile={activeFile?.path ?? null}
-                    onToggleFile={() => { }}
+                    onToggleFile={() => {}}
                     onFileDoubleClick={(path) => handleOpenFile(path, false)}
                     stickyHeaders={true}
                 />

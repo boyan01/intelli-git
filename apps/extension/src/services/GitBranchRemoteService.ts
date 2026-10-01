@@ -11,7 +11,7 @@ import type {
     RemoteLinkCapabilities,
     RemoteLinkInfo,
     RemoteProvider,
-    WorktreeInfo
+    WorktreeInfo,
 } from '@shared/messages';
 import { logger } from '../utils/logger';
 
@@ -22,19 +22,19 @@ const UNKNOWN_REMOTE_LINK_CAPABILITIES: RemoteLinkCapabilities = {
     commit: false,
     branch: false,
     file: false,
-    compare: false
+    compare: false,
 };
 const COMMON_REMOTE_LINK_CAPABILITIES: RemoteLinkCapabilities = {
     commit: true,
     branch: true,
     file: true,
-    compare: true
+    compare: true,
 };
 const PARTIAL_REMOTE_LINK_CAPABILITIES: RemoteLinkCapabilities = {
     commit: true,
     branch: true,
     file: true,
-    compare: false
+    compare: false,
 };
 
 export interface GitBranchRemoteServiceOptions {
@@ -70,7 +70,10 @@ interface ParsedRemoteUrl {
 }
 
 function stripGitSuffix(value: string): string {
-    return value.trim().replace(/\.git\/?$/, '').replace(/\/+$/, '');
+    return value
+        .trim()
+        .replace(/\.git\/?$/, '')
+        .replace(/\/+$/, '');
 }
 
 function splitRemotePath(pathname: string): string[] {
@@ -98,7 +101,7 @@ function parseRemoteUrl(remoteUrl: string): ParsedRemoteUrl | undefined {
         const url = new URL(normalized);
         return {
             hostname: url.hostname.toLowerCase(),
-            pathParts: splitRemotePath(url.pathname).map(decodeRemotePathPart)
+            pathParts: splitRemotePath(url.pathname).map(decodeRemotePathPart),
         };
     } catch {
         const sshMatch = normalized.match(/^(?:[^@/\s]+@)?([^:/\s]+):(.+)$/);
@@ -108,7 +111,7 @@ function parseRemoteUrl(remoteUrl: string): ParsedRemoteUrl | undefined {
 
         return {
             hostname: sshMatch[1].toLowerCase(),
-            pathParts: splitRemotePath(sshMatch[2]).map(decodeRemotePathPart)
+            pathParts: splitRemotePath(sshMatch[2]).map(decodeRemotePathPart),
         };
     }
 }
@@ -185,7 +188,10 @@ function getRemoteLinkInfo(remoteUrl: string): RemoteLinkInfo {
 }
 
 function encodePath(value: string): string {
-    return value.split('/').map(part => encodeURIComponent(part)).join('/');
+    return value
+        .split('/')
+        .map((part) => encodeURIComponent(part))
+        .join('/');
 }
 
 function createQueryString(params: Record<string, string>): string {
@@ -310,7 +316,7 @@ function parseWorktreeCheckoutError(error: unknown): { branch: string; path: str
 
     return {
         branch: match[1],
-        path: match[2]
+        path: match[2],
     };
 }
 
@@ -324,7 +330,7 @@ export class GitBranchRemoteService {
     private getRemoteGit(): SimpleGit {
         this.remoteGit ??= simpleGit({
             baseDir: this.options.gitRoot,
-            maxConcurrentProcesses: 1
+            maxConcurrentProcesses: 1,
         });
         return this.remoteGit;
     }
@@ -336,11 +342,9 @@ export class GitBranchRemoteService {
     public async getWorktreeBranchUsage(branchName: string): Promise<WorktreeBranchUsage | undefined> {
         const records = await this.readWorktreeRecords();
         const currentGitRoot = normalizePath(this.options.gitRoot);
-        const record = records.find(item => (
-            !item.isBare &&
-            item.branch === branchName &&
-            normalizePath(item.path) !== currentGitRoot
-        ));
+        const record = records.find(
+            (item) => !item.isBare && item.branch === branchName && normalizePath(item.path) !== currentGitRoot
+        );
 
         if (!record) {
             return undefined;
@@ -349,7 +353,10 @@ export class GitBranchRemoteService {
         return this.toWorktreeBranchUsage(branchName, record.path, Boolean(record.isPrunable));
     }
 
-    public async resolveWorktreeBranchUsage(branchName: string, error: unknown): Promise<WorktreeBranchUsage | undefined> {
+    public async resolveWorktreeBranchUsage(
+        branchName: string,
+        error: unknown
+    ): Promise<WorktreeBranchUsage | undefined> {
         try {
             const usage = await this.getWorktreeBranchUsage(branchName);
             if (usage) {
@@ -396,7 +403,7 @@ export class GitBranchRemoteService {
                 isActiveRepository: worktreePath === activePath,
                 pathExists,
                 isPrunable: Boolean(record.isPrunable),
-                isDirty: pathExists ? await this.isWorktreeDirty(worktreePath) : false
+                isDirty: pathExists ? await this.isWorktreeDirty(worktreePath) : false,
             });
         }
 
@@ -414,7 +421,7 @@ export class GitBranchRemoteService {
                 throw new Error('Cannot remove a missing worktree. Prune stale worktrees instead.');
             }
 
-            if (!force && await this.isWorktreeDirty(normalizedPath)) {
+            if (!force && (await this.isWorktreeDirty(normalizedPath))) {
                 throw new Error('Cannot remove a worktree with local changes.');
             }
 
@@ -434,7 +441,7 @@ export class GitBranchRemoteService {
             const branchSummary = await this.options.git.branchLocal();
             return {
                 current: branchSummary.current,
-                all: branchSummary.all
+                all: branchSummary.all,
             };
         } catch (e) {
             console.error('Error getting branches:', e);
@@ -461,7 +468,7 @@ export class GitBranchRemoteService {
             branch,
             path: normalizePath(worktreePath),
             pathExists: fs.existsSync(worktreePath),
-            isPrunable
+            isPrunable,
         };
     }
 
@@ -474,9 +481,9 @@ export class GitBranchRemoteService {
         try {
             const git = simpleGit({
                 baseDir: worktreePath,
-                maxConcurrentProcesses: 1
+                maxConcurrentProcesses: 1,
             });
-            if (!await git.checkIsRepo()) {
+            if (!(await git.checkIsRepo())) {
                 return false;
             }
             const status = await git.status();
@@ -487,7 +494,11 @@ export class GitBranchRemoteService {
         }
     }
 
-    public async push(remote: string, branch: string, options?: { noVerify?: boolean; setUpstream?: boolean }): Promise<void> {
+    public async push(
+        remote: string,
+        branch: string,
+        options?: { noVerify?: boolean; setUpstream?: boolean }
+    ): Promise<void> {
         return this.runMutation(async () => {
             const args: string[] = [];
             if (options?.setUpstream) {
@@ -501,7 +512,11 @@ export class GitBranchRemoteService {
         });
     }
 
-    public async forcePush(remote: string, branch: string, options?: { noVerify?: boolean; setUpstream?: boolean }): Promise<void> {
+    public async forcePush(
+        remote: string,
+        branch: string,
+        options?: { noVerify?: boolean; setUpstream?: boolean }
+    ): Promise<void> {
         return this.runMutation(async () => {
             const args: string[] = ['--force-with-lease'];
             if (options?.setUpstream) {
@@ -551,7 +566,7 @@ export class GitBranchRemoteService {
     public async getRemotes(): Promise<string[]> {
         try {
             const remotes = await this.options.git.getRemotes();
-            return remotes.map(r => r.name);
+            return remotes.map((r) => r.name);
         } catch (e) {
             console.error('Error getting remotes:', e);
             return [];
@@ -560,7 +575,7 @@ export class GitBranchRemoteService {
 
     private async getRemoteUrl(remoteName: string): Promise<string | undefined> {
         const remotes = await this.options.git.getRemotes(true);
-        const remote = remotes.find(item => item.name === remoteName);
+        const remote = remotes.find((item) => item.name === remoteName);
         const refs = remote?.refs as { fetch?: string; push?: string } | undefined;
         return refs?.fetch || refs?.push;
     }
@@ -614,7 +629,11 @@ export class GitBranchRemoteService {
         return getRemoteCompareUrl(await this.getRemoteLinkInfo(), base, head);
     }
 
-    public async getRemoteCompareUrlForRemote(remoteName: string, base: string, head: string): Promise<string | undefined> {
+    public async getRemoteCompareUrlForRemote(
+        remoteName: string,
+        base: string,
+        head: string
+    ): Promise<string | undefined> {
         return getRemoteCompareUrl(await this.getRemoteLinkInfoForRemote(remoteName), base, head);
     }
 
@@ -669,7 +688,10 @@ export class GitBranchRemoteService {
     public async getBranchStatus(): Promise<{ ahead: number; behind: number }> {
         try {
             const result = await this.options.git.raw(['rev-list', '--left-right', '--count', `HEAD...@{u}`]);
-            const [ahead, behind] = result.trim().split(/\s+/).map(n => parseInt(n, 10));
+            const [ahead, behind] = result
+                .trim()
+                .split(/\s+/)
+                .map((n) => parseInt(n, 10));
 
             return { ahead: ahead || 0, behind: behind || 0 };
         } catch {
@@ -685,12 +707,18 @@ export class GitBranchRemoteService {
     public async getUnpushedCommits(): Promise<Set<string>> {
         try {
             const result = await this.options.git.raw(['rev-list', '@{u}..HEAD']);
-            const hashes = result.trim().split('\n').filter(h => h.length > 0);
+            const hashes = result
+                .trim()
+                .split('\n')
+                .filter((h) => h.length > 0);
             return new Set(hashes);
         } catch {
             try {
                 const result = await this.options.git.raw(['log', 'HEAD', '--not', '--remotes', '--format=%H']);
-                const hashes = result.trim().split('\n').filter(h => h.length > 0);
+                const hashes = result
+                    .trim()
+                    .split('\n')
+                    .filter((h) => h.length > 0);
                 return new Set(hashes);
             } catch {
                 return new Set();
@@ -698,20 +726,23 @@ export class GitBranchRemoteService {
         }
     }
 
-    public async getAllBranchesAheadBehind(): Promise<Map<string, { ahead: number; behind: number; upstream?: string }>> {
+    public async getAllBranchesAheadBehind(): Promise<
+        Map<string, { ahead: number; behind: number; upstream?: string }>
+    > {
         const result = new Map<string, { ahead: number; behind: number; upstream?: string }>();
         try {
             const output = await this.options.git.raw([
                 'for-each-ref',
                 '--format=%(refname:short)%00%(upstream:short)%00%(upstream:track)',
-                'refs/heads'
+                'refs/heads',
             ]);
 
             for (const line of output.trim().split('\n')) {
                 if (!line) continue;
                 const [branch, upstream, track] = line.split('\0');
 
-                let ahead = 0, behind = 0;
+                let ahead = 0,
+                    behind = 0;
                 if (track) {
                     const aheadMatch = track.match(/ahead (\d+)/);
                     const behindMatch = track.match(/behind (\d+)/);
@@ -722,7 +753,7 @@ export class GitBranchRemoteService {
                 result.set(branch, {
                     ahead,
                     behind,
-                    upstream: upstream || undefined
+                    upstream: upstream || undefined,
                 });
             }
         } catch {
@@ -826,16 +857,16 @@ export class GitBranchRemoteService {
         }
     }
 
-    public async getCommitsToPushCount(
-        localBranch: string,
-        remote: string,
-        remoteBranch: string
-    ): Promise<number> {
+    public async getCommitsToPushCount(localBranch: string, remote: string, remoteBranch: string): Promise<number> {
         try {
             const hasRemoteBranch = await this.remoteBranchExists(remote, remoteBranch);
 
             if (hasRemoteBranch) {
-                const count = await this.options.git.raw(['rev-list', '--count', `${remote}/${remoteBranch}..${localBranch}`]);
+                const count = await this.options.git.raw([
+                    'rev-list',
+                    '--count',
+                    `${remote}/${remoteBranch}..${localBranch}`,
+                ]);
                 return parseInt(count.trim(), 10);
             } else {
                 const count = await this.options.git.raw(['rev-list', '--count', localBranch, '--not', '--remotes']);
@@ -854,7 +885,7 @@ export class GitBranchRemoteService {
                 '--not',
                 '--remotes',
                 `--max-count=${maxCount}`,
-                `--format=${PUSH_COMMIT_LOG_FORMAT}`
+                `--format=${PUSH_COMMIT_LOG_FORMAT}`,
             ];
 
             if (skip) {
@@ -876,13 +907,12 @@ export class GitBranchRemoteService {
 
         return result
             .split(GIT_LOG_RECORD_SEPARATOR)
-            .map(record => record.trimEnd())
-            .filter(record => record.trim())
-            .map(record => {
-                const [hash, shortHash, subject, authorName, date, authorEmail, parentsStr, ...bodyParts] = record.split(GIT_LOG_FIELD_SEPARATOR);
-                const parentHashes = parentsStr
-                    ? parentsStr.trim().split(' ').filter(Boolean)
-                    : [];
+            .map((record) => record.trimEnd())
+            .filter((record) => record.trim())
+            .map((record) => {
+                const [hash, shortHash, subject, authorName, date, authorEmail, parentsStr, ...bodyParts] =
+                    record.split(GIT_LOG_FIELD_SEPARATOR);
+                const parentHashes = parentsStr ? parentsStr.trim().split(' ').filter(Boolean) : [];
 
                 return {
                     hash,
@@ -897,7 +927,7 @@ export class GitBranchRemoteService {
                     parentHashes,
                     containingBranches: [],
                     refs: [],
-                    filteredAncestors: []
+                    filteredAncestors: [],
                 };
             });
     }
@@ -914,9 +944,7 @@ export class GitBranchRemoteService {
     public async getRebaseStatus(): Promise<'none' | 'interactive' | 'merging'> {
         try {
             const gitDir = (await this.options.git.revparse(['--git-dir'])).trim();
-            const absoluteGitDir = path.isAbsolute(gitDir)
-                ? gitDir
-                : path.join(this.options.gitRoot, gitDir);
+            const absoluteGitDir = path.isAbsolute(gitDir) ? gitDir : path.join(this.options.gitRoot, gitDir);
 
             const rebaseMergeDir = path.join(absoluteGitDir, 'rebase-merge');
             const rebaseApplyDir = path.join(absoluteGitDir, 'rebase-apply');
@@ -988,9 +1016,7 @@ export class GitBranchRemoteService {
     public async getRebaseCommitMessage(): Promise<string> {
         try {
             const gitDir = (await this.options.git.revparse(['--git-dir'])).trim();
-            const absoluteGitDir = path.isAbsolute(gitDir)
-                ? gitDir
-                : path.join(this.options.gitRoot, gitDir);
+            const absoluteGitDir = path.isAbsolute(gitDir) ? gitDir : path.join(this.options.gitRoot, gitDir);
 
             logger.info('rebaseMergeMsg gitDir', absoluteGitDir);
 
@@ -1035,7 +1061,7 @@ export class GitBranchRemoteService {
         const branches = await this.options.git.branch(['-r']);
         const grouped: Record<string, string[]> = {};
 
-        branches.all.forEach(fullBranchName => {
+        branches.all.forEach((fullBranchName) => {
             if (fullBranchName.includes('->')) return;
 
             const parts = fullBranchName.split('/');
@@ -1060,7 +1086,7 @@ export class GitBranchRemoteService {
             repositoryPath: this.options.gitRoot,
             localBranch: branches.current,
             remotes: remotes.length > 0 ? remotes : ['origin'],
-            upstream: upstream ?? undefined
+            upstream: upstream ?? undefined,
         };
     };
 
@@ -1068,11 +1094,16 @@ export class GitBranchRemoteService {
         const allRemoteBranches = await this.getRemoteBranches();
         const prefix = `${remote}/`;
         return allRemoteBranches
-            .filter(b => b.startsWith(prefix) && !b.includes('HEAD'))
-            .map(b => b.substring(prefix.length));
+            .filter((b) => b.startsWith(prefix) && !b.includes('HEAD'))
+            .map((b) => b.substring(prefix.length));
     };
 
-    public getPushCommits = async (params: { remote: string; branch: string; limit?: number; skip?: number }): Promise<PushCommitsData> => {
+    public getPushCommits = async (params: {
+        remote: string;
+        branch: string;
+        limit?: number;
+        skip?: number;
+    }): Promise<PushCommitsData> => {
         const branches = await this.getBranches();
         const currentBranch = branches.current;
 
@@ -1081,12 +1112,7 @@ export class GitBranchRemoteService {
 
         const [totalCount, commits] = await Promise.all([
             this.getCommitsToPushCount(currentBranch, params.remote, params.branch),
-            this.getCommitsToPush(
-                currentBranch,
-                params.remote,
-                params.branch,
-                { maxCount: limit, skip }
-            )
+            this.getCommitsToPush(currentBranch, params.remote, params.branch, { maxCount: limit, skip }),
         ]);
 
         const commitsWithFiles = await Promise.all(
@@ -1096,12 +1122,12 @@ export class GitBranchRemoteService {
             })
         );
 
-        const hasMore = (skip + commits.length) < totalCount;
+        const hasMore = skip + commits.length < totalCount;
 
         return {
             commits: commitsWithFiles,
             hasMore,
-            totalCount
+            totalCount,
         };
     };
 
@@ -1109,7 +1135,7 @@ export class GitBranchRemoteService {
         const [branches, branchStatus, rebaseStatus] = await Promise.all([
             this.getBranches(),
             this.getBranchStatus(),
-            this.getRebaseStatus()
+            this.getRebaseStatus(),
         ]);
 
         return {
@@ -1117,7 +1143,7 @@ export class GitBranchRemoteService {
             all: branches.all,
             ahead: branchStatus.ahead,
             behind: branchStatus.behind,
-            rebaseStatus
+            rebaseStatus,
         };
     };
 
@@ -1126,7 +1152,7 @@ export class GitBranchRemoteService {
             this.getBranches(),
             this.getGroupedRemoteBranches(),
             this.getTags(),
-            this.getAllBranchesAheadBehind()
+            this.getAllBranchesAheadBehind(),
         ]);
 
         const localBranchesInfo = branches.all.map((branchName) => {
@@ -1135,7 +1161,7 @@ export class GitBranchRemoteService {
                 name: branchName,
                 ahead: info.ahead,
                 behind: info.behind,
-                upstream: info.upstream
+                upstream: info.upstream,
             };
         });
 
@@ -1144,7 +1170,7 @@ export class GitBranchRemoteService {
             localBranches: branches.all,
             localBranchesInfo,
             remoteBranches: groupedRemote,
-            tags: tags
+            tags: tags,
         };
     };
 

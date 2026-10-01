@@ -10,7 +10,7 @@ const BRANCH_COLORS = [
     '#aed581', // Light Green
     '#ff8a65', // Deep Orange
     '#dce775', // Lime
-    '#9575cd'  // Deep Purple
+    '#9575cd', // Deep Purple
 ];
 
 export const LONG_DISTANCE_THRESHOLD = 30;
@@ -61,7 +61,7 @@ interface SuspendedConnection {
 function getDefaultBranchNameRank(name: string): number | null {
     const normalizedName = name.toLowerCase();
     const refName = normalizedName.includes(' -> ')
-        ? normalizedName.split(' -> ').pop()?.trim() ?? normalizedName
+        ? (normalizedName.split(' -> ').pop()?.trim() ?? normalizedName)
         : normalizedName;
 
     if (refName === 'main' || refName === 'origin/main') return 0;
@@ -73,9 +73,7 @@ function getDefaultBranchRefRank(ref: LogCommit['refs'][number], hasRemoteHead: 
     const branchNameRank = getDefaultBranchNameRank(ref.name);
     if (branchNameRank === null || ref.type === 'tag') return null;
 
-    const refRank = ref.type === 'head' || ref.type === 'local'
-        ? 0
-        : hasRemoteHead ? 1 : 2;
+    const refRank = ref.type === 'head' || ref.type === 'local' ? 0 : hasRemoteHead ? 1 : 2;
 
     return branchNameRank * 3 + refRank;
 }
@@ -87,18 +85,14 @@ function findDefaultBranchTipHash(commits: LogCommit[]): string | null {
     for (let commitIndex = 0; commitIndex < commits.length; commitIndex++) {
         const commit = commits[commitIndex];
         const refs = commit.refs ?? [];
-        const hasRemoteHead = refs.some(ref => ref.name.toLowerCase().endsWith('/head'));
+        const hasRemoteHead = refs.some((ref) => ref.name.toLowerCase().endsWith('/head'));
 
         for (const ref of refs) {
             const rank = getDefaultBranchRefRank(ref, hasRemoteHead);
             if (rank === null) continue;
             candidates.set(commit.hash, Math.min(candidates.get(commit.hash) ?? rank, rank));
 
-            if (
-                best === null
-                || rank < best.rank
-                || (rank === best.rank && commitIndex < best.commitIndex)
-            ) {
+            if (best === null || rank < best.rank || (rank === best.rank && commitIndex < best.commitIndex)) {
                 best = { hash: commit.hash, rank, commitIndex };
             }
         }
@@ -108,7 +102,7 @@ function findDefaultBranchTipHash(commits: LogCommit[]): string | null {
 
     // A remote tip ahead of the local branch belongs to the same first-parent spine.
     // Keep divergent histories separate, including merges through a second parent.
-    const commitByHash = new Map(commits.map(commit => [commit.hash, commit]));
+    const commitByHash = new Map(commits.map((commit) => [commit.hash, commit]));
     for (const [candidateHash, rank] of candidates) {
         if (Math.floor(rank / 3) !== Math.floor(best.rank / 3)) continue;
         let currentHash: string | undefined = candidateHash;
@@ -127,7 +121,7 @@ function buildDefaultBranchHashes(commits: LogCommit[]): Set<string> {
     const hashes = new Set<string>();
     if (!tipHash) return hashes;
 
-    const commitByHash = new Map(commits.map(commit => [commit.hash, commit]));
+    const commitByHash = new Map(commits.map((commit) => [commit.hash, commit]));
     let currentHash: string | undefined = tipHash;
     while (currentHash && !hashes.has(currentHash)) {
         const commit = commitByHash.get(currentHash);
@@ -180,7 +174,7 @@ export function computeGraph(
     commits.forEach((c, i) => commitIndexMap.set(c.hash, i));
 
     // Detect filtered mode: if any commit has filteredAncestors
-    const isFilteredMode = commits.some(c => c.filteredAncestors && c.filteredAncestors.length > 0);
+    const isFilteredMode = commits.some((c) => c.filteredAncestors && c.filteredAncestors.length > 0);
 
     for (let rowIndex = 0; rowIndex < commits.length; rowIndex++) {
         arrowColumns.clear();
@@ -188,9 +182,7 @@ export function computeGraph(
         const { hash, parentHashes: rawParentHashes } = commit;
 
         // In filtered mode, only consider parents that exist in the list
-        const parentHashes = isFilteredMode
-            ? rawParentHashes.filter(ph => commitIndexMap.has(ph))
-            : rawParentHashes;
+        const parentHashes = isFilteredMode ? rawParentHashes.filter((ph) => commitIndexMap.has(ph)) : rawParentHashes;
 
         const lines: GraphLine[] = [];
         let maxX = 0;
@@ -225,7 +217,7 @@ export function computeGraph(
 
         const isDefaultBranchCommit = isDefaultBranchHash(hash);
         // Keep incoming coordinates unchanged; route side lanes into the pinned node.
-        let myLaneIndex = isDefaultBranchCommit ? 0 : expectingLanes[0] ?? findEmptyLane();
+        let myLaneIndex = isDefaultBranchCommit ? 0 : (expectingLanes[0] ?? findEmptyLane());
         if (!isDefaultBranchCommit && expectingLanes.length > 0 && !lanes[expectingLanes[0]]?.isResuming) {
             // A down arrow may have kept this lane to the right at the previous boundary.
             // Reclaim the empty column before placing the node, keeping the incoming bend.
@@ -239,7 +231,7 @@ export function computeGraph(
         ensureLaneExists(myLaneIndex);
         const myColor = isDefaultBranchCommit
             ? BRANCH_COLORS[0]
-            : lanes[expectingLanes[0]]?.color ?? reconnectingConnections[0]?.color ?? allocateColor();
+            : (lanes[expectingLanes[0]]?.color ?? reconnectingConnections[0]?.color ?? allocateColor());
         const isMerge = parentHashes.length > 1;
         maxX = myLaneIndex;
 
@@ -254,14 +246,14 @@ export function computeGraph(
                 y2: 0.5,
                 color: laneInfo.color,
                 isMerge: false,
-                isDashed: laneInfo.isDashed
+                isDashed: laneInfo.isDashed,
             });
         }
 
         // 4. Draw reconnecting connections (at a target without a visible resume row)
         for (const conn of reconnectingConnections) {
             // Find the lane that was used for this connection
-            let reconnectLane = lanes.findIndex(l => l?.targetHash === hash && l?.sourceHash === conn.sourceHash);
+            let reconnectLane = lanes.findIndex((l) => l?.targetHash === hash && l?.sourceHash === conn.sourceHash);
             if (reconnectLane === -1) {
                 reconnectLane = findEmptyLane();
             }
@@ -276,7 +268,7 @@ export function computeGraph(
                 y2: 0.5,
                 color: conn.color,
                 isMerge: true,
-                isDashed: conn.isDashed
+                isDashed: conn.isDashed,
             });
 
             // Clear the lane
@@ -297,7 +289,7 @@ export function computeGraph(
                 y2: 0.5,
                 color: laneInfo.color,
                 isMerge: true,
-                isDashed: laneInfo.isDashed
+                isDashed: laneInfo.isDashed,
             });
             lanes[fromLane] = null;
         }
@@ -308,7 +300,7 @@ export function computeGraph(
             for (let i = 1; i < parentHashes.length; i++) {
                 const parentHash = parentHashes[i];
                 // Check if this parent already has a lane
-                const existingLane = lanes.findIndex(l => l?.targetHash === parentHash);
+                const existingLane = lanes.findIndex((l) => l?.targetHash === parentHash);
                 if (existingLane === -1) {
                     neededForForks++;
                 }
@@ -364,7 +356,7 @@ export function computeGraph(
                 isLongDistance: true,
                 targetCommitHash: conn.sourceHash,
                 arrowDirection: 'up',
-                isDashed: conn.isDashed
+                isDashed: conn.isDashed,
             });
 
             // Occupy the lane with this connection info, mark as resuming to skip pass-through line
@@ -374,7 +366,7 @@ export function computeGraph(
                 sourceHash: conn.sourceHash,
                 color: conn.color,
                 isResuming: true,
-                isDashed: conn.isDashed
+                isDashed: conn.isDashed,
             };
         }
 
@@ -398,8 +390,11 @@ export function computeGraph(
 
                 // Check if this should become a suspended connection
                 const totalDistance = effectiveTargetIndex - laneInfo.sourceRowIndex;
-                const shouldSuspend = !(reserveDefaultLane && i === 0)
-                    && totalDistance > LONG_DISTANCE_THRESHOLD && distance >= 1 && distanceToTarget > 1;
+                const shouldSuspend =
+                    !(reserveDefaultLane && i === 0) &&
+                    totalDistance > LONG_DISTANCE_THRESHOLD &&
+                    distance >= 1 &&
+                    distanceToTarget > 1;
                 if (shouldSuspend) {
                     // End inside the neighboring row so another edge can reuse the boundary below.
                     arrowColumns.add(i);
@@ -414,7 +409,7 @@ export function computeGraph(
                         isLongDistance: true,
                         targetCommitHash: laneInfo.targetHash,
                         arrowDirection: 'down',
-                        isDashed: laneInfo.isDashed
+                        isDashed: laneInfo.isDashed,
                     });
 
                     // Suspend this connection and free the lane
@@ -424,7 +419,7 @@ export function computeGraph(
                         sourceHash: laneInfo.sourceHash,
                         originalLane: i,
                         color: laneInfo.color,
-                        isDashed: laneInfo.isDashed
+                        isDashed: laneInfo.isDashed,
                     });
                     lanes[i] = null;
                 } else {
@@ -441,7 +436,7 @@ export function computeGraph(
                             y2: 1,
                             color: laneInfo.color,
                             isMerge: false,
-                            isDashed: laneInfo.isDashed
+                            isDashed: laneInfo.isDashed,
                         });
                     }
                 }
@@ -462,7 +457,7 @@ export function computeGraph(
                         sourceRowIndex: rowIndex,
                         sourceHash: hash,
                         color: myColor,
-                        isDashed: true
+                        isDashed: true,
                     };
 
                     // Always draw as dashed line for filtered ancestor connection
@@ -473,7 +468,7 @@ export function computeGraph(
                         y2: 1,
                         color: myColor,
                         isMerge: false,
-                        isDashed: true
+                        isDashed: true,
                     });
                 } else {
                     lanes[myLaneIndex] = null;
@@ -498,7 +493,7 @@ export function computeGraph(
                         targetHash: parentHash,
                         sourceRowIndex: rowIndex,
                         sourceHash: hash,
-                        color: myColor
+                        color: myColor,
                     };
 
                     lines.push({
@@ -507,11 +502,11 @@ export function computeGraph(
                         x2: myLaneIndex,
                         y2: 1,
                         color: myColor,
-                        isMerge: false
+                        isMerge: false,
                     });
                 } else {
                     // Find existing lane for this parent, but exclude resuming lanes
-                    let parentLaneIndex = lanes.findIndex(l => l?.targetHash === parentHash && !l?.isResuming);
+                    let parentLaneIndex = lanes.findIndex((l) => l?.targetHash === parentHash && !l?.isResuming);
                     if (parentLaneIndex === -1) {
                         parentLaneIndex = isDefaultBranchHash(parentHash) && !lanes[0] ? 0 : findEmptyLane();
                         ensureLaneExists(parentLaneIndex);
@@ -519,13 +514,14 @@ export function computeGraph(
                             targetHash: parentHash,
                             sourceRowIndex: rowIndex,
                             sourceHash: hash,
-                            color: reserveDefaultLane && parentLaneIndex === 0 ? BRANCH_COLORS[0] : allocateColor()
+                            color: reserveDefaultLane && parentLaneIndex === 0 ? BRANCH_COLORS[0] : allocateColor(),
                         };
                     }
 
                     if (parentLaneIndex > maxX) maxX = parentLaneIndex;
 
-                    const parentColor = lanes[parentLaneIndex]?.color || BRANCH_COLORS[parentLaneIndex % BRANCH_COLORS.length];
+                    const parentColor =
+                        lanes[parentLaneIndex]?.color || BRANCH_COLORS[parentLaneIndex % BRANCH_COLORS.length];
 
                     lines.push({
                         x1: myLaneIndex,
@@ -533,7 +529,7 @@ export function computeGraph(
                         x2: parentLaneIndex,
                         y2: 1,
                         color: parentColor,
-                        isMerge: true
+                        isMerge: true,
                     });
                 }
             });
@@ -544,20 +540,18 @@ export function computeGraph(
         const nextHash = commits[rowIndex + 1]?.hash;
         if (!reserveDefaultLane && isDefaultBranchHash(nextHash)) {
             reserveDefaultLane = true;
-            pinnedLaneIndex = lanes.findIndex(lane => lane?.targetHash === nextHash);
+            pinnedLaneIndex = lanes.findIndex((lane) => lane?.targetHash === nextHash);
             if (pinnedLaneIndex > 0 && (arrowColumns.has(pinnedLaneIndex) || arrowColumns.has(0))) {
                 pinnedLaneIndex = -1;
             }
         }
-        const compactedLanes: (LaneInfo | null)[] = reserveDefaultLane
-            ? [lanes[pinnedLaneIndex] ?? null]
-            : [];
+        const compactedLanes: (LaneInfo | null)[] = reserveDefaultLane ? [lanes[pinnedLaneIndex] ?? null] : [];
         const laneMapping = new Map<number, number>();
 
         if (pinnedLaneIndex >= 0 && lanes[pinnedLaneIndex]) laneMapping.set(pinnedLaneIndex, 0);
 
         // Only upward arrows continue across this boundary; downward arrows have ended.
-        const continuingArrowColumns = new Set([...arrowColumns].filter(column => lanes[column] !== null));
+        const continuingArrowColumns = new Set([...arrowColumns].filter((column) => lanes[column] !== null));
         for (const column of continuingArrowColumns) {
             while (compactedLanes.length <= column) compactedLanes.push(null);
             compactedLanes[column] = lanes[column];
@@ -568,8 +562,12 @@ export function computeGraph(
             if (i !== pinnedLaneIndex && !continuingArrowColumns.has(i) && lanes[i] !== null) {
                 // Do not pull an edge left behind a terminating arrow just to compact it.
                 // A necessary rightward move (for example, making room for main) can reuse its slot.
-                while (continuingArrowColumns.has(nextColumn) || compactedLanes[nextColumn]
-                    || (nextColumn < i && arrowColumns.has(nextColumn))) nextColumn++;
+                while (
+                    continuingArrowColumns.has(nextColumn) ||
+                    compactedLanes[nextColumn] ||
+                    (nextColumn < i && arrowColumns.has(nextColumn))
+                )
+                    nextColumn++;
                 while (compactedLanes.length <= nextColumn) compactedLanes.push(null);
                 compactedLanes[nextColumn] = lanes[i];
                 laneMapping.set(i, nextColumn++);
@@ -580,13 +578,17 @@ export function computeGraph(
         }
 
         // Apply mapping to lines that extend to the next row (y2 === 1)
-        lines.forEach(line => {
+        lines.forEach((line) => {
             if (line.y2 === 1 && line.arrowDirection !== 'down') {
                 const newX2 = laneMapping.get(line.x2);
                 if (newX2 !== undefined) {
                     // Approach a released arrow column in the lower half, below its head.
-                    if (newX2 !== line.x1 && line.y1 === 0 && arrowColumns.has(newX2)
-                        && !continuingArrowColumns.has(newX2)) {
+                    if (
+                        newX2 !== line.x1 &&
+                        line.y1 === 0 &&
+                        arrowColumns.has(newX2) &&
+                        !continuingArrowColumns.has(newX2)
+                    ) {
                         lines.push({ ...line, x2: line.x1, y2: 0.5 });
                         line.y1 = 0.5;
                     }
@@ -606,7 +608,7 @@ export function computeGraph(
             color: myColor,
             lines,
             isMerge,
-            maxX
+            maxX,
         });
     }
 

@@ -1,6 +1,15 @@
 import simpleGit, { SimpleGit, StatusResult } from 'simple-git';
 import * as vscode from 'vscode';
-import type { ConflictChange, ConflictFileContent, ConflictResolutionSnapshot, ConflictSideContent, FileStatus, CommitFile, GitStatusCode, GitHunk } from '@shared/messages';
+import type {
+    ConflictChange,
+    ConflictFileContent,
+    ConflictResolutionSnapshot,
+    ConflictSideContent,
+    FileStatus,
+    CommitFile,
+    GitStatusCode,
+    GitHunk,
+} from '@shared/messages';
 import { hasConflictMarkerBlocks } from '@shared/conflictMarkers';
 import { logger } from '../utils/logger';
 import { i18n } from '../utils/i18n';
@@ -56,14 +65,14 @@ const SIMPLE_GIT_UNSAFE_ENV_KEYS = new Set([
     'git_template_dir',
     'pager',
     'prefix',
-    'ssh_askpass'
+    'ssh_askpass',
 ]);
 const SIMPLE_GIT_MAX_CONCURRENT_PROCESSES = 1;
 
 function createQueuedSimpleGit(baseDir: string): SimpleGit {
     return simpleGit({
         baseDir,
-        maxConcurrentProcesses: SIMPLE_GIT_MAX_CONCURRENT_PROCESSES
+        maxConcurrentProcesses: SIMPLE_GIT_MAX_CONCURRENT_PROCESSES,
     });
 }
 
@@ -80,11 +89,7 @@ function formatGitError(error: unknown): string {
     return message.replace(/\s+/g, ' ').trim() || 'Unknown git error';
 }
 
-function createWorktreeFingerprint(
-    kind: WorktreeFileSnapshot['kind'],
-    content: Buffer,
-    executable = false
-): string {
+function createWorktreeFingerprint(kind: WorktreeFileSnapshot['kind'], content: Buffer, executable = false): string {
     return createHash('sha256')
         .update(kind)
         .update('\0')
@@ -116,7 +121,7 @@ function readWorktreeFileSnapshot(filePath: string): WorktreeFileSnapshot {
             return {
                 content,
                 fingerprint: createWorktreeFingerprint('missing', content),
-                kind: 'missing'
+                kind: 'missing',
             };
         }
         throw error;
@@ -127,7 +132,7 @@ function readWorktreeFileSnapshot(filePath: string): WorktreeFileSnapshot {
         return {
             content,
             fingerprint: createWorktreeFingerprint('symlink', content),
-            kind: 'symlink'
+            kind: 'symlink',
         };
     }
 
@@ -136,7 +141,7 @@ function readWorktreeFileSnapshot(filePath: string): WorktreeFileSnapshot {
         return {
             content,
             fingerprint: createWorktreeFingerprint('file', content, (stat.mode & 0o111) !== 0),
-            kind: 'file'
+            kind: 'file',
         };
     }
 
@@ -144,7 +149,7 @@ function readWorktreeFileSnapshot(filePath: string): WorktreeFileSnapshot {
     return {
         content: Buffer.alloc(0),
         fingerprint: createWorktreeFingerprint('other', content),
-        kind: 'other'
+        kind: 'other',
     };
 }
 
@@ -225,29 +230,39 @@ export class GitService implements vscode.Disposable {
         return this._changelistStateService;
     }
 
-    constructor(workspaceRoot: string, gitRoot: string, git: SimpleGit, inactiveChangesService?: InactiveChangesService, changelistStateService?: ChangelistStateService) {
+    constructor(
+        workspaceRoot: string,
+        gitRoot: string,
+        git: SimpleGit,
+        inactiveChangesService?: InactiveChangesService,
+        changelistStateService?: ChangelistStateService
+    ) {
         this._workspaceRoot = normalizeExistingPath(workspaceRoot);
         this._gitRoot = normalizeExistingPath(gitRoot);
         this.git = git;
         this._inactiveChangesService = inactiveChangesService;
         this._changelistStateService = changelistStateService;
         this.log = new GitLogService(this.git, {
-            toRepoPath: filePath => this.toRepoPath(filePath),
-            toWorkspacePath: repoPath => this.toWorkspacePath(repoPath),
-            getWorkspaceRoot: () => this.getWorkspaceRoot()
+            toRepoPath: (filePath) => this.toRepoPath(filePath),
+            toWorkspacePath: (repoPath) => this.toWorkspacePath(repoPath),
+            getWorkspaceRoot: () => this.getWorkspaceRoot(),
         });
         this.branchRemote = new GitBranchRemoteService({
             git: this.git,
             gitRoot: this._gitRoot,
-            notifyChanged: kind => this.fireChange(kind),
+            notifyChanged: (kind) => this.fireChange(kind),
             withTemporaryStash: (operationName, operation) => this.withTemporaryStash(operationName, operation),
-            createEditorGit: envOverrides => this.createEditorGit(envOverrides),
-            runMutation: operation => this.runGitMutation(operation),
-            getCommitFiles: hash => this.log.getCommitFiles(hash)
+            createEditorGit: (envOverrides) => this.createEditorGit(envOverrides),
+            runMutation: (operation) => this.runGitMutation(operation),
+            getCommitFiles: (hash) => this.log.getCommitFiles(hash),
         });
     }
 
-    public static async create(workspaceRoot: string, inactiveChangesService?: InactiveChangesService, changelistStateService?: ChangelistStateService): Promise<GitService> {
+    public static async create(
+        workspaceRoot: string,
+        inactiveChangesService?: InactiveChangesService,
+        changelistStateService?: ChangelistStateService
+    ): Promise<GitService> {
         const tempGit = createQueuedSimpleGit(workspaceRoot);
         let gitRoot = workspaceRoot;
         let finalGit = tempGit;
@@ -272,7 +287,8 @@ export class GitService implements vscode.Disposable {
         if (this._gitRoot === this._workspaceRoot) {
             return filePath;
         }
-        return path.relative(this._gitRoot, path.join(this._workspaceRoot, filePath))
+        return path
+            .relative(this._gitRoot, path.join(this._workspaceRoot, filePath))
             .replaceAll(path.sep, path.posix.sep);
     }
 
@@ -305,31 +321,32 @@ export class GitService implements vscode.Disposable {
     }
 
     private cloneStatus(files: FileStatus[]): FileStatus[] {
-        return files.map(file => ({
+        return files.map((file) => ({
             ...file,
-            hunks: file.hunks?.map(hunk => ({ ...hunk })),
-            inactiveHunkIds: file.inactiveHunkIds ? [...file.inactiveHunkIds] : undefined
+            hunks: file.hunks?.map((hunk) => ({ ...hunk })),
+            inactiveHunkIds: file.inactiveHunkIds ? [...file.inactiveHunkIds] : undefined,
         }));
     }
 
     private applyCurrentDiagnostics(files: FileStatus[]): FileStatus[] {
-        return files.map(file => {
+        return files.map((file) => {
             const uri = vscode.Uri.file(path.join(this._workspaceRoot, file.path));
-            const error = vscode.languages.getDiagnostics(uri)
-                .some(diagnostic => diagnostic.severity === vscode.DiagnosticSeverity.Error);
+            const error = vscode.languages
+                .getDiagnostics(uri)
+                .some((diagnostic) => diagnostic.severity === vscode.DiagnosticSeverity.Error);
             return error === Boolean(file.error) ? file : { ...file, error };
         });
     }
 
     private createStatusFingerprint(files: FileStatus[]): string {
         return JSON.stringify({
-            files: files.map(file => ({
+            files: files.map((file) => ({
                 path: file.path,
                 status: file.status,
                 staged: file.staged,
                 resolvedCandidate: file.resolvedCandidate,
-                hunks: file.hunks?.map(hunk => hunk.id)
-            }))
+                hunks: file.hunks?.map((hunk) => hunk.id),
+            })),
         });
     }
 
@@ -343,7 +360,10 @@ export class GitService implements vscode.Disposable {
             () => this.gitMutationContext.run(true, operation),
             () => this.gitMutationContext.run(true, operation)
         );
-        this.gitMutationQueue = run.then(() => undefined, () => undefined);
+        this.gitMutationQueue = run.then(
+            () => undefined,
+            () => undefined
+        );
         return run;
     }
 
@@ -361,18 +381,14 @@ export class GitService implements vscode.Disposable {
             return new Map();
         }
 
-        return parseDiffToFileHunks(
-            diffText,
-            repoPath => this.toWorkspacePath(repoPath),
-            { idPrefix }
-        );
+        return parseDiffToFileHunks(diffText, (repoPath) => this.toWorkspacePath(repoPath), { idPrefix });
     }
 
     // Status snapshots stay content-free for untracked files. Only editor operations
     // request their whole-file hunk, with a hard byte limit even if the file grows.
     public async getFileStatusWithHunks(filePath: string, status?: FileStatus[]): Promise<FileStatus[]> {
-        const files = (status ?? await this.getStatus()).filter(file => file.path === filePath);
-        if (!files.some(file => file.status === '?')) {
+        const files = (status ?? (await this.getStatus())).filter((file) => file.path === filePath);
+        if (!files.some((file) => file.status === '?')) {
             return files;
         }
 
@@ -404,10 +420,10 @@ export class GitService implements vscode.Disposable {
                     '--- /dev/null',
                     `+++ b/${repoPath}`,
                     `@@ -0,0 +1,${content.split('\n').length} @@`,
-                    `+${content.replace(/\n/g, '\n+')}`
+                    `+${content.replace(/\n/g, '\n+')}`,
                 ].join('\n');
-                hunks = parseDiffToFileHunks(diff, repoPath => this.toWorkspacePath(repoPath), {
-                    idPrefix: 'worktree'
+                hunks = parseDiffToFileHunks(diff, (repoPath) => this.toWorkspacePath(repoPath), {
+                    idPrefix: 'worktree',
                 }).get(filePath);
             } finally {
                 await handle.close();
@@ -415,7 +431,7 @@ export class GitService implements vscode.Disposable {
         } catch (error) {
             logger.debug('Failed to read untracked file hunks', { path: filePath, error: `${error}` });
         }
-        return files.map(file => file.status === '?' ? { ...file, hunks } : file);
+        return files.map((file) => (file.status === '?' ? { ...file, hunks } : file));
     }
 
     private async hasLocalChanges(): Promise<boolean> {
@@ -442,7 +458,10 @@ export class GitService implements vscode.Disposable {
             const gitState = await this.describeCurrentGitState();
             await this.restoreExtensionGitStateSnapshot(extensionStateSnapshot);
             this.fireChange();
-            throw new Error(`${operationName} failed after local changes were saved to the temporary stash "${stashMessage}". Current Git state: ${gitState}. Resolve the Git state, then restore the stash from the stash list. Git error: ${formatGitError(operationError)}`, { cause: operationError });
+            throw new Error(
+                `${operationName} failed after local changes were saved to the temporary stash "${stashMessage}". Current Git state: ${gitState}. Resolve the Git state, then restore the stash from the stash list. Git error: ${formatGitError(operationError)}`,
+                { cause: operationError }
+            );
         }
 
         try {
@@ -451,7 +470,10 @@ export class GitService implements vscode.Disposable {
             const gitState = await this.describeCurrentGitState();
             await this.restoreExtensionGitStateSnapshot(extensionStateSnapshot);
             this.fireChange();
-            throw new Error(`${operationName} completed, but restoring local changes caused conflicts. The temporary stash "${stashMessage}" was kept for recovery. Current Git state: ${gitState}. Resolve conflicts, then restore or drop the stash from the stash list. Git error: ${formatGitError(restoreError)}`, { cause: restoreError });
+            throw new Error(
+                `${operationName} completed, but restoring local changes caused conflicts. The temporary stash "${stashMessage}" was kept for recovery. Current Git state: ${gitState}. Resolve conflicts, then restore or drop the stash from the stash list. Git error: ${formatGitError(restoreError)}`,
+                { cause: restoreError }
+            );
         }
 
         await this.restoreExtensionGitStateSnapshot(extensionStateSnapshot, true);
@@ -472,7 +494,7 @@ export class GitService implements vscode.Disposable {
                 parts.push(`${status.staged.length} staged`);
             }
 
-            const unstagedCount = status.files.filter(file => file.index !== '?' && file.working_dir !== ' ').length;
+            const unstagedCount = status.files.filter((file) => file.index !== '?' && file.working_dir !== ' ').length;
             if (unstagedCount > 0) {
                 parts.push(`${unstagedCount} unstaged`);
             }
@@ -494,11 +516,14 @@ export class GitService implements vscode.Disposable {
     private createExtensionGitStateSnapshot(): ExtensionGitStateSnapshot {
         return {
             inactiveChanges: this._inactiveChangesService?.createSnapshot(),
-            changelists: this._changelistStateService?.createSnapshot()
+            changelists: this._changelistStateService?.createSnapshot(),
         };
     }
 
-    private async restoreExtensionGitStateSnapshot(snapshot: ExtensionGitStateSnapshot, reconcile: boolean = false): Promise<void> {
+    private async restoreExtensionGitStateSnapshot(
+        snapshot: ExtensionGitStateSnapshot,
+        reconcile: boolean = false
+    ): Promise<void> {
         if (snapshot.inactiveChanges) {
             await this._inactiveChangesService?.restoreSnapshot(snapshot.inactiveChanges);
         }
@@ -517,9 +542,11 @@ export class GitService implements vscode.Disposable {
     private async withTemporaryIndex<T>(operation: (git: SimpleGit) => Promise<T>): Promise<T> {
         const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'intelli-git-index-'));
         const indexPath = path.join(tempDir, 'index');
-        const tempGit = createQueuedSimpleGit(this._gitRoot).env(this.createGitEnv({
-            GIT_INDEX_FILE: indexPath
-        }));
+        const tempGit = createQueuedSimpleGit(this._gitRoot).env(
+            this.createGitEnv({
+                GIT_INDEX_FILE: indexPath,
+            })
+        );
 
         try {
             await tempGit.raw(['read-tree', 'HEAD']);
@@ -544,7 +571,7 @@ export class GitService implements vscode.Disposable {
 
         return {
             ...env,
-            ...overrides
+            ...overrides,
         };
     }
 
@@ -553,8 +580,8 @@ export class GitService implements vscode.Disposable {
             baseDir: this._gitRoot,
             maxConcurrentProcesses: SIMPLE_GIT_MAX_CONCURRENT_PROCESSES,
             unsafe: {
-                allowUnsafeEditor: true
-            }
+                allowUnsafeEditor: true,
+            },
         }).env(this.createGitEnv(envOverrides));
     }
 
@@ -577,18 +604,18 @@ export class GitService implements vscode.Disposable {
             const entries = statusMap.get(filePath) || [];
             const repoPath = this.toRepoPath(filePath);
 
-            if (entries.some(entry => entry.status === 'C' || entry.status === 'U')) {
+            if (entries.some((entry) => entry.status === 'C' || entry.status === 'U')) {
                 throw new Error(`Resolve conflicts before committing ${filePath}`);
             }
 
-            const stagedEntry = entries.find(entry => entry.staged && entry.status !== 'D' && entry.status !== '?');
-            const worktreeEntry = entries.find(entry => !entry.staged);
+            const stagedEntry = entries.find((entry) => entry.staged && entry.status !== 'D' && entry.status !== '?');
+            const worktreeEntry = entries.find((entry) => !entry.staged);
 
             if (stagedEntry) {
                 filesToCopyFromIndex.push(repoPath);
             }
 
-            if (worktreeEntry?.status === 'D' || (!worktreeEntry && entries.some(entry => entry.status === 'D'))) {
+            if (worktreeEntry?.status === 'D' || (!worktreeEntry && entries.some((entry) => entry.status === 'D'))) {
                 filesToRemove.push(repoPath);
             } else if (!stagedEntry || worktreeEntry) {
                 filesToDirectAdd.push(repoPath);
@@ -633,14 +660,14 @@ export class GitService implements vscode.Disposable {
                 trackedFiles.set(file.path, file);
             }
         }
-        const untrackedFiles = status.filter(file => file.status === '?');
+        const untrackedFiles = status.filter((file) => file.status === '?');
 
         return {
             trackedCount: trackedFiles.size,
             untrackedCount: untrackedFiles.length,
             sampleFiles: Array.from(trackedFiles.values())
                 .slice(0, sampleLimit)
-                .map(file => file.displayPath || file.path)
+                .map((file) => file.displayPath || file.path),
         };
     }
 
@@ -675,13 +702,11 @@ export class GitService implements vscode.Disposable {
             return new Map();
         }
 
-        const repoPathspecs = filePaths
-            .map(filePath => this.toRepoPath(filePath))
-            .map(toLiteralGitPathspec);
+        const repoPathspecs = filePaths.map((filePath) => this.toRepoPath(filePath)).map(toLiteralGitPathspec);
         const output = await this.git.raw(['ls-files', '-u', '-z', '--', ...repoPathspecs]);
         const stagesByPath = new Map<string, Set<number>>();
 
-        output.split('\0').forEach(record => {
+        output.split('\0').forEach((record) => {
             const match = record.match(/^\d+\s+[0-9a-f]+\s+([123])\t([\s\S]+)$/);
             if (!match) {
                 return;
@@ -702,7 +727,7 @@ export class GitService implements vscode.Disposable {
 
     private parseUnmergedStages(output: string): Map<number, ConflictStageEntry> {
         const stages = new Map<number, ConflictStageEntry>();
-        output.split('\0').forEach(record => {
+        output.split('\0').forEach((record) => {
             const match = record.match(/^(\d+)\s+([0-9a-f]+)\s+([123])\t/);
             if (!match) {
                 return;
@@ -710,7 +735,7 @@ export class GitService implements vscode.Disposable {
 
             stages.set(Number(match[3]), {
                 mode: match[1],
-                objectId: match[2]
+                objectId: match[2],
             });
         });
         return stages;
@@ -727,17 +752,11 @@ export class GitService implements vscode.Disposable {
         stages: Map<number, ConflictStageEntry>;
         signature: string;
     }> {
-        const unmerged = await this.git.raw([
-            'ls-files',
-            '-u',
-            '-z',
-            '--',
-            toLiteralGitPathspec(repoPath)
-        ]);
+        const unmerged = await this.git.raw(['ls-files', '-u', '-z', '--', toLiteralGitPathspec(repoPath)]);
         const stages = this.parseUnmergedStages(unmerged);
         return {
             stages,
-            signature: this.getConflictStageSignature(stages)
+            signature: this.getConflictStageSignature(stages),
         };
     }
 
@@ -748,7 +767,7 @@ export class GitService implements vscode.Disposable {
         if (!stage) {
             return {
                 content: Buffer.alloc(0),
-                side: { exists: false, content: '' }
+                side: { exists: false, content: '' },
             };
         }
 
@@ -757,8 +776,8 @@ export class GitService implements vscode.Disposable {
             content,
             side: {
                 exists: true,
-                content: content.toString('utf8')
-            }
+                content: content.toString('utf8'),
+            },
         };
     }
 
@@ -774,22 +793,26 @@ export class GitService implements vscode.Disposable {
             return [];
         }
         if (!baseStage && sideStage) {
-            return [{
-                id: `${filePath}:${sideName}:add`,
-                baseStart: 0,
-                baseLineCount: 0,
-                sideStart: 0,
-                sideLineCount: countContentLines(side.content)
-            }];
+            return [
+                {
+                    id: `${filePath}:${sideName}:add`,
+                    baseStart: 0,
+                    baseLineCount: 0,
+                    sideStart: 0,
+                    sideLineCount: countContentLines(side.content),
+                },
+            ];
         }
         if (baseStage && !sideStage) {
-            return [{
-                id: `${filePath}:${sideName}:delete`,
-                baseStart: 0,
-                baseLineCount: countContentLines(base.content),
-                sideStart: 0,
-                sideLineCount: 0
-            }];
+            return [
+                {
+                    id: `${filePath}:${sideName}:delete`,
+                    baseStart: 0,
+                    baseLineCount: countContentLines(base.content),
+                    sideStart: 0,
+                    sideLineCount: 0,
+                },
+            ];
         }
         if (baseStage?.objectId === sideStage?.objectId) {
             return [];
@@ -801,14 +824,14 @@ export class GitService implements vscode.Disposable {
             '--no-color',
             '--unified=0',
             baseStage!.objectId,
-            sideStage!.objectId
+            sideStage!.objectId,
         ]);
-        return parseDiffToHunks(diff, filePath, { idPrefix: `conflict-${sideName}` }).map(hunk => ({
+        return parseDiffToHunks(diff, filePath, { idPrefix: `conflict-${sideName}` }).map((hunk) => ({
             id: hunk.id,
             baseStart: getDiffRangeStart(hunk.oldStart, hunk.oldLineCount),
             baseLineCount: hunk.oldLineCount,
             sideStart: getDiffRangeStart(hunk.newStart, hunk.newLineCount),
-            sideLineCount: hunk.newLineCount
+            sideLineCount: hunk.newLineCount,
         }));
     }
 
@@ -822,9 +845,7 @@ export class GitService implements vscode.Disposable {
             throw new Error(i18n.t('extension.conflictStagesChanged'));
         }
 
-        const resultSnapshot = readWorktreeFileSnapshot(
-            resolveSafeConflictWorktreePath(this._workspaceRoot, filePath)
-        );
+        const resultSnapshot = readWorktreeFileSnapshot(resolveSafeConflictWorktreePath(this._workspaceRoot, filePath));
         if (resultSnapshot.fingerprint !== expected.resultFingerprint) {
             throw new Error(i18n.t('extension.conflictResultChanged'));
         }
@@ -834,9 +855,7 @@ export class GitService implements vscode.Disposable {
 
     private async getAbsoluteGitDir(): Promise<string> {
         const gitDir = (await this.git.revparse(['--git-dir'])).trim();
-        return path.isAbsolute(gitDir)
-            ? gitDir
-            : path.join(this._gitRoot, gitDir);
+        return path.isAbsolute(gitDir) ? gitDir : path.join(this._gitRoot, gitDir);
     }
 
     private readGitStateFile(gitDir: string, name: string): string {
@@ -880,8 +899,8 @@ export class GitService implements vscode.Disposable {
         try {
             const gitDir = await this.getAbsoluteGitDir();
             const rebaseDir = ['rebase-merge', 'rebase-apply']
-                .map(name => path.join(gitDir, name))
-                .find(candidate => fs.existsSync(candidate));
+                .map((name) => path.join(gitDir, name))
+                .find((candidate) => fs.existsSync(candidate));
             if (rebaseDir) {
                 const headName = this.readGitStateFile(rebaseDir, 'head-name');
                 const onto = this.readGitStateFile(rebaseDir, 'onto');
@@ -889,12 +908,9 @@ export class GitService implements vscode.Disposable {
                     incomingLabel = headName.replace(/^refs\/heads\//, '').replace(/^refs\/remotes\//, '');
                 }
                 if (onto) {
-                    currentLabel = (await this.git.raw([
-                        'name-rev',
-                        '--name-only',
-                        '--exclude=tags/*',
-                        onto
-                    ])).trim() || currentLabel;
+                    currentLabel =
+                        (await this.git.raw(['name-rev', '--name-only', '--exclude=tags/*', onto])).trim() ||
+                        currentLabel;
                 }
                 return { baseLabel: 'base', currentLabel, incomingLabel };
             }
@@ -905,7 +921,9 @@ export class GitService implements vscode.Disposable {
             if (incomingLabel === 'theirs') {
                 const mergeHead = this.readGitStateFile(gitDir, 'MERGE_HEAD').split(/\s+/)[0];
                 if (mergeHead) {
-                    incomingLabel = (await this.git.raw(['name-rev', '--name-only', '--exclude=tags/*', mergeHead])).trim() || incomingLabel;
+                    incomingLabel =
+                        (await this.git.raw(['name-rev', '--name-only', '--exclude=tags/*', mergeHead])).trim() ||
+                        incomingLabel;
                 }
             }
         } catch {
@@ -915,7 +933,7 @@ export class GitService implements vscode.Disposable {
         return {
             baseLabel: 'base',
             currentLabel,
-            incomingLabel
+            incomingLabel,
         };
     }
 
@@ -933,9 +951,9 @@ export class GitService implements vscode.Disposable {
         const stageNumbers = new Set(stages.keys());
         const labels = await this.getConflictLabels();
         const stageEntries = [...stages.values()];
-        const hasUnsupportedMode = stageEntries.some(stage => !isRegularConflictMode(stage.mode));
+        const hasUnsupportedMode = stageEntries.some((stage) => !isRegularConflictMode(stage.mode));
         if (hasUnsupportedMode) {
-            const kind = stageEntries.every(stage => stage.mode === '160000') ? 'submodule' : 'unsupported';
+            const kind = stageEntries.every((stage) => stage.mode === '160000') ? 'submodule' : 'unsupported';
             return {
                 path: filePath,
                 ...labels,
@@ -949,19 +967,20 @@ export class GitService implements vscode.Disposable {
                 resultFingerprint: resultSnapshot.fingerprint,
                 resolvedCandidate: false,
                 isBinary: true,
-                kind
+                kind,
             };
         }
 
         const [baseSide, currentSide, incomingSide] = await Promise.all([
             this.readConflictSide(stages.get(1)),
             this.readConflictSide(stages.get(2)),
-            this.readConflictSide(stages.get(3))
+            this.readConflictSide(stages.get(3)),
         ]);
         const base = baseSide.side;
         const current = currentSide.side;
         const incoming = incomingSide.side;
-        const isBinary = (resultSnapshot.kind !== 'file' && resultSnapshot.kind !== 'missing') ||
+        const isBinary =
+            (resultSnapshot.kind !== 'file' && resultSnapshot.kind !== 'missing') ||
             isBinaryConflictContent(resultSnapshot.content) ||
             isBinaryConflictContent(baseSide.content) ||
             isBinaryConflictContent(currentSide.content) ||
@@ -969,9 +988,9 @@ export class GitService implements vscode.Disposable {
         const [currentChanges, incomingChanges] = isBinary
             ? [[], []]
             : await Promise.all([
-                this.readConflictChanges(filePath, stages.get(1), stages.get(2), base, current, 'current'),
-                this.readConflictChanges(filePath, stages.get(1), stages.get(3), base, incoming, 'incoming')
-            ]);
+                  this.readConflictChanges(filePath, stages.get(1), stages.get(2), base, current, 'current'),
+                  this.readConflictChanges(filePath, stages.get(1), stages.get(3), base, incoming, 'incoming'),
+              ]);
 
         return {
             path: filePath,
@@ -986,7 +1005,7 @@ export class GitService implements vscode.Disposable {
             resultFingerprint: resultSnapshot.fingerprint,
             resolvedCandidate: this.isResolvedConflictCandidate(stageNumbers, resultSnapshot),
             isBinary,
-            kind: isBinary ? 'binary' : 'text'
+            kind: isBinary ? 'binary' : 'text',
         };
     }
 
@@ -996,7 +1015,7 @@ export class GitService implements vscode.Disposable {
         if (this.viewStatusCache) {
             logger.debug('[git-status] view cache hit', {
                 ageMs: Date.now() - this.viewStatusCache.loadedAt,
-                files: this.viewStatusCache.files.length
+                files: this.viewStatusCache.files.length,
             });
             return this.applyCurrentDiagnostics(this.cloneStatus(this.viewStatusCache.files));
         }
@@ -1011,21 +1030,23 @@ export class GitService implements vscode.Disposable {
         }
 
         const generation = this.viewStatusGeneration;
-        const request = this.loadStatus().then(files => {
-            if (generation === this.viewStatusGeneration) {
-                this.viewStatusCache = {
-                    files: this.cloneStatus(files),
-                    loadedAt: Date.now()
-                };
-                this.viewStatusFingerprint = this.createStatusFingerprint(files);
-                this.viewBranchFingerprint = this.latestStatusIdentity;
-            }
-            return files;
-        }).finally(() => {
-            if (this.viewStatusInFlight === request) {
-                this.viewStatusInFlight = undefined;
-            }
-        });
+        const request = this.loadStatus()
+            .then((files) => {
+                if (generation === this.viewStatusGeneration) {
+                    this.viewStatusCache = {
+                        files: this.cloneStatus(files),
+                        loadedAt: Date.now(),
+                    };
+                    this.viewStatusFingerprint = this.createStatusFingerprint(files);
+                    this.viewBranchFingerprint = this.latestStatusIdentity;
+                }
+                return files;
+            })
+            .finally(() => {
+                if (this.viewStatusInFlight === request) {
+                    this.viewStatusInFlight = undefined;
+                }
+            });
         this.viewStatusInFlight = request;
         return this.cloneStatus(await request);
     };
@@ -1036,8 +1057,10 @@ export class GitService implements vscode.Disposable {
         this.invalidateStatusCache();
         await this.getStatusForView();
         return {
-            commitChanged: previousStatusFingerprint === undefined || previousStatusFingerprint !== this.viewStatusFingerprint,
-            branchChanged: previousBranchFingerprint === undefined || previousBranchFingerprint !== this.viewBranchFingerprint
+            commitChanged:
+                previousStatusFingerprint === undefined || previousStatusFingerprint !== this.viewStatusFingerprint,
+            branchChanged:
+                previousBranchFingerprint === undefined || previousBranchFingerprint !== this.viewBranchFingerprint,
         };
     };
 
@@ -1058,10 +1081,10 @@ export class GitService implements vscode.Disposable {
                 tracking: status.tracking,
                 ahead: status.ahead,
                 behind: status.behind,
-                detached: status.detached
+                detached: status.detached,
             });
 
-            status.files.forEach(file => {
+            status.files.forEach((file) => {
                 const wsPath = this.toWorkspacePath(file.path);
                 if (!wsPath) return;
 
@@ -1071,7 +1094,7 @@ export class GitService implements vscode.Disposable {
                     files.push({
                         path: wsPath,
                         status: 'C',
-                        staged: true
+                        staged: true,
                     });
                     return;
                 }
@@ -1081,7 +1104,7 @@ export class GitService implements vscode.Disposable {
                     files.push({
                         path: wsPath,
                         status: file.index as GitStatusCode,
-                        staged: true
+                        staged: true,
                     });
                 }
 
@@ -1091,18 +1114,17 @@ export class GitService implements vscode.Disposable {
                     files.push({
                         path: wsPath,
                         status: statusCode,
-                        staged: false
+                        staged: false,
                     });
                 } else if (file.index === '?' && file.working_dir === '?') {
                     // Untracked file
                     files.push({
                         path: wsPath,
                         status: '?',
-                        staged: false
+                        staged: false,
                     });
                 }
             });
-
         } catch (e) {
             logger.error('Error getting status:', e);
         }
@@ -1113,8 +1135,8 @@ export class GitService implements vscode.Disposable {
         const shouldResolveGitHunks = (file: FileStatus) =>
             file.status === 'M' || (file.status === 'A' && file.staged) || file.status === 'D';
 
-        const hasStagedDiff = files.some(file => file.staged && shouldResolveGitHunks(file));
-        const hasWorktreeDiff = files.some(file => !file.staged && shouldResolveGitHunks(file));
+        const hasStagedDiff = files.some((file) => file.staged && shouldResolveGitHunks(file));
+        const hasWorktreeDiff = files.some((file) => !file.staged && shouldResolveGitHunks(file));
         const workspacePathspec = this.getWorkspacePathspecArgs();
 
         try {
@@ -1140,7 +1162,6 @@ export class GitService implements vscode.Disposable {
                     file.hunks = hunks;
                     hunkFileCount++;
                 }
-
             }
         } catch (e) {
             logger.error('Error parsing git hunks:', e);
@@ -1150,10 +1171,10 @@ export class GitService implements vscode.Disposable {
         // Check for diagnostics errors
         const diagnosticsStartedAt = Date.now();
         const conflictFilePaths = files
-            .filter(file => file.status === 'C' || file.status === 'U')
-            .map(file => file.path);
+            .filter((file) => file.status === 'C' || file.status === 'U')
+            .map((file) => file.path);
         const unmergedStagesByPath = await this.getUnmergedStageNumbers(conflictFilePaths);
-        files.forEach(file => {
+        files.forEach((file) => {
             try {
                 if (file.status === 'C' || file.status === 'U') {
                     const resultSnapshot = readWorktreeFileSnapshot(
@@ -1169,7 +1190,7 @@ export class GitService implements vscode.Disposable {
                 const absPath = path.join(this._workspaceRoot, file.path);
                 const uri = vscode.Uri.file(absPath);
                 const diagnostics = vscode.languages.getDiagnostics(uri);
-                const hasError = diagnostics.some(d => d.severity === vscode.DiagnosticSeverity.Error);
+                const hasError = diagnostics.some((d) => d.severity === vscode.DiagnosticSeverity.Error);
                 if (hasError) {
                     file.error = true;
                 }
@@ -1185,7 +1206,7 @@ export class GitService implements vscode.Disposable {
             diffMs,
             diagnosticsMs,
             files: files.length,
-            hunkFiles: hunkFileCount
+            hunkFiles: hunkFileCount,
         };
         if (metrics.elapsedMs >= 250) {
             logger.info('[git-status] slow load', metrics);
@@ -1194,7 +1215,7 @@ export class GitService implements vscode.Disposable {
         }
 
         return files.sort((a, b) => a.path.localeCompare(b.path));
-    }
+    };
 
     public async stageFile(filePath: string): Promise<void> {
         return this.runGitMutation(async () => {
@@ -1219,7 +1240,7 @@ export class GitService implements vscode.Disposable {
         }
 
         const currentStatus = await this.getStatus();
-        const statusMap = new Map(currentStatus.map(f => [f.path, f]));
+        const statusMap = new Map(currentStatus.map((f) => [f.path, f]));
 
         const filesToDirectAdd: string[] = [];
         const filesToUpdate: string[] = [];
@@ -1238,7 +1259,7 @@ export class GitService implements vscode.Disposable {
                 continue;
             }
 
-            // Exclude entirely inactive files if this is from a bulk operation? 
+            // Exclude entirely inactive files if this is from a bulk operation?
             // Usually stageFiles/stageFile is an explicit user action on these files.
             // But we still respect hunk-level inactivity.
             const hasInactiveHunks = fileStatus.inactiveHunkIds && fileStatus.inactiveHunkIds.length > 0;
@@ -1267,7 +1288,7 @@ export class GitService implements vscode.Disposable {
 
             await this.git.add(repoPath);
 
-            const inactiveHunks = fileStatus.hunks!.filter(h => fileStatus.inactiveHunkIds?.includes(h.id));
+            const inactiveHunks = fileStatus.hunks!.filter((h) => fileStatus.inactiveHunkIds?.includes(h.id));
             if (inactiveHunks.length > 0) {
                 const combinedPatch = this.buildPatchFromHunks(inactiveHunks);
 
@@ -1293,7 +1314,7 @@ export class GitService implements vscode.Disposable {
                 return;
             }
 
-            await this.git.reset(['HEAD', '--', ...filePaths.map(filePath => this.toRepoPath(filePath))]);
+            await this.git.reset(['HEAD', '--', ...filePaths.map((filePath) => this.toRepoPath(filePath))]);
             this.fireChange();
         });
     }
@@ -1312,7 +1333,7 @@ export class GitService implements vscode.Disposable {
             if (stages.size === 0) {
                 throw new Error(`No unresolved conflict found for ${filePath}`);
             }
-            if ([...stages.values()].some(stage => !isRegularConflictMode(stage.mode))) {
+            if ([...stages.values()].some((stage) => !isRegularConflictMode(stage.mode))) {
                 throw new Error(i18n.t('extension.unsupportedConflictFile'));
             }
 
@@ -1345,7 +1366,7 @@ export class GitService implements vscode.Disposable {
             }
 
             const stages = await this.assertConflictResolutionSnapshot(filePath, expected);
-            if ([...stages.values()].some(stage => !isRegularConflictMode(stage.mode))) {
+            if ([...stages.values()].some((stage) => !isRegularConflictMode(stage.mode))) {
                 throw new Error(i18n.t('extension.unsupportedConflictFile'));
             }
 
@@ -1377,9 +1398,7 @@ export class GitService implements vscode.Disposable {
         return this.runGitMutation(async () => {
             const currentStatus = await this.getStatus();
             // Get all files that are not already staged and NOT entirely inactive
-            const filesToStage = currentStatus
-                .filter(f => !f.staged && !f.inactive)
-                .map(f => f.path);
+            const filesToStage = currentStatus.filter((f) => !f.staged && !f.inactive).map((f) => f.path);
 
             if (filesToStage.length > 0) {
                 await this._stageFilesWithSupport(filesToStage);
@@ -1393,8 +1412,8 @@ export class GitService implements vscode.Disposable {
             const currentStatus = await this.getStatus();
             // Get all tracked files (not status '?') that are not already staged and NOT entirely inactive
             const filesToStage = currentStatus
-                .filter(f => !f.staged && f.status !== '?' && !f.inactive)
-                .map(f => f.path);
+                .filter((f) => !f.staged && f.status !== '?' && !f.inactive)
+                .map((f) => f.path);
 
             if (filesToStage.length > 0) {
                 await this._stageFilesWithSupport(filesToStage);
@@ -1415,7 +1434,12 @@ export class GitService implements vscode.Disposable {
         });
     }
 
-    public async stash(message?: string, files?: string[], includeUntracked: boolean = false, stagedOnly: boolean = false): Promise<void> {
+    public async stash(
+        message?: string,
+        files?: string[],
+        includeUntracked: boolean = false,
+        stagedOnly: boolean = false
+    ): Promise<void> {
         return this.runGitMutation(async () => {
             const args = ['push'];
             if (stagedOnly) {
@@ -1428,7 +1452,7 @@ export class GitService implements vscode.Disposable {
                 args.push('-m', message);
             }
             if (files && files.length > 0) {
-                args.push('--', ...files.map(f => this.toRepoPath(f)));
+                args.push('--', ...files.map((f) => this.toRepoPath(f)));
             } else if (this._gitRoot !== this._workspaceRoot) {
                 // Scope stash to workspace if possible, or just stash all
                 // git stash push pathspec
@@ -1453,11 +1477,11 @@ export class GitService implements vscode.Disposable {
 
                 // Group files by action needed
                 const toCheckout: string[] = []; // Modified, Deleted
-                const toClean: string[] = [];    // Untracked
-                const toReset: string[] = [];    // Added (Staged new files) -> just unstage
+                const toClean: string[] = []; // Untracked
+                const toReset: string[] = []; // Added (Staged new files) -> just unstage
 
                 for (const filePath of files) {
-                    const fileStatus = allFiles.find(f => f.path === filePath);
+                    const fileStatus = allFiles.find((f) => f.path === filePath);
                     if (!fileStatus) continue;
 
                     if (fileStatus.status === '?') {
@@ -1474,17 +1498,17 @@ export class GitService implements vscode.Disposable {
 
                 // Execute actions using repo paths
                 if (toCheckout.length > 0) {
-                    await this.git.checkout(['HEAD', '--', ...toCheckout.map(f => this.toRepoPath(f))]);
+                    await this.git.checkout(['HEAD', '--', ...toCheckout.map((f) => this.toRepoPath(f))]);
                 }
 
                 if (toReset.length > 0) {
                     // Just unstage, keep the file as untracked
-                    await this.git.reset(['HEAD', '--', ...toReset.map(f => this.toRepoPath(f))]);
+                    await this.git.reset(['HEAD', '--', ...toReset.map((f) => this.toRepoPath(f))]);
                 }
 
                 if (toClean.length > 0) {
                     // Remove untracked files
-                    await this.git.clean('f', ['-d', '--', ...toClean.map(f => this.toRepoPath(f))]);
+                    await this.git.clean('f', ['-d', '--', ...toClean.map((f) => this.toRepoPath(f))]);
                 }
                 this.fireChange();
             } catch (e) {
@@ -1494,7 +1518,7 @@ export class GitService implements vscode.Disposable {
         });
     }
 
-    public getStashList = async (): Promise<Array<{ index: number, message: string, branch: string }>> => {
+    public getStashList = async (): Promise<Array<{ index: number; message: string; branch: string }>> => {
         try {
             const result = await this.git.stashList();
             logger.info('simple-git stashList result:', JSON.stringify(result));
@@ -1506,14 +1530,14 @@ export class GitService implements vscode.Disposable {
                 return {
                     index,
                     message: msg,
-                    branch
+                    branch,
                 };
             });
         } catch (e) {
             console.error('getStashList error:', e);
             return [];
         }
-    }
+    };
 
     public getStashFiles = async (index: number): Promise<CommitFile[]> => {
         try {
@@ -1528,7 +1552,7 @@ export class GitService implements vscode.Disposable {
                     files.push({
                         status: parts[0] as GitStatusCode,
                         path: repoPath,
-                        displayPath: wsPath || repoPath
+                        displayPath: wsPath || repoPath,
                     });
                 }
             }
@@ -1536,7 +1560,7 @@ export class GitService implements vscode.Disposable {
         } catch {
             return [];
         }
-    }
+    };
 
     public async getStashFileDiff(index: number, filePath: string): Promise<string> {
         try {
@@ -1554,7 +1578,12 @@ export class GitService implements vscode.Disposable {
             return await this.git.show([`${ref}:${repoPath}`]);
         } catch (e: any) {
             // If file doesn't exist in the revision (e.g. Added file), return empty string
-            if (e.message && (e.message.includes('broken fragment') || e.message.includes('does not exist') || e.message.includes('exists on disk'))) {
+            if (
+                e.message &&
+                (e.message.includes('broken fragment') ||
+                    e.message.includes('does not exist') ||
+                    e.message.includes('exists on disk'))
+            ) {
                 return '';
             }
             console.error('getFileContent error:', e, 'ref:', ref, 'path:', repoPath);
@@ -1579,7 +1608,12 @@ export class GitService implements vscode.Disposable {
         });
     }
 
-    private async applyPatchWithGit(git: SimpleGit, patch: string, reverse: boolean = false, cached: boolean = false): Promise<void> {
+    private async applyPatchWithGit(
+        git: SimpleGit,
+        patch: string,
+        reverse: boolean = false,
+        cached: boolean = false
+    ): Promise<void> {
         const tempPatchFile = path.join(os.tmpdir(), `intelli-git-patch-${Date.now()}.patch`);
         fs.writeFileSync(tempPatchFile, patch);
         try {
@@ -1593,7 +1627,11 @@ export class GitService implements vscode.Disposable {
             args.push(tempPatchFile);
             await git.raw(args);
         } finally {
-            try { fs.unlinkSync(tempPatchFile); } catch { /* ignore */ }
+            try {
+                fs.unlinkSync(tempPatchFile);
+            } catch {
+                /* ignore */
+            }
         }
     }
 
@@ -1602,12 +1640,12 @@ export class GitService implements vscode.Disposable {
             return '';
         }
 
-        return `${hunks[0].fileHeader}\n${hunks.map(h => h.content).join('\n')}\n`;
+        return `${hunks[0].fileHeader}\n${hunks.map((h) => h.content).join('\n')}\n`;
     }
 
     private async _excludeInactiveFromIndex(): Promise<void> {
         const currentStatus = await this.getStatus();
-        const stagedEntries = currentStatus.filter(file => file.staged);
+        const stagedEntries = currentStatus.filter((file) => file.staged);
 
         for (const file of stagedEntries) {
             if (file.inactive) {
@@ -1615,7 +1653,7 @@ export class GitService implements vscode.Disposable {
                 continue;
             }
 
-            const inactiveHunks = file.hunks?.filter(h => file.inactiveHunkIds?.includes(h.id)) || [];
+            const inactiveHunks = file.hunks?.filter((h) => file.inactiveHunkIds?.includes(h.id)) || [];
             if (inactiveHunks.length === 0) {
                 continue;
             }
@@ -1668,8 +1706,8 @@ export class GitService implements vscode.Disposable {
         return this.runGitMutation(async () => {
             if (files && files.length > 0) {
                 const currentStatus = await this.getStatus();
-                const statusMap = new Map(currentStatus.map(f => [f.path, f]));
-                const filesToCommit = files.filter(f => statusMap.has(f));
+                const statusMap = new Map(currentStatus.map((f) => [f.path, f]));
+                const filesToCommit = files.filter((f) => statusMap.has(f));
 
                 if (filesToCommit.length === 0) {
                     throw new Error('No valid files to commit');
@@ -1687,13 +1725,18 @@ export class GitService implements vscode.Disposable {
         });
     }
 
-    public async commitChangelistPlan(message: string, amend: boolean, plan: CommitPlan, status: FileStatus[]): Promise<void> {
+    public async commitChangelistPlan(
+        message: string,
+        amend: boolean,
+        plan: CommitPlan,
+        status: FileStatus[]
+    ): Promise<void> {
         return this.runGitMutation(async () => {
             if (!plan.files || plan.files.length === 0) {
                 throw new Error('No active changelist changes to commit');
             }
 
-            await this.withTemporaryIndex(async tempGit => {
+            await this.withTemporaryIndex(async (tempGit) => {
                 await this.applyCommitPlanToIndex(tempGit, plan, status);
 
                 const args = amend ? ['commit', '--amend'] : ['commit'];
@@ -1706,7 +1749,7 @@ export class GitService implements vscode.Disposable {
                 await tempGit.raw(args);
             });
 
-            await this.git.reset(['-q', 'HEAD', '--', ...plan.files.map(filePath => this.toRepoPath(filePath))]);
+            await this.git.reset(['-q', 'HEAD', '--', ...plan.files.map((filePath) => this.toRepoPath(filePath))]);
             this.fireChange();
         });
     }
@@ -1716,7 +1759,7 @@ export class GitService implements vscode.Disposable {
             return '';
         }
 
-        return this.withTemporaryIndex(async tempGit => {
+        return this.withTemporaryIndex(async (tempGit) => {
             await this.applyCommitPlanToIndex(tempGit, plan, status);
             return tempGit.diff(['--cached']);
         });
@@ -1732,9 +1775,9 @@ export class GitService implements vscode.Disposable {
             }
 
             const hunks = status
-                .filter(file => file.path === filePath)
-                .flatMap(file => file.hunks || [])
-                .filter(hunk => hunkIds.includes(hunk.id));
+                .filter((file) => file.path === filePath)
+                .flatMap((file) => file.hunks || [])
+                .filter((hunk) => hunkIds.includes(hunk.id));
 
             if (hunks.length > 0) {
                 await this.applyPatchWithGit(git, this.buildPatchFromHunks(hunks), true, true);
@@ -1746,11 +1789,11 @@ export class GitService implements vscode.Disposable {
         return this.runGitMutation(async () => {
             if (files && files.length > 0) {
                 const currentStatus = await this.getStatus();
-                const statusMap = new Map(currentStatus.map(f => [f.path, f]));
-                const validFiles = files.filter(f => statusMap.has(f));
+                const statusMap = new Map(currentStatus.map((f) => [f.path, f]));
+                const validFiles = files.filter((f) => statusMap.has(f));
 
                 // Only add files that are not yet staged
-                const filesToAdd = validFiles.filter(f => {
+                const filesToAdd = validFiles.filter((f) => {
                     const status = statusMap.get(f);
                     // Keep staged modified files eligible here, but skip staged deletions
                     // because re-adding a removed path triggers a Git pathspec error.
@@ -1759,11 +1802,11 @@ export class GitService implements vscode.Disposable {
 
                 if (filesToAdd.length > 0) {
                     const filesToDirectAdd = filesToAdd
-                        .filter(f => statusMap.get(f)?.status !== 'D')
-                        .map(f => this.toRepoPath(f));
+                        .filter((f) => statusMap.get(f)?.status !== 'D')
+                        .map((f) => this.toRepoPath(f));
                     const filesToUpdate = filesToAdd
-                        .filter(f => statusMap.get(f)?.status === 'D')
-                        .map(f => this.toRepoPath(f));
+                        .filter((f) => statusMap.get(f)?.status === 'D')
+                        .map((f) => this.toRepoPath(f));
 
                     if (filesToDirectAdd.length > 0) {
                         await this.git.add(filesToDirectAdd);
@@ -1822,7 +1865,7 @@ export class GitService implements vscode.Disposable {
                 shortHash: hash.substring(0, 7),
                 subject: message.split('\n')[0],
                 message,
-                files
+                files,
             };
         } catch {
             return null;
@@ -1873,7 +1916,7 @@ export class GitService implements vscode.Disposable {
                 // GIT_EDITOR: cat the new message file to replace the commit message
                 const rebaseGit = this.createEditorGit({
                     GIT_SEQUENCE_EDITOR: `sed -i '' 's/^pick ${shortHash}/reword ${shortHash}/'`,
-                    GIT_EDITOR: `cp "${msgFile}"`
+                    GIT_EDITOR: `cp "${msgFile}"`,
                 });
 
                 await rebaseGit.raw(['rebase', '-i', `${hash}^`, '--autostash']);
@@ -1903,7 +1946,7 @@ export class GitService implements vscode.Disposable {
         }
 
         try {
-            const repoFiles = files.map(f => this.toRepoPath(f));
+            const repoFiles = files.map((f) => this.toRepoPath(f));
             return await this.git.diff(['--cached', '--', ...repoFiles]);
         } catch {
             return '';
@@ -1921,7 +1964,7 @@ export class GitService implements vscode.Disposable {
             const untrackedFiles: string[] = [];
 
             for (const file of files) {
-                const fileStatus = status.find(f => f.path === file);
+                const fileStatus = status.find((f) => f.path === file);
                 if (fileStatus && fileStatus.status === '?') {
                     untrackedFiles.push(file);
                 } else {
@@ -1933,7 +1976,7 @@ export class GitService implements vscode.Disposable {
 
             if (trackedFiles.length > 0) {
                 try {
-                    const repoFiles = trackedFiles.map(f => this.toRepoPath(f));
+                    const repoFiles = trackedFiles.map((f) => this.toRepoPath(f));
                     diffOutput += await this.git.diff(['--', ...repoFiles]);
                 } catch (e) {
                     console.error('Error getting unstaged diff for tracked files:', e);
@@ -1966,7 +2009,7 @@ export class GitService implements vscode.Disposable {
             const untrackedFiles: string[] = [];
 
             for (const file of files) {
-                const fileStatus = status.find(f => f.path === file);
+                const fileStatus = status.find((f) => f.path === file);
                 if (fileStatus && fileStatus.status === '?') {
                     untrackedFiles.push(file);
                 } else {
@@ -1981,7 +2024,7 @@ export class GitService implements vscode.Disposable {
                 // git diff HEAD -- files...
                 // This shows changes in working directory (and index) vs HEAD
                 try {
-                    const repoFiles = trackedFiles.map(f => this.toRepoPath(f));
+                    const repoFiles = trackedFiles.map((f) => this.toRepoPath(f));
                     const trackedDiff = await this.git.diff(['HEAD', '--', ...repoFiles]);
                     diffOutput += trackedDiff;
                 } catch (e) {
@@ -1993,7 +2036,6 @@ export class GitService implements vscode.Disposable {
             diffOutput += await this.getUntrackedFilesDiff(untrackedFiles);
 
             return diffOutput;
-
         } catch (e) {
             console.error('Error getting diff for files:', e);
             return '';
@@ -2023,8 +2065,7 @@ export class GitService implements vscode.Disposable {
 
     public getStashFilesAsCommitFiles = async (index: number): Promise<CommitFile[]> => {
         const files = await this.getStashFiles(index);
-        return files.map(f => ({ path: f.path, status: f.status as GitStatusCode }));
+        return files.map((f) => ({ path: f.path, status: f.status as GitStatusCode }));
     };
-
 }
 export { FileStatus };

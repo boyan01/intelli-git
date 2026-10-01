@@ -28,7 +28,12 @@ function hashHunk(content: string): string {
     return (hash >>> 0).toString(36);
 }
 
-function createHunkId(filePath: string, hunk: Pick<GitHunk, 'oldStart' | 'oldLineCount' | 'newStart' | 'newLineCount'>, content: string, options?: ParseDiffOptions): string {
+function createHunkId(
+    filePath: string,
+    hunk: Pick<GitHunk, 'oldStart' | 'oldLineCount' | 'newStart' | 'newLineCount'>,
+    content: string,
+    options?: ParseDiffOptions
+): string {
     const prefix = options?.idPrefix ? `${options.idPrefix}:` : '';
     return `${filePath}:${prefix}${hunk.oldStart}:${hunk.oldLineCount}:${hunk.newStart}:${hunk.newLineCount}:${hashHunk(content)}`;
 }
@@ -150,19 +155,19 @@ function buildChangeBlock(
     }
 
     const includedLines = lines.slice(includeStart, includeEnd + 1);
-    const oldLines = includedLines.filter(line => line.type === 'context' || line.type === 'delete');
-    const newLines = includedLines.filter(line => line.type === 'context' || line.type === 'add');
+    const oldLines = includedLines.filter((line) => line.type === 'context' || line.type === 'delete');
+    const newLines = includedLines.filter((line) => line.type === 'context' || line.type === 'add');
     const firstIncluded = includedLines[0];
     const patchOldStart = oldLines[0]?.oldLine ?? firstIncluded.oldBefore;
     const patchNewStart = newLines[0]?.newLine ?? firstIncluded.newBefore;
     const patchOldLineCount = oldLines.length;
     const patchNewLineCount = newLines.length;
     const patchHeader = `@@ -${formatRange(patchOldStart, patchOldLineCount)} +${formatRange(patchNewStart, patchNewLineCount)} @@`;
-    const content = [patchHeader, ...includedLines.map(line => line.text)].join('\n');
+    const content = [patchHeader, ...includedLines.map((line) => line.text)].join('\n');
 
     const changedLines = lines.slice(changeStart, changeEnd + 1);
-    const deletedLines = changedLines.filter(line => line.type === 'delete');
-    const addedLines = changedLines.filter(line => line.type === 'add');
+    const deletedLines = changedLines.filter((line) => line.type === 'delete');
+    const addedLines = changedLines.filter((line) => line.type === 'add');
     const firstChanged = changedLines[0];
     const oldStart = deletedLines[0]?.oldLine ?? firstChanged.oldBefore;
     const newStart = addedLines[0]?.newLine ?? firstChanged.newBefore;
@@ -176,7 +181,7 @@ function buildChangeBlock(
         oldStart,
         oldLineCount,
         newStart,
-        newLineCount
+        newLineCount,
     };
     block.id = createHunkId(filePath, block, content, options);
     return block;
@@ -203,13 +208,24 @@ function splitHunkIntoChangeBlocks(
         }
 
         if (changeStart !== null) {
-            hunks.push(buildChangeBlock(filePath, currentHunk.fileHeader || '', parsedLines, changeStart, i - 1, options));
+            hunks.push(
+                buildChangeBlock(filePath, currentHunk.fileHeader || '', parsedLines, changeStart, i - 1, options)
+            );
             changeStart = null;
         }
     }
 
     if (changeStart !== null) {
-        hunks.push(buildChangeBlock(filePath, currentHunk.fileHeader || '', parsedLines, changeStart, parsedLines.length - 1, options));
+        hunks.push(
+            buildChangeBlock(
+                filePath,
+                currentHunk.fileHeader || '',
+                parsedLines,
+                changeStart,
+                parsedLines.length - 1,
+                options
+            )
+        );
     }
 }
 
@@ -247,7 +263,7 @@ export function parseDiffToHunks(diffText: string, filePath: string, options?: P
                 oldStart,
                 oldLineCount,
                 newStart,
-                newLineCount
+                newLineCount,
             };
             hunkLines = [line];
         } else if (currentHunk) {
@@ -324,7 +340,7 @@ export function parseDiffToFileHunks(
                 oldStart,
                 oldLineCount,
                 newStart,
-                newLineCount
+                newLineCount,
             };
             hunkLines = [line];
             continue;

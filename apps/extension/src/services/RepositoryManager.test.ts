@@ -15,7 +15,7 @@ function createWorkspaceState(): WorkspaceState {
     const values = new Map<string, unknown>();
     return {
         get<T>(key: string, defaultValue?: T): T | undefined {
-            return values.has(key) ? values.get(key) as T : defaultValue;
+            return values.has(key) ? (values.get(key) as T) : defaultValue;
         },
         async update(key: string, value: unknown): Promise<void> {
             if (value === undefined) {
@@ -23,14 +23,14 @@ function createWorkspaceState(): WorkspaceState {
                 return;
             }
             values.set(key, value);
-        }
+        },
     };
 }
 
 function createExtensionContext() {
     return {
         workspaceState: createWorkspaceState(),
-        subscriptions: []
+        subscriptions: [],
     };
 }
 
@@ -72,20 +72,20 @@ describe('RepositoryManager worktree discovery', () => {
         await manager.initialize();
 
         const repos = manager.getRepositories();
-        const workspaceRepo = repos.find(repo => repo.repoPath === fs.realpathSync(repoPath));
-        const worktreeRepo = repos.find(repo => repo.repoPath === fs.realpathSync(worktreePath));
+        const workspaceRepo = repos.find((repo) => repo.repoPath === fs.realpathSync(repoPath));
+        const worktreeRepo = repos.find((repo) => repo.repoPath === fs.realpathSync(worktreePath));
 
         expect(workspaceRepo).toMatchObject({
             kind: 'workspace',
             branch: mainBranch,
-            isSubmodule: false
+            isSubmodule: false,
         });
         expect(worktreeRepo).toMatchObject({
             kind: 'worktree',
             branch: 'codex/worktree-test',
             mainWorktreePath: fs.realpathSync(repoPath),
             isSubmodule: false,
-            isDetached: false
+            isDetached: false,
         });
         expect(worktreeRepo?.head).toMatch(/^[0-9a-f]{40}$/);
         expect(worktreeRepo?.gitDir).toContain(path.join('.git', 'worktrees'));
@@ -116,26 +116,26 @@ describe('RepositoryManager worktree discovery', () => {
         const mainRepoPath = fs.realpathSync(repoPath);
         const openedWorktreePath = fs.realpathSync(worktreePath);
         const repos = manager.getRepositories();
-        const mainRepo = repos.find(repo => repo.repoPath === mainRepoPath);
-        const openedWorktreeRepo = repos.find(repo => repo.repoPath === openedWorktreePath);
+        const mainRepo = repos.find((repo) => repo.repoPath === mainRepoPath);
+        const openedWorktreeRepo = repos.find((repo) => repo.repoPath === openedWorktreePath);
 
         expect(manager.getActiveScope()).toMatchObject({
             repoPath: openedWorktreePath,
             kind: 'worktree',
             branch: 'codex/worktree-window',
-            mainWorktreePath: mainRepoPath
+            mainWorktreePath: mainRepoPath,
         });
         expect(openedWorktreeRepo).toMatchObject({
             kind: 'worktree',
             branch: 'codex/worktree-window',
             mainWorktreePath: mainRepoPath,
             isSubmodule: false,
-            isDetached: false
+            isDetached: false,
         });
         expect(mainRepo).toMatchObject({
             kind: 'workspace',
             branch: mainBranch,
-            isSubmodule: false
+            isSubmodule: false,
         });
     });
 
@@ -150,7 +150,7 @@ describe('RepositoryManager worktree discovery', () => {
         manager = new RepositoryManager(createExtensionContext() as never);
         await manager.initialize();
 
-        expect(manager.getRepositories().map(repo => repo.repoPath)).not.toContain(path.normalize(staleWorktreePath));
+        expect(manager.getRepositories().map((repo) => repo.repoPath)).not.toContain(path.normalize(staleWorktreePath));
     });
 
     it('discovers nested workspace repositories only when the user scans or adds them', async () => {
@@ -169,16 +169,16 @@ describe('RepositoryManager worktree discovery', () => {
         expect(manager.getRepositories()).toEqual([]);
 
         const candidates = await manager.discoverWorkspaceRepositories();
-        expect(candidates.map(repo => repo.name).sort()).toEqual(['flutter-app', 'mixin-route']);
+        expect(candidates.map((repo) => repo.name).sort()).toEqual(['flutter-app', 'mixin-route']);
 
         await manager.addRepository(routeRepoPath);
-        expect(manager.getRepositories().map(repo => repo.repoPath)).toContain(fs.realpathSync(routeRepoPath));
+        expect(manager.getRepositories().map((repo) => repo.repoPath)).toContain(fs.realpathSync(routeRepoPath));
 
         manager.dispose();
         manager = new RepositoryManager(context as never);
         await manager.initialize();
-        expect(manager.getRepositories().map(repo => repo.repoPath)).toContain(fs.realpathSync(routeRepoPath));
-        expect(manager.getRepositories().map(repo => repo.repoPath)).not.toContain(fs.realpathSync(appRepoPath));
+        expect(manager.getRepositories().map((repo) => repo.repoPath)).toContain(fs.realpathSync(routeRepoPath));
+        expect(manager.getRepositories().map((repo) => repo.repoPath)).not.toContain(fs.realpathSync(appRepoPath));
     });
 
     it('restores the selected active repository from workspace state', async () => {
@@ -221,13 +221,15 @@ describe('RepositoryManager worktree discovery', () => {
         __setWorkspaceFolders([repoAPath]);
         manager = new RepositoryManager(context as never);
         const fallbacks: Array<{ previousRepoPath: string; nextRepoPath?: string }> = [];
-        manager.onDidFallbackActiveRepo(event => fallbacks.push(event));
+        manager.onDidFallbackActiveRepo((event) => fallbacks.push(event));
         await manager.initialize();
 
         expect(manager.getActiveRepoPath()).toBe(repoARealPath);
-        expect(fallbacks).toEqual([{
-            previousRepoPath: repoBRealPath,
-            nextRepoPath: repoARealPath
-        }]);
+        expect(fallbacks).toEqual([
+            {
+                previousRepoPath: repoBRealPath,
+                nextRepoPath: repoARealPath,
+            },
+        ]);
     });
 });

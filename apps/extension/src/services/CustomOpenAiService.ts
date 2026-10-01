@@ -40,16 +40,18 @@ class CustomOpenAiChatResponse implements vscode.LanguageModelChatResponse {
         return {
             async *[Symbol.asyncIterator]() {
                 yield text;
-            }
+            },
         };
     }
 
-    get stream(): AsyncIterable<vscode.LanguageModelTextPart | vscode.LanguageModelToolCallPart | vscode.LanguageModelToolResultPart | unknown> {
+    get stream(): AsyncIterable<
+        vscode.LanguageModelTextPart | vscode.LanguageModelToolCallPart | vscode.LanguageModelToolResultPart | unknown
+    > {
         const text = this._text;
         return {
             async *[Symbol.asyncIterator]() {
                 yield new vscode.LanguageModelTextPart(text);
-            }
+            },
         };
     }
 }
@@ -86,10 +88,7 @@ export class CustomOpenAiLanguageModel implements vscode.LanguageModelChat {
         return new CustomOpenAiChatResponse(responseText);
     }
 
-    countTokens(
-        _text: string | vscode.LanguageModelChatMessage,
-        _token?: vscode.CancellationToken
-    ): Thenable<number> {
+    countTokens(_text: string | vscode.LanguageModelChatMessage, _token?: vscode.CancellationToken): Thenable<number> {
         // Rough estimation: ~4 chars per token
         const text = typeof _text === 'string' ? _text : this.messageToString(_text);
         return Promise.resolve(Math.ceil(text.length / 4));
@@ -100,7 +99,7 @@ export class CustomOpenAiLanguageModel implements vscode.LanguageModelChat {
             return message.content;
         }
         return message.content
-            .map(part => {
+            .map((part) => {
                 if (part instanceof vscode.LanguageModelTextPart) {
                     return part.value;
                 }
@@ -110,9 +109,9 @@ export class CustomOpenAiLanguageModel implements vscode.LanguageModelChat {
     }
 
     private convertMessages(messages: vscode.LanguageModelChatMessage[]): OpenAiMessage[] {
-        return messages.map(msg => ({
-            role: msg.role === vscode.LanguageModelChatMessageRole.User ? 'user' as const : 'assistant' as const,
-            content: this.messageToString(msg)
+        return messages.map((msg) => ({
+            role: msg.role === vscode.LanguageModelChatMessageRole.User ? ('user' as const) : ('assistant' as const),
+            content: this.messageToString(msg),
         }));
     }
 
@@ -133,12 +132,12 @@ export class CustomOpenAiLanguageModel implements vscode.LanguageModelChat {
             const requestBody = JSON.stringify({
                 model: this.id,
                 messages: messages,
-                stream: false
+                stream: false,
             });
 
             const headers: Record<string, string> = {
                 'Content-Type': 'application/json',
-                'Content-Length': Buffer.byteLength(requestBody).toString()
+                'Content-Length': Buffer.byteLength(requestBody).toString(),
             };
 
             if (this.apiKey) {
@@ -150,7 +149,7 @@ export class CustomOpenAiLanguageModel implements vscode.LanguageModelChat {
                 port: url.port || (isHttps ? 443 : 80),
                 path: url.pathname + url.search,
                 method: 'POST',
-                headers: headers
+                headers: headers,
             };
 
             const req = httpModule.request(options, (res) => {
@@ -164,7 +163,7 @@ export class CustomOpenAiLanguageModel implements vscode.LanguageModelChat {
                     try {
                         const response: OpenAiApiResponse = JSON.parse(data);
 
-                        if (response.error || res.statusCode && res.statusCode >= 400) {
+                        if (response.error || (res.statusCode && res.statusCode >= 400)) {
                             const errorMsg = response.error?.message || `HTTP Status ${res.statusCode}`;
                             reject(new Error(i18n.t('extension.customRequestFailed', errorMsg)));
                             return;

@@ -26,14 +26,12 @@ function estimateWrappedLineCount(text: string): number {
 }
 
 export function getInlineFileSummary(files: CommitFile[], limit = INLINE_FILE_LIMIT): InlineFileSummary {
-    const visibleFiles = files
-        .slice(0, limit)
-        .map(file => file.displayPath || file.path);
+    const visibleFiles = files.slice(0, limit).map((file) => file.displayPath || file.path);
 
     return {
         visibleFiles,
         moreCount: Math.max(0, files.length - visibleFiles.length),
-        totalCount: files.length
+        totalCount: files.length,
     };
 }
 
@@ -48,5 +46,7 @@ export function getInlineDetailsHeight(commit?: Pick<CommitDetails, 'body' | 'fi
     const sectionCount = 1 + (bodyHeight > 0 ? 1 : 0) + (filesHeight > 0 ? 1 : 0);
     const gapHeight = Math.max(0, sectionCount - 1) * INLINE_SECTION_GAP;
 
-    return INLINE_VERTICAL_PADDING + bodyHeight + INLINE_META_HEIGHT + filesHeight + gapHeight + INLINE_VERTICAL_PADDING;
+    return (
+        INLINE_VERTICAL_PADDING + bodyHeight + INLINE_META_HEIGHT + filesHeight + gapHeight + INLINE_VERTICAL_PADDING
+    );
 }

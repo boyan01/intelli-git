@@ -21,7 +21,7 @@ export const RebaseForm: React.FC<RebaseFormProps> = ({
     deletedCount = 0,
     disableContinue = false,
     onMessageChange,
-    onContinue
+    onContinue,
 }) => {
     const { t } = useTranslation();
 
@@ -37,9 +37,19 @@ export const RebaseForm: React.FC<RebaseFormProps> = ({
                 </div>
                 {(addedCount > 0 || modifiedCount > 0 || deletedCount > 0) && (
                     <div className={styles.stats}>
-                        {addedCount > 0 && <span className={styles.statAdded}>{t('{{count}} Added', { count: addedCount })}</span>}
-                        {modifiedCount > 0 && <span className={styles.statModified}>{t('{{count}} Modified', { count: modifiedCount })}</span>}
-                        {deletedCount > 0 && <span className={styles.statDeleted}>{t('{{count}} Deleted', { count: deletedCount })}</span>}
+                        {addedCount > 0 && (
+                            <span className={styles.statAdded}>{t('{{count}} Added', { count: addedCount })}</span>
+                        )}
+                        {modifiedCount > 0 && (
+                            <span className={styles.statModified}>
+                                {t('{{count}} Modified', { count: modifiedCount })}
+                            </span>
+                        )}
+                        {deletedCount > 0 && (
+                            <span className={styles.statDeleted}>
+                                {t('{{count}} Deleted', { count: deletedCount })}
+                            </span>
+                        )}
                     </div>
                 )}
             </div>

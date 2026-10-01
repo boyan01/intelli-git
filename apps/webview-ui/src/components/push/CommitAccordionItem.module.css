@@ -212,7 +212,6 @@
     color: var(--vscode-textLink-foreground);
 }
 
-
 .authorText {
     max-width: 150px;
     overflow: hidden;

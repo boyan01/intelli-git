@@ -6,16 +6,16 @@ Date: 2026-05-12
 
 ## Spec Index
 
-| Spec | Product goal |
-| --- | --- |
-| [AI Commit Plan](./01-ai-commit-plan.md) | AI 分析当前 diff / changelist，建议如何拆分 commits。 |
-| [AI Pre-Commit Review](./02-ai-pre-commit-review.md) | commit 前检查明显风险、遗漏和质量问题。 |
-| [AI Auto Commit](./03-ai-auto-commit.md) | 在 dry-run preview 和用户确认后执行 commit。 |
-| [AI PR Draft](./04-ai-pr-draft.md) | 基于 branch diff / commits 生成 PR title 和 body。 |
-| [AI PR Readiness Check](./05-ai-pr-readiness-check.md) | 创建 PR 前检查 branch、push、test、risk 和 metadata。 |
-| [AI Release Notes](./06-ai-release-notes.md) | 从 commit history 提炼 product-facing changelog。 |
-| [AI Recovery Assistant](./07-ai-recovery-assistant.md) | Git 操作失败后解释状态并给 recovery actions。 |
-| [AI Branch Work Summary](./08-ai-branch-work-summary.md) | 总结当前 branch 做了什么、风险是什么、还差什么。 |
+| Spec                                                     | Product goal                                          |
+| -------------------------------------------------------- | ----------------------------------------------------- |
+| [AI Commit Plan](./01-ai-commit-plan.md)                 | AI 分析当前 diff / changelist，建议如何拆分 commits。 |
+| [AI Pre-Commit Review](./02-ai-pre-commit-review.md)     | commit 前检查明显风险、遗漏和质量问题。               |
+| [AI Auto Commit](./03-ai-auto-commit.md)                 | 在 dry-run preview 和用户确认后执行 commit。          |
+| [AI PR Draft](./04-ai-pr-draft.md)                       | 基于 branch diff / commits 生成 PR title 和 body。    |
+| [AI PR Readiness Check](./05-ai-pr-readiness-check.md)   | 创建 PR 前检查 branch、push、test、risk 和 metadata。 |
+| [AI Release Notes](./06-ai-release-notes.md)             | 从 commit history 提炼 product-facing changelog。     |
+| [AI Recovery Assistant](./07-ai-recovery-assistant.md)   | Git 操作失败后解释状态并给 recovery actions。         |
+| [AI Branch Work Summary](./08-ai-branch-work-summary.md) | 总结当前 branch 做了什么、风险是什么、还差什么。      |
 
 ## Shared Product Principles
 
@@ -87,4 +87,3 @@ Do not allow a workflow to skip the preview when it creates commits, pushes, ope
 - Keep command palette entries meaningful without webview context; context-only commands should be hidden or backed by a QuickPick.
 - Reuse existing `CommitView`, `PushTab`, `GitLogView`, and native VS Code diff editors instead of creating a separate AI workspace UI.
 - AI context preview should be inspectable before a paid/provider request when practical.
-

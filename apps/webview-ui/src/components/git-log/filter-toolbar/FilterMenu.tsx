@@ -34,7 +34,7 @@ export const FilterMenu: React.FC<FilterMenuProps> = ({
     dropdownItems,
     popupContent,
     className,
-    ariaLabel
+    ariaLabel,
 }) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const buttonRef = useRef<HTMLButtonElement>(null);
@@ -43,7 +43,7 @@ export const FilterMenu: React.FC<FilterMenuProps> = ({
     const popupId = useId();
     const [focusedIndex, setFocusedIndex] = useState(0);
 
-    const enabledItems = dropdownItems.filter(item => !item.disabled);
+    const enabledItems = dropdownItems.filter((item) => !item.disabled);
 
     const closeMenu = useCallback(() => {
         setShowMenu(false);
@@ -54,7 +54,7 @@ export const FilterMenu: React.FC<FilterMenuProps> = ({
     const openMenu = (focusLast = false) => {
         setShowPopup(false);
         setShowMenu(true);
-        const checkedIndex = dropdownItems.findIndex(item => item.checked && !item.disabled);
+        const checkedIndex = dropdownItems.findIndex((item) => item.checked && !item.disabled);
         if (checkedIndex >= 0) {
             setFocusedIndex(checkedIndex);
         } else if (focusLast) {
@@ -72,10 +72,10 @@ export const FilterMenu: React.FC<FilterMenuProps> = ({
     const focusItemAt = (index: number) => {
         if (enabledItems.length === 0) return;
 
-        const enabledIndex = enabledItems.findIndex(item => item.id === dropdownItems[index]?.id);
+        const enabledIndex = enabledItems.findIndex((item) => item.id === dropdownItems[index]?.id);
         const nextEnabledIndex = enabledIndex >= 0 ? enabledIndex : 0;
         const item = enabledItems[nextEnabledIndex];
-        const nextIndex = dropdownItems.findIndex(candidate => candidate.id === item.id);
+        const nextIndex = dropdownItems.findIndex((candidate) => candidate.id === item.id);
         setFocusedIndex(nextIndex);
     };
 
@@ -83,10 +83,10 @@ export const FilterMenu: React.FC<FilterMenuProps> = ({
         if (enabledItems.length === 0) return;
 
         const currentItem = dropdownItems[focusedIndex];
-        const currentEnabledIndex = enabledItems.findIndex(item => item.id === currentItem?.id);
+        const currentEnabledIndex = enabledItems.findIndex((item) => item.id === currentItem?.id);
         const nextEnabledIndex = (currentEnabledIndex + delta + enabledItems.length) % enabledItems.length;
         const nextItem = enabledItems[nextEnabledIndex];
-        setFocusedIndex(dropdownItems.findIndex(item => item.id === nextItem.id));
+        setFocusedIndex(dropdownItems.findIndex((item) => item.id === nextItem.id));
     };
 
     useEffect(() => {
@@ -190,9 +190,7 @@ export const FilterMenu: React.FC<FilterMenuProps> = ({
                 aria-controls={showMenu ? menuId : undefined}
                 aria-label={ariaLabel}
             >
-                <span className={styles.buttonLabel}>
-                    {label}
-                </span>
+                <span className={styles.buttonLabel}>{label}</span>
                 {active ? (
                     <span
                         className={`codicon codicon-close ${styles.icon} ${styles.iconMedium}`}
@@ -237,10 +235,7 @@ export const FilterMenu: React.FC<FilterMenuProps> = ({
                             onClick={() => selectItem(item)}
                         >
                             <span className={styles.dropdownItemLabel}>{item.label}</span>
-                            <span
-                                className={`codicon codicon-check ${styles.dropdownItemCheck}`}
-                                aria-hidden="true"
-                            />
+                            <span className={`codicon codicon-check ${styles.dropdownItemCheck}`} aria-hidden="true" />
                         </div>
                     ))}
                 </div>

@@ -21,18 +21,10 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
     const { webview, extensionUri, title, initialRoute, initialState } = options;
     const nonce = generateNonce();
 
-    const scriptUri = webview.asWebviewUri(
-        vscode.Uri.joinPath(extensionUri, 'out', 'webview', 'webview.js')
-    );
-    const styleUri = webview.asWebviewUri(
-        vscode.Uri.joinPath(extensionUri, 'out', 'webview', 'index.css')
-    );
-    const editorStyleUri = webview.asWebviewUri(
-        vscode.Uri.joinPath(extensionUri, 'out', 'webview', 'editor.css')
-    );
-    const iconStyleUri = webview.asWebviewUri(
-        vscode.Uri.joinPath(extensionUri, 'media', 'intelli-git-icons.css')
-    );
+    const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'out', 'webview', 'webview.js'));
+    const styleUri = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'out', 'webview', 'index.css'));
+    const editorStyleUri = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'out', 'webview', 'editor.css'));
+    const iconStyleUri = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'media', 'intelli-git-icons.css'));
 
     const language = vscode.env.language;
     const initialStateJson = JSON.stringify(initialState ?? null).replace(/</g, '\\u003c');

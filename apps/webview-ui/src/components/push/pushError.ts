@@ -12,7 +12,7 @@ export function describePushFailure(result: PushFailedResult): PushErrorDescript
         kind: result.code,
         message: result.message,
         canPull: result.code === 'behind',
-        behindCount: result.behindCount
+        behindCount: result.behindCount,
     };
 }
 
@@ -20,6 +20,6 @@ export function describeUnknownPushError(error: unknown): PushErrorDescriptor {
     return {
         kind: 'unknown',
         message: error instanceof Error ? error.message : String(error),
-        canPull: false
+        canPull: false,
     };
 }

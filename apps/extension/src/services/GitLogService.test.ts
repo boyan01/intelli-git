@@ -38,9 +38,9 @@ describe('GitLogService', () => {
         hashes = [rootHash, middleHash, headHash];
 
         service = new GitLogService(git, {
-            toRepoPath: filePath => `app/${filePath}`,
-            toWorkspacePath: repoPath => repoPath.startsWith('app/') ? repoPath.slice('app/'.length) : null,
-            getWorkspaceRoot: () => path.join(tempDir, 'app')
+            toRepoPath: (filePath) => `app/${filePath}`,
+            toWorkspacePath: (repoPath) => (repoPath.startsWith('app/') ? repoPath.slice('app/'.length) : null),
+            getWorkspaceRoot: () => path.join(tempDir, 'app'),
         });
     });
 
@@ -58,48 +58,28 @@ describe('GitLogService', () => {
     it('loads scoped log entries and stitches filtered ancestors', async () => {
         const commits = await service.getLog({
             search: 'match',
-            paths: ['scoped.txt']
+            paths: ['scoped.txt'],
         });
 
-        expect(commits.map(commit => commit.subject)).toEqual(['match head', 'match root']);
+        expect(commits.map((commit) => commit.subject)).toEqual(['match head', 'match root']);
         expect(commits[0].filteredAncestors).toEqual([hashes[0]]);
         expect(commits[0].parentHashes).toEqual([hashes[1]]);
     });
 
     it('orders visible log entries by author date without breaking ancestry', async () => {
         await git.checkout(['-B', 'ordering-feature', hashes[0]]);
-        await commitWithAuthorDate(
-            'feature-new',
-            'feature-ordering.txt',
-            'feature\n',
-            '2026-01-04T00:00:00+0000'
-        );
+        await commitWithAuthorDate('feature-new', 'feature-ordering.txt', 'feature\n', '2026-01-04T00:00:00+0000');
 
         await git.checkout(['-B', 'ordering-main', hashes[0]]);
-        await commitWithAuthorDate(
-            'main-mid',
-            'main-mid-ordering.txt',
-            'main mid\n',
-            '2026-01-03T00:00:00+0000'
-        );
-        await commitWithAuthorDate(
-            'main-new',
-            'main-new-ordering.txt',
-            'main new\n',
-            '2026-01-05T00:00:00+0000'
-        );
+        await commitWithAuthorDate('main-mid', 'main-mid-ordering.txt', 'main mid\n', '2026-01-03T00:00:00+0000');
+        await commitWithAuthorDate('main-new', 'main-new-ordering.txt', 'main new\n', '2026-01-05T00:00:00+0000');
 
         const commits = await service.getLog({
             branch: 'ordering-main,ordering-feature',
-            maxCount: 4
+            maxCount: 4,
         });
 
-        expect(commits.map(commit => commit.subject)).toEqual([
-            'main-new',
-            'feature-new',
-            'main-mid',
-            'match root'
-        ]);
+        expect(commits.map((commit) => commit.subject)).toEqual(['main-new', 'feature-new', 'main-mid', 'match root']);
     });
 
     it('excludes stash commits from all-branches logs', async () => {
@@ -111,16 +91,16 @@ describe('GitLogService', () => {
 
         const commits = await service.getLog({
             branch: 'all',
-            maxCount: 20
+            maxCount: 20,
         });
 
-        expect(commits.map(commit => commit.subject).join('\n')).not.toContain('stash-only');
+        expect(commits.map((commit) => commit.subject).join('\n')).not.toContain('stash-only');
     });
 
     it('resolves hash searches to the exact commit', async () => {
         const commits = await service.getLog({
             search: hashes[1].slice(0, 8),
-            maxCount: 20
+            maxCount: 20,
         });
 
         expect(commits).toHaveLength(1);
@@ -132,14 +112,14 @@ describe('GitLogService', () => {
 
         expect(details.subject).toBe('match root');
         expect(details.body).toBe('Root body');
-        expect(details.files).toEqual([
-            { path: 'app/scoped.txt', displayPath: 'scoped.txt', status: 'A' }
-        ]);
+        expect(details.files).toEqual([{ path: 'app/scoped.txt', displayPath: 'scoped.txt', status: 'A' }]);
         expect(details.stats.additions).toBe(1);
-        expect(details.refs).toEqual(expect.arrayContaining([
-            { name: 'v1', type: 'tag' },
-            { name: 'release', type: 'local' }
-        ]));
+        expect(details.refs).toEqual(
+            expect.arrayContaining([
+                { name: 'v1', type: 'tag' },
+                { name: 'release', type: 'local' },
+            ])
+        );
         expect(details.containingBranches).toEqual(expect.arrayContaining(['release']));
     });
 
@@ -150,9 +130,9 @@ describe('GitLogService', () => {
 
     it('caches authors until the refs snapshot changes', async () => {
         const rawSpy = vi.spyOn(git, 'raw');
-        const countAuthorScans = () => rawSpy.mock.calls.filter(([args]) =>
-            Array.isArray(args) && args[0] === 'log' && args[1] === '--format=%aN'
-        ).length;
+        const countAuthorScans = () =>
+            rawSpy.mock.calls.filter(([args]) => Array.isArray(args) && args[0] === 'log' && args[1] === '--format=%aN')
+                .length;
 
         await expect(service.getAuthors()).resolves.toEqual(['Test User']);
         await expect(service.getAuthors()).resolves.toEqual(['Test User']);
@@ -168,7 +148,7 @@ describe('GitLogService', () => {
             'commit',
             '--author=Other User <other@example.com>',
             '-m',
-            'other author'
+            'other author',
         ]);
 
         await expect(service.getAuthors()).resolves.toEqual(['Other User', 'Test User']);
@@ -177,9 +157,10 @@ describe('GitLogService', () => {
 
     it('reuses filtered graph data until the refs snapshot changes', async () => {
         const rawSpy = vi.spyOn(git, 'raw');
-        const countGraphLoads = () => rawSpy.mock.calls.filter(([args]) =>
-            Array.isArray(args) && args.join(' ') === 'rev-list --exclude=refs/stash --all --parents'
-        ).length;
+        const countGraphLoads = () =>
+            rawSpy.mock.calls.filter(
+                ([args]) => Array.isArray(args) && args.join(' ') === 'rev-list --exclude=refs/stash --all --parents'
+            ).length;
 
         await service.getLog({ search: 'match', maxCount: 20 });
         await service.getLog({ search: 'match', maxCount: 20 });

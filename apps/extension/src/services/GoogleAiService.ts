@@ -43,18 +43,20 @@ class GoogleChatResponse implements vscode.LanguageModelChatResponse {
                 for await (const chunk of stream) {
                     yield chunk;
                 }
-            }
+            },
         };
     }
 
-    get stream(): AsyncIterable<vscode.LanguageModelTextPart | vscode.LanguageModelToolCallPart | vscode.LanguageModelToolResultPart | unknown> {
+    get stream(): AsyncIterable<
+        vscode.LanguageModelTextPart | vscode.LanguageModelToolCallPart | vscode.LanguageModelToolResultPart | unknown
+    > {
         const stream = this._stream;
         return {
             async *[Symbol.asyncIterator]() {
                 for await (const chunk of stream) {
                     yield new vscode.LanguageModelTextPart(chunk);
                 }
-            }
+            },
         };
     }
 }
@@ -91,10 +93,7 @@ export class GoogleLanguageModel implements vscode.LanguageModelChat {
         return new GoogleChatResponse(stream);
     }
 
-    countTokens(
-        _text: string | vscode.LanguageModelChatMessage,
-        _token?: vscode.CancellationToken
-    ): Thenable<number> {
+    countTokens(_text: string | vscode.LanguageModelChatMessage, _token?: vscode.CancellationToken): Thenable<number> {
         // Rough estimation: ~4 chars per token
         const text = typeof _text === 'string' ? _text : this.messageToString(_text);
         return Promise.resolve(Math.ceil(text.length / 4));
@@ -105,7 +104,7 @@ export class GoogleLanguageModel implements vscode.LanguageModelChat {
             return message.content;
         }
         return message.content
-            .map(part => {
+            .map((part) => {
                 if (part instanceof vscode.LanguageModelTextPart) {
                     return part.value;
                 }
@@ -115,13 +114,16 @@ export class GoogleLanguageModel implements vscode.LanguageModelChat {
     }
 
     private convertMessages(messages: vscode.LanguageModelChatMessage[]): GoogleMessage[] {
-        return messages.map(msg => ({
-            role: msg.role === vscode.LanguageModelChatMessageRole.User ? 'user' as const : 'model' as const,
-            parts: [{ text: this.messageToString(msg) }]
+        return messages.map((msg) => ({
+            role: msg.role === vscode.LanguageModelChatMessageRole.User ? ('user' as const) : ('model' as const),
+            parts: [{ text: this.messageToString(msg) }],
         }));
     }
 
-    private sendHttpRequestStream(messages: GoogleMessage[], token?: vscode.CancellationToken): Promise<AsyncGenerator<string, void, unknown>> {
+    private sendHttpRequestStream(
+        messages: GoogleMessage[],
+        token?: vscode.CancellationToken
+    ): Promise<AsyncGenerator<string, void, unknown>> {
         return new Promise((resolve, reject) => {
             let fullUrlString = this.apiUrl;
             if (fullUrlString.includes('generateContent')) {
@@ -152,23 +154,29 @@ export class GoogleLanguageModel implements vscode.LanguageModelChat {
                 headers: {
                     'Content-Type': 'application/json',
                     'Content-Length': Buffer.byteLength(requestBody),
-                    'x-goog-api-key': this.apiKey
+                    'x-goog-api-key': this.apiKey,
                 },
-                timeout: 60000
+                timeout: 60000,
             };
 
             const req = httpModule.request(options, (res) => {
                 if (res.statusCode && res.statusCode >= 400) {
                     let errorData = '';
-                    res.on('data', chunk => {
+                    res.on('data', (chunk) => {
                         errorData += chunk;
                     });
                     res.on('end', () => {
                         try {
                             const parsed = JSON.parse(errorData);
-                            reject(new Error(i18n.t('extension.googleRequestFailed', parsed.error?.message || errorData)));
+                            reject(
+                                new Error(i18n.t('extension.googleRequestFailed', parsed.error?.message || errorData))
+                            );
                         } catch {
-                            reject(new Error(i18n.t('extension.googleRequestFailed', `HTTP ${res.statusCode}: ${errorData}`)));
+                            reject(
+                                new Error(
+                                    i18n.t('extension.googleRequestFailed', `HTTP ${res.statusCode}: ${errorData}`)
+                                )
+                            );
                         }
                     });
                     return;

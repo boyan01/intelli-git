@@ -3,16 +3,9 @@
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
     "target": "ES2022",
     "useDefineForClassFields": true,
-    "lib": [
-      "ES2022",
-      "DOM",
-      "DOM.Iterable"
-    ],
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "module": "ESNext",
-    "types": [
-      "vite/client",
-      "vscode-webview"
-    ],
+    "types": ["vite/client", "vscode-webview"],
     "skipLibCheck": true,
     /* Bundler mode */
     "moduleResolution": "bundler",
@@ -23,12 +16,8 @@
     "jsx": "react-jsx",
     /* Paths */
     "paths": {
-      "@shared/*": [
-        "../../packages/shared/*"
-      ],
-      "@/*": [
-        "./src/*"
-      ]
+      "@shared/*": ["../../packages/shared/*"],
+      "@/*": ["./src/*"]
     },
     /* Linting */
     "strict": true,
@@ -36,8 +25,5 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": [
-    "src",
-    "../../packages/shared"
-  ]
+  "include": ["src", "../../packages/shared"]
 }

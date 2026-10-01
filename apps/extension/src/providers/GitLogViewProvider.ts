@@ -4,7 +4,6 @@ import { BaseWebviewProvider, WebviewProviderOptions } from './BaseWebviewProvid
 import type { ExtensionRpcHandlerOptions } from '../rpc';
 
 export class GitLogViewProvider extends BaseWebviewProvider implements vscode.WebviewViewProvider {
-
     public static readonly viewType = 'intelli-git.logView';
     private _view?: vscode.WebviewView;
     private _pendingReveal?: GitLogRevealRequest;
@@ -29,14 +28,14 @@ export class GitLogViewProvider extends BaseWebviewProvider implements vscode.We
                 const pendingReveal = this._pendingReveal;
                 this._pendingReveal = undefined;
                 return pendingReveal;
-            }
+            },
         };
     }
 
     public requestRefresh(event: RefreshEvent): void {
         this._pendingRefresh = {
             scopes: Array.from(new Set([...(this._pendingRefresh?.scopes || []), ...event.scopes])),
-            reason: [this._pendingRefresh?.reason, event.reason].filter(Boolean).join(',')
+            reason: [this._pendingRefresh?.reason, event.reason].filter(Boolean).join(','),
         };
 
         if (!this.isVisible() || this._refreshTimeout) {
@@ -61,16 +60,18 @@ export class GitLogViewProvider extends BaseWebviewProvider implements vscode.We
     public resolveWebviewView(
         webviewView: vscode.WebviewView,
         _context: vscode.WebviewViewResolveContext,
-        _token: vscode.CancellationToken,
+        _token: vscode.CancellationToken
     ) {
         this._view = webviewView;
         this._pendingRefresh = undefined;
 
-        this._disposables.push(webviewView.onDidChangeVisibility(() => {
-            if (webviewView.visible) {
-                this.flushRefresh();
-            }
-        }));
+        this._disposables.push(
+            webviewView.onDidChangeVisibility(() => {
+                if (webviewView.visible) {
+                    this.flushRefresh();
+                }
+            })
+        );
 
         this.setupWebview(webviewView.webview, () => !this._view);
         webviewView.webview.html = this.getHtml(webviewView.webview);

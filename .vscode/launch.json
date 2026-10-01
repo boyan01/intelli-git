@@ -1,45 +1,36 @@
 {
-    "version": "0.2.0",
-    "configurations": [
-        {
-            "name": "Run Extension",
-            "type": "extensionHost",
-            "request": "launch",
-            "args": [
-                "--extensionDevelopmentPath=${workspaceFolder}/apps/extension",
-                "--disable-extensions"
-            ],
-            "outFiles": [
-                "${workspaceFolder}/apps/extension/out/**/*.js"
-            ],
-            "preLaunchTask": "Watch All (Run Extension)"
-        },
-        {
-            "name": "Run Extension (Checkout Test)",
-            "type": "extensionHost",
-            "request": "launch",
-            "args": [
-                "--extensionDevelopmentPath=${workspaceFolder}/apps/extension",
-                "--disable-extensions",
-                "${workspaceFolder}/.test/intelli-git-test/debug/test-git-checkout"
-            ],
-            "outFiles": [
-                "${workspaceFolder}/apps/extension/out/**/*.js"
-            ],
-            "preLaunchTask": "Prepare Checkout Test and Watch"
-        },
-        {
-            "name": "Extension Tests",
-            "type": "extensionHost",
-            "request": "launch",
-            "args": [
-                "--extensionDevelopmentPath=${workspaceFolder}/apps/extension",
-                "--extensionTestsPath=${workspaceFolder}/apps/extension/out/test/suite/index"
-            ],
-            "outFiles": [
-                "${workspaceFolder}/apps/extension/out/**/*.js"
-            ],
-            "preLaunchTask": "${defaultBuildTask}"
-        }
-    ]
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run Extension",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": ["--extensionDevelopmentPath=${workspaceFolder}/apps/extension", "--disable-extensions"],
+      "outFiles": ["${workspaceFolder}/apps/extension/out/**/*.js"],
+      "preLaunchTask": "Watch All (Run Extension)"
+    },
+    {
+      "name": "Run Extension (Checkout Test)",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}/apps/extension",
+        "--disable-extensions",
+        "${workspaceFolder}/.test/intelli-git-test/debug/test-git-checkout"
+      ],
+      "outFiles": ["${workspaceFolder}/apps/extension/out/**/*.js"],
+      "preLaunchTask": "Prepare Checkout Test and Watch"
+    },
+    {
+      "name": "Extension Tests",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}/apps/extension",
+        "--extensionTestsPath=${workspaceFolder}/apps/extension/out/test/suite/index"
+      ],
+      "outFiles": ["${workspaceFolder}/apps/extension/out/**/*.js"],
+      "preLaunchTask": "${defaultBuildTask}"
+    }
+  ]
 }

@@ -154,4 +154,3 @@ Examples:
 - Summary distinguishes committed branch changes from uncommitted working tree changes.
 - Suggested actions are real product actions.
 - Cached summary invalidates when HEAD or target changes.
-

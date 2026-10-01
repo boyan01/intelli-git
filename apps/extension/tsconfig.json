@@ -2,33 +2,18 @@
   "compilerOptions": {
     "module": "commonjs",
     "target": "ESNext",
-    "lib": [
-      "ESNext",
-      "DOM"
-    ],
+    "lib": ["ESNext", "DOM"],
     "sourceMap": true,
     "rootDir": "../..",
     "strict": true,
     "skipLibCheck": true,
     "resolveJsonModule": true,
     "outDir": "out",
-    "types": [
-      "node",
-      "vscode"
-    ],
+    "types": ["node", "vscode"],
     "paths": {
-      "@shared/*": [
-        "../../packages/shared/*"
-      ]
+      "@shared/*": ["../../packages/shared/*"]
     }
   },
-  "include": [
-    "src/**/*"
-  ],
-  "exclude": [
-    "node_modules",
-    ".vscode-test",
-    "webview-ui",
-    "../../packages/shared"
-  ]
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", ".vscode-test", "webview-ui", "../../packages/shared"]
 }

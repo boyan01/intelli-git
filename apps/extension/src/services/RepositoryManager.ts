@@ -72,7 +72,7 @@ export class RepositoryManager implements vscode.Disposable {
     constructor(private context: vscode.ExtensionContext) {
         this.disposables.push(
             vscode.workspace.onDidChangeWorkspaceFolders(() => {
-                this.initialize().catch(e => logger.error('Failed to scan repositories after workspace change', e));
+                this.initialize().catch((e) => logger.error('Failed to scan repositories after workspace change', e));
             })
         );
     }
@@ -122,10 +122,9 @@ export class RepositoryManager implements vscode.Disposable {
     }
 
     private saveActiveRepositoryPath(repoPath: string | undefined): void {
-        this.context.workspaceState.update(
-            RepositoryManager.ACTIVE_REPOSITORY_KEY,
-            repoPath ? normalizeExistingPath(repoPath) : undefined
-        ).then(undefined, e => logger.error('Failed to save active repository', e));
+        this.context.workspaceState
+            .update(RepositoryManager.ACTIVE_REPOSITORY_KEY, repoPath ? normalizeExistingPath(repoPath) : undefined)
+            .then(undefined, (e) => logger.error('Failed to save active repository', e));
     }
 
     private async scanRepositories() {
@@ -138,13 +137,13 @@ export class RepositoryManager implements vscode.Disposable {
         for (const [index, folder] of workspaceFolders.entries()) {
             candidateFolders.push({
                 folderPath: normalizeExistingPath(folder.uri.fsPath),
-                workspaceIndex: index
+                workspaceIndex: index,
             });
         }
 
         for (const repoPath of this.getUserRepositoryPaths()) {
             candidateFolders.push({
-                folderPath: normalizeExistingPath(repoPath)
+                folderPath: normalizeExistingPath(repoPath),
             });
         }
 
@@ -178,7 +177,7 @@ export class RepositoryManager implements vscode.Disposable {
                     try {
                         const submoduleStatus = await git.subModule(['status']);
                         if (submoduleStatus && typeof submoduleStatus === 'string') {
-                            const lines = submoduleStatus.split('\n').filter(l => l.trim().length > 0);
+                            const lines = submoduleStatus.split('\n').filter((l) => l.trim().length > 0);
                             for (const line of lines) {
                                 // Output format is generally:
                                 // +hash path (describe)
@@ -188,13 +187,16 @@ export class RepositoryManager implements vscode.Disposable {
                                     const subPath = parts[1];
                                     const absoluteSubPath = normalizeExistingPath(path.join(scope.gitRoot, subPath));
                                     const submoduleGit = simpleGit(absoluteSubPath);
-                                    const submoduleGitState = await this.readRepositoryGitState(submoduleGit, absoluteSubPath);
+                                    const submoduleGitState = await this.readRepositoryGitState(
+                                        submoduleGit,
+                                        absoluteSubPath
+                                    );
                                     const submoduleScope = this.createRepositoryScope({
                                         workspaceRoot: absoluteSubPath,
                                         gitRoot: absoluteSubPath,
                                         isSubmodule: true,
                                         kind: 'submodule',
-                                        ...submoduleGitState
+                                        ...submoduleGitState,
                                     });
                                     if (!hiddenRepoPaths.has(submoduleScope.repoPath)) {
                                         newRepos.set(absoluteSubPath, submoduleScope);
@@ -243,8 +245,16 @@ export class RepositoryManager implements vscode.Disposable {
             if (!this.repositories.has(repoPath)) {
                 try {
                     const shouldMigrateGlobalState = repoPath === globalStateMigrationRepoPath;
-                    const inactiveService = new InactiveChangesService(this.context, repoPath, shouldMigrateGlobalState);
-                    const changelistService = new ChangelistStateService(this.context, repoPath, shouldMigrateGlobalState);
+                    const inactiveService = new InactiveChangesService(
+                        this.context,
+                        repoPath,
+                        shouldMigrateGlobalState
+                    );
+                    const changelistService = new ChangelistStateService(
+                        this.context,
+                        repoPath,
+                        shouldMigrateGlobalState
+                    );
                     const gitService = await GitService.create(info.workspaceRoot, inactiveService, changelistService);
                     this.repositories.set(repoPath, { service: gitService, info });
                     changed = true;
@@ -266,12 +276,9 @@ export class RepositoryManager implements vscode.Disposable {
         const savedActiveRepoPath = this.getSavedActiveRepositoryPath();
         const requestedActiveRepoPath = previousActiveRepoPath || savedActiveRepoPath;
         const activeRepoStillAvailable = requestedActiveRepoPath && this.repositories.has(requestedActiveRepoPath);
-        const nextRepoPath = activeRepoStillAvailable
-            ? requestedActiveRepoPath
-            : this.repositories.keys().next().value;
-        const fallbackRepoPath = requestedActiveRepoPath && requestedActiveRepoPath !== nextRepoPath
-            ? requestedActiveRepoPath
-            : undefined;
+        const nextRepoPath = activeRepoStillAvailable ? requestedActiveRepoPath : this.repositories.keys().next().value;
+        const fallbackRepoPath =
+            requestedActiveRepoPath && requestedActiveRepoPath !== nextRepoPath ? requestedActiveRepoPath : undefined;
 
         if (previousActiveRepoPath === nextRepoPath) {
             if (savedActiveRepoPath !== nextRepoPath) {
@@ -280,7 +287,7 @@ export class RepositoryManager implements vscode.Disposable {
             if (fallbackRepoPath) {
                 this._onDidFallbackActiveRepo.fire({
                     previousRepoPath: fallbackRepoPath,
-                    nextRepoPath
+                    nextRepoPath,
                 });
             }
             return Boolean(fallbackRepoPath);
@@ -293,7 +300,7 @@ export class RepositoryManager implements vscode.Disposable {
         if (fallbackRepoPath) {
             this._onDidFallbackActiveRepo.fire({
                 previousRepoPath: fallbackRepoPath,
-                nextRepoPath
+                nextRepoPath,
             });
         }
 
@@ -336,7 +343,7 @@ export class RepositoryManager implements vscode.Disposable {
 
     private async resolveRepositoryScope(folderPath: string): Promise<RepositoryScope | undefined> {
         const git = simpleGit(folderPath);
-        if (!await git.checkIsRepo()) {
+        if (!(await git.checkIsRepo())) {
             return undefined;
         }
 
@@ -345,10 +352,12 @@ export class RepositoryManager implements vscode.Disposable {
         const rootGit = simpleGit(rootPath);
         const gitState = await this.readRepositoryGitState(rootGit, rootPath);
         const worktreeList = await this.readWorktreeList(rootGit, rootPath);
-        const currentWorktreeRecord = worktreeList?.records.find(record => (
-            record.path && normalizeExistingPath(record.path) === rootPath
-        ));
-        const isLinkedWorktreeRoot = Boolean(worktreeList && currentWorktreeRecord && rootPath !== worktreeList.mainWorktreePath);
+        const currentWorktreeRecord = worktreeList?.records.find(
+            (record) => record.path && normalizeExistingPath(record.path) === rootPath
+        );
+        const isLinkedWorktreeRoot = Boolean(
+            worktreeList && currentWorktreeRecord && rootPath !== worktreeList.mainWorktreePath
+        );
 
         return this.createRepositoryScope({
             workspaceRoot: folderPath,
@@ -359,7 +368,7 @@ export class RepositoryManager implements vscode.Disposable {
             head: currentWorktreeRecord?.head || gitState.head,
             branch: currentWorktreeRecord?.branch || gitState.branch,
             isDetached: currentWorktreeRecord?.isDetached ?? gitState.isDetached,
-            gitDir: gitState.gitDir
+            gitDir: gitState.gitDir,
         });
     }
 
@@ -408,7 +417,10 @@ export class RepositoryManager implements vscode.Disposable {
         return records;
     }
 
-    private async readWorktreeList(git: SimpleGit, rootPath: string): Promise<{ records: WorktreeRecord[]; mainWorktreePath: string } | undefined> {
+    private async readWorktreeList(
+        git: SimpleGit,
+        rootPath: string
+    ): Promise<{ records: WorktreeRecord[]; mainWorktreePath: string } | undefined> {
         let output: string;
         try {
             output = await git.raw(['worktree', 'list', '--porcelain']);
@@ -427,7 +439,7 @@ export class RepositoryManager implements vscode.Disposable {
         rootPath: string,
         worktreeList?: { records: WorktreeRecord[]; mainWorktreePath: string }
     ): Promise<RepositoryScope[]> {
-        const list = worktreeList ?? await this.readWorktreeList(git, rootPath);
+        const list = worktreeList ?? (await this.readWorktreeList(git, rootPath));
         if (!list) {
             return [];
         }
@@ -447,7 +459,7 @@ export class RepositoryManager implements vscode.Disposable {
 
             try {
                 const worktreeGit = simpleGit(worktreePath);
-                if (!await worktreeGit.checkIsRepo()) {
+                if (!(await worktreeGit.checkIsRepo())) {
                     continue;
                 }
 
@@ -458,17 +470,19 @@ export class RepositoryManager implements vscode.Disposable {
 
                 const gitState = await this.readRepositoryGitState(worktreeGit, worktreePath);
                 const kind: RepositoryScope['kind'] = worktreePath === mainWorktreePath ? 'workspace' : 'worktree';
-                scopes.push(this.createRepositoryScope({
-                    workspaceRoot: worktreePath,
-                    gitRoot: worktreePath,
-                    isSubmodule: false,
-                    kind,
-                    mainWorktreePath: kind === 'worktree' ? mainWorktreePath : undefined,
-                    head: record.head || gitState.head,
-                    branch: record.branch || gitState.branch,
-                    isDetached: record.isDetached ?? gitState.isDetached,
-                    gitDir: gitState.gitDir
-                }));
+                scopes.push(
+                    this.createRepositoryScope({
+                        workspaceRoot: worktreePath,
+                        gitRoot: worktreePath,
+                        isSubmodule: false,
+                        kind,
+                        mainWorktreePath: kind === 'worktree' ? mainWorktreePath : undefined,
+                        head: record.head || gitState.head,
+                        branch: record.branch || gitState.branch,
+                        isDetached: record.isDetached ?? gitState.isDetached,
+                        gitDir: gitState.gitDir,
+                    })
+                );
             } catch (e) {
                 logger.debug(`Ignoring unavailable worktree ${worktreePath}`, e);
             }
@@ -502,23 +516,25 @@ export class RepositoryManager implements vscode.Disposable {
             mainWorktreePath: input.mainWorktreePath,
             branch: input.branch,
             head: input.head,
-            isDetached: input.isDetached
+            isDetached: input.isDetached,
         };
     }
 
     private isSameScope(a: RepositoryScope, b: RepositoryScope): boolean {
-        return a.name === b.name
-            && a.repoPath === b.repoPath
-            && a.path === b.path
-            && a.workspaceRoot === b.workspaceRoot
-            && a.gitRoot === b.gitRoot
-            && a.gitDir === b.gitDir
-            && a.isSubmodule === b.isSubmodule
-            && a.kind === b.kind
-            && a.mainWorktreePath === b.mainWorktreePath
-            && a.branch === b.branch
-            && a.head === b.head
-            && a.isDetached === b.isDetached;
+        return (
+            a.name === b.name &&
+            a.repoPath === b.repoPath &&
+            a.path === b.path &&
+            a.workspaceRoot === b.workspaceRoot &&
+            a.gitRoot === b.gitRoot &&
+            a.gitDir === b.gitDir &&
+            a.isSubmodule === b.isSubmodule &&
+            a.kind === b.kind &&
+            a.mainWorktreePath === b.mainWorktreePath &&
+            a.branch === b.branch &&
+            a.head === b.head &&
+            a.isDetached === b.isDetached
+        );
     }
 
     public getActiveService(): GitService | undefined {
@@ -547,11 +563,11 @@ export class RepositoryManager implements vscode.Disposable {
     }
 
     public getRepositories(): RepositoryScope[] {
-        const repos = Array.from(this.repositories.values()).map(entry => entry.info);
+        const repos = Array.from(this.repositories.values()).map((entry) => entry.info);
         const kindOrder: Record<RepositoryScope['kind'], number> = {
             workspace: 0,
             worktree: 1,
-            submodule: 2
+            submodule: 2,
         };
 
         return repos.sort((a, b) => {
@@ -579,11 +595,11 @@ export class RepositoryManager implements vscode.Disposable {
             return undefined;
         }
 
-        const hidden = this.getHiddenRepositoryPaths().filter(path => path !== scope.repoPath);
+        const hidden = this.getHiddenRepositoryPaths().filter((path) => path !== scope.repoPath);
         await this.saveHiddenRepositoryPaths(hidden);
 
         const userRepositories = this.getUserRepositoryPaths();
-        if (!userRepositories.some(path => normalizeExistingPath(path) === scope.workspaceRoot)) {
+        if (!userRepositories.some((path) => normalizeExistingPath(path) === scope.workspaceRoot)) {
             userRepositories.push(scope.workspaceRoot);
             await this.saveUserRepositoryPaths(userRepositories);
         }
@@ -597,14 +613,14 @@ export class RepositoryManager implements vscode.Disposable {
         const existing = this.repositories.get(normalizedRepoPath);
         const existed = Boolean(existing);
         const workspaceRoot = existing?.info.workspaceRoot;
-        const userRepositories = this.getUserRepositoryPaths().filter(path => {
+        const userRepositories = this.getUserRepositoryPaths().filter((path) => {
             const normalizedPath = normalizeExistingPath(path);
             return normalizedPath !== normalizedRepoPath && normalizedPath !== workspaceRoot;
         });
         await this.saveUserRepositoryPaths(userRepositories);
 
         const hidden = this.getHiddenRepositoryPaths();
-        if (!hidden.some(path => normalizeExistingPath(path) === normalizedRepoPath)) {
+        if (!hidden.some((path) => normalizeExistingPath(path) === normalizedRepoPath)) {
             hidden.push(normalizedRepoPath);
             await this.saveHiddenRepositoryPaths(hidden);
         }
@@ -615,7 +631,7 @@ export class RepositoryManager implements vscode.Disposable {
 
     public async discoverWorkspaceRepositories(maxDepth = 3): Promise<RepositoryScope[]> {
         const workspaceFolders = vscode.workspace.workspaceFolders || [];
-        const existing = new Set(this.getRepositories().map(repo => repo.repoPath));
+        const existing = new Set(this.getRepositories().map((repo) => repo.repoPath));
         const hidden = new Set(this.getHiddenRepositoryPaths());
         const candidates = new Set<string>();
         const ignoredNames = new Set([
@@ -630,7 +646,7 @@ export class RepositoryManager implements vscode.Disposable {
             '.dart_tool',
             '.gradle',
             '.idea',
-            '.vscode'
+            '.vscode',
         ]);
 
         const walk = (dir: string, depth: number) => {
@@ -645,7 +661,7 @@ export class RepositoryManager implements vscode.Disposable {
                 return;
             }
 
-            if (entries.some(entry => entry.name === '.git')) {
+            if (entries.some((entry) => entry.name === '.git')) {
                 candidates.add(dir);
                 return;
             }
@@ -679,7 +695,7 @@ export class RepositoryManager implements vscode.Disposable {
     }
 
     public getAllServices(): GitService[] {
-        return Array.from(this.repositories.values()).map(entry => entry.service);
+        return Array.from(this.repositories.values()).map((entry) => entry.service);
     }
 
     public dispose() {

@@ -1,5 +1,11 @@
 import * as vscode from 'vscode';
-import type { ChangelistAssignment, ChangelistInfo, ChangelistMode, ChangelistState, FileStatus } from '@shared/messages';
+import type {
+    ChangelistAssignment,
+    ChangelistInfo,
+    ChangelistMode,
+    ChangelistState,
+    FileStatus,
+} from '@shared/messages';
 import { remapHunkValues } from '../utils/hunkIdentity';
 
 interface PersistedChangelistState {
@@ -17,9 +23,11 @@ export interface CommitPlan {
 }
 
 function hasEquivalentHunkId(hunkId: string, hunkIds: Set<string>): boolean {
-    return hunkIds.has(hunkId) ||
+    return (
+        hunkIds.has(hunkId) ||
         hunkIds.has(hunkId.replace(':index:', ':worktree:')) ||
-        hunkIds.has(hunkId.replace(':worktree:', ':index:'));
+        hunkIds.has(hunkId.replace(':worktree:', ':index:'))
+    );
 }
 
 function getEquivalentHunkAssignment(hunkId: string, hunkListIds?: Record<string, string>): string | undefined {
@@ -27,9 +35,11 @@ function getEquivalentHunkAssignment(hunkId: string, hunkListIds?: Record<string
         return undefined;
     }
 
-    return hunkListIds[hunkId] ||
+    return (
+        hunkListIds[hunkId] ||
         hunkListIds[hunkId.replace(':index:', ':worktree:')] ||
-        hunkListIds[hunkId.replace(':worktree:', ':index:')];
+        hunkListIds[hunkId.replace(':worktree:', ':index:')]
+    );
 }
 
 export class ChangelistStateService {
@@ -40,10 +50,10 @@ export class ChangelistStateService {
     private state: PersistedChangelistState = {
         lists: [
             { id: ChangelistStateService.DEFAULT_LIST_ID, name: 'Changes' },
-            { id: ChangelistStateService.INACTIVE_LIST_ID, name: 'Inactive Changes' }
+            { id: ChangelistStateService.INACTIVE_LIST_ID, name: 'Inactive Changes' },
         ],
         activeListId: ChangelistStateService.DEFAULT_LIST_ID,
-        assignments: {}
+        assignments: {},
     };
 
     private storageKey: string;
@@ -68,10 +78,12 @@ export class ChangelistStateService {
 
         // Migrate the old global key only for the repository that previously owned it.
         if (!saved && this.repoPath && this.migrateGlobalState) {
-             const globalSaved = this.context.workspaceState.get<PersistedChangelistState>(ChangelistStateService.STORAGE_KEY);
-             if (globalSaved) {
-                 saved = globalSaved;
-             }
+            const globalSaved = this.context.workspaceState.get<PersistedChangelistState>(
+                ChangelistStateService.STORAGE_KEY
+            );
+            if (globalSaved) {
+                saved = globalSaved;
+            }
         }
 
         if (saved) {
@@ -100,7 +112,7 @@ export class ChangelistStateService {
         }
 
         const ensureList = (id: string, name: string) => {
-            if (!this.state.lists.some(list => list.id === id)) {
+            if (!this.state.lists.some((list) => list.id === id)) {
                 this.state.lists.push({ id, name });
             }
         };
@@ -109,7 +121,7 @@ export class ChangelistStateService {
         ensureList(ChangelistStateService.INACTIVE_LIST_ID, 'Inactive Changes');
 
         const seen = new Set<string>();
-        this.state.lists = this.state.lists.filter(list => {
+        this.state.lists = this.state.lists.filter((list) => {
             if (!list.id || seen.has(list.id)) {
                 return false;
             }
@@ -117,8 +129,10 @@ export class ChangelistStateService {
             return true;
         });
 
-        if (!this.state.lists.some(list => list.id === this.state.activeListId)) {
-            this.state.activeListId = this.state.lists.find(list => list.id !== ChangelistStateService.INACTIVE_LIST_ID)?.id || ChangelistStateService.DEFAULT_LIST_ID;
+        if (!this.state.lists.some((list) => list.id === this.state.activeListId)) {
+            this.state.activeListId =
+                this.state.lists.find((list) => list.id !== ChangelistStateService.INACTIVE_LIST_ID)?.id ||
+                ChangelistStateService.DEFAULT_LIST_ID;
         }
 
         if (this.state.activeListId === ChangelistStateService.INACTIVE_LIST_ID) {
@@ -154,23 +168,27 @@ export class ChangelistStateService {
     }
 
     private hasList(id: string): boolean {
-        return this.state.lists.some(list => list.id === id);
+        return this.state.lists.some((list) => list.id === id);
     }
 
     private createInfo(): ChangelistInfo[] {
-        return this.state.lists.map(list => ({
+        return this.state.lists.map((list) => ({
             id: list.id,
             name: list.name,
-            isDefault: list.id === ChangelistStateService.DEFAULT_LIST_ID || list.id === ChangelistStateService.INACTIVE_LIST_ID,
-            isActive: list.id === this.state.activeListId
+            isDefault:
+                list.id === ChangelistStateService.DEFAULT_LIST_ID ||
+                list.id === ChangelistStateService.INACTIVE_LIST_ID,
+            isActive: list.id === this.state.activeListId,
         }));
     }
 
     private getActiveMode(): ChangelistMode {
-        return this.context.workspaceState.get<ChangelistMode>(
-            ChangelistStateService.MODE_STORAGE_KEY,
-            vscode.workspace.getConfiguration('intelli-git').get<ChangelistMode>('changelist.mode', 'staged')
-        ) || 'staged';
+        return (
+            this.context.workspaceState.get<ChangelistMode>(
+                ChangelistStateService.MODE_STORAGE_KEY,
+                vscode.workspace.getConfiguration('intelli-git').get<ChangelistMode>('changelist.mode', 'staged')
+            ) || 'staged'
+        );
     }
 
     public async setMode(mode: ChangelistMode): Promise<void> {
@@ -183,7 +201,7 @@ export class ChangelistStateService {
             mode: this.getActiveMode(),
             activeListId: this.state.activeListId,
             lists: this.createInfo(),
-            assignments: this.state.assignments
+            assignments: this.state.assignments,
         };
     }
 
@@ -191,18 +209,22 @@ export class ChangelistStateService {
         const id = `changes-${Date.now()}`;
         this.state.lists.push({ id, name });
         await this.saveState();
-        return this.createInfo().find(list => list.id === id)!;
+        return this.createInfo().find((list) => list.id === id)!;
     }
 
     public async renameList(id: string, name: string): Promise<ChangelistInfo> {
-        const target = this.state.lists.find(list => list.id === id);
-        if (!target || id === ChangelistStateService.DEFAULT_LIST_ID || id === ChangelistStateService.INACTIVE_LIST_ID) {
+        const target = this.state.lists.find((list) => list.id === id);
+        if (
+            !target ||
+            id === ChangelistStateService.DEFAULT_LIST_ID ||
+            id === ChangelistStateService.INACTIVE_LIST_ID
+        ) {
             throw new Error(`Unknown changelist: ${id}`);
         }
 
         target.name = name;
         await this.saveState();
-        return this.createInfo().find(list => list.id === id)!;
+        return this.createInfo().find((list) => list.id === id)!;
     }
 
     public async deleteList(id: string): Promise<void> {
@@ -214,7 +236,7 @@ export class ChangelistStateService {
             return;
         }
 
-        const target = this.state.lists.find(list => list.id === id);
+        const target = this.state.lists.find((list) => list.id === id);
         if (!target) {
             return;
         }
@@ -235,7 +257,7 @@ export class ChangelistStateService {
             }
         }
 
-        this.state.lists = this.state.lists.filter(list => list.id !== id);
+        this.state.lists = this.state.lists.filter((list) => list.id !== id);
         if (this.state.activeListId === id) {
             this.state.activeListId = fallbackId;
         }
@@ -301,13 +323,13 @@ export class ChangelistStateService {
         }
 
         for (const [path, entries] of grouped.entries()) {
-            if (entries.some(entry => entry.status === '?')) {
+            if (entries.some((entry) => entry.status === '?')) {
                 continue;
             }
 
-            const hunks = Array.from(new Map(
-                entries.flatMap(entry => (entry.hunks || []).map(hunk => [hunk.id, hunk]))
-            ).values());
+            const hunks = Array.from(
+                new Map(entries.flatMap((entry) => (entry.hunks || []).map((hunk) => [hunk.id, hunk]))).values()
+            );
             const assignment = this.state.assignments[path] || {};
 
             if (hunks.length > 0) {
@@ -356,7 +378,7 @@ export class ChangelistStateService {
                 continue;
             }
 
-            if (assignment.hunkListIds && Object.values(assignment.hunkListIds).some(listId => listId === id)) {
+            if (assignment.hunkListIds && Object.values(assignment.hunkListIds).some((listId) => listId === id)) {
                 count += 1;
             }
         }
@@ -364,7 +386,11 @@ export class ChangelistStateService {
         return count;
     }
 
-    public buildCommitPlan(status: FileStatus[], requestedFiles?: Iterable<string>, targetListId = this.state.activeListId): CommitPlan {
+    public buildCommitPlan(
+        status: FileStatus[],
+        requestedFiles?: Iterable<string>,
+        targetListId = this.state.activeListId
+    ): CommitPlan {
         const requestedFileValues = requestedFiles ? Array.from(requestedFiles) : [];
         const requestedFileSet = requestedFileValues.length > 0 ? new Set(requestedFileValues) : undefined;
         const grouped = new Map<string, FileStatus[]>();
@@ -384,7 +410,7 @@ export class ChangelistStateService {
             }
 
             const assignment = this.state.assignments[path];
-            if (entries.some(entry => entry.status === '?')) {
+            if (entries.some((entry) => entry.status === '?')) {
                 const listId = assignment?.fileListId || (requestedFileSet?.has(path) ? targetListId : undefined);
                 if (listId === targetListId) {
                     files.add(path);
@@ -394,11 +420,11 @@ export class ChangelistStateService {
                 continue;
             }
 
-            const hunks = Array.from(new Map(
-                entries.flatMap(entry => (entry.hunks || []).map(hunk => [hunk.id, hunk]))
-            ).values());
-            const inactiveHunkIds = new Set(entries.flatMap(entry => entry.inactiveHunkIds || []));
-            const isInactiveFile = entries.some(entry => entry.inactive);
+            const hunks = Array.from(
+                new Map(entries.flatMap((entry) => (entry.hunks || []).map((hunk) => [hunk.id, hunk]))).values()
+            );
+            const inactiveHunkIds = new Set(entries.flatMap((entry) => entry.inactiveHunkIds || []));
+            const isInactiveFile = entries.some((entry) => entry.inactive);
 
             if (isInactiveFile) {
                 excludedFiles.add(path);
@@ -407,8 +433,13 @@ export class ChangelistStateService {
 
             if (hunks.length > 0) {
                 const excludedHunks = hunks
-                    .filter(hunk => hasEquivalentHunkId(hunk.id, inactiveHunkIds) || (getEquivalentHunkAssignment(hunk.id, assignment?.hunkListIds) || this.state.activeListId) !== targetListId)
-                    .map(hunk => hunk.id);
+                    .filter(
+                        (hunk) =>
+                            hasEquivalentHunkId(hunk.id, inactiveHunkIds) ||
+                            (getEquivalentHunkAssignment(hunk.id, assignment?.hunkListIds) ||
+                                this.state.activeListId) !== targetListId
+                    )
+                    .map((hunk) => hunk.id);
 
                 if (excludedHunks.length < hunks.length) {
                     files.add(path);
@@ -433,7 +464,7 @@ export class ChangelistStateService {
         return {
             files: Array.from(files),
             excludedFiles: Array.from(excludedFiles),
-            excludedHunkIdsByPath
+            excludedHunkIdsByPath,
         };
     }
 }

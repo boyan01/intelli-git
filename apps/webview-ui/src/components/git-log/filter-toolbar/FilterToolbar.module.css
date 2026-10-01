@@ -236,7 +236,7 @@
     font-size: 14px;
 }
 
-.dropdownItem[aria-checked="true"] .dropdownItemCheck {
+.dropdownItem[aria-checked='true'] .dropdownItemCheck {
     opacity: 1;
 }
 

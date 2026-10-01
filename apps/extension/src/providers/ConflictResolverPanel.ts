@@ -1,6 +1,10 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
-import type { ConflictResolverContextActionRequest, ConflictResolverOpenRequest, RepositoryFileReference } from '@shared/messages';
+import type {
+    ConflictResolverContextActionRequest,
+    ConflictResolverOpenRequest,
+    RepositoryFileReference,
+} from '@shared/messages';
 import { BaseWebviewProvider, WebviewProviderOptions } from './BaseWebviewProvider';
 
 function getPanelKey(file: RepositoryFileReference): string {
@@ -11,9 +15,7 @@ export async function openConflictFile(
     options: WebviewProviderOptions,
     file: ConflictResolverOpenRequest
 ): Promise<void> {
-    const enabled = vscode.workspace
-        .getConfiguration('intelli-git.mergeEditor')
-        .get<boolean>('enabled', false);
+    const enabled = vscode.workspace.getConfiguration('intelli-git.mergeEditor').get<boolean>('enabled', false);
 
     if (enabled) {
         ConflictResolverPanel.createOrShow(options, file);
@@ -59,11 +61,11 @@ export class ConflictResolverPanel extends BaseWebviewProvider {
     protected getInitialState(): unknown {
         const conflictFile: RepositoryFileReference = {
             path: this.file.path,
-            repoPath: this.file.repoPath
+            repoPath: this.file.repoPath,
         };
 
         return {
-            conflictFile
+            conflictFile,
         };
     }
 
@@ -75,7 +77,7 @@ export class ConflictResolverPanel extends BaseWebviewProvider {
         return {
             updateConflictResolverTitle: (file: RepositoryFileReference) => {
                 this.updateActiveFile(file);
-            }
+            },
         };
     }
 
@@ -127,12 +129,12 @@ export class ConflictResolverPanel extends BaseWebviewProvider {
             `Merge: ${path.basename(file.path)}`,
             {
                 viewColumn: vscode.ViewColumn.Active,
-                preserveFocus: false
+                preserveFocus: false,
             },
             {
                 enableScripts: true,
                 localResourceRoots: [options.extensionUri],
-                retainContextWhenHidden: true
+                retainContextWhenHidden: true,
             }
         );
 

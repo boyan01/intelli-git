@@ -53,7 +53,11 @@
 }
 
 .local {
-    background-color: color-mix(in srgb, var(--vscode-gitDecoration-untrackedResourceForeground, #73c991) 14%, transparent);
+    background-color: color-mix(
+        in srgb,
+        var(--vscode-gitDecoration-untrackedResourceForeground, #73c991) 14%,
+        transparent
+    );
     border-color: color-mix(in srgb, var(--vscode-gitDecoration-untrackedResourceForeground, #73c991) 42%, transparent);
     color: var(--vscode-gitDecoration-untrackedResourceForeground, #73c991);
 }

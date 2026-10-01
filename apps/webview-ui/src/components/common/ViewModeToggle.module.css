@@ -35,7 +35,9 @@
     opacity: 0;
     pointer-events: none;
     transform: translate(-50%, -2px);
-    transition: opacity 80ms ease, transform 80ms ease;
+    transition:
+        opacity 80ms ease,
+        transform 80ms ease;
     white-space: nowrap;
 }
 

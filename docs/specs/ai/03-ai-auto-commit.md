@@ -160,4 +160,3 @@ interface AiAutoCommitPreview {
 - changes mode commits only active changelist.
 - staged mode commits only staged files.
 - Result screen shows commit hash and next actions.
-

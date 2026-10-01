@@ -20,7 +20,7 @@ export function parseHunkSignature(hunkId: string): HunkSignature | null {
             oldStart: Number(newFormatMatch[2]),
             oldLineCount: Number(newFormatMatch[3]),
             newStart: Number(newFormatMatch[4]),
-            newLineCount: Number(newFormatMatch[5])
+            newLineCount: Number(newFormatMatch[5]),
         };
     }
 
@@ -32,7 +32,7 @@ export function parseHunkSignature(hunkId: string): HunkSignature | null {
     return {
         id: hunkId,
         oldStart: Number(oldFormatMatch[1]),
-        newStart: Number(oldFormatMatch[2])
+        newStart: Number(oldFormatMatch[2]),
     };
 }
 
@@ -43,7 +43,7 @@ export function signatureFromHunk(hunk: GitHunk): HunkSignature {
         oldStart: hunk.oldStart,
         oldLineCount: hunk.oldLineCount,
         newStart: hunk.newStart,
-        newLineCount: hunk.newLineCount
+        newLineCount: hunk.newLineCount,
     };
 }
 
@@ -74,8 +74,8 @@ export function remapHunkValues<T>(
         return nextValues;
     }
 
-    const currentIds = new Set(hunks.map(hunk => hunk.id));
-    const unmatchedHunks = new Map(hunks.map(hunk => [hunk.id, signatureFromHunk(hunk)]));
+    const currentIds = new Set(hunks.map((hunk) => hunk.id));
+    const unmatchedHunks = new Map(hunks.map((hunk) => [hunk.id, signatureFromHunk(hunk)]));
     const staleEntries: Array<[HunkSignature, T]> = [];
 
     for (const [hunkId, value] of Object.entries(previousValues)) {
@@ -117,8 +117,8 @@ export function remapHunkValues<T>(
 }
 
 export function remapHunkIdSet(hunks: GitHunk[], previousHunkIds: string[]): string[] {
-    const currentIds = new Set(hunks.map(hunk => hunk.id));
-    const unmatchedHunks = new Map(hunks.map(hunk => [hunk.id, signatureFromHunk(hunk)]));
+    const currentIds = new Set(hunks.map((hunk) => hunk.id));
+    const unmatchedHunks = new Map(hunks.map((hunk) => [hunk.id, signatureFromHunk(hunk)]));
     const nextHunkIds = new Set<string>();
     const staleSignatures: HunkSignature[] = [];
 

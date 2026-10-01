@@ -127,7 +127,7 @@ interface StickyHeaderState<T> {
 
 function flattenVisibleNodes<T>(nodes: TreeNode<T>[], expandedIds: Set<string>): FlatTreeNode<T>[] {
     const result: FlatTreeNode<T>[] = [];
-    const stack = nodes.map(node => ({ node, depth: 0, ancestorIds: [] as string[] })).reverse();
+    const stack = nodes.map((node) => ({ node, depth: 0, ancestorIds: [] as string[] })).reverse();
 
     while (stack.length > 0) {
         const item = stack.pop()!;
@@ -139,7 +139,7 @@ function flattenVisibleNodes<T>(nodes: TreeNode<T>[], expandedIds: Set<string>):
                 stack.push({
                     node: children[i],
                     depth: item.depth + 1,
-                    ancestorIds: [...item.ancestorIds, item.node.id]
+                    ancestorIds: [...item.ancestorIds, item.node.id],
                 });
             }
         }
@@ -177,10 +177,7 @@ function getStickyHeaderStates<T>(
         return depth;
     };
 
-    const topIndex = Math.min(
-        flatNodes.length - 1,
-        Math.max(0, Math.floor(visibleTop / ROW_HEIGHT))
-    );
+    const topIndex = Math.min(flatNodes.length - 1, Math.max(0, Math.floor(visibleTop / ROW_HEIGHT)));
 
     let lastActiveIndex = topIndex;
     while (lastActiveIndex + 1 < flatNodes.length) {
@@ -200,7 +197,7 @@ function getStickyHeaderStates<T>(
 
     const candidateIds = [
         ...lastActiveNode.ancestorIds,
-        ...(canStick(lastActiveNode.node) ? [lastActiveNode.node.id] : [])
+        ...(canStick(lastActiveNode.node) ? [lastActiveNode.node.id] : []),
     ];
 
     const result: StickyHeaderState<T>[] = [];
@@ -230,7 +227,7 @@ function getStickyHeaderStates<T>(
 
         result.push({
             item: candidate,
-            offset
+            offset,
         });
     }
 
@@ -242,7 +239,7 @@ function applyStickyHeaderTransforms<T>(
     states: StickyHeaderState<T>[],
     hideMissing = true
 ) {
-    const stateById = new Map(states.map(state => [state.item.node.id, state]));
+    const stateById = new Map(states.map((state) => [state.item.node.id, state]));
     elements.forEach((element, id) => {
         const state = stateById.get(id);
         if (state) {
@@ -275,7 +272,7 @@ function getScrollViewport(scrollTarget: HTMLElement | Window) {
         return {
             top: 0,
             bottom: window.innerHeight,
-            height: window.innerHeight
+            height: window.innerHeight,
         };
     }
 
@@ -283,7 +280,7 @@ function getScrollViewport(scrollTarget: HTMLElement | Window) {
     return {
         top: rect.top,
         bottom: rect.bottom,
-        height: rect.height
+        height: rect.height,
     };
 }
 
@@ -310,15 +307,45 @@ function isInteractiveKeyboardTarget(target: EventTarget | null): boolean {
 
 const TreeNodeItem = <T,>(props: TreeNodeItemProps<T>) => {
     const {
-        node, depth, isStickyClone = false, expandedIds, selectedId, focusedId, dragOverId,
-        toggleNode, onSelect, onAction, onDoubleClick, onContextMenu, onFocusNodeChange,
-        renderLabel, renderTrailing, getNodeClassName, getContextData, renderLeading,
-        baseIndent, indent, isDraggable, isDropTarget,
-        getDropTargetRootId, onDrop, getDragData, getDragLabel,
-        setFocusedId, setDragOverId, focusTree, dragGhostRef,
-        draggedNodeRef, clearDragTimeoutRef, scheduleDragAutoScroll,
-        startDragAutoScrollTracking, stopDragAutoScrollTracking,
-        nodeElementId, ariaSetSize, ariaPosInSet, setNodeElement
+        node,
+        depth,
+        isStickyClone = false,
+        expandedIds,
+        selectedId,
+        focusedId,
+        dragOverId,
+        toggleNode,
+        onSelect,
+        onAction,
+        onDoubleClick,
+        onContextMenu,
+        onFocusNodeChange,
+        renderLabel,
+        renderTrailing,
+        getNodeClassName,
+        getContextData,
+        renderLeading,
+        baseIndent,
+        indent,
+        isDraggable,
+        isDropTarget,
+        getDropTargetRootId,
+        onDrop,
+        getDragData,
+        getDragLabel,
+        setFocusedId,
+        setDragOverId,
+        focusTree,
+        dragGhostRef,
+        draggedNodeRef,
+        clearDragTimeoutRef,
+        scheduleDragAutoScroll,
+        startDragAutoScrollTracking,
+        stopDragAutoScrollTracking,
+        nodeElementId,
+        ariaSetSize,
+        ariaPosInSet,
+        setNodeElement,
     } = props;
 
     const hasChildren = node.children && node.children.length > 0;
@@ -492,9 +519,7 @@ const TreeNodeItem = <T,>(props: TreeNodeItemProps<T>) => {
                     if (hasChildren) toggleNode(node.id);
                 }}
             >
-                {hasChildren && (
-                    <i className={`codicon codicon-chevron-${isExpanded ? 'down' : 'right'}`} />
-                )}
+                {hasChildren && <i className={`codicon codicon-chevron-${isExpanded ? 'down' : 'right'}`} />}
             </div>
 
             {leadingContent && <div className={styles.leading}>{leadingContent}</div>}
@@ -514,16 +539,36 @@ const TreeNodeItem = <T,>(props: TreeNodeItemProps<T>) => {
     );
 };
 
-function BasicTreeViewInner<T>(
-    props: BasicTreeViewProps<T>,
-    ref: React.ForwardedRef<BasicTreeViewRef>
-) {
+function BasicTreeViewInner<T>(props: BasicTreeViewProps<T>, ref: React.ForwardedRef<BasicTreeViewRef>) {
     const {
-        nodes, expandedIds: controlledExpandedIds, selectedId, defaultExpandAll = false,
-        stickyHeaders = false, isStickyHeader,
-        onToggle, onSelect, onAction, onDoubleClick, onContextMenu, onFocusNodeChange, onFocusChange, renderLabel, renderTrailing,
-        getNodeClassName, getContextData, indent = 8, baseIndent = 0, renderLeading, isDraggable, isDropTarget,
-        getDropTargetRootId, onDrop, getDragData, getDragLabel, rootContextData, ariaLabel
+        nodes,
+        expandedIds: controlledExpandedIds,
+        selectedId,
+        defaultExpandAll = false,
+        stickyHeaders = false,
+        isStickyHeader,
+        onToggle,
+        onSelect,
+        onAction,
+        onDoubleClick,
+        onContextMenu,
+        onFocusNodeChange,
+        onFocusChange,
+        renderLabel,
+        renderTrailing,
+        getNodeClassName,
+        getContextData,
+        indent = 8,
+        baseIndent = 0,
+        renderLeading,
+        isDraggable,
+        isDropTarget,
+        getDropTargetRootId,
+        onDrop,
+        getDragData,
+        getDragLabel,
+        rootContextData,
+        ariaLabel,
     } = props;
 
     const rootRef = useRef<HTMLDivElement>(null);
@@ -581,21 +626,24 @@ function BasicTreeViewInner<T>(
         }
     }, []);
 
-    const toggleNode = useCallback((id: string) => {
-        const isExpanded = expandedIds.has(id);
-        onToggle?.(id, !isExpanded);
-        if (!controlledExpandedIds) {
-            setInternalExpandedIds(prev => {
-                const next = new Set(prev);
-                if (next.has(id)) {
-                    next.delete(id);
-                } else {
-                    next.add(id);
-                }
-                return next;
-            });
-        }
-    }, [expandedIds, onToggle, controlledExpandedIds]);
+    const toggleNode = useCallback(
+        (id: string) => {
+            const isExpanded = expandedIds.has(id);
+            onToggle?.(id, !isExpanded);
+            if (!controlledExpandedIds) {
+                setInternalExpandedIds((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(id)) {
+                        next.delete(id);
+                    } else {
+                        next.add(id);
+                    }
+                    return next;
+                });
+            }
+        },
+        [expandedIds, onToggle, controlledExpandedIds]
+    );
 
     const scrollIndexIntoView = useCallback((index: number) => {
         const root = rootRef.current;
@@ -604,7 +652,8 @@ function BasicTreeViewInner<T>(
         const scrollParent = getScrollParent(root);
         const rootRect = root.getBoundingClientRect();
         const viewportTop = scrollParent instanceof Window ? 0 : scrollParent.getBoundingClientRect().top;
-        const viewportBottom = scrollParent instanceof Window ? window.innerHeight : scrollParent.getBoundingClientRect().bottom;
+        const viewportBottom =
+            scrollParent instanceof Window ? window.innerHeight : scrollParent.getBoundingClientRect().bottom;
         const itemTop = rootRect.top + index * ROW_HEIGHT;
         const itemBottom = itemTop + ROW_HEIGHT;
 
@@ -615,128 +664,132 @@ function BasicTreeViewInner<T>(
         }
     }, []);
 
-    const focusItemAtIndex = useCallback((index: number) => {
-        if (flatNodes.length === 0) return;
+    const focusItemAtIndex = useCallback(
+        (index: number) => {
+            if (flatNodes.length === 0) return;
 
-        const boundedIndex = Math.max(0, Math.min(flatNodes.length - 1, index));
-        const item = flatNodes[boundedIndex];
-        setFocusedId(item.node.id);
-        onFocusNodeChange?.(item.node);
-        scrollIndexIntoView(boundedIndex);
-    }, [flatNodes, onFocusNodeChange, scrollIndexIntoView]);
+            const boundedIndex = Math.max(0, Math.min(flatNodes.length - 1, index));
+            const item = flatNodes[boundedIndex];
+            setFocusedId(item.node.id);
+            onFocusNodeChange?.(item.node);
+            scrollIndexIntoView(boundedIndex);
+        },
+        [flatNodes, onFocusNodeChange, scrollIndexIntoView]
+    );
 
-    const activateItem = useCallback((item: FlatTreeNode<T>) => {
-        const hasChildren = !!item.node.children?.length;
-        if (hasChildren) {
-            toggleNode(item.node.id);
-            return;
-        }
+    const activateItem = useCallback(
+        (item: FlatTreeNode<T>) => {
+            const hasChildren = !!item.node.children?.length;
+            if (hasChildren) {
+                toggleNode(item.node.id);
+                return;
+            }
 
-        (onAction ?? onDoubleClick ?? onSelect)?.(item.node);
-    }, [onAction, onDoubleClick, onSelect, toggleNode]);
+            (onAction ?? onDoubleClick ?? onSelect)?.(item.node);
+        },
+        [onAction, onDoubleClick, onSelect, toggleNode]
+    );
 
-    const handleKeyDown = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
-        if (isInteractiveKeyboardTarget(event.target)) {
-            return;
-        }
+    const handleKeyDown = useCallback(
+        (event: React.KeyboardEvent<HTMLDivElement>) => {
+            if (isInteractiveKeyboardTarget(event.target)) {
+                return;
+            }
 
-        const currentIndex = focusedId ? flatNodeIndexById.get(focusedId) : undefined;
-        const fallbackIndex = selectedId ? flatNodeIndexById.get(selectedId) : undefined;
-        const activeIndex = currentIndex ?? fallbackIndex ?? 0;
-        const activeItem = flatNodes[activeIndex];
+            const currentIndex = focusedId ? flatNodeIndexById.get(focusedId) : undefined;
+            const fallbackIndex = selectedId ? flatNodeIndexById.get(selectedId) : undefined;
+            const activeIndex = currentIndex ?? fallbackIndex ?? 0;
+            const activeItem = flatNodes[activeIndex];
 
-        if (!activeItem) {
-            return;
-        }
+            if (!activeItem) {
+                return;
+            }
 
-        switch (event.key) {
-            case 'ArrowDown':
-                event.preventDefault();
-                focusItemAtIndex(activeIndex + 1);
-                break;
-            case 'ArrowUp':
-                event.preventDefault();
-                focusItemAtIndex(activeIndex - 1);
-                break;
-            case 'Home':
-                event.preventDefault();
-                focusItemAtIndex(0);
-                break;
-            case 'End':
-                event.preventDefault();
-                focusItemAtIndex(flatNodes.length - 1);
-                break;
-            case 'ArrowRight': {
-                const hasChildren = !!activeItem.node.children?.length;
-                if (!hasChildren) return;
+            switch (event.key) {
+                case 'ArrowDown':
+                    event.preventDefault();
+                    focusItemAtIndex(activeIndex + 1);
+                    break;
+                case 'ArrowUp':
+                    event.preventDefault();
+                    focusItemAtIndex(activeIndex - 1);
+                    break;
+                case 'Home':
+                    event.preventDefault();
+                    focusItemAtIndex(0);
+                    break;
+                case 'End':
+                    event.preventDefault();
+                    focusItemAtIndex(flatNodes.length - 1);
+                    break;
+                case 'ArrowRight': {
+                    const hasChildren = !!activeItem.node.children?.length;
+                    if (!hasChildren) return;
 
-                event.preventDefault();
-                if (!expandedIds.has(activeItem.node.id)) {
-                    toggleNode(activeItem.node.id);
-                    return;
+                    event.preventDefault();
+                    if (!expandedIds.has(activeItem.node.id)) {
+                        toggleNode(activeItem.node.id);
+                        return;
+                    }
+                    focusItemAtIndex(activeIndex + 1);
+                    break;
                 }
-                focusItemAtIndex(activeIndex + 1);
-                break;
-            }
-            case 'ArrowLeft': {
-                const hasChildren = !!activeItem.node.children?.length;
-                event.preventDefault();
+                case 'ArrowLeft': {
+                    const hasChildren = !!activeItem.node.children?.length;
+                    event.preventDefault();
 
-                if (hasChildren && expandedIds.has(activeItem.node.id)) {
-                    toggleNode(activeItem.node.id);
-                    return;
-                }
+                    if (hasChildren && expandedIds.has(activeItem.node.id)) {
+                        toggleNode(activeItem.node.id);
+                        return;
+                    }
 
-                const parentId = activeItem.ancestorIds[activeItem.ancestorIds.length - 1];
-                const parentIndex = parentId ? flatNodeIndexById.get(parentId) : undefined;
-                if (parentIndex !== undefined) {
-                    focusItemAtIndex(parentIndex);
+                    const parentId = activeItem.ancestorIds[activeItem.ancestorIds.length - 1];
+                    const parentIndex = parentId ? flatNodeIndexById.get(parentId) : undefined;
+                    if (parentIndex !== undefined) {
+                        focusItemAtIndex(parentIndex);
+                    }
+                    break;
                 }
-                break;
+                case 'Enter':
+                case ' ':
+                    event.preventDefault();
+                    activateItem(activeItem);
+                    break;
+                case 'ContextMenu': {
+                    event.preventDefault();
+                    const element = nodeElementRefs.current.get(activeItem.node.id);
+                    const rect = element?.getBoundingClientRect();
+                    element?.dispatchEvent(
+                        new MouseEvent('contextmenu', {
+                            bubbles: true,
+                            cancelable: true,
+                            clientX: rect?.left ?? 0,
+                            clientY: rect?.bottom ?? 0,
+                        })
+                    );
+                    break;
+                }
+                case 'F10': {
+                    if (!event.shiftKey) return;
+                    event.preventDefault();
+                    const element = nodeElementRefs.current.get(activeItem.node.id);
+                    const rect = element?.getBoundingClientRect();
+                    element?.dispatchEvent(
+                        new MouseEvent('contextmenu', {
+                            bubbles: true,
+                            cancelable: true,
+                            clientX: rect?.left ?? 0,
+                            clientY: rect?.bottom ?? 0,
+                        })
+                    );
+                    break;
+                }
+                default:
+                    break;
             }
-            case 'Enter':
-            case ' ':
-                event.preventDefault();
-                activateItem(activeItem);
-                break;
-            case 'ContextMenu': {
-                event.preventDefault();
-                const element = nodeElementRefs.current.get(activeItem.node.id);
-                const rect = element?.getBoundingClientRect();
-                element?.dispatchEvent(new MouseEvent('contextmenu', {
-                    bubbles: true,
-                    cancelable: true,
-                    clientX: rect?.left ?? 0,
-                    clientY: rect?.bottom ?? 0
-                }));
-                break;
-            }
-            case 'F10': {
-                if (!event.shiftKey) return;
-                event.preventDefault();
-                const element = nodeElementRefs.current.get(activeItem.node.id);
-                const rect = element?.getBoundingClientRect();
-                element?.dispatchEvent(new MouseEvent('contextmenu', {
-                    bubbles: true,
-                    cancelable: true,
-                    clientX: rect?.left ?? 0,
-                    clientY: rect?.bottom ?? 0
-                }));
-                break;
-            }
-            default:
-                break;
-        }
-    }, [
-        activateItem,
-        expandedIds,
-        flatNodeIndexById,
-        flatNodes,
-        focusItemAtIndex,
-        focusedId,
-        selectedId,
-        toggleNode
-    ]);
+        },
+        [activateItem, expandedIds, flatNodeIndexById, flatNodes, focusItemAtIndex, focusedId, selectedId, toggleNode]
+    );
 
     const updateVisibleRange = useCallback(() => {
         const root = rootRef.current;
@@ -762,11 +815,11 @@ function BasicTreeViewInner<T>(
 
         applyStickyHeaderTransforms(stickyHeaderRefs.current, nextStickyHeaderStates, false);
 
-        setVisibleRange(prev => (
+        setVisibleRange((prev) =>
             prev.start === nextStart && prev.end === end && prev.visibleTop === visibleTop
                 ? prev
                 : { start: nextStart, end, visibleTop }
-        ));
+        );
     }, [flatNodeIndexById, flatNodes, isStickyHeader, stickyHeaders, totalHeight]);
 
     useEffect(() => {
@@ -787,28 +840,34 @@ function BasicTreeViewInner<T>(
         nodeElementRefs.current.get(focusedId)?.focus({ preventScroll: true });
     }, [focusedId, isTreeFocused, visibleItems]);
 
-    const handleRootFocus = useCallback((event: React.FocusEvent<HTMLDivElement>) => {
-        if (event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget)) {
-            return;
-        }
+    const handleRootFocus = useCallback(
+        (event: React.FocusEvent<HTMLDivElement>) => {
+            if (event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget)) {
+                return;
+            }
 
-        setIsTreeFocused(true);
-        onFocusChange?.(true);
+            setIsTreeFocused(true);
+            onFocusChange?.(true);
 
-        if (!focusedId) {
-            const selectedIndex = selectedId ? flatNodeIndexById.get(selectedId) : undefined;
-            focusItemAtIndex(selectedIndex ?? 0);
-        }
-    }, [flatNodeIndexById, focusItemAtIndex, focusedId, onFocusChange, selectedId]);
+            if (!focusedId) {
+                const selectedIndex = selectedId ? flatNodeIndexById.get(selectedId) : undefined;
+                focusItemAtIndex(selectedIndex ?? 0);
+            }
+        },
+        [flatNodeIndexById, focusItemAtIndex, focusedId, onFocusChange, selectedId]
+    );
 
-    const handleRootBlur = useCallback((event: React.FocusEvent<HTMLDivElement>) => {
-        if (event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget)) {
-            return;
-        }
+    const handleRootBlur = useCallback(
+        (event: React.FocusEvent<HTMLDivElement>) => {
+            if (event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget)) {
+                return;
+            }
 
-        setIsTreeFocused(false);
-        onFocusChange?.(false);
-    }, [onFocusChange]);
+            setIsTreeFocused(false);
+            onFocusChange?.(false);
+        },
+        [onFocusChange]
+    );
 
     const stopDragAutoScroll = useCallback(() => {
         dragAutoScrollVelocityRef.current = 0;
@@ -826,49 +885,52 @@ function BasicTreeViewInner<T>(
         }
     }, [stopDragAutoScroll]);
 
-    const scheduleDragAutoScroll = useCallback((clientY: number) => {
-        const root = rootRef.current;
-        if (!root) return;
+    const scheduleDragAutoScroll = useCallback(
+        (clientY: number) => {
+            const root = rootRef.current;
+            if (!root) return;
 
-        const scrollTarget = getScrollParent(root);
-        const viewport = getScrollViewport(scrollTarget);
-        const edgeSize = Math.min(DRAG_AUTO_SCROLL_EDGE, Math.max(24, viewport.height / 3));
-        const topDistance = clientY - viewport.top;
-        const bottomDistance = viewport.bottom - clientY;
-        let velocity = 0;
+            const scrollTarget = getScrollParent(root);
+            const viewport = getScrollViewport(scrollTarget);
+            const edgeSize = Math.min(DRAG_AUTO_SCROLL_EDGE, Math.max(24, viewport.height / 3));
+            const topDistance = clientY - viewport.top;
+            const bottomDistance = viewport.bottom - clientY;
+            let velocity = 0;
 
-        if (topDistance < edgeSize) {
-            const strength = Math.max(0, Math.min(1, (edgeSize - topDistance) / edgeSize));
-            velocity = -Math.ceil(strength * DRAG_AUTO_SCROLL_MAX_SPEED);
-        } else if (bottomDistance < edgeSize) {
-            const strength = Math.max(0, Math.min(1, (edgeSize - bottomDistance) / edgeSize));
-            velocity = Math.ceil(strength * DRAG_AUTO_SCROLL_MAX_SPEED);
-        }
+            if (topDistance < edgeSize) {
+                const strength = Math.max(0, Math.min(1, (edgeSize - topDistance) / edgeSize));
+                velocity = -Math.ceil(strength * DRAG_AUTO_SCROLL_MAX_SPEED);
+            } else if (bottomDistance < edgeSize) {
+                const strength = Math.max(0, Math.min(1, (edgeSize - bottomDistance) / edgeSize));
+                velocity = Math.ceil(strength * DRAG_AUTO_SCROLL_MAX_SPEED);
+            }
 
-        dragAutoScrollVelocityRef.current = velocity;
-        if (velocity === 0) {
-            stopDragAutoScroll();
-            return;
-        }
-
-        if (dragAutoScrollFrameRef.current !== null) {
-            return;
-        }
-
-        const tick = () => {
-            const nextVelocity = dragAutoScrollVelocityRef.current;
-            if (nextVelocity === 0) {
-                dragAutoScrollFrameRef.current = null;
+            dragAutoScrollVelocityRef.current = velocity;
+            if (velocity === 0) {
+                stopDragAutoScroll();
                 return;
             }
 
-            scrollTargetBy(scrollTarget, nextVelocity);
-            updateVisibleRange();
-            dragAutoScrollFrameRef.current = window.requestAnimationFrame(tick);
-        };
+            if (dragAutoScrollFrameRef.current !== null) {
+                return;
+            }
 
-        dragAutoScrollFrameRef.current = window.requestAnimationFrame(tick);
-    }, [stopDragAutoScroll, updateVisibleRange]);
+            const tick = () => {
+                const nextVelocity = dragAutoScrollVelocityRef.current;
+                if (nextVelocity === 0) {
+                    dragAutoScrollFrameRef.current = null;
+                    return;
+                }
+
+                scrollTargetBy(scrollTarget, nextVelocity);
+                updateVisibleRange();
+                dragAutoScrollFrameRef.current = window.requestAnimationFrame(tick);
+            };
+
+            dragAutoScrollFrameRef.current = window.requestAnimationFrame(tick);
+        },
+        [stopDragAutoScroll, updateVisibleRange]
+    );
 
     const startDragAutoScrollTracking = useCallback(() => {
         if (dragAutoScrollListenerRef.current) {
@@ -925,9 +987,7 @@ function BasicTreeViewInner<T>(
         scrollTarget.addEventListener('scroll', scheduleUpdate, { passive: true });
         window.addEventListener('resize', scheduleUpdate);
 
-        const resizeObserver = typeof ResizeObserver !== 'undefined'
-            ? new ResizeObserver(scheduleUpdate)
-            : null;
+        const resizeObserver = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(scheduleUpdate) : null;
         resizeObserver?.observe(root);
         if (resizeTarget instanceof HTMLElement) {
             resizeObserver?.observe(resizeTarget);
@@ -943,21 +1003,24 @@ function BasicTreeViewInner<T>(
         };
     }, [flatNodeIndexById, flatNodes, isStickyHeader, stickyHeaders, updateVisibleRange]);
 
-    React.useImperativeHandle(ref, () => ({
-        expandAll: () => {
-            const allIds = getAllExpandableIds(nodes);
-            if (!controlledExpandedIds) setInternalExpandedIds(allIds);
-            allIds.forEach(id => onToggle?.(id, true));
-        },
-        collapseAll: () => {
-            if (!controlledExpandedIds) setInternalExpandedIds(new Set());
-            expandedIds.forEach(id => onToggle?.(id, false));
-        }
-    }), [nodes, controlledExpandedIds, onToggle, expandedIds]);
+    React.useImperativeHandle(
+        ref,
+        () => ({
+            expandAll: () => {
+                const allIds = getAllExpandableIds(nodes);
+                if (!controlledExpandedIds) setInternalExpandedIds(allIds);
+                allIds.forEach((id) => onToggle?.(id, true));
+            },
+            collapseAll: () => {
+                if (!controlledExpandedIds) setInternalExpandedIds(new Set());
+                expandedIds.forEach((id) => onToggle?.(id, false));
+            },
+        }),
+        [nodes, controlledExpandedIds, onToggle, expandedIds]
+    );
 
-    const activeDescendantId = focusedId && flatNodeIndexById.has(focusedId)
-        ? getTreeNodeElementId(focusedId)
-        : undefined;
+    const activeDescendantId =
+        focusedId && flatNodeIndexById.has(focusedId) ? getTreeNodeElementId(focusedId) : undefined;
 
     return (
         <div
@@ -973,7 +1036,7 @@ function BasicTreeViewInner<T>(
             {...(rootContextData ? { 'data-vscode-context': JSON.stringify(rootContextData) } : {})}
             data-basic-tree-root="true"
         >
-            {stickyHeaderStates.map(stickyHeaderState => (
+            {stickyHeaderStates.map((stickyHeaderState) => (
                 <div
                     key={stickyHeaderState.item.node.id}
                     ref={(element) => {
@@ -1070,8 +1133,44 @@ function BasicTreeViewInner<T>(
                 />
             ))}
             <div className={styles.virtualSpacer} style={{ height: `${bottomSpacerHeight}px` }} />
-            <div ref={dragGhostRef} style={{ position: 'absolute', top: '-1000px', left: '-1000px', display: 'flex', alignItems: 'center', padding: '4px 8px', backgroundColor: 'var(--vscode-list-hoverBackground)', border: '1px solid var(--vscode-list-focusOutline)', borderRadius: '5px', color: 'var(--vscode-foreground)', fontFamily: 'var(--vscode-font-family)', fontSize: '13px', pointerEvents: 'none', zIndex: 9999, whiteSpace: 'nowrap' }}>
-                <div className="drag-badge" style={{ display: 'none', backgroundColor: 'var(--vscode-badge-background)', color: 'var(--vscode-badge-foreground)', borderRadius: '10px', padding: '0 6px', marginRight: '6px', fontSize: '11px', height: '16px', alignItems: 'center', justifyContent: 'center', minWidth: '16px' }}>0</div>
+            <div
+                ref={dragGhostRef}
+                style={{
+                    position: 'absolute',
+                    top: '-1000px',
+                    left: '-1000px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    padding: '4px 8px',
+                    backgroundColor: 'var(--vscode-list-hoverBackground)',
+                    border: '1px solid var(--vscode-list-focusOutline)',
+                    borderRadius: '5px',
+                    color: 'var(--vscode-foreground)',
+                    fontFamily: 'var(--vscode-font-family)',
+                    fontSize: '13px',
+                    pointerEvents: 'none',
+                    zIndex: 9999,
+                    whiteSpace: 'nowrap',
+                }}
+            >
+                <div
+                    className="drag-badge"
+                    style={{
+                        display: 'none',
+                        backgroundColor: 'var(--vscode-badge-background)',
+                        color: 'var(--vscode-badge-foreground)',
+                        borderRadius: '10px',
+                        padding: '0 6px',
+                        marginRight: '6px',
+                        fontSize: '11px',
+                        height: '16px',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        minWidth: '16px',
+                    }}
+                >
+                    0
+                </div>
                 <span className="drag-label"></span>
             </div>
         </div>

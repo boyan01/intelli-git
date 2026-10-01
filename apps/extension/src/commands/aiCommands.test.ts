@@ -4,28 +4,40 @@ import { registerAiCommands } from './aiCommands';
 
 const mocks = vi.hoisted(() => ({
     callbacks: new Map<string, (...args: unknown[]) => unknown>(),
-    quickPick: vi.fn(), input: vi.fn(), update: vi.fn(), listModels: vi.fn(),
-    token: { isCancellationRequested: false }
+    quickPick: vi.fn(),
+    input: vi.fn(),
+    update: vi.fn(),
+    listModels: vi.fn(),
+    token: { isCancellationRequested: false },
 }));
 vi.mock('../services/CodexCliService', () => ({ listCodexModels: mocks.listModels }));
 vi.mock('../utils/aiSecrets', () => ({ getAiApiKey: async () => '', setAiApiKey: vi.fn() }));
-vi.mock('vscode', async importOriginal => {
+vi.mock('vscode', async (importOriginal) => {
     const actual = await importOriginal<typeof import('vscode')>();
     return {
         ...actual,
-        commands: { ...actual.commands, registerCommand: (name: string, callback: (...args: unknown[]) => unknown) => {
-            mocks.callbacks.set(name, callback);
-            return { dispose() {} };
-        } },
-        workspace: { ...actual.workspace, getConfiguration: () => ({
-            get: (key: string, fallback: unknown) => ({ provider: 'codex', model: 'existing', path: '/opt/codex' }[key] ?? fallback),
-            update: mocks.update
-        }) },
-        window: { ...actual.window,
+        commands: {
+            ...actual.commands,
+            registerCommand: (name: string, callback: (...args: unknown[]) => unknown) => {
+                mocks.callbacks.set(name, callback);
+                return { dispose() {} };
+            },
+        },
+        workspace: {
+            ...actual.workspace,
+            getConfiguration: () => ({
+                get: (key: string, fallback: unknown) =>
+                    ({ provider: 'codex', model: 'existing', path: '/opt/codex' })[key] ?? fallback,
+                update: mocks.update,
+            }),
+        },
+        window: {
+            ...actual.window,
             showQuickPick: mocks.quickPick,
             showInputBox: mocks.input,
-            withProgress: async (_options: unknown, callback: (progress: unknown, token: unknown) => unknown) => callback({}, mocks.token)
-        }
+            withProgress: async (_options: unknown, callback: (progress: unknown, token: unknown) => unknown) =>
+                callback({}, mocks.token),
+        },
     };
 });
 
@@ -39,7 +51,17 @@ beforeEach(() => {
     registerAiCommands({ subscriptions: [] } as unknown as vscode.ExtensionContext);
     mocks.quickPick.mockResolvedValueOnce({ id: 'codex' }).mockResolvedValueOnce({ action: 'changeModel' });
     mocks.listModels.mockResolvedValue([
-        { model: 'new-model', displayName: 'New Model', description: 'Available model', isDefault: true, defaultReasoningEffort: 'low', supportedReasoningEfforts: [{ reasoningEffort: 'low', description: 'Fast' }, { reasoningEffort: 'high', description: 'Thorough' }] }
+        {
+            model: 'new-model',
+            displayName: 'New Model',
+            description: 'Available model',
+            isDefault: true,
+            defaultReasoningEffort: 'low',
+            supportedReasoningEfforts: [
+                { reasoningEffort: 'low', description: 'Fast' },
+                { reasoningEffort: 'high', description: 'Thorough' },
+            ],
+        },
     ]);
 });
 
@@ -52,12 +74,14 @@ describe('Codex model picker', () => {
         mocks.quickPick.mockResolvedValueOnce({ model: 'new-model' });
         await configure();
         const items = mocks.quickPick.mock.calls[2][0];
-        expect(items).toEqual(expect.arrayContaining([
-            expect.objectContaining({ label: 'New Model', model: 'new-model' }),
-            expect.objectContaining({ label: 'existing', model: 'existing' }),
-            expect.objectContaining({ model: '' }),
-            expect.objectContaining({ action: 'manual' })
-        ]));
+        expect(items).toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({ label: 'New Model', model: 'new-model' }),
+                expect.objectContaining({ label: 'existing', model: 'existing' }),
+                expect.objectContaining({ model: '' }),
+                expect.objectContaining({ action: 'manual' }),
+            ])
+        );
         expect(mocks.listModels).toHaveBeenCalledWith('/opt/codex', mocks.token);
         expect(mocks.update).toHaveBeenCalledWith('model', 'new-model', expect.anything());
     });
@@ -103,7 +127,6 @@ describe('Codex model picker', () => {
     });
 });
 
-
 describe('Codex reasoning effort picker', () => {
     it('offers only the selected model capabilities and saves the selected effort', async () => {
         mocks.quickPick.mockResolvedValueOnce({ model: 'new-model' }).mockResolvedValueOnce({ effort: 'high' });
@@ -131,7 +154,11 @@ describe('Codex reasoning effort picker', () => {
     it('uses the default model capabilities when selecting the CLI default', async () => {
         mocks.quickPick.mockResolvedValueOnce({ model: '' }).mockResolvedValueOnce({ effort: 'low' });
         await configure();
-        expect(mocks.quickPick.mock.calls[3][0].map((item: { effort: string }) => item.effort)).toEqual(['', 'low', 'high']);
+        expect(mocks.quickPick.mock.calls[3][0].map((item: { effort: string }) => item.effort)).toEqual([
+            '',
+            'low',
+            'high',
+        ]);
         expect(mocks.update).toHaveBeenCalledWith('reasoningEffort', 'low', expect.anything());
     });
 });

@@ -5,5 +5,5 @@ export interface StashPersistedStateSchema {
 
 export const stashStateDefaults: StashPersistedStateSchema = {
     'stash.viewMode': 'tree',
-    'stash.selectedIndex': null
+    'stash.selectedIndex': null,
 };

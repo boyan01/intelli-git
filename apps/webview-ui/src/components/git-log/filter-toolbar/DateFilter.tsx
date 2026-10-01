@@ -93,25 +93,27 @@ export const DateFilter: React.FC<DateFilterProps> = ({ onChange, initialSince, 
             setShowPopup(false);
             onChange({
                 since: customSince || undefined,
-                until: customUntil || undefined
+                until: customUntil || undefined,
             });
         }
     };
 
     const getLabel = () => {
         switch (filterType) {
-            case '24h': return t('Last 24 Hours');
-            case '7d': return t('Last 7 Days');
+            case '24h':
+                return t('Last 24 Hours');
+            case '7d':
+                return t('Last 7 Days');
             case 'custom':
                 if (customSince && customUntil) return `${customSince} - ${customUntil}`;
-                if (customSince) return t('Since {{date}}', { date: customSince }); // i18next interpolation uses {{key}} or just {0} if configured, standard i18next defaults. 
+                if (customSince) return t('Since {{date}}', { date: customSince }); // i18next interpolation uses {{key}} or just {0} if configured, standard i18next defaults.
                 // Wait, useTranslation replacement usually uses keys. { "since": "Since {{date}}" }
                 // My JSON has "Since {0}". Extension uses {0}. i18next default is {{key}}.
                 // I should check if I configured i18next to use {0} or if I should assume standard.
                 // Standard i18next uses {{val}}.
                 // Extension vscode.l10n uses {0}.
                 // To support both, I might need different strings or a formatter.
-                // OR simpler: `t('filter.date.since').replace('{0}', customSince)` for now as a quick fix, 
+                // OR simpler: `t('filter.date.since').replace('{0}', customSince)` for now as a quick fix,
                 // OR better, update JSON to use {{val}} for webview? But we want SHARED json.
                 // Shared JSON means one format. VS Code uses {0}. Webview i18next uses {{val}}.
                 // I can configure i18next to use {0} interpolation?
@@ -119,7 +121,8 @@ export const DateFilter: React.FC<DateFilterProps> = ({ onChange, initialSince, 
                 // Or I can just manual replace.
                 if (customUntil) return t('Until {{date}}', { date: customUntil });
                 return t('Custom Range');
-            default: return t('Date');
+            default:
+                return t('Date');
         }
     };
 
@@ -128,20 +131,20 @@ export const DateFilter: React.FC<DateFilterProps> = ({ onChange, initialSince, 
             id: 'custom',
             label: t('Custom...'),
             checked: filterType === 'custom',
-            onSelect: () => handleSelect('custom')
+            onSelect: () => handleSelect('custom'),
         },
         {
             id: '24h',
             label: t('Last 24 Hours'),
             checked: filterType === '24h',
-            onSelect: () => handleSelect('24h')
+            onSelect: () => handleSelect('24h'),
         },
         {
             id: '7d',
             label: t('Last 7 Days'),
             checked: filterType === '7d',
-            onSelect: () => handleSelect('7d')
-        }
+            onSelect: () => handleSelect('7d'),
+        },
     ];
 
     const popupContent = (
@@ -153,7 +156,7 @@ export const DateFilter: React.FC<DateFilterProps> = ({ onChange, initialSince, 
                     className={`${styles.dateInput} ${sinceError ? styles.invalid : ''}`}
                     placeholder={t('e.g. 2024-01-01 or 3 days ago')}
                     value={customSince}
-                    onChange={e => {
+                    onChange={(e) => {
                         setCustomSince(e.target.value);
                         if (sinceError) setSinceError(false);
                     }}
@@ -165,14 +168,16 @@ export const DateFilter: React.FC<DateFilterProps> = ({ onChange, initialSince, 
                     className={`${styles.dateInput} ${untilError ? styles.invalid : ''}`}
                     placeholder={t('e.g. 2024-01-01 or 3 days ago')}
                     value={customUntil}
-                    onChange={e => {
+                    onChange={(e) => {
                         setCustomUntil(e.target.value);
                         if (untilError) setUntilError(false);
                     }}
                 />
             </div>
             <div className={styles.popupButtonRow}>
-                <button className={styles.primaryButton} onClick={handleCustomApply}>{t('Apply')}</button>
+                <button className={styles.primaryButton} onClick={handleCustomApply}>
+                    {t('Apply')}
+                </button>
             </div>
         </>
     );

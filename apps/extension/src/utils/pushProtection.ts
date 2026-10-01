@@ -7,15 +7,11 @@ function getPushTargetKey(remote: string, branch: string): string {
 }
 
 export function isProtectedBranchConfirmationEnabled(): boolean {
-    return vscode.workspace
-        .getConfiguration('intelli-git.push')
-        .get<boolean>('confirmProtectedBranch', true);
+    return vscode.workspace.getConfiguration('intelli-git.push').get<boolean>('confirmProtectedBranch', true);
 }
 
 export function getProtectedPushTargets(): string[] {
-    return isProtectedBranchConfirmationEnabled()
-        ? [...DEFAULT_PROTECTED_PUSH_TARGETS]
-        : [];
+    return isProtectedBranchConfirmationEnabled() ? [...DEFAULT_PROTECTED_PUSH_TARGETS] : [];
 }
 
 export function isProtectedPushTarget(remote: string, branch: string): boolean {

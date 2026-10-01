@@ -79,7 +79,9 @@
     box-sizing: border-box;
     border-bottom: 1px solid var(--vscode-tree-inputValidationBorder);
     cursor: pointer;
-    transition: background-color 0.12s ease, border-color 0.12s ease;
+    transition:
+        background-color 0.12s ease,
+        border-color 0.12s ease;
 }
 
 .expandedRow {
@@ -182,7 +184,11 @@
 }
 
 .expandedRow:hover {
-    background: color-mix(in srgb, var(--vscode-list-activeSelectionBackground) 16%, var(--vscode-list-hoverBackground));
+    background: color-mix(
+        in srgb,
+        var(--vscode-list-activeSelectionBackground) 16%,
+        var(--vscode-list-hoverBackground)
+    );
 }
 
 /* Inactive selection (when list loses focus) */
@@ -265,7 +271,7 @@
     min-width: 0;
 }
 
-.subject>span:first-child {
+.subject > span:first-child {
     overflow: hidden;
     text-overflow: ellipsis;
 }
@@ -294,7 +300,6 @@
 }
 
 @keyframes blinkOnce {
-
     0%,
     100% {
         background-color: transparent !important;

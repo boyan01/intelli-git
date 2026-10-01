@@ -21,7 +21,7 @@ const emptyBranchListData: BranchListData = {
     localBranches: [],
     localBranchesInfo: [],
     remoteBranches: {},
-    tags: []
+    tags: [],
 };
 
 interface BranchFilterRequest {
@@ -40,24 +40,30 @@ export function GitLogView() {
     const {
         data: activeRepositoryPath,
         loading: activeRepositoryLoading,
-        reload: reloadActiveRepository
-    } = useRpcData(
-        loadActiveRepository,
-        { initialValue: undefined, loadingOnRefresh: true, refreshScopes: GIT_LOG_REFRESH_SCOPES }
-    );
-    const { data: branchListData, loading: branchListLoading, reload: reloadBranchList } = useRpcData(
-        loadBranchListData,
-        { initialValue: emptyBranchListData, loadingOnRefresh: true, refreshScopes: GIT_LOG_REFRESH_SCOPES }
-    );
+        reload: reloadActiveRepository,
+    } = useRpcData(loadActiveRepository, {
+        initialValue: undefined,
+        loadingOnRefresh: true,
+        refreshScopes: GIT_LOG_REFRESH_SCOPES,
+    });
+    const {
+        data: branchListData,
+        loading: branchListLoading,
+        reload: reloadBranchList,
+    } = useRpcData(loadBranchListData, {
+        initialValue: emptyBranchListData,
+        loadingOnRefresh: true,
+        refreshScopes: GIT_LOG_REFRESH_SCOPES,
+    });
 
     const [branchSplitRatio, setBranchSplitRatio] = usePersistedState('gitLog.branchSplitRatio');
     const [detailsSplitRatio, setDetailsSplitRatio] = usePersistedState('gitLog.detailsSplitRatio');
     const [commitDetailsSplitRatio, setCommitDetailsSplitRatio] = usePersistedState('gitLog.commitDetailsSplitRatio');
 
     const handleBranchFilter = useCallback((branch: string) => {
-        setBranchFilter(previous => ({
+        setBranchFilter((previous) => ({
             branch,
-            requestId: (previous?.requestId ?? 0) + 1
+            requestId: (previous?.requestId ?? 0) + 1,
         }));
     }, []);
 
@@ -71,17 +77,14 @@ export function GitLogView() {
         return selectedHashes.length === 1 ? rpc.getCommitDetails(selectedHashes[0]) : Promise.resolve(undefined);
     }, [selectedHashes]);
 
-    const { data: commitDetails } = useRpcData(
-        loadCommitDetails,
-        {
-            initialValue: undefined,
-            refreshOnEvent: false
-        }
-    );
+    const { data: commitDetails } = useRpcData(loadCommitDetails, {
+        initialValue: undefined,
+        refreshOnEvent: false,
+    });
 
     useEffect(() => {
         if (!containerRef.current) return;
-        const observer = new ResizeObserver(entries => {
+        const observer = new ResizeObserver((entries) => {
             for (const entry of entries) {
                 setIsNarrowMode(entry.contentRect.width < NARROW_THRESHOLD);
             }
@@ -92,10 +95,7 @@ export function GitLogView() {
 
     const handleInitializeRepository = useCallback(async () => {
         await rpc.initializeRepository();
-        await Promise.all([
-            reloadActiveRepository(),
-            reloadBranchList()
-        ]);
+        await Promise.all([reloadActiveRepository(), reloadBranchList()]);
     }, [reloadActiveRepository, reloadBranchList]);
 
     const hasRepository = activeRepositoryLoading
@@ -118,19 +118,11 @@ export function GitLogView() {
                         {t('Open a folder that contains a Git repository, or initialize one in the current workspace.')}
                     </div>
                     <div className={styles.stateActions}>
-                        <button
-                            className={styles.stateButton}
-                            type="button"
-                            onClick={() => void rpc.openFolder()}
-                        >
+                        <button className={styles.stateButton} type="button" onClick={() => void rpc.openFolder()}>
                             <i className="codicon codicon-folder-opened" aria-hidden="true" />
                             <span>{t('Open Folder')}</span>
                         </button>
-                        <button
-                            className={styles.stateButton}
-                            type="button"
-                            onClick={handleInitializeRepository}
-                        >
+                        <button className={styles.stateButton} type="button" onClick={handleInitializeRepository}>
                             <i className="codicon codicon-repo-create" aria-hidden="true" />
                             <span>{t('Initialize Repository')}</span>
                         </button>
@@ -148,19 +140,20 @@ export function GitLogView() {
         );
     }
 
-    const logListPanel = activeRepositoryLoading && !repositoryPath ? (
-        <div className={styles.loadingPlaceholder}>
-            <LoadingProgressBar active={activeRepositoryLoading} ariaLabel={t('Loading...')} />
-        </div>
-    ) : (
-        <LogListPanel
-            onSelectionChange={setSelectedHashes}
-            externalBranchFilter={branchFilter}
-            isNarrowMode={isNarrowMode}
-            commitDetails={commitDetails}
-            repositoryPath={repositoryPath}
-        />
-    );
+    const logListPanel =
+        activeRepositoryLoading && !repositoryPath ? (
+            <div className={styles.loadingPlaceholder}>
+                <LoadingProgressBar active={activeRepositoryLoading} ariaLabel={t('Loading...')} />
+            </div>
+        ) : (
+            <LogListPanel
+                onSelectionChange={setSelectedHashes}
+                externalBranchFilter={branchFilter}
+                isNarrowMode={isNarrowMode}
+                commitDetails={commitDetails}
+                repositoryPath={repositoryPath}
+            />
+        );
 
     const commitDetailsPanel = (
         <CommitDetailsView
@@ -180,13 +173,13 @@ export function GitLogView() {
                 minSize={0}
                 ratio={branchSplitRatio}
                 onRatioChange={setBranchSplitRatio}
-                first={(
+                first={
                     <BranchListPanel
                         data={branchListData}
                         isLoading={branchListLoading}
                         onBranchFilter={handleBranchFilter}
                     />
-                )}
+                }
                 second={
                     isNarrowMode ? (
                         logListPanel

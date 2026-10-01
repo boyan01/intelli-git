@@ -19,12 +19,12 @@ describe('openConflictFile', () => {
         const options: WebviewProviderOptions = {
             extensionUri: {} as vscode.Uri,
             context: {} as vscode.ExtensionContext,
-            repositoryManager: {} as RepositoryManager
+            repositoryManager: {} as RepositoryManager,
         };
 
         await openConflictFile(options, {
             path: 'src/conflict.ts',
-            repoPath: '/workspace/repository'
+            repoPath: '/workspace/repository',
         });
 
         const [command] = testVscode.__getExecutedCommands();

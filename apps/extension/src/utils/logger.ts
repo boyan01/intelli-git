@@ -7,7 +7,7 @@ const REDACTION_PATTERNS: RegExp[] = [
     /(AIza[0-9A-Za-z_-]{20,})/g,
     /(sk-ant-[A-Za-z0-9_-]{12,})/g,
     /(Bearer\s+)[A-Za-z0-9._~+/=-]{12,}/gi,
-    /((?:api[-_ ]?key|x-api-key|x-goog-api-key|authorization)["'\s:=]+)["']?([^"',\s}]{8,})/gi
+    /((?:api[-_ ]?key|x-api-key|x-goog-api-key|authorization)["'\s:=]+)["']?([^"',\s}]{8,})/gi,
 ];
 
 function initLogger(context: vscode.ExtensionContext): void {
@@ -53,11 +53,14 @@ function showOutputChannel(): void {
 }
 
 function formatMessage(...args: unknown[]): string {
-    return args.map(arg => {
-        const value = prepareLogValue(arg);
-        const message = stringifyValue(value);
-        return shouldStartOnNewLine(value) ? `\n${message}` : message;
-    }).join(' ').replace(/ \n/g, '\n');
+    return args
+        .map((arg) => {
+            const value = prepareLogValue(arg);
+            const message = stringifyValue(value);
+            return shouldStartOnNewLine(value) ? `\n${message}` : message;
+        })
+        .join(' ')
+        .replace(/ \n/g, '\n');
 }
 
 function stringifyValue(value: unknown): string {
@@ -91,13 +94,15 @@ function isFlatLogRecord(value: unknown): value is Record<string, unknown> {
         return false;
     }
 
-    return Object.values(value).every(nestedValue => {
-        return nestedValue === null
-            || nestedValue === undefined
-            || typeof nestedValue === 'string'
-            || typeof nestedValue === 'number'
-            || typeof nestedValue === 'boolean'
-            || typeof nestedValue === 'bigint';
+    return Object.values(value).every((nestedValue) => {
+        return (
+            nestedValue === null ||
+            nestedValue === undefined ||
+            typeof nestedValue === 'string' ||
+            typeof nestedValue === 'number' ||
+            typeof nestedValue === 'boolean' ||
+            typeof nestedValue === 'bigint'
+        );
     });
 }
 
@@ -143,20 +148,23 @@ function compactWorkspacePaths(value: string): string {
         return value;
     }
 
-    return workspaceRoots.reduce((message, workspaceRoot) => {
-        const escapedRoot = escapeRegExp(workspaceRoot);
-        return message
-            .replace(new RegExp(`${escapedRoot}/`, 'g'), '')
-            .replace(new RegExp(`${escapedRoot}(?=$|[\\s"'\\)\\]\\},])`, 'g'), '.');
-    }, value.replace(/\\/g, '/'));
+    return workspaceRoots.reduce(
+        (message, workspaceRoot) => {
+            const escapedRoot = escapeRegExp(workspaceRoot);
+            return message
+                .replace(new RegExp(`${escapedRoot}/`, 'g'), '')
+                .replace(new RegExp(`${escapedRoot}(?=$|[\\s"'\\)\\]\\},])`, 'g'), '.');
+        },
+        value.replace(/\\/g, '/')
+    );
 }
 
 function getWorkspaceRootPaths(): string[] {
     const workspaceFolders = vscode.workspace.workspaceFolders ?? [];
     const roots = workspaceFolders
-        .map(folder => folder.uri.fsPath)
+        .map((folder) => folder.uri.fsPath)
         .filter(Boolean)
-        .map(root => root.replace(/\\/g, '/').replace(/\/+$/, ''));
+        .map((root) => root.replace(/\\/g, '/').replace(/\/+$/, ''));
 
     return Array.from(new Set(roots)).sort((a, b) => b.length - a.length);
 }
@@ -184,4 +192,4 @@ export const logger = {
     debug,
     showOutputChannel,
     initLogger,
-}
+};

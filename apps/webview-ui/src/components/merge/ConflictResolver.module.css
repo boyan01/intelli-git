@@ -300,13 +300,25 @@
 
 :global(.intelli-git-merge-deleted) {
     --intelli-git-merge-line-background: var(--vscode-diffEditor-unchangedCodeBackground, rgba(128, 128, 128, 0.16));
-    --intelli-git-merge-word-background: color-mix(in srgb, var(--vscode-diffEditor-move-border, #8b8b8b) 34%, transparent);
+    --intelli-git-merge-word-background: color-mix(
+        in srgb,
+        var(--vscode-diffEditor-move-border, #8b8b8b) 34%,
+        transparent
+    );
     --intelli-git-merge-marker: var(--vscode-diffEditor-move-border, #8b8b8b);
 }
 
 :global(.intelli-git-merge-modified) {
-    --intelli-git-merge-line-background: color-mix(in srgb, var(--vscode-editorGutter-modifiedBackground, #0078d4) 18%, transparent);
-    --intelli-git-merge-word-background: color-mix(in srgb, var(--vscode-editorGutter-modifiedBackground, #0078d4) 34%, transparent);
+    --intelli-git-merge-line-background: color-mix(
+        in srgb,
+        var(--vscode-editorGutter-modifiedBackground, #0078d4) 18%,
+        transparent
+    );
+    --intelli-git-merge-word-background: color-mix(
+        in srgb,
+        var(--vscode-editorGutter-modifiedBackground, #0078d4) 34%,
+        transparent
+    );
     --intelli-git-merge-marker: var(--vscode-editorGutter-modifiedBackground, #0078d4);
 }
 

@@ -54,12 +54,12 @@ Intelli Git supports two commit workflows. Choose one in settings:
 }
 ```
 
-| Feature | `changes` Mode (IntelliJ Style) | `staged` Mode (Classic Git Style, Default) |
-| :--- | :--- | :--- |
-| **Commit Target** | Only changes in the **Active Changelist** | All changes currently in the **Git Index (Staged)** |
-| **Multitasking** | Move files/hunks across named changelists | Use `Mark as Inactive Changes` to set work aside |
-| **Context Menus** | `Create Changelist`, `Set Active Changelist`, `Move to Changelist...` | `Stage`, `Unstage`, `Mark as Inactive Changes` |
-| **Best For** | Parallel tasks, bugfixes mid-feature, clean commits | Traditional git add / git commit mental models |
+| Feature           | `changes` Mode (IntelliJ Style)                                       | `staged` Mode (Classic Git Style, Default)          |
+| :---------------- | :-------------------------------------------------------------------- | :-------------------------------------------------- |
+| **Commit Target** | Only changes in the **Active Changelist**                             | All changes currently in the **Git Index (Staged)** |
+| **Multitasking**  | Move files/hunks across named changelists                             | Use `Mark as Inactive Changes` to set work aside    |
+| **Context Menus** | `Create Changelist`, `Set Active Changelist`, `Move to Changelist...` | `Stage`, `Unstage`, `Mark as Inactive Changes`      |
+| **Best For**      | Parallel tasks, bugfixes mid-feature, clean commits                   | Traditional git add / git commit mental models      |
 
 Move files between changelists from the commit panel. To move an individual hunk, hover over its change block in the editor and choose `Move to Changelist...`.
 
@@ -107,26 +107,26 @@ Run **`Intelli: Configure AI Provider`** from the Command Palette to choose your
 
 ## ⌨️ Common Commands
 
-| Command | Description |
-| :--- | :--- |
-| `Intelli: Focus Commit View` | Reveal the Intelli Git commit panel |
-| `Focus Git Log` | Open the interactive commit graph in the bottom panel |
-| `Worktrees` | View, switch, and prune Git worktrees |
-| `Intelli: Switch Branch` | Open the branch switch / checkout dialog |
-| `Intelli: Configure AI Provider` | Switch or configure AI backends & API keys |
-| `Push...` | Push commits with protected branch confirmation |
+| Command                          | Description                                           |
+| :------------------------------- | :---------------------------------------------------- |
+| `Intelli: Focus Commit View`     | Reveal the Intelli Git commit panel                   |
+| `Focus Git Log`                  | Open the interactive commit graph in the bottom panel |
+| `Worktrees`                      | View, switch, and prune Git worktrees                 |
+| `Intelli: Switch Branch`         | Open the branch switch / checkout dialog              |
+| `Intelli: Configure AI Provider` | Switch or configure AI backends & API keys            |
+| `Push...`                        | Push commits with protected branch confirmation       |
 
 ---
 
 ## ⚙️ Key Settings
 
-| Setting | Default | Description |
-| :--- | :--- | :--- |
-| `intelli-git.changelist.mode` | `"staged"` | Workflow mode: `"staged"` or `"changes"` |
-| `intelli-git.ai.provider` | `"copilot"` | AI backend: `copilot`, `codex`, `anthropic`, `google`, or `custom` |
-| `intelli-git.ai.commitPrompt` | *(Conventional Commit)* | Custom prompt template for commit generation |
-| `intelli-git.backgroundFetch.enabled` | `false` | Periodically fetch remotes in the background |
-| `intelli-git.push.confirmProtectedBranch` | `true` | Prompt for confirmation when pushing to protected branches |
+| Setting                                   | Default                 | Description                                                        |
+| :---------------------------------------- | :---------------------- | :----------------------------------------------------------------- |
+| `intelli-git.changelist.mode`             | `"staged"`              | Workflow mode: `"staged"` or `"changes"`                           |
+| `intelli-git.ai.provider`                 | `"copilot"`             | AI backend: `copilot`, `codex`, `anthropic`, `google`, or `custom` |
+| `intelli-git.ai.commitPrompt`             | _(Conventional Commit)_ | Custom prompt template for commit generation                       |
+| `intelli-git.backgroundFetch.enabled`     | `false`                 | Periodically fetch remotes in the background                       |
+| `intelli-git.push.confirmProtectedBranch` | `true`                  | Prompt for confirmation when pushing to protected branches         |
 
 ---
 
@@ -154,10 +154,17 @@ Press `F5` in VS Code to launch the **Extension Development Host**.
 ### Quality Checks & Packaging
 
 ```bash
+npm run format        # Apply the repository's Prettier style
+npm run format:check  # Check formatting without changing files
 npm run lint          # Run linter across all workspaces
+npm run typecheck     # Check extension, webview and shared TypeScript
 npm run test          # Execute tests
+npm run test:release  # Check release scripts and VSIX validation
+npm run check         # Run all checks above without rewriting files
 npm run package:extension:dev # Build dev VSIX into out/
 ```
+
+The CI workflow runs on branch pushes, pull requests and merge queues. It checks formatting, lint (including shared code and the webview localization audit), TypeScript, unit/regression tests, release scripts, and production VSIX packaging. Use `npm run check` and `npm run package:extension` to run the same checks locally. Generated assets and lockfiles are excluded from formatting.
 
 Contributions are welcome! Please follow [AGENTS.md](AGENTS.md) conventions for commit messages, architecture rules, and testing requirements before opening a PR.
 

@@ -11,20 +11,24 @@ interface ActiveEditorFile {
 function getActiveEditorFile(gitService: GitService): ActiveEditorFile | null {
     const editor = vscode.window.activeTextEditor;
     if (!editor || editor.document.uri.scheme !== 'file') {
-        vscode.window.showInformationMessage(vscode.l10n.t('Open a file inside the active repository to use Intelli Git history.'));
+        vscode.window.showInformationMessage(
+            vscode.l10n.t('Open a file inside the active repository to use Intelli Git history.')
+        );
         return null;
     }
 
     const workspaceRoot = gitService.getWorkspaceRoot();
     const relativePath = path.relative(workspaceRoot, editor.document.uri.fsPath);
     if (!relativePath || relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
-        vscode.window.showInformationMessage(vscode.l10n.t('Open a file inside the active repository to use Intelli Git history.'));
+        vscode.window.showInformationMessage(
+            vscode.l10n.t('Open a file inside the active repository to use Intelli Git history.')
+        );
         return null;
     }
 
     return {
         path: relativePath.replace(/\\/g, '/'),
-        line: editor.selection.active.line + 1
+        line: editor.selection.active.line + 1,
     };
 }
 
@@ -41,13 +45,17 @@ export function registerEditorGitCommands(
             try {
                 const hash = await gitService.getBlameCommitForLine(file.path, file.line);
                 if (!hash) {
-                    vscode.window.showInformationMessage(vscode.l10n.t('No committed change found for the current line.'));
+                    vscode.window.showInformationMessage(
+                        vscode.l10n.t('No committed change found for the current line.')
+                    );
                     return;
                 }
 
                 await gitLogProvider.revealLog({ hash });
             } catch (error: any) {
-                vscode.window.showErrorMessage(vscode.l10n.t('Failed to open blame commit in Git Log: {0}', error.message));
+                vscode.window.showErrorMessage(
+                    vscode.l10n.t('Failed to open blame commit in Git Log: {0}', error.message)
+                );
             }
         }),
         vscode.commands.registerCommand('intelli-git.showFileHistory', async () => {

@@ -32,7 +32,7 @@ export const CommitDetailsView: React.FC<CommitDetailsViewProps> = ({
     isPinned = false,
     onPin,
     detailsSplitRatio,
-    onDetailsSplitRatioChange
+    onDetailsSplitRatioChange,
 }) => {
     const { t } = useTranslation();
     const [files, setFiles] = useState<CommitFile[]>([]);
@@ -66,7 +66,7 @@ export const CommitDetailsView: React.FC<CommitDetailsViewProps> = ({
         if (selectedHashes.length === 0) return;
 
         if (selectedHashes.length === 1 && commit) {
-            const file = commit.files.find(f => f.path === path);
+            const file = commit.files.find((f) => f.path === path);
             if (!file) return;
 
             const parentHash = commit.parentHashes.length > 0 ? commit.parentHashes[0] : '';
@@ -90,25 +90,25 @@ export const CommitDetailsView: React.FC<CommitDetailsViewProps> = ({
     };
 
     const fileItems: FileStatus[] = useMemo(() => {
-        return files.map(f => ({
+        return files.map((f) => ({
             path: f.path,
             displayPath: f.displayPath,
             status: f.status,
-            staged: false
+            staged: false,
         }));
     }, [files]);
 
     const containingBranchesRefs = useMemo<RefInfo[]>(() => {
         if (!commit || !showBranches || commit.containingBranches.length === 0) return [];
-        return commit.containingBranches.map(b => ({
+        return commit.containingBranches.map((b) => ({
             name: b,
-            type: b.includes('/') ? 'remote' : 'local'
+            type: b.includes('/') ? 'remote' : 'local',
         }));
     }, [commit, showBranches]);
 
     const tagRefs = useMemo<RefInfo[]>(() => {
         if (!commit || !showBranches) return [];
-        return commit.refs.filter(ref => ref.type === 'tag');
+        return commit.refs.filter((ref) => ref.type === 'tag');
     }, [commit, showBranches]);
 
     const formattedDate = useMemo(() => {
@@ -125,10 +125,7 @@ export const CommitDetailsView: React.FC<CommitDetailsViewProps> = ({
             <div className={styles.filesToolbar}>
                 <div className={styles.toolbarLeft}>
                     {onPin && (
-                        <button
-                            className={`${styles.iconBtn} ${isPinned ? styles.active : ''}`}
-                            onClick={onPin}
-                        >
+                        <button className={`${styles.iconBtn} ${isPinned ? styles.active : ''}`} onClick={onPin}>
                             <i className={`codicon codicon-${isPinned ? 'pinned' : 'pin'}`} />
                         </button>
                     )}
@@ -138,28 +135,19 @@ export const CommitDetailsView: React.FC<CommitDetailsViewProps> = ({
                     {showToggleDetails && (
                         <button
                             className={`${styles.iconBtn} ${showDetails ? styles.active : ''}`}
-                            onClick={() => setShowDetails(prev => !prev)}
+                            onClick={() => setShowDetails((prev) => !prev)}
                         >
                             <i className={`codicon codicon-${showDetails ? 'layout-panel' : 'layout-panel-off'}`} />
                         </button>
                     )}
-                    <button
-                        className={styles.iconBtn}
-                        onClick={() => treeRef.current?.expandAll()}
-                    >
+                    <button className={styles.iconBtn} onClick={() => treeRef.current?.expandAll()}>
                         <i className="codicon codicon-expand-all" />
                     </button>
-                    <button
-                        className={styles.iconBtn}
-                        onClick={() => treeRef.current?.collapseAll()}
-                    >
+                    <button className={styles.iconBtn} onClick={() => treeRef.current?.collapseAll()}>
                         <i className="codicon codicon-collapse-all" />
                     </button>
                     {isPinned && onClose && (
-                        <button
-                            className={styles.iconBtn}
-                            onClick={onClose}
-                        >
+                        <button className={styles.iconBtn} onClick={onClose}>
                             <i className="codicon codicon-close" />
                         </button>
                     )}
@@ -174,13 +162,17 @@ export const CommitDetailsView: React.FC<CommitDetailsViewProps> = ({
                     onFileClick={handleFileClick}
                     selectedFiles={new Set()}
                     activeFile={null}
-                    onToggleFile={() => { }}
+                    onToggleFile={() => {}}
                     onFileDoubleClick={handleFileClick}
                     contextMenuSection={selectedHashes.length === 1 ? 'gitLogCommitFile' : undefined}
-                    contextMenuData={selectedHashes.length === 1 ? {
-                        commitHash: selectedHashes[0],
-                        parentHash: commit?.parentHashes?.[0] || ''
-                    } : undefined}
+                    contextMenuData={
+                        selectedHashes.length === 1
+                            ? {
+                                  commitHash: selectedHashes[0],
+                                  parentHash: commit?.parentHashes?.[0] || '',
+                              }
+                            : undefined
+                    }
                     stickyHeaders={true}
                 />
             </div>
@@ -196,16 +188,15 @@ export const CommitDetailsView: React.FC<CommitDetailsViewProps> = ({
                 </div>
                 <div className={styles.detailMeta}>
                     <div className={styles.metaRow}>
-                        {commit.authorName}{' <'}
+                        {commit.authorName}
+                        {' <'}
                         <a href={`mailto:${commit.authorEmail}`} className={styles.emailLink}>
                             {commit.authorEmail}
                         </a>
                         {'>, '}
                         {formattedDate}
                     </div>
-                    <div className={styles.metaHash}>
-                        {commit.hash}
-                    </div>
+                    <div className={styles.metaHash}>{commit.hash}</div>
                     {tagRefs.length > 0 && (
                         <div className={`${styles.metaRow} ${styles.refRow}`}>
                             <span className={styles.metaLabel}>{t('Tags')}:</span>
@@ -215,7 +206,12 @@ export const CommitDetailsView: React.FC<CommitDetailsViewProps> = ({
                     {containingBranchesRefs.length > 0 && (
                         <div className={`${styles.metaRow} ${styles.refRow}`}>
                             <span className={styles.metaLabel}>{t('Branches')}:</span>
-                            <RefLabels refs={containingBranchesRefs} maxVisible={containingBranchesRefs.length} wrap truncate={false} />
+                            <RefLabels
+                                refs={containingBranchesRefs}
+                                maxVisible={containingBranchesRefs.length}
+                                wrap
+                                truncate={false}
+                            />
                         </div>
                     )}
                 </div>

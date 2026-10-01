@@ -17,54 +17,53 @@ import {
     isMergeReviewRangePending,
     parseConflictBlocks,
     parseConflictDocument,
-    splitContentLines
+    splitContentLines,
 } from './conflictModel';
 
 describe('conflictModel', () => {
     it('finds the exact stable-gap position of manually inserted result lines', () => {
-        expect(buildLineAlignmentBlocks(
-            ['68', '69', '70', '71'],
-            ['68', '69', 'manual-a', 'manual-b', '70', '71']
-        )).toEqual([{
-            referenceStart: 2,
-            referenceLineCount: 0,
-            resultStart: 2,
-            resultLineCount: 2
-        }]);
+        expect(
+            buildLineAlignmentBlocks(['68', '69', '70', '71'], ['68', '69', 'manual-a', 'manual-b', '70', '71'])
+        ).toEqual([
+            {
+                referenceStart: 2,
+                referenceLineCount: 0,
+                resultStart: 2,
+                resultLineCount: 2,
+            },
+        ]);
     });
 
     it('keeps separate insertion and deletion alignment blocks in a stable gap', () => {
-        expect(buildLineAlignmentBlocks(
-            ['a', 'b', 'c', 'd', 'e', 'f'],
-            ['a', 'insert', 'b', 'c', 'e', 'replace', 'f']
-        )).toEqual([
+        expect(
+            buildLineAlignmentBlocks(['a', 'b', 'c', 'd', 'e', 'f'], ['a', 'insert', 'b', 'c', 'e', 'replace', 'f'])
+        ).toEqual([
             {
                 referenceStart: 1,
                 referenceLineCount: 0,
                 resultStart: 1,
-                resultLineCount: 1
+                resultLineCount: 1,
             },
             {
                 referenceStart: 3,
                 referenceLineCount: 1,
                 resultStart: 4,
-                resultLineCount: 0
+                resultLineCount: 0,
             },
             {
                 referenceStart: 5,
                 referenceLineCount: 0,
                 resultStart: 5,
-                resultLineCount: 1
-            }
+                resultLineCount: 1,
+            },
         ]);
     });
 
     it('normalizes line endings before aligning merge panes', () => {
         expect(splitContentLines('one\r\ntwo\nthree\r')).toEqual(['one', 'two', 'three']);
-        expect(buildLineAlignmentBlocks(
-            splitContentLines('one\r\ntwo\r\n'),
-            splitContentLines('one\ntwo\n')
-        )).toEqual([]);
+        expect(buildLineAlignmentBlocks(splitContentLines('one\r\ntwo\r\n'), splitContentLines('one\ntwo\n'))).toEqual(
+            []
+        );
     });
 
     it('builds Base-backed change groups without exposing worktree markers', () => {
@@ -78,7 +77,7 @@ describe('conflictModel', () => {
             [{ id: 'left-1', baseStart: 1, baseLineCount: 1, sideStart: 1, sideLineCount: 1 }],
             [
                 { id: 'right-1', baseStart: 1, baseLineCount: 1, sideStart: 1, sideLineCount: 1 },
-                { id: 'right-2', baseStart: 3, baseLineCount: 1, sideStart: 3, sideLineCount: 1 }
+                { id: 'right-2', baseStart: 3, baseLineCount: 1, sideStart: 3, sideLineCount: 1 },
             ]
         );
 
@@ -90,7 +89,7 @@ describe('conflictModel', () => {
                 baseStart: 1,
                 baseText: 'base-first\n',
                 leftText: 'left-first\n',
-                rightText: 'right-first\n'
+                rightText: 'right-first\n',
             }),
             expect.objectContaining({
                 id: 'change-1',
@@ -98,12 +97,12 @@ describe('conflictModel', () => {
                 baseStart: 3,
                 baseText: 'base-second\n',
                 leftText: 'base-second\n',
-                rightText: 'right-second\n'
-            })
+                rightText: 'right-second\n',
+            }),
         ]);
         expect(session.reviewRanges).toEqual([
             expect.objectContaining({ leftDecision: 'pending', rightDecision: 'pending' }),
-            expect.objectContaining({ leftDecision: null, rightDecision: 'pending' })
+            expect.objectContaining({ leftDecision: null, rightDecision: 'pending' }),
         ]);
     });
 
@@ -123,17 +122,15 @@ describe('conflictModel', () => {
                 leftText: 'left\nb\n',
                 rightText: '',
                 leftLineCount: 2,
-                rightLineCount: 0
-            })
+                rightLineCount: 0,
+            }),
         ]);
     });
 
     it('rebuilds merge groups with the selected whitespace comparison mode', () => {
         const base = 'value\nconst item = 1;\n';
         const left = 'value   \nconst  item = 1;\n';
-        const changes = [
-            { id: 'mixed-whitespace', baseStart: 0, baseLineCount: 2, sideStart: 0, sideLineCount: 2 }
-        ];
+        const changes = [{ id: 'mixed-whitespace', baseStart: 0, baseLineCount: 2, sideStart: 0, sideLineCount: 2 }];
 
         const defaultSession = buildMergeSessionDocument(base, left, base, changes, [], 'none');
         const trimmedSession = buildMergeSessionDocument(base, left, base, changes, [], 'trim');
@@ -141,7 +138,7 @@ describe('conflictModel', () => {
 
         expect(defaultSession.groups).toHaveLength(1);
         expect(trimmedSession.groups).toEqual([
-            expect.objectContaining({ baseStart: 1, leftText: 'const  item = 1;\n' })
+            expect.objectContaining({ baseStart: 1, leftText: 'const  item = 1;\n' }),
         ]);
         expect(ignoredSession.groups).toHaveLength(0);
         expect(ignoredSession.reviewRanges).toHaveLength(0);
@@ -151,13 +148,15 @@ describe('conflictModel', () => {
         const lineCount = 501;
         const base = 'value\n'.repeat(lineCount);
         const left = '  value   \n'.repeat(lineCount);
-        const changes = [{
-            id: 'large-whitespace',
-            baseStart: 0,
-            baseLineCount: lineCount,
-            sideStart: 0,
-            sideLineCount: lineCount
-        }];
+        const changes = [
+            {
+                id: 'large-whitespace',
+                baseStart: 0,
+                baseLineCount: lineCount,
+                sideStart: 0,
+                sideLineCount: lineCount,
+            },
+        ];
 
         expect(buildMergeSessionDocument(base, left, base, changes, [], 'trim').groups).toHaveLength(0);
         expect(buildMergeSessionDocument(base, left, base, changes, [], 'ignore').groups).toHaveLength(0);
@@ -178,15 +177,15 @@ describe('conflictModel', () => {
                 kind: 'conflict',
                 baseText: '',
                 leftText: 'left add\n',
-                rightText: 'right add\n'
-            })
+                rightText: 'right add\n',
+            }),
         ]);
         expect(session.reviewRanges[0]).toMatchObject({
             startOffset: 0,
             endOffset: 0,
             leftDecision: 'pending',
             rightDecision: 'pending',
-            lastAppliedSide: null
+            lastAppliedSide: null,
         });
     });
 
@@ -198,7 +197,7 @@ describe('conflictModel', () => {
             [{ id: 'left-1', baseStart: 0, baseLineCount: 1, sideStart: 0, sideLineCount: 1 }],
             [
                 { id: 'right-1', baseStart: 0, baseLineCount: 1, sideStart: 0, sideLineCount: 1 },
-                { id: 'right-2', baseStart: 1, baseLineCount: 1, sideStart: 1, sideLineCount: 1 }
+                { id: 'right-2', baseStart: 1, baseLineCount: 1, sideStart: 1, sideLineCount: 1 },
             ]
         );
         const first = applyMergeGroupDecision(
@@ -213,24 +212,18 @@ describe('conflictModel', () => {
         expect(first.ranges[0]).toMatchObject({
             leftDecision: 'applied',
             rightDecision: 'pending',
-            lastAppliedSide: 'left'
+            lastAppliedSide: 'left',
         });
         expect(isMergeReviewRangePending(first.ranges[0])).toBe(true);
         expect(first.content.slice(first.ranges[1].startOffset, first.ranges[1].endOffset)).toBe('base-two\n');
 
-        const second = applyMergeGroupDecision(
-            first.content,
-            first.ranges,
-            session.groups[0],
-            'right',
-            'cancelled'
-        );
+        const second = applyMergeGroupDecision(first.content, first.ranges, session.groups[0], 'right', 'cancelled');
 
         expect(second.content).toBe(first.content);
         expect(second.ranges[0]).toMatchObject({
             leftDecision: 'applied',
             rightDecision: 'cancelled',
-            lastAppliedSide: 'left'
+            lastAppliedSide: 'left',
         });
         expect(isMergeReviewRangePending(second.ranges[0])).toBe(false);
     });
@@ -250,19 +243,13 @@ describe('conflictModel', () => {
             'left',
             'applied'
         );
-        const reviewed = applyMergeGroupDecision(
-            left.content,
-            left.ranges,
-            session.groups[0],
-            'both',
-            'manual'
-        );
+        const reviewed = applyMergeGroupDecision(left.content, left.ranges, session.groups[0], 'both', 'manual');
 
         expect(reviewed.content).toBe('left\n');
         expect(reviewed.ranges[0]).toMatchObject({
             leftDecision: 'applied',
             rightDecision: 'manual',
-            lastAppliedSide: 'left'
+            lastAppliedSide: 'left',
         });
         expect(isMergeReviewRangePending(reviewed.ranges[0])).toBe(false);
     });
@@ -282,19 +269,8 @@ describe('conflictModel', () => {
             'left',
             'applied'
         );
-        expect(getMergeGroupApplyMode(
-            left.content,
-            left.ranges[0],
-            session.groups[0],
-            'right'
-        )).toBe('append');
-        const right = applyMergeGroupDecision(
-            left.content,
-            left.ranges,
-            session.groups[0],
-            'right',
-            'applied'
-        );
+        expect(getMergeGroupApplyMode(left.content, left.ranges[0], session.groups[0], 'right')).toBe('append');
+        const right = applyMergeGroupDecision(left.content, left.ranges, session.groups[0], 'right', 'applied');
         const cancelledRight = applyMergeGroupDecision(
             right.content,
             right.ranges,
@@ -308,7 +284,7 @@ describe('conflictModel', () => {
         expect(cancelledRight.ranges[0]).toMatchObject({
             leftDecision: 'applied',
             rightDecision: 'cancelled',
-            lastAppliedSide: 'left'
+            lastAppliedSide: 'left',
         });
     });
 
@@ -327,25 +303,14 @@ describe('conflictModel', () => {
             'right',
             'applied'
         );
-        expect(getMergeGroupApplyMode(
-            right.content,
-            right.ranges[0],
-            session.groups[0],
-            'left'
-        )).toBe('append');
-        const left = applyMergeGroupDecision(
-            right.content,
-            right.ranges,
-            session.groups[0],
-            'left',
-            'applied'
-        );
+        expect(getMergeGroupApplyMode(right.content, right.ranges[0], session.groups[0], 'left')).toBe('append');
+        const left = applyMergeGroupDecision(right.content, right.ranges, session.groups[0], 'left', 'applied');
 
         expect(left.content).toBe('right add\nleft add');
         expect(left.ranges[0]).toMatchObject({
             leftDecision: 'applied',
             rightDecision: 'applied',
-            lastAppliedSide: 'left'
+            lastAppliedSide: 'left',
         });
     });
 
@@ -365,20 +330,9 @@ describe('conflictModel', () => {
             'applied'
         );
 
-        expect(getMergeGroupApplyMode(
-            left.content,
-            left.ranges[0],
-            session.groups[0],
-            'right'
-        )).toBe('preserve');
+        expect(getMergeGroupApplyMode(left.content, left.ranges[0], session.groups[0], 'right')).toBe('preserve');
 
-        const right = applyMergeGroupDecision(
-            left.content,
-            left.ranges,
-            session.groups[0],
-            'right',
-            'applied'
-        );
+        const right = applyMergeGroupDecision(left.content, left.ranges, session.groups[0], 'right', 'applied');
         expect(right.content).toBe('left\n');
     });
 
@@ -390,7 +344,7 @@ describe('conflictModel', () => {
                 endOffset: 6,
                 leftDecision: 'applied' as const,
                 rightDecision: 'cancelled' as const,
-                lastAppliedSide: 'left' as const
+                lastAppliedSide: 'left' as const,
             },
             {
                 groupId: 'change-1',
@@ -398,12 +352,10 @@ describe('conflictModel', () => {
                 endOffset: 12,
                 leftDecision: null,
                 rightDecision: 'applied' as const,
-                lastAppliedSide: 'right' as const
-            }
+                lastAppliedSide: 'right' as const,
+            },
         ];
-        const updated = applyMergeContentChanges(ranges, [
-            { rangeOffset: 3, rangeLength: 1, text: 'manual' }
-        ]);
+        const updated = applyMergeContentChanges(ranges, [{ rangeOffset: 3, rangeLength: 1, text: 'manual' }]);
 
         expect(updated.touchedGroupIds).toEqual(['change-0']);
         expect(updated.ranges[0]).toMatchObject({
@@ -411,14 +363,14 @@ describe('conflictModel', () => {
             endOffset: 11,
             leftDecision: 'pending',
             rightDecision: 'pending',
-            lastAppliedSide: null
+            lastAppliedSide: null,
         });
         expect(updated.ranges[1]).toMatchObject({
             startOffset: 15,
             endOffset: 17,
             leftDecision: null,
             rightDecision: 'applied',
-            lastAppliedSide: 'right'
+            lastAppliedSide: 'right',
         });
     });
 
@@ -431,16 +383,8 @@ describe('conflictModel', () => {
             []
         );
         const editedContent = 'a\r\nStable';
-        const updated = applyMergeContentChanges(session.reviewRanges, [
-            { rangeOffset: 3, rangeLength: 1, text: 'S' }
-        ]);
-        const accepted = applyMergeGroupDecision(
-            editedContent,
-            updated.ranges,
-            session.groups[0],
-            'left',
-            'applied'
-        );
+        const updated = applyMergeContentChanges(session.reviewRanges, [{ rangeOffset: 3, rangeLength: 1, text: 'S' }]);
+        const accepted = applyMergeGroupDecision(editedContent, updated.ranges, session.groups[0], 'left', 'applied');
 
         expect(updated.touchedGroupIds).toEqual([]);
         expect(updated.ranges[0]).toMatchObject({ startOffset: 0, endOffset: 3 });
@@ -457,15 +401,9 @@ describe('conflictModel', () => {
         );
         const editedContent = 'a\nmanual\nb\n';
         const updated = applyMergeContentChanges(session.reviewRanges, [
-            { rangeOffset: 2, rangeLength: 0, text: 'manual\n' }
+            { rangeOffset: 2, rangeLength: 0, text: 'manual\n' },
         ]);
-        const accepted = applyMergeGroupDecision(
-            editedContent,
-            updated.ranges,
-            session.groups[0],
-            'left',
-            'applied'
-        );
+        const accepted = applyMergeGroupDecision(editedContent, updated.ranges, session.groups[0], 'left', 'applied');
 
         expect(updated.touchedGroupIds).toEqual(['change-1']);
         expect(updated.ranges[0]).toMatchObject({ startOffset: 0, endOffset: 2 });
@@ -482,7 +420,7 @@ describe('conflictModel', () => {
                 endOffset: 2,
                 leftDecision: 'pending' as const,
                 rightDecision: null,
-                lastAppliedSide: null
+                lastAppliedSide: null,
             },
             {
                 groupId: 'change-1',
@@ -490,12 +428,10 @@ describe('conflictModel', () => {
                 endOffset: 4,
                 leftDecision: null,
                 rightDecision: 'pending' as const,
-                lastAppliedSide: null
-            }
+                lastAppliedSide: null,
+            },
         ];
-        const updated = applyMergeContentChanges(ranges, [
-            { rangeOffset: 1, rangeLength: 2, text: 'X' }
-        ]);
+        const updated = applyMergeContentChanges(ranges, [{ rangeOffset: 1, rangeLength: 2, text: 'X' }]);
 
         expect(updated.touchedGroupIds).toEqual(['change-0', 'change-1']);
         expect(updated.ranges[0]).toMatchObject({ startOffset: 0, endOffset: 1 });
@@ -503,26 +439,27 @@ describe('conflictModel', () => {
     });
 
     it('keeps an empty range anchored when a following range owns a boundary insertion', () => {
-        const updated = applyMergeContentChanges([
-            {
-                groupId: 'change-0',
-                startOffset: 0,
-                endOffset: 0,
-                leftDecision: 'pending' as const,
-                rightDecision: null,
-                lastAppliedSide: null
-            },
-            {
-                groupId: 'change-1',
-                startOffset: 0,
-                endOffset: 4,
-                leftDecision: null,
-                rightDecision: 'pending' as const,
-                lastAppliedSide: null
-            }
-        ], [
-            { rangeOffset: 0, rangeLength: 0, text: 'manual' }
-        ]);
+        const updated = applyMergeContentChanges(
+            [
+                {
+                    groupId: 'change-0',
+                    startOffset: 0,
+                    endOffset: 0,
+                    leftDecision: 'pending' as const,
+                    rightDecision: null,
+                    lastAppliedSide: null,
+                },
+                {
+                    groupId: 'change-1',
+                    startOffset: 0,
+                    endOffset: 4,
+                    leftDecision: null,
+                    rightDecision: 'pending' as const,
+                    lastAppliedSide: null,
+                },
+            ],
+            [{ rangeOffset: 0, rangeLength: 0, text: 'manual' }]
+        );
 
         expect(updated.touchedGroupIds).toEqual(['change-1']);
         expect(updated.ranges[0]).toMatchObject({ startOffset: 0, endOffset: 0 });
@@ -537,7 +474,7 @@ describe('conflictModel', () => {
                 endOffset: 6,
                 leftDecision: 'applied' as const,
                 rightDecision: null,
-                lastAppliedSide: 'left' as const
+                lastAppliedSide: 'left' as const,
             },
             {
                 groupId: 'change-1',
@@ -545,12 +482,12 @@ describe('conflictModel', () => {
                 endOffset: 12,
                 leftDecision: null,
                 rightDecision: 'cancelled' as const,
-                lastAppliedSide: null
-            }
+                lastAppliedSide: null,
+            },
         ];
         const updated = applyMergeContentChanges(ranges, [
             { rangeOffset: 10, rangeLength: 0, text: 'xy' },
-            { rangeOffset: 3, rangeLength: 1, text: 'manual' }
+            { rangeOffset: 3, rangeLength: 1, text: 'manual' },
         ]);
 
         expect(updated.touchedGroupIds).toEqual(['change-0', 'change-1']);
@@ -559,17 +496,22 @@ describe('conflictModel', () => {
     });
 
     it('expands an empty EOF range for all insertions at the same offset', () => {
-        const updated = applyMergeContentChanges([{
-            groupId: 'change-0',
-            startOffset: 6,
-            endOffset: 6,
-            leftDecision: 'pending',
-            rightDecision: 'pending',
-            lastAppliedSide: null
-        }], [
-            { rangeOffset: 6, rangeLength: 0, text: 'right' },
-            { rangeOffset: 6, rangeLength: 0, text: 'left' }
-        ]);
+        const updated = applyMergeContentChanges(
+            [
+                {
+                    groupId: 'change-0',
+                    startOffset: 6,
+                    endOffset: 6,
+                    leftDecision: 'pending',
+                    rightDecision: 'pending',
+                    lastAppliedSide: null,
+                },
+            ],
+            [
+                { rangeOffset: 6, rangeLength: 0, text: 'right' },
+                { rangeOffset: 6, rangeLength: 0, text: 'left' },
+            ]
+        );
 
         expect(updated.touchedGroupIds).toEqual(['change-0']);
         expect(updated.ranges[0]).toMatchObject({ startOffset: 6, endOffset: 15 });
@@ -579,10 +521,10 @@ describe('conflictModel', () => {
         expect(buildInlineDiffSegments('const value = 2;\n', 'const value = 1;\n')).toEqual([
             { text: 'const value = ', changed: false },
             { text: '2', changed: true },
-            { text: ';\n', changed: false }
+            { text: ';\n', changed: false },
         ]);
         expect(buildInlineDiffSegments('same line\n', 'same line\n')).toEqual([
-            { text: 'same line\n', changed: false }
+            { text: 'same line\n', changed: false },
         ]);
     });
 
@@ -590,18 +532,18 @@ describe('conflictModel', () => {
         expect(buildInlineDiffSegments('const  value\n', 'const value\n')).toEqual([
             { text: 'const', changed: false },
             { text: '  ', changed: true },
-            { text: 'value\n', changed: false }
+            { text: 'value\n', changed: false },
         ]);
         expect(buildInlineDiffSegments('const  value\n', 'const value\n', 'ignore')).toEqual([
-            { text: 'const  value\n', changed: false }
+            { text: 'const  value\n', changed: false },
         ]);
         expect(buildInlineDiffSegments('  value  \n', 'value\n', 'trim')).toEqual([
-            { text: '  value  \n', changed: false }
+            { text: '  value  \n', changed: false },
         ]);
         expect(buildInlineDiffSegments('const  value\n', 'const value\n', 'trim')).toEqual([
             { text: 'const', changed: false },
             { text: '  ', changed: true },
-            { text: 'value\n', changed: false }
+            { text: 'value\n', changed: false },
         ]);
     });
 
@@ -613,7 +555,7 @@ describe('conflictModel', () => {
             'const value = 1;\n',
             '=======\n',
             'const value = 3;\n',
-            '>>>>>>> incoming\n'
+            '>>>>>>> incoming\n',
         ].join('');
 
         expect(buildConflictInlineDiffRanges(content, '')).toEqual([
@@ -623,7 +565,7 @@ describe('conflictModel', () => {
                 startLine: 2,
                 startColumn: 15,
                 endLine: 2,
-                endColumn: 16
+                endColumn: 16,
             },
             {
                 conflictId: 'conflict-0',
@@ -631,8 +573,8 @@ describe('conflictModel', () => {
                 startLine: 6,
                 startColumn: 15,
                 endLine: 6,
-                endColumn: 16
-            }
+                endColumn: 16,
+            },
         ]);
     });
 
@@ -644,7 +586,7 @@ describe('conflictModel', () => {
             '=======\n',
             'incoming line\n',
             '>>>>>>> feature\n',
-            'after\n'
+            'after\n',
         ].join('');
 
         const [block] = parseConflictBlocks(content);
@@ -658,7 +600,7 @@ describe('conflictModel', () => {
             incomingLabel: 'feature',
             currentText: 'current line\n',
             incomingText: 'incoming line\n',
-            baseText: ''
+            baseText: '',
         });
         expect(content.slice(block.currentStartOffset, block.currentEndOffset)).toBe(block.currentText);
         expect(content.slice(block.incomingStartOffset, block.incomingEndOffset)).toBe(block.incomingText);
@@ -673,7 +615,7 @@ describe('conflictModel', () => {
             'base line\n',
             '=======\n',
             'incoming line\n',
-            '>>>>>>> theirs\n'
+            '>>>>>>> theirs\n',
         ].join('');
 
         expect(parseConflictBlocks(content)[0]).toMatchObject({
@@ -682,7 +624,7 @@ describe('conflictModel', () => {
             incomingLabel: 'theirs',
             currentText: 'current line\n',
             baseText: 'base line\n',
-            incomingText: 'incoming line\n'
+            incomingText: 'incoming line\n',
         });
     });
 
@@ -694,38 +636,44 @@ describe('conflictModel', () => {
             'base\n',
             '==========\n',
             'theirs\n',
-            '>>>>>>>>>> incoming\n'
+            '>>>>>>>>>> incoming\n',
         ].join('');
 
         expect(parseConflictBlocks(content)[0]).toMatchObject({
             markerSize: 10,
             currentLabel: 'current',
             baseLabel: 'base',
-            incomingLabel: 'incoming'
+            incomingLabel: 'incoming',
         });
     });
 
     it('does not treat marker-like source text as a conflict block', () => {
-        expect(hasConflictBlocks('const marker = "<<<<<<<";\nconst separator = "=======";\nconst end = ">>>>>>>";\n')).toBe(false);
+        expect(
+            hasConflictBlocks('const marker = "<<<<<<<";\nconst separator = "=======";\nconst end = ">>>>>>>";\n')
+        ).toBe(false);
         expect(hasConflictBlocks('<<<<<<< incomplete\n=======\n')).toBe(false);
     });
 
     it('requires explicit review before applying an unchanged marker-free result', () => {
         expect(getMergeResultReviewState('resolved\n', 'resolved\n', false)).toEqual({
             conflictMarkerCount: 0,
-            isResolutionConfirmed: false
+            isResolutionConfirmed: false,
         });
         expect(getMergeResultReviewState('resolved\n', 'resolved\n', true)).toEqual({
             conflictMarkerCount: 0,
-            isResolutionConfirmed: true
+            isResolutionConfirmed: true,
         });
-        expect(getMergeResultReviewState('<<<<<<< HEAD\nours\n=======\ntheirs\n>>>>>>> branch\n', 'manual\n', false)).toEqual({
+        expect(
+            getMergeResultReviewState('<<<<<<< HEAD\nours\n=======\ntheirs\n>>>>>>> branch\n', 'manual\n', false)
+        ).toEqual({
             conflictMarkerCount: 0,
-            isResolutionConfirmed: true
+            isResolutionConfirmed: true,
         });
-        expect(getMergeResultReviewState('original\n', '<<<<<<< HEAD\nours\n=======\ntheirs\n>>>>>>> branch\n', true)).toEqual({
+        expect(
+            getMergeResultReviewState('original\n', '<<<<<<< HEAD\nours\n=======\ntheirs\n>>>>>>> branch\n', true)
+        ).toEqual({
             conflictMarkerCount: 1,
-            isResolutionConfirmed: false
+            isResolutionConfirmed: false,
         });
     });
 
@@ -745,7 +693,7 @@ describe('conflictModel', () => {
             '=======\n',
             'theirs\n',
             '>>>>>>> branch\n',
-            'after\n'
+            'after\n',
         ].join('');
 
         expect(applyConflictBlockResolution(content, 'conflict-0', 'base')).toBe('before\nbase\nafter\n');
@@ -758,7 +706,7 @@ describe('conflictModel', () => {
         const content = [
             '<<<<<<< HEAD\nours 1\n=======\ntheirs 1\n>>>>>>> branch\n',
             'middle\n',
-            '<<<<<<< HEAD\nours 2\n=======\ntheirs 2\n>>>>>>> branch\n'
+            '<<<<<<< HEAD\nours 2\n=======\ntheirs 2\n>>>>>>> branch\n',
         ].join('');
 
         const next = applyConflictBlockResolution(content, 'conflict-0', 'current');
@@ -783,11 +731,13 @@ describe('conflictModel', () => {
             '<<<<<<< HEAD\nours 1\n=======\ntheirs 1\n>>>>>>> branch\n',
             'middle\n',
             '<<<<<<< HEAD\nours 2\n=======\ntheirs 2\n>>>>>>> branch\n',
-            'after\n'
+            'after\n',
         ].join('');
         const base = 'before\nbase 1\nmiddle\nbase 2\nafter\n';
-        const conflicts = parseConflictDocument(content, base)
-            .filter((part): part is Extract<ReturnType<typeof parseConflictDocument>[number], { type: 'conflict' }> => part.type === 'conflict');
+        const conflicts = parseConflictDocument(content, base).filter(
+            (part): part is Extract<ReturnType<typeof parseConflictDocument>[number], { type: 'conflict' }> =>
+                part.type === 'conflict'
+        );
 
         expect(getConflictBaseText(conflicts[0].block)).toBe('base 1\n');
         expect(getConflictBaseText(conflicts[1].block)).toBe('base 2\n');
@@ -797,25 +747,27 @@ describe('conflictModel', () => {
         const content = [
             '<<<<<<< HEAD\nours 1\n=======\ntheirs 1\n>>>>>>> branch\n',
             'middle\n',
-            '<<<<<<< HEAD\nours 2\n=======\ntheirs 2\n>>>>>>> branch\n'
+            '<<<<<<< HEAD\nours 2\n=======\ntheirs 2\n>>>>>>> branch\n',
         ].join('');
         const parts = parseConflictDocument(content);
-        const firstConflict = parts.find(part => part.type === 'conflict');
+        const firstConflict = parts.find((part) => part.type === 'conflict');
         if (!firstConflict || firstConflict.type !== 'conflict') {
             throw new Error('Expected a conflict part');
         }
 
         const partialResolutions = {
-            [firstConflict.id]: getConflictResolutionText(firstConflict.block, 'incoming')
+            [firstConflict.id]: getConflictResolutionText(firstConflict.block, 'incoming'),
         };
         const partial = buildConflictDocumentResult(parts, partialResolutions);
 
         expect(partial).toContain('theirs 1\n');
         expect(partial).toContain('<<<<<<< HEAD\n');
         expect(getUnresolvedConflictIds(parts, partialResolutions)).toEqual(['conflict-1']);
-        expect(buildConflictDocumentResult(parts, {
-            'conflict-0': '',
-            'conflict-1': 'resolved 2\n'
-        })).toBe('middle\nresolved 2\n');
+        expect(
+            buildConflictDocumentResult(parts, {
+                'conflict-0': '',
+                'conflict-1': 'resolved 2\n',
+            })
+        ).toBe('middle\nresolved 2\n');
     });
 });

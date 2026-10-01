@@ -11,7 +11,7 @@ interface BranchQuickPickItem extends vscode.QuickPickItem {
 export class BranchPicker {
     private isDeleteMode: boolean = false;
 
-    constructor(private gitService: GitService) { }
+    constructor(private gitService: GitService) {}
 
     public async show() {
         const quickPick = vscode.window.createQuickPick<BranchQuickPickItem>();
@@ -26,12 +26,12 @@ export class BranchPicker {
                 quickPick.buttons = [
                     {
                         iconPath: new vscode.ThemeIcon('arrow-left'),
-                        tooltip: vscode.l10n.t('Back to Checkout')
+                        tooltip: vscode.l10n.t('Back to Checkout'),
                     },
                     {
                         iconPath: new vscode.ThemeIcon('trash'),
-                        tooltip: vscode.l10n.t('Confirm Delete')
-                    }
+                        tooltip: vscode.l10n.t('Confirm Delete'),
+                    },
                 ];
             } else {
                 quickPick.placeholder = vscode.l10n.t('Search branches or select action...');
@@ -39,12 +39,12 @@ export class BranchPicker {
                 quickPick.buttons = [
                     {
                         iconPath: new vscode.ThemeIcon('trash'),
-                        tooltip: vscode.l10n.t('Delete Branches')
+                        tooltip: vscode.l10n.t('Delete Branches'),
                     },
                     {
                         iconPath: new vscode.ThemeIcon('cloud-download'),
-                        tooltip: vscode.l10n.t('Fetch from remote')
-                    }
+                        tooltip: vscode.l10n.t('Fetch from remote'),
+                    },
                 ];
             }
 
@@ -79,8 +79,8 @@ export class BranchPicker {
                 }
 
                 const branchesToDelete = quickPick.selectedItems
-                    .filter(i => i.branch && !i.isRemote)
-                    .map(i => i.branch!);
+                    .filter((i) => i.branch && !i.isRemote)
+                    .map((i) => i.branch!);
 
                 if (branchesToDelete.length === 0) {
                     return;
@@ -159,7 +159,7 @@ export class BranchPicker {
         const branches = await this.gitService.branchRemote.getBranches();
 
         if (this.isDeleteMode) {
-            branches.all.forEach(branch => {
+            branches.all.forEach((branch) => {
                 const isCurrent = branch === branches.current;
                 if (isCurrent) return;
 
@@ -167,7 +167,7 @@ export class BranchPicker {
                     label: `$(git-branch) ${branch}`,
                     description: '',
                     branch: branch,
-                    isRemote: false
+                    isRemote: false,
                 });
             });
             return items;
@@ -179,39 +179,39 @@ export class BranchPicker {
         items.push({
             label: '$(cloud-download) ' + vscode.l10n.t('Fetch'),
             description: vscode.l10n.t('Fetch latest changes from remote'),
-            action: 'fetch'
+            action: 'fetch',
         });
 
         items.push({
             label: '$(arrow-down) ' + vscode.l10n.t('Update Project'),
             description: vscode.l10n.t('Pull latest changes'),
-            action: 'update'
+            action: 'update',
         });
 
         items.push({
             label: '$(check) ' + vscode.l10n.t('Commit'),
             description: vscode.l10n.t('Open commit panel'),
-            action: 'commit'
+            action: 'commit',
         });
 
         items.push({
             label: '$(arrow-up) ' + vscode.l10n.t('Push'),
             description: vscode.l10n.t('Push commits to remote'),
-            action: 'push'
+            action: 'push',
         });
 
         items.push({
             label: '$(add) ' + vscode.l10n.t('New Branch'),
             description: vscode.l10n.t('Create a new branch'),
-            action: 'newBranch'
+            action: 'newBranch',
         });
 
         items.push({
             label: vscode.l10n.t('Local'),
-            kind: vscode.QuickPickItemKind.Separator
+            kind: vscode.QuickPickItemKind.Separator,
         });
 
-        branches.all.forEach(branch => {
+        branches.all.forEach((branch) => {
             const isCurrent = branch === branches.current;
             items.push({
                 label: `$(git-branch) ${branch}`,
@@ -222,24 +222,24 @@ export class BranchPicker {
                 buttons: [
                     {
                         iconPath: new vscode.ThemeIcon('edit'),
-                        tooltip: vscode.l10n.t('Rename Branch')
-                    }
-                ]
+                        tooltip: vscode.l10n.t('Rename Branch'),
+                    },
+                ],
             });
         });
 
         for (const remote of remotes) {
             const remoteBranchesForRemote = remoteBranches
-                .filter(b => b.startsWith(`${remote}/`))
-                .map(b => b.replace(`${remote}/`, ''));
+                .filter((b) => b.startsWith(`${remote}/`))
+                .map((b) => b.replace(`${remote}/`, ''));
 
             if (remoteBranchesForRemote.length > 0) {
                 items.push({
                     label: vscode.l10n.t('Remote ({0})', remote),
-                    kind: vscode.QuickPickItemKind.Separator
+                    kind: vscode.QuickPickItemKind.Separator,
                 });
 
-                remoteBranchesForRemote.forEach(branch => {
+                remoteBranchesForRemote.forEach((branch) => {
                     if (branch === 'HEAD') return;
                     const existsLocally = branches.all.includes(branch);
                     items.push({
@@ -247,7 +247,7 @@ export class BranchPicker {
                         description: existsLocally ? vscode.l10n.t('exists locally') : '',
                         action: 'checkout',
                         branch: `${remote}/${branch}`,
-                        isRemote: true
+                        isRemote: true,
                     });
                 });
             }
@@ -262,7 +262,7 @@ export class BranchPicker {
                 {
                     location: vscode.ProgressLocation.Notification,
                     title: vscode.l10n.t('Fetching from remote...'),
-                    cancellable: false
+                    cancellable: false,
                 },
                 async () => {
                     await this.gitService.branchRemote.fetch();
@@ -279,7 +279,7 @@ export class BranchPicker {
                 {
                     location: vscode.ProgressLocation.Notification,
                     title: vscode.l10n.t('Updating project...'),
-                    cancellable: false
+                    cancellable: false,
                 },
                 async () => {
                     await this.gitService.branchRemote.pull();
@@ -299,7 +299,7 @@ export class BranchPicker {
                 if (!value) return vscode.l10n.t('Branch name is required');
                 if (value.includes(' ')) return vscode.l10n.t('Branch name cannot contain spaces');
                 return null;
-            }
+            },
         });
 
         if (!branchName) return;
@@ -318,7 +318,7 @@ export class BranchPicker {
                 {
                     location: vscode.ProgressLocation.Notification,
                     title: vscode.l10n.t('Switching to {0}...', branch),
-                    cancellable: false
+                    cancellable: false,
                 },
                 async (progress) => {
                     await this._performCheckout(branch, isRemote, false, progress);
@@ -326,13 +326,15 @@ export class BranchPicker {
             );
             vscode.commands.executeCommand('intelli-git.refresh');
         } catch (e: any) {
-            if (await handleCheckoutWorktreeConflict({
-                gitService: this.gitService,
-                branch,
-                isRemote,
-                error: e,
-                retry: () => this._handleCheckout(branch, isRemote)
-            })) {
+            if (
+                await handleCheckoutWorktreeConflict({
+                    gitService: this.gitService,
+                    branch,
+                    isRemote,
+                    error: e,
+                    retry: () => this._handleCheckout(branch, isRemote),
+                })
+            ) {
                 return;
             }
 
@@ -358,13 +360,22 @@ export class BranchPicker {
             const localBranches = await this.gitService.branchRemote.getBranches();
             if (localBranches.all.includes(localBranchName)) {
                 // Check if local branch is ahead of remote
-                const aheadCount = await this.gitService.branchRemote.getCommitsToPushCount(localBranchName, remote, localBranchName);
+                const aheadCount = await this.gitService.branchRemote.getCommitsToPushCount(
+                    localBranchName,
+                    remote,
+                    localBranchName
+                );
                 if (aheadCount > 0) {
                     const action = await vscode.window.showWarningMessage(
                         vscode.l10n.t('Checkout Remote Branch'),
                         {
                             modal: true,
-                            detail: vscode.l10n.t('Local branch {0} has {1} commits not in {2}.', localBranchName, aheadCount, branch)
+                            detail: vscode.l10n.t(
+                                'Local branch {0} has {1} commits not in {2}.',
+                                localBranchName,
+                                aheadCount,
+                                branch
+                            ),
                         },
                         vscode.l10n.t('Rebase'),
                         vscode.l10n.t('Delete Local Commits'),
@@ -376,12 +387,16 @@ export class BranchPicker {
                     }
 
                     if (action === vscode.l10n.t('Rebase')) {
-                        progress?.report({ message: vscode.l10n.t('Rebasing {0} onto {1}...', localBranchName, branch) });
+                        progress?.report({
+                            message: vscode.l10n.t('Rebasing {0} onto {1}...', localBranchName, branch),
+                        });
                         await this.gitService.branchRemote.switchBranch(localBranchName, force);
                         await this.gitService.branchRemote.rebaseOnto(branch);
                         return;
                     } else if (action === vscode.l10n.t('Delete Local Commits')) {
-                        progress?.report({ message: vscode.l10n.t('Resetting {0} to {1}...', localBranchName, branch) });
+                        progress?.report({
+                            message: vscode.l10n.t('Resetting {0} to {1}...', localBranchName, branch),
+                        });
                         await this.gitService.branchRemote.switchBranch(localBranchName, force);
                         await this.gitService.branchRemote.reset('hard', branch);
                         return;
@@ -401,15 +416,22 @@ export class BranchPicker {
 
     private _isLocalChangesError(e: any): boolean {
         const msg = String(e);
-        return msg.includes('Your local changes to the following files would be overwritten by checkout') ||
+        return (
+            msg.includes('Your local changes to the following files would be overwritten by checkout') ||
             msg.includes('The following untracked working tree files would be overwritten by checkout') ||
-            msg.includes('Please commit your changes or stash them before you switch branches');
+            msg.includes('Please commit your changes or stash them before you switch branches')
+        );
     }
 
     private async _handleSmartCheckout(branch: string, isRemote?: boolean) {
         const action = await vscode.window.showWarningMessage(
             vscode.l10n.t('Checkout Conflict'),
-            { modal: true, detail: vscode.l10n.t('Your local changes would be overwritten by checkout.\nGit suggests committing or stashing them.') },
+            {
+                modal: true,
+                detail: vscode.l10n.t(
+                    'Your local changes would be overwritten by checkout.\nGit suggests committing or stashing them.'
+                ),
+            },
             vscode.l10n.t('Smart Checkout'),
             vscode.l10n.t('Force Checkout'),
             vscode.l10n.t('Cancel')
@@ -424,11 +446,15 @@ export class BranchPicker {
                 {
                     location: vscode.ProgressLocation.Notification,
                     title: vscode.l10n.t('Smart Checkout: Stashing & Switching...'),
-                    cancellable: false
+                    cancellable: false,
                 },
                 async () => {
                     try {
-                        await this.gitService.stash(`Smart Checkout: ${branch} at ${new Date().toISOString()}`, undefined, true);
+                        await this.gitService.stash(
+                            `Smart Checkout: ${branch} at ${new Date().toISOString()}`,
+                            undefined,
+                            true
+                        );
 
                         await this._performCheckout(branch, isRemote);
 
@@ -439,11 +465,15 @@ export class BranchPicker {
                             const errorMsg = String(popError);
                             if (errorMsg.includes('could not restore untracked files')) {
                                 vscode.window.showWarningMessage(
-                                    vscode.l10n.t('Checkout successful, but could not restore untracked files because they exist in the current branch. Your changes are saved in the Stash list.')
+                                    vscode.l10n.t(
+                                        'Checkout successful, but could not restore untracked files because they exist in the current branch. Your changes are saved in the Stash list.'
+                                    )
                                 );
                             } else {
                                 vscode.window.showWarningMessage(
-                                    vscode.l10n.t('Checkout successful, but conflicts occurred while restoring changes. Stash is kept for safety. Please resolve manually.')
+                                    vscode.l10n.t(
+                                        'Checkout successful, but conflicts occurred while restoring changes. Stash is kept for safety. Please resolve manually.'
+                                    )
                                 );
                             }
                             vscode.commands.executeCommand('intelli-git.refresh');
@@ -458,7 +488,7 @@ export class BranchPicker {
                 {
                     location: vscode.ProgressLocation.Notification,
                     title: vscode.l10n.t('Force Switching to {0}...', branch),
-                    cancellable: false
+                    cancellable: false,
                 },
                 async () => {
                     try {
@@ -481,7 +511,7 @@ export class BranchPicker {
                 if (value.includes(' ')) return vscode.l10n.t('Branch name cannot contain spaces');
                 if (value === branch) return vscode.l10n.t('Please enter a different name');
                 return null;
-            }
+            },
         });
 
         if (!newName) return;

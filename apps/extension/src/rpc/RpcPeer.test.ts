@@ -8,9 +8,12 @@ describe('RPC method timeouts', () => {
     it('keeps AI generation pending beyond the ordinary RPC deadline', async () => {
         vi.useFakeTimers();
         const postMessage = vi.fn();
-        const peer = new RpcPeer<{ generateCommitMessage(): Promise<string> }>({ postMessage }, {
-            methodTimeoutsMs: { generateCommitMessage: AI_GENERATION_TIMEOUT_MS + 30000 }
-        });
+        const peer = new RpcPeer<{ generateCommitMessage(): Promise<string> }>(
+            { postMessage },
+            {
+                methodTimeoutsMs: { generateCommitMessage: AI_GENERATION_TIMEOUT_MS + 30000 },
+            }
+        );
         const completed = vi.fn();
         const pending = peer.proxy.generateCommitMessage().then(completed);
         await vi.advanceTimersByTimeAsync(90000);
@@ -24,9 +27,12 @@ describe('RPC method timeouts', () => {
     it('delivers the provider timeout before the longer RPC deadline', async () => {
         vi.useFakeTimers();
         const postMessage = vi.fn();
-        const peer = new RpcPeer<{ generateCommitMessage(): Promise<string> }>({ postMessage }, {
-            methodTimeoutsMs: { generateCommitMessage: AI_GENERATION_TIMEOUT_MS + 30000 }
-        });
+        const peer = new RpcPeer<{ generateCommitMessage(): Promise<string> }>(
+            { postMessage },
+            {
+                methodTimeoutsMs: { generateCommitMessage: AI_GENERATION_TIMEOUT_MS + 30000 },
+            }
+        );
         const pending = peer.proxy.generateCommitMessage();
         const assertion = expect(pending).rejects.toThrow('Codex CLI timed out');
         await vi.advanceTimersByTimeAsync(AI_GENERATION_TIMEOUT_MS);
@@ -37,10 +43,15 @@ describe('RPC method timeouts', () => {
 
     it('still times out unresponsive AI handlers and keeps ordinary calls at 60 seconds', async () => {
         vi.useFakeTimers();
-        const peer = new RpcPeer<{ generateCommitMessage(): Promise<void>; getStatus(): Promise<void> }>({ postMessage() {} }, {
-            methodTimeoutsMs: { generateCommitMessage: AI_GENERATION_TIMEOUT_MS + 30000 }
-        });
-        const ai = expect(peer.proxy.generateCommitMessage()).rejects.toThrow('RPC timeout for method: generateCommitMessage');
+        const peer = new RpcPeer<{ generateCommitMessage(): Promise<void>; getStatus(): Promise<void> }>(
+            { postMessage() {} },
+            {
+                methodTimeoutsMs: { generateCommitMessage: AI_GENERATION_TIMEOUT_MS + 30000 },
+            }
+        );
+        const ai = expect(peer.proxy.generateCommitMessage()).rejects.toThrow(
+            'RPC timeout for method: generateCommitMessage'
+        );
         const normal = expect(peer.proxy.getStatus()).rejects.toThrow('RPC timeout for method: getStatus');
         await vi.advanceTimersByTimeAsync(60000);
         await normal;

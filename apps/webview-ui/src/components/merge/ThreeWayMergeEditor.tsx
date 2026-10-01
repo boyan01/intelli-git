@@ -8,7 +8,7 @@ import {
     type CodeDecoration,
     type CodeEditorContentChange,
     type CodeViewZone,
-    type MonacoCodeEditorHandle
+    type MonacoCodeEditorHandle,
 } from './MonacoCodeEditor';
 import type { MergeReviewDecision } from './conflictModel';
 import styles from './ThreeWayMergeEditor.module.css';
@@ -135,7 +135,7 @@ export function ThreeWayMergeEditor({
     onResultChange,
     onLeftLineClick,
     onResultLineClick,
-    onRightLineClick
+    onRightLineClick,
 }: ThreeWayMergeEditorProps) {
     const { t } = useTranslation();
     const resultEditorRef = useRef<MonacoCodeEditorHandle | null>(null);
@@ -145,10 +145,10 @@ export function ThreeWayMergeEditor({
     const [scrollLeft, setScrollLeft] = useState(0);
     const handleScroll = useCallback((nextScrollTop: number | undefined, nextScrollLeft: number | undefined) => {
         if (nextScrollTop !== undefined) {
-            setScrollTop(current => current === nextScrollTop ? current : nextScrollTop);
+            setScrollTop((current) => (current === nextScrollTop ? current : nextScrollTop));
         }
         if (nextScrollLeft !== undefined) {
-            setScrollLeft(current => current === nextScrollLeft ? current : nextScrollLeft);
+            setScrollLeft((current) => (current === nextScrollLeft ? current : nextScrollLeft));
         }
     }, []);
 
@@ -157,9 +157,9 @@ export function ThreeWayMergeEditor({
             resultEditorRef.current?.delegateScrollFromWheelEvent(event);
         };
         const gutters = [leftGutterRef.current, rightGutterRef.current];
-        gutters.forEach(gutter => gutter?.addEventListener('wheel', handleGutterWheel, { passive: false }));
+        gutters.forEach((gutter) => gutter?.addEventListener('wheel', handleGutterWheel, { passive: false }));
         return () => {
-            gutters.forEach(gutter => gutter?.removeEventListener('wheel', handleGutterWheel));
+            gutters.forEach((gutter) => gutter?.removeEventListener('wheel', handleGutterWheel));
         };
     }, []);
 
@@ -183,50 +183,54 @@ export function ThreeWayMergeEditor({
                 />
             </section>
             <div ref={leftGutterRef} className={styles.editorGutter}>
-                {blockActions.map(action => (
+                {blockActions.map((action) => (
                     <MergeConnector key={action.id} action={action} side="left" scrollTop={scrollTop} />
                 ))}
-                {blockActions.filter(action => action.hasLeftChange && action.leftDecision === 'pending').map(action => {
-                    const acceptLabel = action.leftApplyAppends ? t('Append Left Change Below') : t('Accept Left');
-                    return (
-                        <div
-                            key={action.id}
-                            className={styles.leftGutterActionGroup}
-                            style={{
-                                top: `${MERGE_EDITOR_TOP_OFFSET + action.displayRow * CODE_EDITOR_LINE_HEIGHT - scrollTop}px`,
-                                height: `${Math.max(1, action.leftLineCount, action.resultLineCount) * CODE_EDITOR_LINE_HEIGHT}px`
-                            }}
-                            data-decoration-type={action.decorationType}
-                            data-vscode-context={JSON.stringify(action.leftContextData)}
-                        >
-                            <button
-                                className={styles.gutterActionButton}
-                                type="button"
-                                onClick={action.onCancelLeft}
-                                disabled={action.disabled}
-                                title={t('Cancel Left Change')}
-                                aria-label={t('Cancel Left Change')}
+                {blockActions
+                    .filter((action) => action.hasLeftChange && action.leftDecision === 'pending')
+                    .map((action) => {
+                        const acceptLabel = action.leftApplyAppends ? t('Append Left Change Below') : t('Accept Left');
+                        return (
+                            <div
+                                key={action.id}
+                                className={styles.leftGutterActionGroup}
+                                style={{
+                                    top: `${MERGE_EDITOR_TOP_OFFSET + action.displayRow * CODE_EDITOR_LINE_HEIGHT - scrollTop}px`,
+                                    height: `${Math.max(1, action.leftLineCount, action.resultLineCount) * CODE_EDITOR_LINE_HEIGHT}px`,
+                                }}
+                                data-decoration-type={action.decorationType}
+                                data-vscode-context={JSON.stringify(action.leftContextData)}
                             >
-                                <span className="codicon codicon-close" aria-hidden="true"></span>
-                            </button>
-                            <button
-                                className={styles.gutterActionButton}
-                                type="button"
-                                onClick={action.onAcceptLeft}
-                                disabled={action.disabled}
-                                title={acceptLabel}
-                                aria-label={acceptLabel}
-                            >
-                                <span
-                                    className={action.leftApplyAppends
-                                        ? `codicon codicon-newline ${styles.leftAppendIcon}`
-                                        : 'codicon codicon-arrow-right'}
-                                    aria-hidden="true"
-                                ></span>
-                            </button>
-                        </div>
-                    );
-                })}
+                                <button
+                                    className={styles.gutterActionButton}
+                                    type="button"
+                                    onClick={action.onCancelLeft}
+                                    disabled={action.disabled}
+                                    title={t('Cancel Left Change')}
+                                    aria-label={t('Cancel Left Change')}
+                                >
+                                    <span className="codicon codicon-close" aria-hidden="true"></span>
+                                </button>
+                                <button
+                                    className={styles.gutterActionButton}
+                                    type="button"
+                                    onClick={action.onAcceptLeft}
+                                    disabled={action.disabled}
+                                    title={acceptLabel}
+                                    aria-label={acceptLabel}
+                                >
+                                    <span
+                                        className={
+                                            action.leftApplyAppends
+                                                ? `codicon codicon-newline ${styles.leftAppendIcon}`
+                                                : 'codicon codicon-arrow-right'
+                                        }
+                                        aria-hidden="true"
+                                    ></span>
+                                </button>
+                            </div>
+                        );
+                    })}
             </div>
             <section className={`${styles.mergePane} ${styles.resultPane}`} aria-label={t('Result')}>
                 <MonacoCodeEditor
@@ -248,50 +252,56 @@ export function ThreeWayMergeEditor({
                 />
             </section>
             <div ref={rightGutterRef} className={styles.editorGutter}>
-                {blockActions.map(action => (
+                {blockActions.map((action) => (
                     <MergeConnector key={action.id} action={action} side="right" scrollTop={scrollTop} />
                 ))}
-                {blockActions.filter(action => action.hasRightChange && action.rightDecision === 'pending').map(action => {
-                    const acceptLabel = action.rightApplyAppends ? t('Append Right Change Below') : t('Accept Right');
-                    return (
-                        <div
-                            key={action.id}
-                            className={styles.rightGutterActionGroup}
-                            style={{
-                                top: `${MERGE_EDITOR_TOP_OFFSET + action.displayRow * CODE_EDITOR_LINE_HEIGHT - scrollTop}px`,
-                                height: `${Math.max(1, action.resultLineCount, action.rightLineCount) * CODE_EDITOR_LINE_HEIGHT}px`
-                            }}
-                            data-decoration-type={action.decorationType}
-                            data-vscode-context={JSON.stringify(action.rightContextData)}
-                        >
-                            <button
-                                className={styles.gutterActionButton}
-                                type="button"
-                                onClick={action.onAcceptRight}
-                                disabled={action.disabled}
-                                title={acceptLabel}
-                                aria-label={acceptLabel}
+                {blockActions
+                    .filter((action) => action.hasRightChange && action.rightDecision === 'pending')
+                    .map((action) => {
+                        const acceptLabel = action.rightApplyAppends
+                            ? t('Append Right Change Below')
+                            : t('Accept Right');
+                        return (
+                            <div
+                                key={action.id}
+                                className={styles.rightGutterActionGroup}
+                                style={{
+                                    top: `${MERGE_EDITOR_TOP_OFFSET + action.displayRow * CODE_EDITOR_LINE_HEIGHT - scrollTop}px`,
+                                    height: `${Math.max(1, action.resultLineCount, action.rightLineCount) * CODE_EDITOR_LINE_HEIGHT}px`,
+                                }}
+                                data-decoration-type={action.decorationType}
+                                data-vscode-context={JSON.stringify(action.rightContextData)}
                             >
-                                <span
-                                    className={action.rightApplyAppends
-                                        ? 'codicon codicon-newline'
-                                        : 'codicon codicon-arrow-left'}
-                                    aria-hidden="true"
-                                ></span>
-                            </button>
-                            <button
-                                className={styles.gutterActionButton}
-                                type="button"
-                                onClick={action.onCancelRight}
-                                disabled={action.disabled}
-                                title={t('Cancel Right Change')}
-                                aria-label={t('Cancel Right Change')}
-                            >
-                                <span className="codicon codicon-close" aria-hidden="true"></span>
-                            </button>
-                        </div>
-                    );
-                })}
+                                <button
+                                    className={styles.gutterActionButton}
+                                    type="button"
+                                    onClick={action.onAcceptRight}
+                                    disabled={action.disabled}
+                                    title={acceptLabel}
+                                    aria-label={acceptLabel}
+                                >
+                                    <span
+                                        className={
+                                            action.rightApplyAppends
+                                                ? 'codicon codicon-newline'
+                                                : 'codicon codicon-arrow-left'
+                                        }
+                                        aria-hidden="true"
+                                    ></span>
+                                </button>
+                                <button
+                                    className={styles.gutterActionButton}
+                                    type="button"
+                                    onClick={action.onCancelRight}
+                                    disabled={action.disabled}
+                                    title={t('Cancel Right Change')}
+                                    aria-label={t('Cancel Right Change')}
+                                >
+                                    <span className="codicon codicon-close" aria-hidden="true"></span>
+                                </button>
+                            </div>
+                        );
+                    })}
             </div>
             <section className={styles.mergePane} aria-label={t('Right')}>
                 <MonacoCodeEditor

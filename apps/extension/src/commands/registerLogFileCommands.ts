@@ -4,10 +4,7 @@ import * as path from 'path';
 import { createRevisionContentUri } from '../utils/repositoryContentUri';
 import { copyPatchToClipboard, savePatchToFile } from '../utils/patchExport';
 
-export function registerLogFileCommands(
-    context: vscode.ExtensionContext,
-    gitService: GitService
-) {
+export function registerLogFileCommands(context: vscode.ExtensionContext, gitService: GitService) {
     const getCommandArgs = (arg: any) => {
         if (!arg || arg.webviewSection !== 'gitLogCommitFile') return null;
         return {
@@ -15,7 +12,7 @@ export function registerLogFileCommands(
             status: arg.status,
             isFile: !!arg.isFile,
             commitHash: arg.commitHash,
-            parentHash: arg.parentHash
+            parentHash: arg.parentHash,
         };
     };
 
@@ -29,7 +26,7 @@ export function registerLogFileCommands(
 
         return {
             patch,
-            defaultBaseName: `${fileName}-${shortHash}`
+            defaultBaseName: `${fileName}-${shortHash}`,
         };
     };
 
@@ -39,8 +36,10 @@ export function registerLogFileCommands(
             const data = getCommandArgs(arg);
             if (!data || !data.isFile) return;
 
-            const leftRef = data.status?.startsWith('A') ? '' : (data.parentHash || `${data.commitHash}^`);
-            const rightRef = data.status?.startsWith('D') ? '4b825dc642cb6eb9a060e54bf8d69288fbee4904' : data.commitHash;
+            const leftRef = data.status?.startsWith('A') ? '' : data.parentHash || `${data.commitHash}^`;
+            const rightRef = data.status?.startsWith('D')
+                ? '4b825dc642cb6eb9a060e54bf8d69288fbee4904'
+                : data.commitHash;
 
             const repoPath = data.path;
             const leftUri = createRevisionContentUri(gitService, repoPath, { ref: leftRef, pathKind: 'repo' });
@@ -78,7 +77,10 @@ export function registerLogFileCommands(
             if (!data || !data.isFile || data.status === 'D') return;
 
             const repoPath = data.path;
-            const revisionUri = createRevisionContentUri(gitService, repoPath, { ref: data.commitHash, pathKind: 'repo' });
+            const revisionUri = createRevisionContentUri(gitService, repoPath, {
+                ref: data.commitHash,
+                pathKind: 'repo',
+            });
 
             await vscode.window.showTextDocument(revisionUri, { preview: false });
         })
@@ -146,7 +148,7 @@ export function registerLogFileCommands(
 
             await savePatchToFile(result.patch, {
                 workspaceRoot: gitService.getWorkspaceRoot(),
-                defaultBaseName: result.defaultBaseName
+                defaultBaseName: result.defaultBaseName,
             });
         })
     );

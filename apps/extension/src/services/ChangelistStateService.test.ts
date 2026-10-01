@@ -8,25 +8,29 @@ interface WorkspaceState {
     update(key: string, value: unknown): Promise<void>;
 }
 
-function createWorkspaceState(initial: Record<string, unknown> = {}): WorkspaceState & { values: Record<string, unknown> } {
+function createWorkspaceState(
+    initial: Record<string, unknown> = {}
+): WorkspaceState & { values: Record<string, unknown> } {
     const values = { ...initial };
     return {
         values,
         get<T>(key: string, defaultValue?: T): T | undefined {
-            return Object.prototype.hasOwnProperty.call(values, key)
-                ? values[key] as T | undefined
-                : defaultValue;
+            return Object.prototype.hasOwnProperty.call(values, key) ? (values[key] as T | undefined) : defaultValue;
         },
         async update(key: string, value: unknown): Promise<void> {
             values[key] = value;
-        }
+        },
     };
 }
 
 function createService(initial?: unknown): ChangelistStateService {
-    const workspaceState = createWorkspaceState(initial ? {
-        'ideaCommitPanel.changelists.v1': initial
-    } : {});
+    const workspaceState = createWorkspaceState(
+        initial
+            ? {
+                  'ideaCommitPanel.changelists.v1': initial,
+              }
+            : {}
+    );
 
     return new ChangelistStateService({ workspaceState } as never);
 }
@@ -35,7 +39,7 @@ function createServiceWithWorkspaceState(initial: Record<string, unknown> = {}) 
     const workspaceState = createWorkspaceState(initial);
     return {
         workspaceState,
-        service: new ChangelistStateService({ workspaceState } as never)
+        service: new ChangelistStateService({ workspaceState } as never),
     };
 }
 
@@ -48,7 +52,7 @@ function hunk(id: string): GitHunk {
         oldStart: 1,
         oldLineCount: 1,
         newStart: 1,
-        newLineCount: 1
+        newLineCount: 1,
     };
 }
 
@@ -57,7 +61,7 @@ function status(path: string, hunks: GitHunk[] = []): FileStatus {
         path,
         status: 'M',
         staged: false,
-        hunks
+        hunks,
     };
 }
 
@@ -73,7 +77,7 @@ describe('ChangelistStateService', () => {
             lists: [
                 { id: '', name: 'Broken' },
                 { id: 'review', name: 'Review' },
-                { id: 'review', name: 'Duplicate' }
+                { id: 'review', name: 'Duplicate' },
             ],
             activeListId: 'missing',
             assignments: {
@@ -82,10 +86,10 @@ describe('ChangelistStateService', () => {
                 'src/hunks.ts': {
                     hunkListIds: {
                         keep: 'review',
-                        drop: 'missing'
-                    }
-                }
-            }
+                        drop: 'missing',
+                    },
+                },
+            },
         });
 
         expect(service.getState()).toEqual({
@@ -96,25 +100,25 @@ describe('ChangelistStateService', () => {
                     id: 'review',
                     name: 'Review',
                     isDefault: false,
-                    isActive: true
+                    isActive: true,
                 },
                 {
                     id: 'changes',
                     name: 'Changes',
                     isDefault: true,
-                    isActive: false
+                    isActive: false,
                 },
                 {
                     id: 'inactive-changes',
                     name: 'Inactive Changes',
                     isDefault: true,
-                    isActive: false
-                }
+                    isActive: false,
+                },
             ],
             assignments: {
                 'src/kept.ts': { fileListId: 'review' },
-                'src/hunks.ts': { hunkListIds: { keep: 'review' } }
-            }
+                'src/hunks.ts': { hunkListIds: { keep: 'review' } },
+            },
         });
     });
 
@@ -134,20 +138,20 @@ describe('ChangelistStateService', () => {
             'ideaCommitPanel.changelists.v1': {
                 lists: [
                     { id: 'changes', name: 'Changes' },
-                    { id: 'review', name: 'Review' }
+                    { id: 'review', name: 'Review' },
                 ],
                 activeListId: 'review',
                 assignments: {
-                    'README.md': { fileListId: 'review' }
-                }
-            }
+                    'README.md': { fileListId: 'review' },
+                },
+            },
         });
 
         const service = new ChangelistStateService({ workspaceState } as never, '/workspace/second');
 
         expect(service.getState()).toMatchObject({
             activeListId: 'changes',
-            assignments: {}
+            assignments: {},
         });
     });
 
@@ -156,13 +160,13 @@ describe('ChangelistStateService', () => {
             'ideaCommitPanel.changelists.v1': {
                 lists: [
                     { id: 'changes', name: 'Changes' },
-                    { id: 'review', name: 'Review' }
+                    { id: 'review', name: 'Review' },
                 ],
                 activeListId: 'review',
                 assignments: {
-                    'README.md': { fileListId: 'review' }
-                }
-            }
+                    'README.md': { fileListId: 'review' },
+                },
+            },
         });
 
         const service = new ChangelistStateService({ workspaceState } as never, '/workspace/first', true);
@@ -170,8 +174,8 @@ describe('ChangelistStateService', () => {
         expect(service.getState()).toMatchObject({
             activeListId: 'review',
             assignments: {
-                'README.md': { fileListId: 'review' }
-            }
+                'README.md': { fileListId: 'review' },
+            },
         });
     });
 
@@ -189,17 +193,17 @@ describe('ChangelistStateService', () => {
             lists: [
                 {
                     id: 'changes',
-                    isActive: true
+                    isActive: true,
                 },
                 {
                     id: 'inactive-changes',
-                    isActive: false
-                }
+                    isActive: false,
+                },
             ],
             assignments: {
                 'src/file.ts': { fileListId: 'changes' },
-                'src/hunks.ts': { hunkListIds: { h1: 'changes' } }
-            }
+                'src/hunks.ts': { hunkListIds: { h1: 'changes' } },
+            },
         });
     });
 
@@ -214,13 +218,13 @@ describe('ChangelistStateService', () => {
             {
                 path: 'src/untracked.ts',
                 status: '?',
-                staged: false
-            }
+                staged: false,
+            },
         ]);
 
         expect(service.getState().assignments).toEqual({
             'src/untracked.ts': { fileListId: 'changes' },
-            'src/tracked.ts': { fileListId: review.id }
+            'src/tracked.ts': { fileListId: review.id },
         });
     });
 
@@ -234,16 +238,16 @@ describe('ChangelistStateService', () => {
                 path: 'src/added.ts',
                 status: 'A',
                 staged: true,
-                hunks: [hunk('src/added.ts:index:0:0:1:1:added')]
-            }
+                hunks: [hunk('src/added.ts:index:0:0:1:1:added')],
+            },
         ]);
 
         expect(service.getState().assignments).toEqual({
             'src/added.ts': {
                 hunkListIds: {
-                    'src/added.ts:index:0:0:1:1:added': review.id
-                }
-            }
+                    'src/added.ts:index:0:0:1:1:added': review.id,
+                },
+            },
         });
     });
 
@@ -259,21 +263,21 @@ describe('ChangelistStateService', () => {
                 path: 'src/inactive.ts',
                 status: 'M',
                 staged: false,
-                inactive: true
+                inactive: true,
             },
             {
                 path: 'src/untracked.ts',
                 status: '?',
-                staged: false
-            }
+                staged: false,
+            },
         ]);
 
         expect(plan).toEqual({
             files: ['src/file.ts', 'src/other.ts'],
             excludedFiles: ['src/inactive.ts'],
             excludedHunkIdsByPath: {
-                'src/file.ts': ['h2']
-            }
+                'src/file.ts': ['h2'],
+            },
         });
     });
 
@@ -283,18 +287,22 @@ describe('ChangelistStateService', () => {
         await service.moveHunks('src/file.ts', ['h2'], review.id);
         await service.moveFiles(['src/review-only.ts'], review.id);
 
-        const plan = service.buildCommitPlan([
-            status('src/file.ts', [hunk('h1'), hunk('h2')]),
-            status('src/review-only.ts'),
-            status('src/active-only.ts')
-        ], undefined, review.id);
+        const plan = service.buildCommitPlan(
+            [
+                status('src/file.ts', [hunk('h1'), hunk('h2')]),
+                status('src/review-only.ts'),
+                status('src/active-only.ts'),
+            ],
+            undefined,
+            review.id
+        );
 
         expect(plan).toEqual({
             files: ['src/file.ts', 'src/review-only.ts'],
             excludedFiles: ['src/active-only.ts'],
             excludedHunkIdsByPath: {
-                'src/file.ts': ['h1']
-            }
+                'src/file.ts': ['h1'],
+            },
         });
         expect(service.getState().activeListId).toBe('changes');
     });
@@ -305,40 +313,44 @@ describe('ChangelistStateService', () => {
         await service.moveHunks('src/file.ts', ['h2'], review.id);
         await service.moveFiles(['src/other.ts'], review.id);
 
-        const plan = service.buildCommitPlan([
-            status('src/file.ts', [hunk('h1'), hunk('h2')]),
-            status('src/other.ts')
-        ], ['src/file.ts'], review.id);
+        const plan = service.buildCommitPlan(
+            [status('src/file.ts', [hunk('h1'), hunk('h2')]), status('src/other.ts')],
+            ['src/file.ts'],
+            review.id
+        );
 
         expect(plan).toEqual({
             files: ['src/file.ts'],
             excludedFiles: [],
             excludedHunkIdsByPath: {
-                'src/file.ts': ['h1']
-            }
+                'src/file.ts': ['h1'],
+            },
         });
     });
 
     it('includes requested untracked files in the active changelist commit plan', async () => {
         const service = createService();
 
-        const plan = service.buildCommitPlan([
-            {
-                path: 'src/new.ts',
-                status: '?',
-                staged: false
-            },
-            {
-                path: 'src/ignored.ts',
-                status: '?',
-                staged: false
-            }
-        ], ['src/new.ts']);
+        const plan = service.buildCommitPlan(
+            [
+                {
+                    path: 'src/new.ts',
+                    status: '?',
+                    staged: false,
+                },
+                {
+                    path: 'src/ignored.ts',
+                    status: '?',
+                    staged: false,
+                },
+            ],
+            ['src/new.ts']
+        );
 
         expect(plan).toEqual({
             files: ['src/new.ts'],
             excludedFiles: [],
-            excludedHunkIdsByPath: {}
+            excludedHunkIdsByPath: {},
         });
     });
 
@@ -349,13 +361,13 @@ describe('ChangelistStateService', () => {
 
         const plan = service.buildCommitPlan([
             status('src/active.ts', [hunk('active-hunk')]),
-            status('src/deleted.ts', [hunk('delete-hunk')])
+            status('src/deleted.ts', [hunk('delete-hunk')]),
         ]);
 
         expect(plan).toEqual({
             files: ['src/active.ts'],
             excludedFiles: ['src/deleted.ts'],
-            excludedHunkIdsByPath: {}
+            excludedHunkIdsByPath: {},
         });
     });
 });

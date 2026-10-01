@@ -25,20 +25,20 @@ export class GitLogService {
     constructor(
         private readonly git: SimpleGit,
         private readonly options: GitLogServiceOptions
-    ) { }
+    ) {}
 
     public getCommitFiles = async (hash: string): Promise<CommitFile[]> => {
         try {
             const result = await this.git.show([hash, '--name-status', '--pretty=format:']);
-            const lines = result.split('\n').filter(l => l.trim());
-            return lines.map(line => {
+            const lines = result.split('\n').filter((l) => l.trim());
+            return lines.map((line) => {
                 const [status, ...pathParts] = line.split('\t');
                 const repoPath = pathParts.join('\t');
                 const wsPath = this.options.toWorkspacePath(repoPath);
                 return {
                     path: repoPath,
                     displayPath: wsPath || repoPath,
-                    status: status as GitStatusCode
+                    status: status as GitStatusCode,
                 };
             });
         } catch (e) {
@@ -123,7 +123,10 @@ export class GitLogService {
                     } else if (options.branch === 'HEAD') {
                         // Default behavior already uses HEAD ancestry.
                     } else if (options.branch.includes(',')) {
-                        const branches = options.branch.split(',').map(b => b.trim()).filter(Boolean);
+                        const branches = options.branch
+                            .split(',')
+                            .map((b) => b.trim())
+                            .filter(Boolean);
                         args.push(...branches);
                     } else {
                         args.push(options.branch);
@@ -143,7 +146,7 @@ export class GitLogService {
             args.push('--author-date-order');
 
             if (options.paths && options.paths.length > 0) {
-                args.push('--', ...options.paths.map(p => this.options.toRepoPath(p)));
+                args.push('--', ...options.paths.map((p) => this.options.toRepoPath(p)));
             } else if (options.fileFilter) {
                 args.push('--', this.options.toRepoPath(options.fileFilter));
             }
@@ -153,10 +156,12 @@ export class GitLogService {
 
             if (!result) return [];
 
-            const commits: LogCommit[] = result.split('\n')
-                .filter(line => line.trim())
-                .map(line => {
-                    const [hash, shortHash, subject, authorName, authorEmail, date, parentsStr, refsStr] = line.split('\0');
+            const commits: LogCommit[] = result
+                .split('\n')
+                .filter((line) => line.trim())
+                .map((line) => {
+                    const [hash, shortHash, subject, authorName, authorEmail, date, parentsStr, refsStr] =
+                        line.split('\0');
 
                     return {
                         hash,
@@ -171,26 +176,26 @@ export class GitLogService {
                         files: [],
                         stats: { additions: 0, deletions: 0 },
                         containingBranches: [],
-                        filteredAncestors: []
+                        filteredAncestors: [],
                     };
                 });
 
-            const isFilteredMode = !!options.search || (options.branch && options.branch !== 'all' && options.branch !== 'HEAD');
+            const isFilteredMode =
+                !!options.search || (options.branch && options.branch !== 'all' && options.branch !== 'HEAD');
             if (isFilteredMode && commits.length > 1) {
                 await this.ensureGraphLoaded();
 
-                const remainingVisibleHashes = new Set(commits.map(commit => commit.hash));
+                const remainingVisibleHashes = new Set(commits.map((commit) => commit.hash));
 
                 for (let i = 0; i < commits.length; i++) {
                     const commit = commits[i];
                     remainingVisibleHashes.delete(commit.hash);
-                    const hasVisibleParent = commit.parentHashes.some(parentHash => remainingVisibleHashes.has(parentHash));
+                    const hasVisibleParent = commit.parentHashes.some((parentHash) =>
+                        remainingVisibleHashes.has(parentHash)
+                    );
 
                     if (!hasVisibleParent) {
-                        const visibleAncestor = this.findNearestVisibleAncestor(
-                            commit.hash,
-                            remainingVisibleHashes
-                        );
+                        const visibleAncestor = this.findNearestVisibleAncestor(commit.hash, remainingVisibleHashes);
 
                         if (visibleAncestor) {
                             commit.filteredAncestors = [visibleAncestor];
@@ -242,7 +247,11 @@ export class GitLogService {
 
     public getCommitDetails = async (hash: string): Promise<CommitDetails> => {
         try {
-            const showMsg = await this.git.show([hash, '--format=%B%x00%P%x00%an%x00%ae%x00%aI%x00%h%x00%D', '--no-patch']);
+            const showMsg = await this.git.show([
+                hash,
+                '--format=%B%x00%P%x00%an%x00%ae%x00%aI%x00%h%x00%D',
+                '--no-patch',
+            ]);
             const [fullMessage, parentsStr, authorName, authorEmail, date, shortHash, refsStr] = showMsg.split('\0');
 
             const files = await this.getCommitFiles(hash);
@@ -282,7 +291,7 @@ export class GitLogService {
                 date: date?.trim() || '',
                 containingBranches,
                 refs: this.parseRefs(refsStr?.trim() || ''),
-                filteredAncestors: []
+                filteredAncestors: [],
             };
         } catch (e) {
             console.error('getCommitDetails error:', e);
@@ -295,7 +304,14 @@ export class GitLogService {
         try {
             const logResult = await this.git.raw(['log', '--format=%aN']);
             authors = logResult
-                ? Array.from(new Set(logResult.split('\n').map(author => author.trim()).filter(author => !!author))).sort()
+                ? Array.from(
+                      new Set(
+                          logResult
+                              .split('\n')
+                              .map((author) => author.trim())
+                              .filter((author) => !!author)
+                      )
+                  ).sort()
                 : [];
         } catch (e) {
             console.error('Failed to load authors:', e);
@@ -326,7 +342,7 @@ export class GitLogService {
         try {
             const result = await this.git.raw(['rev-list', '--exclude=refs/stash', '--all', '--parents']);
 
-            result.split('\n').forEach(line => {
+            result.split('\n').forEach((line) => {
                 if (!line) return;
                 const parts = line.split(' ');
                 const hash = parts[0];
@@ -346,26 +362,15 @@ export class GitLogService {
     private async getRefsSnapshotKey(): Promise<string> {
         const [head, refs] = await Promise.all([
             this.git.raw(['rev-parse', '--verify', 'HEAD']).catch(() => ''),
-            this.git.raw([
-                'for-each-ref',
-                '--format=%(refname)%00%(objectname)',
-                'refs/heads',
-                'refs/remotes',
-                'refs/tags'
-            ]).catch(() => '')
+            this.git
+                .raw(['for-each-ref', '--format=%(refname)%00%(objectname)', 'refs/heads', 'refs/remotes', 'refs/tags'])
+                .catch(() => ''),
         ]);
 
-        return [
-            this.options.getWorkspaceRoot(),
-            head.trim(),
-            refs.trim()
-        ].join('\0');
+        return [this.options.getWorkspaceRoot(), head.trim(), refs.trim()].join('\0');
     }
 
-    private findNearestVisibleAncestor(
-        startHash: string,
-        visibleHashes: Set<string>
-    ): string | null {
+    private findNearestVisibleAncestor(startHash: string, visibleHashes: Set<string>): string | null {
         const graph = this.graphCache?.value;
         if (!graph) return null;
 
@@ -403,18 +408,21 @@ export class GitLogService {
     private parseRefs(refsStr: string): RefInfo[] {
         if (!refsStr) return [];
 
-        return refsStr.split(', ').filter(Boolean).map(ref => {
-            ref = ref.trim();
-            if (ref.startsWith('HEAD -> ')) {
-                return { name: ref.replace('HEAD -> ', ''), type: 'head' };
-            }
-            if (ref.startsWith('tag: ')) {
-                return { name: ref.replace('tag: ', ''), type: 'tag' };
-            }
-            if (ref.includes('/')) {
-                return { name: ref, type: 'remote' };
-            }
-            return { name: ref, type: 'local' };
-        });
+        return refsStr
+            .split(', ')
+            .filter(Boolean)
+            .map((ref) => {
+                ref = ref.trim();
+                if (ref.startsWith('HEAD -> ')) {
+                    return { name: ref.replace('HEAD -> ', ''), type: 'head' };
+                }
+                if (ref.startsWith('tag: ')) {
+                    return { name: ref.replace('tag: ', ''), type: 'tag' };
+                }
+                if (ref.includes('/')) {
+                    return { name: ref, type: 'remote' };
+                }
+                return { name: ref, type: 'local' };
+            });
     }
 }

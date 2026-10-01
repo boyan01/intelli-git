@@ -156,4 +156,3 @@ interface RecoveryAssistantState {
 - Conflict state shows conflicted files.
 - Raw error remains available.
 - Unknown errors are preserved and logged.
-

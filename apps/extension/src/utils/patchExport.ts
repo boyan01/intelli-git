@@ -45,7 +45,7 @@ export async function savePatchToFile(
     const fileUri = await vscode.window.showSaveDialog({
         defaultUri,
         filters: { 'Patch Files': ['patch', 'diff'] },
-        title: vscode.l10n.t('Save Patch')
+        title: vscode.l10n.t('Save Patch'),
     });
 
     if (!fileUri) {

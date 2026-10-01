@@ -20,7 +20,7 @@ const REF_PRIORITY: Record<Ref['type'], number> = {
     head: 0,
     tag: 1,
     local: 2,
-    remote: 3
+    remote: 3,
 };
 
 function shortenRefName(name: string): string {
@@ -44,11 +44,16 @@ function shortenRefName(name: string): string {
 function getTypeClass(type: string, name: string): string {
     if (name.includes('HEAD')) return styles.head;
     switch (type) {
-        case 'head': return styles.head;
-        case 'tag': return styles.tag;
-        case 'remote': return styles.remote;
-        case 'local': return styles.local;
-        default: return styles.local;
+        case 'head':
+            return styles.head;
+        case 'tag':
+            return styles.tag;
+        case 'remote':
+            return styles.remote;
+        case 'local':
+            return styles.local;
+        default:
+            return styles.local;
     }
 }
 
@@ -69,7 +74,12 @@ function sortRefsForDisplay(refs: Ref[]): Ref[] {
         .map(({ ref }) => ref);
 }
 
-export const RefLabels: React.FC<RefLabelsProps> = ({ refs, maxVisible = VISIBLE_REF_COUNT, wrap = false, truncate = true }) => {
+export const RefLabels: React.FC<RefLabelsProps> = ({
+    refs,
+    maxVisible = VISIBLE_REF_COUNT,
+    wrap = false,
+    truncate = true,
+}) => {
     const [showTooltip, setShowTooltip] = useState(false);
     const containerRef = useRef<HTMLSpanElement>(null);
     const tooltipRef = useRef<HTMLDivElement>(null);
@@ -91,7 +101,7 @@ export const RefLabels: React.FC<RefLabelsProps> = ({ refs, maxVisible = VISIBLE
     const displayRefs = sortRefsForDisplay(refs);
     const visibleRefs = displayRefs.slice(0, Math.max(1, maxVisible));
     const extraCount = displayRefs.length - visibleRefs.length;
-    const hasShortenedRef = truncate && displayRefs.some(ref => shortenRefName(ref.name) !== ref.name);
+    const hasShortenedRef = truncate && displayRefs.some((ref) => shortenRefName(ref.name) !== ref.name);
     const shouldShowTooltip = extraCount > 0 || hasShortenedRef;
 
     return (
@@ -108,20 +118,24 @@ export const RefLabels: React.FC<RefLabelsProps> = ({ refs, maxVisible = VISIBLE
                         key={`${ref.type}:${ref.name}:${index}`}
                         className={`${styles.label} ${getTypeClass(ref.type, ref.name)}`}
                     >
-                        <i className={`codicon codicon-${getTypeIcon(ref.type, ref.name)} ${styles.icon}`} aria-hidden="true" />
+                        <i
+                            className={`codicon codicon-${getTypeIcon(ref.type, ref.name)} ${styles.icon}`}
+                            aria-hidden="true"
+                        />
                         <span className={styles.text}>{displayName}</span>
                     </span>
                 );
             })}
-            {extraCount > 0 && (
-                <span className={styles.extraBadge}>+{extraCount}</span>
-            )}
+            {extraCount > 0 && <span className={styles.extraBadge}>+{extraCount}</span>}
 
             {showTooltip && shouldShowTooltip && (
                 <div ref={tooltipRef} className={styles.tooltip}>
                     {displayRefs.map((ref, i) => (
                         <div key={i} className={`${styles.tooltipItem} ${getTypeClass(ref.type, ref.name)}`}>
-                            <i className={`codicon codicon-${getTypeIcon(ref.type, ref.name)} ${styles.icon}`} aria-hidden="true" />
+                            <i
+                                className={`codicon codicon-${getTypeIcon(ref.type, ref.name)} ${styles.icon}`}
+                                aria-hidden="true"
+                            />
                             <span>{ref.name}</span>
                         </div>
                     ))}

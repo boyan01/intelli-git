@@ -76,7 +76,7 @@ describe('GitService git environment handling', () => {
         const sharedGit = simpleGit(tempDir);
         const service = new GitService(tempDir, tempDir, sharedGit);
         const editorGit = (service as unknown as GitServiceInternals).createEditorGit({
-            GIT_EDITOR: 'true'
+            GIT_EDITOR: 'true',
         });
 
         await expect(editorGit.status()).resolves.toBeTruthy();
@@ -102,7 +102,7 @@ describe('GitService mutation queue', () => {
         const service = new GitService(tempDir, tempDir, git);
         const events: string[] = [];
         let releaseFirst: (() => void) | undefined;
-        const firstCanFinish = new Promise<void>(resolve => {
+        const firstCanFinish = new Promise<void>((resolve) => {
             releaseFirst = resolve;
         });
 
@@ -118,7 +118,7 @@ describe('GitService mutation queue', () => {
             events.push('second:start');
         });
 
-        await new Promise(resolve => setTimeout(resolve, 0));
+        await new Promise((resolve) => setTimeout(resolve, 0));
         expect(events).toEqual(['first:start', 'first:nested']);
 
         releaseFirst?.();
@@ -131,10 +131,11 @@ describe('GitService mutation queue', () => {
 describe('GitService commit view status cache', () => {
     it('joins concurrent view loads and reuses the result until invalidated', async () => {
         let releaseStatus: ((value: { files: never[]; conflicted: never[]; current: string }) => void) | undefined;
-        const firstStatus = new Promise<{ files: never[]; conflicted: never[]; current: string }>(resolve => {
+        const firstStatus = new Promise<{ files: never[]; conflicted: never[]; current: string }>((resolve) => {
             releaseStatus = resolve;
         });
-        const status = vi.fn()
+        const status = vi
+            .fn()
             .mockReturnValueOnce(firstStatus)
             .mockResolvedValue({ files: [], conflicted: [], current: 'main' });
         const service = new GitService('/workspace', '/workspace', { status } as unknown as SimpleGit);
@@ -155,12 +156,12 @@ describe('GitService commit view status cache', () => {
 
         await expect(service.refreshStatusCache()).resolves.toEqual({
             commitChanged: false,
-            branchChanged: false
+            branchChanged: false,
         });
         status.mockResolvedValueOnce({ files: [], conflicted: [], current: 'feature' });
         await expect(service.refreshStatusCache()).resolves.toEqual({
             commitChanged: false,
-            branchChanged: true
+            branchChanged: true,
         });
     });
 });
@@ -197,7 +198,7 @@ describe('GitService repository scope', () => {
 
         expect(service.getWorkspaceRoot()).toBe(fs.realpathSync(workspaceRoot));
         expect(service.getGitRoot()).toBe(fs.realpathSync(tempDir));
-        expect(status.map(file => file.path)).toEqual(['src/scoped.txt']);
+        expect(status.map((file) => file.path)).toEqual(['src/scoped.txt']);
     });
 });
 
@@ -257,7 +258,7 @@ describe('GitService conflict resolution', () => {
     });
 
     async function createTextConflicts(filePaths: string[] = ['conflict.txt']): Promise<GitService> {
-        filePaths.forEach(filePath => {
+        filePaths.forEach((filePath) => {
             fs.mkdirSync(path.dirname(path.join(tempDir, filePath)), { recursive: true });
             fs.writeFileSync(path.join(tempDir, filePath), `base:${filePath}\n`);
         });
@@ -266,14 +267,14 @@ describe('GitService conflict resolution', () => {
 
         const baseBranch = (await git.branch()).current;
         await git.checkoutLocalBranch('feature');
-        filePaths.forEach(filePath => {
+        filePaths.forEach((filePath) => {
             fs.writeFileSync(path.join(tempDir, filePath), `incoming:${filePath}\n`);
         });
         await git.add('.');
         await git.commit('Incoming change');
 
         await git.checkout(baseBranch);
-        filePaths.forEach(filePath => {
+        filePaths.forEach((filePath) => {
             fs.writeFileSync(path.join(tempDir, filePath), `current:${filePath}\n`);
         });
         await git.add('.');
@@ -317,10 +318,10 @@ describe('GitService conflict resolution', () => {
         expect(conflict.current).toEqual({ exists: true, content: 'current\n' });
         expect(conflict.incoming).toEqual({ exists: true, content: 'incoming\n' });
         expect(conflict.currentChanges).toEqual([
-            expect.objectContaining({ baseStart: 0, baseLineCount: 1, sideStart: 0, sideLineCount: 1 })
+            expect.objectContaining({ baseStart: 0, baseLineCount: 1, sideStart: 0, sideLineCount: 1 }),
         ]);
         expect(conflict.incomingChanges).toEqual([
-            expect.objectContaining({ baseStart: 0, baseLineCount: 1, sideStart: 0, sideLineCount: 1 })
+            expect.objectContaining({ baseStart: 0, baseLineCount: 1, sideStart: 0, sideLineCount: 1 }),
         ]);
         expect(conflict.baseLabel).toBe('base');
         expect(conflict.currentLabel).toBe(baseBranch);
@@ -363,15 +364,11 @@ describe('GitService conflict resolution', () => {
 
         const service = new GitService(tempDir, tempDir, git);
         const conflict = await service.getConflictFileContent('conflict.txt');
-        const markerContent = [
-            '<<<<<<< HEAD\n',
-            'current\n',
-            '=======\n',
-            'incoming\n',
-            '>>>>>>> feature\n'
-        ].join('');
+        const markerContent = ['<<<<<<< HEAD\n', 'current\n', '=======\n', 'incoming\n', '>>>>>>> feature\n'].join('');
 
-        await expect(service.saveConflictResolution('conflict.txt', markerContent, conflict)).rejects.toThrow('conflict markers');
+        await expect(service.saveConflictResolution('conflict.txt', markerContent, conflict)).rejects.toThrow(
+            'conflict markers'
+        );
 
         expect(await git.raw(['ls-files', '-u', '--', 'conflict.txt'])).toContain('\tconflict.txt');
         expect(fs.readFileSync(path.join(tempDir, 'conflict.txt'), 'utf8')).toContain('<<<<<<<');
@@ -397,8 +394,9 @@ describe('GitService conflict resolution', () => {
         const resultPath = path.join(tempDir, 'conflict.txt');
         fs.writeFileSync(resultPath, 'external edit\n');
 
-        await expect(service.saveConflictResolution('conflict.txt', 'resolver edit\n', conflict))
-            .rejects.toThrow('result file changed');
+        await expect(service.saveConflictResolution('conflict.txt', 'resolver edit\n', conflict)).rejects.toThrow(
+            'result file changed'
+        );
 
         expect(fs.readFileSync(resultPath, 'utf8')).toBe('external edit\n');
         expect(await git.raw(['ls-files', '-u', '--', 'conflict.txt'])).toContain('\tconflict.txt');
@@ -416,8 +414,9 @@ describe('GitService conflict resolution', () => {
         const originalResult = fs.readFileSync(resultPath, 'utf8');
         fs.chmodSync(resultPath, 0o755);
 
-        await expect(service.saveConflictResolution('conflict.txt', 'resolver edit\n', conflict))
-            .rejects.toThrow('result file changed');
+        await expect(service.saveConflictResolution('conflict.txt', 'resolver edit\n', conflict)).rejects.toThrow(
+            'result file changed'
+        );
 
         expect(fs.readFileSync(resultPath, 'utf8')).toBe(originalResult);
         expect(fs.statSync(resultPath).mode & 0o111).not.toBe(0);
@@ -454,8 +453,9 @@ describe('GitService conflict resolution', () => {
             const conflict = await service.getConflictFileContent('conflict.txt');
 
             expect(conflict.isBinary).toBe(true);
-            await expect(service.saveConflictResolution('conflict.txt', 'resolver edit\n', conflict))
-                .rejects.toThrow('cannot be edited');
+            await expect(service.saveConflictResolution('conflict.txt', 'resolver edit\n', conflict)).rejects.toThrow(
+                'cannot be edited'
+            );
 
             expect(fs.readFileSync(outsidePath, 'utf8')).toBe('outside sentinel\n');
             expect(await git.raw(['ls-files', '-u', '--', 'conflict.txt'])).toContain('\tconflict.txt');
@@ -477,12 +477,10 @@ describe('GitService conflict resolution', () => {
             fs.rmSync(path.join(tempDir, 'nested'), { recursive: true, force: true });
             fs.symlinkSync(outsideDir, path.join(tempDir, 'nested'), 'dir');
 
-            await expect(service.getConflictFileContent('nested/conflict.txt'))
-                .rejects.toThrow('cannot be edited');
+            await expect(service.getConflictFileContent('nested/conflict.txt')).rejects.toThrow('cannot be edited');
 
             expect(fs.readFileSync(outsidePath, 'utf8')).toBe('outside parent sentinel\n');
-            expect(await git.raw(['ls-files', '-u', '--', 'nested/conflict.txt']))
-                .toContain('\tnested/conflict.txt');
+            expect(await git.raw(['ls-files', '-u', '--', 'nested/conflict.txt'])).toContain('\tnested/conflict.txt');
         } finally {
             fs.rmSync(outsideDir, { recursive: true, force: true });
         }
@@ -495,8 +493,9 @@ describe('GitService conflict resolution', () => {
         const originalResult = fs.readFileSync(resultPath, 'utf8');
         await git.add('conflict.txt');
 
-        await expect(service.saveConflictResolution('conflict.txt', 'resolver edit\n', conflict))
-            .rejects.toThrow('conflict changed');
+        await expect(service.saveConflictResolution('conflict.txt', 'resolver edit\n', conflict)).rejects.toThrow(
+            'conflict changed'
+        );
 
         expect(fs.readFileSync(resultPath, 'utf8')).toBe(originalResult);
     });
@@ -508,8 +507,7 @@ describe('GitService conflict resolution', () => {
         await git.add('conflict.txt');
         const indexBefore = await git.raw(['ls-files', '-s', '--', 'conflict.txt']);
 
-        await expect(service.resolveConflict('conflict.txt', 'ours'))
-            .rejects.toThrow('No unresolved conflict found');
+        await expect(service.resolveConflict('conflict.txt', 'ours')).rejects.toThrow('No unresolved conflict found');
 
         expect(fs.readFileSync(resultPath, 'utf8')).toBe('external resolution\n');
         expect(await git.raw(['ls-files', '-s', '--', 'conflict.txt'])).toBe(indexBefore);
@@ -522,8 +520,8 @@ describe('GitService conflict resolution', () => {
         fs.writeFileSync(literalPath, 'manual literal resolution\n');
 
         const status = await service.getStatus();
-        expect(status.find(file => file.path === '*.txt')?.resolvedCandidate).toBe(true);
-        expect(status.find(file => file.path === 'other.txt')?.resolvedCandidate).toBe(false);
+        expect(status.find((file) => file.path === '*.txt')?.resolvedCandidate).toBe(true);
+        expect(status.find((file) => file.path === 'other.txt')?.resolvedCandidate).toBe(false);
 
         const conflict = await service.getConflictFileContent('*.txt');
         expect(conflict.current.content).toBe('current:*.txt\n');
@@ -580,17 +578,19 @@ describe('GitService conflict resolution', () => {
         expect(conflict.current).toEqual({ exists: true, content: 'current edit\n' });
         expect(conflict.incoming).toEqual({ exists: false, content: '' });
         expect(conflict.currentChanges).toEqual([
-            expect.objectContaining({ baseStart: 0, baseLineCount: 1, sideStart: 0, sideLineCount: 1 })
+            expect.objectContaining({ baseStart: 0, baseLineCount: 1, sideStart: 0, sideLineCount: 1 }),
         ]);
         expect(conflict.incomingChanges).toEqual([
-            expect.objectContaining({ baseStart: 0, baseLineCount: 1, sideStart: 0, sideLineCount: 0 })
+            expect.objectContaining({ baseStart: 0, baseLineCount: 1, sideStart: 0, sideLineCount: 0 }),
         ]);
 
         await service.resolveConflict('delete-on-incoming.txt', 'theirs');
 
         expect(fs.existsSync(path.join(tempDir, 'delete-on-incoming.txt'))).toBe(false);
         expect((await git.raw(['ls-files', '-u', '--', 'delete-on-incoming.txt'])).trim()).toBe('');
-        expect(await git.raw(['diff', '--cached', '--name-status', '--', 'delete-on-incoming.txt'])).toContain('D\tdelete-on-incoming.txt');
+        expect(await git.raw(['diff', '--cached', '--name-status', '--', 'delete-on-incoming.txt'])).toContain(
+            'D\tdelete-on-incoming.txt'
+        );
     });
 
     it('describes both sides of an add/add conflict as Base insertions', async () => {
@@ -620,10 +620,10 @@ describe('GitService conflict resolution', () => {
 
         expect(conflict.base).toEqual({ exists: false, content: '' });
         expect(conflict.currentChanges).toEqual([
-            expect.objectContaining({ baseStart: 0, baseLineCount: 0, sideStart: 0, sideLineCount: 1 })
+            expect.objectContaining({ baseStart: 0, baseLineCount: 0, sideStart: 0, sideLineCount: 1 }),
         ]);
         expect(conflict.incomingChanges).toEqual([
-            expect.objectContaining({ baseStart: 0, baseLineCount: 0, sideStart: 0, sideLineCount: 1 })
+            expect.objectContaining({ baseStart: 0, baseLineCount: 0, sideStart: 0, sideLineCount: 1 }),
         ]);
 
         await service.saveConflictResolution('added.txt', '', conflict, false);
@@ -727,7 +727,7 @@ describe('GitService conflict resolution', () => {
         const conflict = await service.getConflictFileContent('invalid-utf8.dat');
         const incomingObjectId = (await git.raw(['ls-files', '-u', '--', 'invalid-utf8.dat']))
             .split('\n')
-            .find(line => /\s3\t/.test(line))
+            .find((line) => /\s3\t/.test(line))
             ?.split(/\s+/)[1];
 
         expect(conflict.isBinary).toBe(true);
@@ -802,8 +802,7 @@ describe('GitService conflict resolution', () => {
             expect(conflict.current).toEqual({ exists: true, content: '', objectId: currentObjectId });
             expect(conflict.incoming).toEqual({ exists: true, content: '', objectId: incomingObjectId });
 
-            await expect(service.resolveConflict('module', 'theirs', conflict))
-                .rejects.toThrow('cannot be edited');
+            await expect(service.resolveConflict('module', 'theirs', conflict)).rejects.toThrow('cannot be edited');
 
             expect(await git.raw(['ls-files', '-u', '--', 'module'])).toBe(indexBefore);
             expect((await moduleGit.revparse(['HEAD'])).trim()).toBe(worktreeHeadBefore);
@@ -836,19 +835,19 @@ describe('GitService conflict resolution', () => {
 
         const service = new GitService(tempDir, tempDir, git);
 
-        let conflict = (await service.getStatus()).find(file => file.path === 'conflict.txt');
+        let conflict = (await service.getStatus()).find((file) => file.path === 'conflict.txt');
         expect(conflict?.resolvedCandidate).toBe(false);
 
         fs.writeFileSync(path.join(tempDir, 'conflict.txt'), 'manual resolution\n');
-        conflict = (await service.getStatus()).find(file => file.path === 'conflict.txt');
+        conflict = (await service.getStatus()).find((file) => file.path === 'conflict.txt');
         expect(conflict?.resolvedCandidate).toBe(true);
 
         fs.writeFileSync(path.join(tempDir, 'conflict.txt'), Buffer.from([0, 1, 2]));
-        conflict = (await service.getStatus()).find(file => file.path === 'conflict.txt');
+        conflict = (await service.getStatus()).find((file) => file.path === 'conflict.txt');
         expect(conflict?.resolvedCandidate).toBe(false);
 
         fs.unlinkSync(path.join(tempDir, 'conflict.txt'));
-        conflict = (await service.getStatus()).find(file => file.path === 'conflict.txt');
+        conflict = (await service.getStatus()).find((file) => file.path === 'conflict.txt');
         expect(conflict?.resolvedCandidate).toBe(false);
     });
 
@@ -875,7 +874,7 @@ describe('GitService conflict resolution', () => {
         }
 
         const service = new GitService(tempDir, tempDir, git);
-        const conflict = (await service.getStatus()).find(file => file.path === 'delete-on-incoming.txt');
+        const conflict = (await service.getStatus()).find((file) => file.path === 'delete-on-incoming.txt');
 
         expect(conflict?.status).toBe('C');
         expect(conflict?.resolvedCandidate).toBe(false);
@@ -908,7 +907,7 @@ describe('GitService staging inactive changes', () => {
         fs.writeFileSync(path.join(tempDir, 'inactive.txt'), 'inactive\n');
 
         const inactiveChangesService = createInactiveChangesService({
-            inactiveFiles: new Set(['inactive.txt'])
+            inactiveFiles: new Set(['inactive.txt']),
         });
         const service = new GitService(tempDir, tempDir, git, inactiveChangesService);
 
@@ -919,44 +918,50 @@ describe('GitService staging inactive changes', () => {
     });
 
     it('keeps inactive hunks out of the index when staging all tracked changes', async () => {
-        fs.writeFileSync(path.join(tempDir, 'partial.txt'), [
-            'one',
-            'two',
-            'three',
-            'four',
-            'five',
-            'six',
-            'seven',
-            'eight',
-            'nine',
-            'ten',
-            'eleven',
-            'twelve',
-            ''
-        ].join('\n'));
+        fs.writeFileSync(
+            path.join(tempDir, 'partial.txt'),
+            [
+                'one',
+                'two',
+                'three',
+                'four',
+                'five',
+                'six',
+                'seven',
+                'eight',
+                'nine',
+                'ten',
+                'eleven',
+                'twelve',
+                '',
+            ].join('\n')
+        );
         await git.add('partial.txt');
         await git.commit('Initial commit');
 
-        fs.writeFileSync(path.join(tempDir, 'partial.txt'), [
-            'one active',
-            'two',
-            'three',
-            'four',
-            'five',
-            'six',
-            'seven',
-            'eight',
-            'nine',
-            'ten inactive',
-            'eleven',
-            'twelve',
-            ''
-        ].join('\n'));
+        fs.writeFileSync(
+            path.join(tempDir, 'partial.txt'),
+            [
+                'one active',
+                'two',
+                'three',
+                'four',
+                'five',
+                'six',
+                'seven',
+                'eight',
+                'nine',
+                'ten inactive',
+                'eleven',
+                'twelve',
+                '',
+            ].join('\n')
+        );
 
         const inactiveHunkIds = new Map<string, string[]>();
         const inactiveChangesService = createInactiveChangesService({ inactiveHunkIds });
         const service = new GitService(tempDir, tempDir, git, inactiveChangesService);
-        const partialStatus = (await service.getStatus()).find(file => file.path === 'partial.txt' && !file.staged);
+        const partialStatus = (await service.getStatus()).find((file) => file.path === 'partial.txt' && !file.staged);
         expect(partialStatus?.hunks).toHaveLength(2);
 
         inactiveHunkIds.set('partial.txt', [partialStatus!.hunks![1].id]);
@@ -969,29 +974,19 @@ describe('GitService staging inactive changes', () => {
     });
 
     it('stages active change blocks when nearby blocks share one git hunk', async () => {
-        fs.writeFileSync(path.join(tempDir, 'shared.txt'), [
-            'shared-on-main',
-            'main-second-line',
-            ''
-        ].join('\n'));
+        fs.writeFileSync(path.join(tempDir, 'shared.txt'), ['shared-on-main', 'main-second-line', ''].join('\n'));
         await git.add('shared.txt');
         await git.commit('Initial commit');
 
-        fs.writeFileSync(path.join(tempDir, 'shared.txt'), [
-            '',
-            '1 let 2414',
-            'shared-on-main',
-            '12ce',
-            'main-second-line',
-            '',
-            '2',
-            '12'
-        ].join('\n'));
+        fs.writeFileSync(
+            path.join(tempDir, 'shared.txt'),
+            ['', '1 let 2414', 'shared-on-main', '12ce', 'main-second-line', '', '2', '12'].join('\n')
+        );
 
         const inactiveHunkIds = new Map<string, string[]>();
         const inactiveChangesService = createInactiveChangesService({ inactiveHunkIds });
         const service = new GitService(tempDir, tempDir, git, inactiveChangesService);
-        const sharedStatus = (await service.getStatus()).find(file => file.path === 'shared.txt' && !file.staged);
+        const sharedStatus = (await service.getStatus()).find((file) => file.path === 'shared.txt' && !file.staged);
         expect(sharedStatus?.hunks).toHaveLength(3);
 
         inactiveHunkIds.set('shared.txt', [sharedStatus!.hunks![2].id]);
@@ -1016,7 +1011,7 @@ describe('GitService staging inactive changes', () => {
         const inactiveHunkIds = new Map<string, string[]>();
         const inactiveChangesService = createInactiveChangesService({ inactiveHunkIds });
         const service = new GitService(tempDir, tempDir, git, inactiveChangesService);
-        const stagedStatus = (await service.getStatus()).find(file => file.path === 'staged.txt' && file.staged);
+        const stagedStatus = (await service.getStatus()).find((file) => file.path === 'staged.txt' && file.staged);
         expect(stagedStatus?.hunks).toHaveLength(1);
 
         const stagedHunk = stagedStatus!.hunks![0];
@@ -1024,7 +1019,7 @@ describe('GitService staging inactive changes', () => {
         await service.applyPatch(service.buildPatchFromHunks([stagedHunk]), true, true);
         inactiveHunkIds.set('staged.txt', [worktreeHunkId]);
 
-        const worktreeStatus = (await service.getStatus()).find(file => file.path === 'staged.txt' && !file.staged);
+        const worktreeStatus = (await service.getStatus()).find((file) => file.path === 'staged.txt' && !file.staged);
         expect(worktreeStatus?.hunks?.[0].id).toBe(worktreeHunkId);
         expect(worktreeStatus?.inactiveHunkIds).toContain(worktreeHunkId);
     });
@@ -1039,21 +1034,26 @@ describe('GitService staging inactive changes', () => {
 
         const service = new GitService(tempDir, tempDir, git);
         const status = await service.getStatus();
-        const deletedStatus = status.find(file => file.path === 'src/deleted.txt' && file.status === 'D');
+        const deletedStatus = status.find((file) => file.path === 'src/deleted.txt' && file.status === 'D');
         expect(deletedStatus).toBeTruthy();
         expect(deletedStatus?.hunks).toHaveLength(1);
         expect(deletedStatus?.hunks?.[0]).toMatchObject({
             oldStart: 1,
             oldLineCount: 1,
             newStart: 0,
-            newLineCount: 0
+            newLineCount: 0,
         });
 
-        await service.commitChangelistPlan('Delete tracked file', false, {
-            files: ['src/deleted.txt'],
-            excludedFiles: [],
-            excludedHunkIdsByPath: {}
-        }, status);
+        await service.commitChangelistPlan(
+            'Delete tracked file',
+            false,
+            {
+                files: ['src/deleted.txt'],
+                excludedFiles: [],
+                excludedHunkIdsByPath: {},
+            },
+            status
+        );
 
         const headNameStatus = await git.show(['--name-status', '--format=', 'HEAD']);
         expect(headNameStatus.trim()).toBe('D\tsrc/deleted.txt');
@@ -1073,7 +1073,7 @@ describe('GitService staging inactive changes', () => {
         try {
             const status = await service.getStatus();
             expect(status).toHaveLength(200);
-            expect(status.every(file => file.hunks === undefined)).toBe(true);
+            expect(status.every((file) => file.hunks === undefined)).toBe(true);
             expect(open).not.toHaveBeenCalled();
             expect(readFile).not.toHaveBeenCalled();
             const [file] = await service.getFileStatusWithHunks('dependencies/0.txt', status);
@@ -1108,7 +1108,7 @@ describe('GitService staging inactive changes', () => {
 
         const service = new GitService(tempDir, tempDir, git);
         const status = await service.getStatus();
-        const untrackedStatus = status.find(file => file.path === 'src/new.txt' && file.status === '?');
+        const untrackedStatus = status.find((file) => file.path === 'src/new.txt' && file.status === '?');
         expect(untrackedStatus).toBeTruthy();
         expect(untrackedStatus?.hunks).toBeUndefined();
         const [editorStatus] = await service.getFileStatusWithHunks('src/new.txt', status);
@@ -1118,14 +1118,19 @@ describe('GitService staging inactive changes', () => {
             oldStart: 0,
             oldLineCount: 0,
             newStart: 1,
-            newLineCount: 2
+            newLineCount: 2,
         });
 
-        await service.commitChangelistPlan('Add untracked file', false, {
-            files: ['src/new.txt'],
-            excludedFiles: [],
-            excludedHunkIdsByPath: {}
-        }, status);
+        await service.commitChangelistPlan(
+            'Add untracked file',
+            false,
+            {
+                files: ['src/new.txt'],
+                excludedFiles: [],
+                excludedHunkIdsByPath: {},
+            },
+            status
+        );
 
         const headNameStatus = await git.show(['--name-status', '--format=', 'HEAD']);
         expect(headNameStatus.trim()).toBe('A\tsrc/new.txt');
@@ -1143,18 +1148,25 @@ describe('GitService staging inactive changes', () => {
 
         const service = new GitService(tempDir, tempDir, git);
         const status = await service.getStatus();
-        const stagedAdd = status.find(file => file.path === 'src/added.txt' && file.staged && file.status === 'A');
-        const worktreeDelete = status.find(file => file.path === 'src/added.txt' && !file.staged && file.status === 'D');
+        const stagedAdd = status.find((file) => file.path === 'src/added.txt' && file.staged && file.status === 'A');
+        const worktreeDelete = status.find(
+            (file) => file.path === 'src/added.txt' && !file.staged && file.status === 'D'
+        );
         expect(stagedAdd?.hunks).toHaveLength(1);
         expect(worktreeDelete?.hunks).toHaveLength(1);
 
-        await service.commitChangelistPlan('Add staged file', false, {
-            files: ['src/added.txt'],
-            excludedFiles: [],
-            excludedHunkIdsByPath: {
-                'src/added.txt': [worktreeDelete!.hunks![0].id]
-            }
-        }, status);
+        await service.commitChangelistPlan(
+            'Add staged file',
+            false,
+            {
+                files: ['src/added.txt'],
+                excludedFiles: [],
+                excludedHunkIdsByPath: {
+                    'src/added.txt': [worktreeDelete!.hunks![0].id],
+                },
+            },
+            status
+        );
 
         const headNameStatus = await git.show(['--name-status', '--format=', 'HEAD']);
         expect(headNameStatus.trim()).toBe('A\tsrc/added.txt');
@@ -1172,70 +1184,84 @@ describe('GitService staging inactive changes', () => {
 
         const service = new GitService(tempDir, tempDir, git);
         const status = await service.getStatus();
-        const deletedStatus = status.find(file => file.path === 'src/delete-on-feature.txt' && file.status === 'D');
+        const deletedStatus = status.find((file) => file.path === 'src/delete-on-feature.txt' && file.status === 'D');
         expect(deletedStatus?.hunks).toHaveLength(1);
 
-        await service.commitChangelistPlan('Commit active file only', false, {
-            files: ['src/active.txt'],
-            excludedFiles: ['src/delete-on-feature.txt'],
-            excludedHunkIdsByPath: {
-                'src/delete-on-feature.txt': [deletedStatus!.hunks![0].id]
-            }
-        }, status);
+        await service.commitChangelistPlan(
+            'Commit active file only',
+            false,
+            {
+                files: ['src/active.txt'],
+                excludedFiles: ['src/delete-on-feature.txt'],
+                excludedHunkIdsByPath: {
+                    'src/delete-on-feature.txt': [deletedStatus!.hunks![0].id],
+                },
+            },
+            status
+        );
 
         const headNameStatus = await git.show(['--name-status', '--format=', 'HEAD']);
         expect(headNameStatus.trim()).toBe('M\tsrc/active.txt');
     });
 
     it('commits the existing index without expanding partial staging', async () => {
-        fs.writeFileSync(path.join(tempDir, 'partial.txt'), [
-            'one',
-            'two',
-            'three',
-            'four',
-            'five',
-            'six',
-            'seven',
-            'eight',
-            'nine',
-            'ten',
-            'eleven',
-            'twelve',
-            ''
-        ].join('\n'));
+        fs.writeFileSync(
+            path.join(tempDir, 'partial.txt'),
+            [
+                'one',
+                'two',
+                'three',
+                'four',
+                'five',
+                'six',
+                'seven',
+                'eight',
+                'nine',
+                'ten',
+                'eleven',
+                'twelve',
+                '',
+            ].join('\n')
+        );
         await git.add('partial.txt');
         await git.commit('Initial commit');
 
-        fs.writeFileSync(path.join(tempDir, 'partial.txt'), [
-            'one staged',
-            'two',
-            'three',
-            'four',
-            'five',
-            'six',
-            'seven',
-            'eight',
-            'nine',
-            'ten unstaged',
-            'eleven',
-            'twelve',
-            ''
-        ].join('\n'));
+        fs.writeFileSync(
+            path.join(tempDir, 'partial.txt'),
+            [
+                'one staged',
+                'two',
+                'three',
+                'four',
+                'five',
+                'six',
+                'seven',
+                'eight',
+                'nine',
+                'ten unstaged',
+                'eleven',
+                'twelve',
+                '',
+            ].join('\n')
+        );
 
         const partialPatch = path.join(tempDir, 'partial.patch');
-        fs.writeFileSync(partialPatch, [
-            'diff --git a/partial.txt b/partial.txt',
-            'index 1111111..2222222 100644',
-            '--- a/partial.txt',
-            '+++ b/partial.txt',
-            '@@ -1,4 +1,4 @@',
-            '-one',
-            '+one staged',
-            ' two',
-            ' three',
-            ' four',
-            ''
-        ].join('\n'));
+        fs.writeFileSync(
+            partialPatch,
+            [
+                'diff --git a/partial.txt b/partial.txt',
+                'index 1111111..2222222 100644',
+                '--- a/partial.txt',
+                '+++ b/partial.txt',
+                '@@ -1,4 +1,4 @@',
+                '-one',
+                '+one staged',
+                ' two',
+                ' three',
+                ' four',
+                '',
+            ].join('\n')
+        );
         await git.raw(['apply', '--cached', partialPatch]);
 
         const service = new GitService(tempDir, tempDir, git);
@@ -1251,54 +1277,63 @@ describe('GitService staging inactive changes', () => {
     });
 
     it('returns only indexed changes when building a staged scoped diff', async () => {
-        fs.writeFileSync(path.join(tempDir, 'partial.txt'), [
-            'one',
-            'two',
-            'three',
-            'four',
-            'five',
-            'six',
-            'seven',
-            'eight',
-            'nine',
-            'ten',
-            'eleven',
-            'twelve',
-            ''
-        ].join('\n'));
+        fs.writeFileSync(
+            path.join(tempDir, 'partial.txt'),
+            [
+                'one',
+                'two',
+                'three',
+                'four',
+                'five',
+                'six',
+                'seven',
+                'eight',
+                'nine',
+                'ten',
+                'eleven',
+                'twelve',
+                '',
+            ].join('\n')
+        );
         await git.add('partial.txt');
         await git.commit('Initial commit');
 
-        fs.writeFileSync(path.join(tempDir, 'partial.txt'), [
-            'one staged',
-            'two',
-            'three',
-            'four',
-            'five',
-            'six',
-            'seven',
-            'eight',
-            'nine',
-            'ten unstaged',
-            'eleven',
-            'twelve',
-            ''
-        ].join('\n'));
+        fs.writeFileSync(
+            path.join(tempDir, 'partial.txt'),
+            [
+                'one staged',
+                'two',
+                'three',
+                'four',
+                'five',
+                'six',
+                'seven',
+                'eight',
+                'nine',
+                'ten unstaged',
+                'eleven',
+                'twelve',
+                '',
+            ].join('\n')
+        );
 
         const partialPatch = path.join(tempDir, 'partial.patch');
-        fs.writeFileSync(partialPatch, [
-            'diff --git a/partial.txt b/partial.txt',
-            'index 1111111..2222222 100644',
-            '--- a/partial.txt',
-            '+++ b/partial.txt',
-            '@@ -1,4 +1,4 @@',
-            '-one',
-            '+one staged',
-            ' two',
-            ' three',
-            ' four',
-            ''
-        ].join('\n'));
+        fs.writeFileSync(
+            partialPatch,
+            [
+                'diff --git a/partial.txt b/partial.txt',
+                'index 1111111..2222222 100644',
+                '--- a/partial.txt',
+                '+++ b/partial.txt',
+                '@@ -1,4 +1,4 @@',
+                '-one',
+                '+one staged',
+                ' two',
+                ' three',
+                ' four',
+                '',
+            ].join('\n')
+        );
         await git.raw(['apply', '--cached', partialPatch]);
 
         const service = new GitService(tempDir, tempDir, git);
@@ -1309,54 +1344,63 @@ describe('GitService staging inactive changes', () => {
     });
 
     it('returns only worktree changes when building an unstaged scoped diff', async () => {
-        fs.writeFileSync(path.join(tempDir, 'partial.txt'), [
-            'one',
-            'two',
-            'three',
-            'four',
-            'five',
-            'six',
-            'seven',
-            'eight',
-            'nine',
-            'ten',
-            'eleven',
-            'twelve',
-            ''
-        ].join('\n'));
+        fs.writeFileSync(
+            path.join(tempDir, 'partial.txt'),
+            [
+                'one',
+                'two',
+                'three',
+                'four',
+                'five',
+                'six',
+                'seven',
+                'eight',
+                'nine',
+                'ten',
+                'eleven',
+                'twelve',
+                '',
+            ].join('\n')
+        );
         await git.add('partial.txt');
         await git.commit('Initial commit');
 
-        fs.writeFileSync(path.join(tempDir, 'partial.txt'), [
-            'one staged',
-            'two',
-            'three',
-            'four',
-            'five',
-            'six',
-            'seven',
-            'eight',
-            'nine',
-            'ten unstaged',
-            'eleven',
-            'twelve',
-            ''
-        ].join('\n'));
+        fs.writeFileSync(
+            path.join(tempDir, 'partial.txt'),
+            [
+                'one staged',
+                'two',
+                'three',
+                'four',
+                'five',
+                'six',
+                'seven',
+                'eight',
+                'nine',
+                'ten unstaged',
+                'eleven',
+                'twelve',
+                '',
+            ].join('\n')
+        );
 
         const partialPatch = path.join(tempDir, 'partial.patch');
-        fs.writeFileSync(partialPatch, [
-            'diff --git a/partial.txt b/partial.txt',
-            'index 1111111..2222222 100644',
-            '--- a/partial.txt',
-            '+++ b/partial.txt',
-            '@@ -1,4 +1,4 @@',
-            '-one',
-            '+one staged',
-            ' two',
-            ' three',
-            ' four',
-            ''
-        ].join('\n'));
+        fs.writeFileSync(
+            partialPatch,
+            [
+                'diff --git a/partial.txt b/partial.txt',
+                'index 1111111..2222222 100644',
+                '--- a/partial.txt',
+                '+++ b/partial.txt',
+                '@@ -1,4 +1,4 @@',
+                '-one',
+                '+one staged',
+                ' two',
+                ' three',
+                ' four',
+                '',
+            ].join('\n')
+        );
         await git.raw(['apply', '--cached', partialPatch]);
 
         const service = new GitService(tempDir, tempDir, git);
@@ -1382,7 +1426,7 @@ describe('GitService staging inactive changes', () => {
 
         await expect(git.show(['HEAD:staged.txt'])).rejects.toBeTruthy();
         const status = await git.status();
-        expect(status.files.some(file => file.path === 'staged.txt' && file.index === 'A')).toBe(true);
+        expect(status.files.some((file) => file.path === 'staged.txt' && file.index === 'A')).toBe(true);
     });
 
     it('rewords HEAD without including staged index changes', async () => {
@@ -1402,7 +1446,7 @@ describe('GitService staging inactive changes', () => {
 
         await expect(git.show(['HEAD:staged.txt'])).rejects.toBeTruthy();
         const status = await git.status();
-        expect(status.files.some(file => file.path === 'staged.txt' && file.index === 'A')).toBe(true);
+        expect(status.files.some((file) => file.path === 'staged.txt' && file.index === 'A')).toBe(true);
     });
 
     it('rewords HEAD with a multiline commit message', async () => {
@@ -1417,7 +1461,7 @@ describe('GitService staging inactive changes', () => {
             '',
             'Explain the change in detail.',
             '',
-            'Signed-off-by: Intelli Git <intelli-git@example.com>'
+            'Signed-off-by: Intelli Git <intelli-git@example.com>',
         ].join('\n');
 
         await service.rewordCommit(headHash.trim(), message);
@@ -1485,11 +1529,16 @@ describe('GitService mutation change events', () => {
         let fireCount = 0;
         service.onDidChange(() => fireCount++);
 
-        await service.commitChangelistPlan('Commit active changelist', false, {
-            files: ['tracked.txt'],
-            excludedFiles: [],
-            excludedHunkIdsByPath: {}
-        }, status);
+        await service.commitChangelistPlan(
+            'Commit active changelist',
+            false,
+            {
+                files: ['tracked.txt'],
+                excludedFiles: [],
+                excludedHunkIdsByPath: {},
+            },
+            status
+        );
 
         expect(fireCount).toBe(1);
     });
@@ -1684,12 +1733,12 @@ describe('GitService branch remote workflows', () => {
             remoteGit: { push } as unknown as SimpleGit,
             gitRoot: tempDir,
             notifyChanged,
-            withTemporaryStash: async () => { },
+            withTemporaryStash: async () => {},
             createEditorGit: () => {
                 throw new Error('Not used');
             },
-            runMutation: async operation => operation(),
-            getCommitFiles: async () => []
+            runMutation: async (operation) => operation(),
+            getCommitFiles: async () => [],
         });
 
         await service.forcePush('origin', 'main:main', { noVerify: true });
@@ -1720,7 +1769,7 @@ describe('GitService branch remote workflows', () => {
                 throw new Error('Not used');
             },
             runMutation,
-            getCommitFiles: async () => []
+            getCommitFiles: async () => [],
         });
 
         await service.pullWithMerge('origin', 'main');
@@ -1751,7 +1800,7 @@ describe('GitService branch remote workflows', () => {
             branch: 'feature',
             path: fs.realpathSync(linkedWorktreePath),
             pathExists: true,
-            isPrunable: false
+            isPrunable: false,
         });
         await expect(service.branchRemote.switchBranch('feature')).rejects.toThrow(/already used by worktree/);
     });
@@ -1772,7 +1821,7 @@ describe('GitService branch remote workflows', () => {
         await expect(service.branchRemote.getWorktreeBranchUsage('feature')).resolves.toMatchObject({
             branch: 'feature',
             path: path.join(fs.realpathSync(remoteDir), 'stale-feature-worktree'),
-            pathExists: false
+            pathExists: false,
         });
 
         await service.branchRemote.pruneWorktrees();
@@ -1803,29 +1852,31 @@ describe('GitService branch remote workflows', () => {
         const service = new GitService(tempDir, tempDir, git);
         const worktrees = await service.branchRemote.getWorktrees(tempDir);
 
-        expect(worktrees).toEqual(expect.arrayContaining([
-            expect.objectContaining({
-                branch: 'main',
-                path: fs.realpathSync(tempDir),
-                isCurrent: true,
-                isActiveRepository: true,
-                pathExists: true,
-                isDirty: false
-            }),
-            expect.objectContaining({
-                branch: 'feature',
-                path: fs.realpathSync(linkedWorktreePath),
-                isCurrent: false,
-                pathExists: true,
-                isDirty: true
-            }),
-            expect.objectContaining({
-                branch: 'stale-feature',
-                path: path.join(fs.realpathSync(remoteDir), 'stale-worktree'),
-                pathExists: false,
-                isDirty: false
-            })
-        ]));
+        expect(worktrees).toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({
+                    branch: 'main',
+                    path: fs.realpathSync(tempDir),
+                    isCurrent: true,
+                    isActiveRepository: true,
+                    pathExists: true,
+                    isDirty: false,
+                }),
+                expect.objectContaining({
+                    branch: 'feature',
+                    path: fs.realpathSync(linkedWorktreePath),
+                    isCurrent: false,
+                    pathExists: true,
+                    isDirty: true,
+                }),
+                expect.objectContaining({
+                    branch: 'stale-feature',
+                    path: path.join(fs.realpathSync(remoteDir), 'stale-worktree'),
+                    pathExists: false,
+                    isDirty: false,
+                }),
+            ])
+        );
     });
 
     it('removes clean linked worktrees but blocks dirty worktrees', async () => {
@@ -1930,13 +1981,21 @@ describe('GitService branch remote workflows', () => {
                 commit: true,
                 branch: true,
                 file: true,
-                compare: true
-            }
+                compare: true,
+            },
         });
-        await expect(service.branchRemote.getRemoteCommitUrl('abc123')).resolves.toBe('https://github.com/owner/repo/commit/abc123');
-        await expect(service.branchRemote.getRemoteBranchUrl('feature/demo')).resolves.toBe('https://github.com/owner/repo/tree/feature/demo');
-        await expect(service.branchRemote.getRemoteFileUrl('main', 'src/index.ts')).resolves.toBe('https://github.com/owner/repo/blob/main/src/index.ts');
-        await expect(service.branchRemote.getRemoteCompareUrl('main', 'feature/demo')).resolves.toBe('https://github.com/owner/repo/compare/main...feature/demo');
+        await expect(service.branchRemote.getRemoteCommitUrl('abc123')).resolves.toBe(
+            'https://github.com/owner/repo/commit/abc123'
+        );
+        await expect(service.branchRemote.getRemoteBranchUrl('feature/demo')).resolves.toBe(
+            'https://github.com/owner/repo/tree/feature/demo'
+        );
+        await expect(service.branchRemote.getRemoteFileUrl('main', 'src/index.ts')).resolves.toBe(
+            'https://github.com/owner/repo/blob/main/src/index.ts'
+        );
+        await expect(service.branchRemote.getRemoteCompareUrl('main', 'feature/demo')).resolves.toBe(
+            'https://github.com/owner/repo/compare/main...feature/demo'
+        );
     });
 
     it('builds commit links for self-hosted GitLab remotes', async () => {
@@ -1952,13 +2011,21 @@ describe('GitService branch remote workflows', () => {
                 commit: true,
                 branch: true,
                 file: true,
-                compare: true
-            }
+                compare: true,
+            },
         });
-        await expect(service.branchRemote.getRemoteCommitUrl('abc123')).resolves.toBe('https://gitlab.example.com/group/subgroup/repo/-/commit/abc123');
-        await expect(service.branchRemote.getRemoteBranchUrl('feature/demo')).resolves.toBe('https://gitlab.example.com/group/subgroup/repo/-/tree/feature/demo');
-        await expect(service.branchRemote.getRemoteFileUrl('main', 'src/index.ts')).resolves.toBe('https://gitlab.example.com/group/subgroup/repo/-/blob/main/src/index.ts');
-        await expect(service.branchRemote.getRemoteCompareUrl('main', 'feature/demo')).resolves.toBe('https://gitlab.example.com/group/subgroup/repo/-/compare/main...feature/demo');
+        await expect(service.branchRemote.getRemoteCommitUrl('abc123')).resolves.toBe(
+            'https://gitlab.example.com/group/subgroup/repo/-/commit/abc123'
+        );
+        await expect(service.branchRemote.getRemoteBranchUrl('feature/demo')).resolves.toBe(
+            'https://gitlab.example.com/group/subgroup/repo/-/tree/feature/demo'
+        );
+        await expect(service.branchRemote.getRemoteFileUrl('main', 'src/index.ts')).resolves.toBe(
+            'https://gitlab.example.com/group/subgroup/repo/-/blob/main/src/index.ts'
+        );
+        await expect(service.branchRemote.getRemoteCompareUrl('main', 'feature/demo')).resolves.toBe(
+            'https://gitlab.example.com/group/subgroup/repo/-/compare/main...feature/demo'
+        );
     });
 
     it('builds provider-aware commit links for Bitbucket and Azure DevOps remotes', async () => {
@@ -1973,12 +2040,18 @@ describe('GitService branch remote workflows', () => {
                 commit: true,
                 branch: true,
                 file: true,
-                compare: false
-            }
+                compare: false,
+            },
         });
-        await expect(service.branchRemote.getRemoteCommitUrl('abc123')).resolves.toBe('https://bitbucket.org/workspace/repo/commits/abc123');
-        await expect(service.branchRemote.getRemoteBranchUrl('feature/demo')).resolves.toBe('https://bitbucket.org/workspace/repo/src/feature/demo/');
-        await expect(service.branchRemote.getRemoteFileUrl('main', 'src/index.ts')).resolves.toBe('https://bitbucket.org/workspace/repo/src/main/src/index.ts');
+        await expect(service.branchRemote.getRemoteCommitUrl('abc123')).resolves.toBe(
+            'https://bitbucket.org/workspace/repo/commits/abc123'
+        );
+        await expect(service.branchRemote.getRemoteBranchUrl('feature/demo')).resolves.toBe(
+            'https://bitbucket.org/workspace/repo/src/feature/demo/'
+        );
+        await expect(service.branchRemote.getRemoteFileUrl('main', 'src/index.ts')).resolves.toBe(
+            'https://bitbucket.org/workspace/repo/src/main/src/index.ts'
+        );
         await expect(service.branchRemote.getRemoteCompareUrl('main', 'feature/demo')).resolves.toBeUndefined();
 
         await git.removeRemote('origin');
@@ -1993,13 +2066,21 @@ describe('GitService branch remote workflows', () => {
                 commit: true,
                 branch: true,
                 file: true,
-                compare: false
-            }
+                compare: false,
+            },
         });
-        await expect(service.branchRemote.getRemoteCommitUrl('abc123')).resolves.toBe('https://dev.azure.com/org/project/_git/repo/commit/abc123');
-        await expect(service.branchRemote.getRemoteBranchUrl('feature/demo')).resolves.toBe('https://dev.azure.com/org/project/_git/repo?version=GBfeature%2Fdemo');
-        await expect(service.branchRemote.getRemoteFileUrl('main', 'src/index.ts')).resolves.toBe('https://dev.azure.com/org/project/_git/repo?path=%2Fsrc%2Findex.ts&version=GBmain');
-        await expect(service.branchRemote.getRemoteFileUrl('abc1234', 'src/index.ts')).resolves.toBe('https://dev.azure.com/org/project/_git/repo?path=%2Fsrc%2Findex.ts&version=GCabc1234');
+        await expect(service.branchRemote.getRemoteCommitUrl('abc123')).resolves.toBe(
+            'https://dev.azure.com/org/project/_git/repo/commit/abc123'
+        );
+        await expect(service.branchRemote.getRemoteBranchUrl('feature/demo')).resolves.toBe(
+            'https://dev.azure.com/org/project/_git/repo?version=GBfeature%2Fdemo'
+        );
+        await expect(service.branchRemote.getRemoteFileUrl('main', 'src/index.ts')).resolves.toBe(
+            'https://dev.azure.com/org/project/_git/repo?path=%2Fsrc%2Findex.ts&version=GBmain'
+        );
+        await expect(service.branchRemote.getRemoteFileUrl('abc1234', 'src/index.ts')).resolves.toBe(
+            'https://dev.azure.com/org/project/_git/repo?path=%2Fsrc%2Findex.ts&version=GCabc1234'
+        );
         await expect(service.branchRemote.getRemoteCompareUrl('main', 'feature/demo')).resolves.toBeUndefined();
     });
 
@@ -2015,8 +2096,8 @@ describe('GitService branch remote workflows', () => {
                 commit: false,
                 branch: false,
                 file: false,
-                compare: false
-            }
+                compare: false,
+            },
         });
         await expect(service.branchRemote.getRemoteCommitUrl('abc123')).resolves.toBeUndefined();
     });
@@ -2038,14 +2119,14 @@ describe('GitService branch remote workflows', () => {
         const service = new GitService(tempDir, tempDir, git);
         const preview = await service.branchRemote.getPushCommits({
             remote: 'origin',
-            branch: 'feature'
+            branch: 'feature',
         });
 
         expect(preview.totalCount).toBe(1);
         expect(preview.hasMore).toBe(false);
         expect(preview.commits).toHaveLength(1);
         expect(preview.commits[0].subject).toBe('Feature commit');
-        expect(preview.commits[0].files.map(file => file.path)).toEqual(['feature.txt']);
+        expect(preview.commits[0].files.map((file) => file.path)).toEqual(['feature.txt']);
     });
 });
 
@@ -2060,6 +2141,6 @@ function createInactiveChangesService(options: {
         getInactiveHunkIds(filePath: string): string[] {
             return options.inactiveHunkIds?.get(filePath) || [];
         },
-        syncWithStatus(_status: FileStatus[]): void { }
+        syncWithStatus(_status: FileStatus[]): void {},
     } as unknown as InactiveChangesService;
 }

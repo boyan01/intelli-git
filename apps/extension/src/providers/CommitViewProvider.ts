@@ -6,7 +6,6 @@ import { openConflictFile } from './ConflictResolverPanel';
 import type { ExtensionRpcHandlerOptions } from '../rpc';
 
 export class CommitViewProvider extends BaseWebviewProvider implements vscode.WebviewViewProvider {
-
     public static readonly viewType = 'intelliGitView';
     private _view?: vscode.WebviewView;
     private _selectedChangelistFile: ChangelistFileSelection | null = null;
@@ -51,19 +50,18 @@ export class CommitViewProvider extends BaseWebviewProvider implements vscode.We
     protected getInitialState(): unknown {
         return {
             activeRepoPath: this.options.repositoryManager.getActiveRepoPath(),
-            cacheSessionId: this.cacheSessionId
+            cacheSessionId: this.cacheSessionId,
         };
     }
 
     public requestRefresh(event: RefreshEvent): void {
         const scopes = new Set([...(this._pendingRefresh?.scopes || []), ...event.scopes]);
-        const reasons = new Set([
-            ...(this._pendingRefresh?.reason?.split(',') || []),
-            ...(event.reason?.split(',') || [])
-        ].filter(Boolean));
+        const reasons = new Set(
+            [...(this._pendingRefresh?.reason?.split(',') || []), ...(event.reason?.split(',') || [])].filter(Boolean)
+        );
         this._pendingRefresh = {
             scopes: Array.from(scopes),
-            reason: Array.from(reasons).join(',')
+            reason: Array.from(reasons).join(','),
         };
 
         if (!this.isVisible() || this._refreshTimeout) {
@@ -100,15 +98,19 @@ export class CommitViewProvider extends BaseWebviewProvider implements vscode.We
         return {
             onChangelistSelectionChange: (selection) => {
                 this._selectedChangelistFile = selection;
-                void vscode.commands.executeCommand('setContext', 'intelli-git.hasSelectedChangelistFile', Boolean(selection?.path));
+                void vscode.commands.executeCommand(
+                    'setContext',
+                    'intelli-git.hasSelectedChangelistFile',
+                    Boolean(selection?.path)
+                );
             },
             onChangelistFocusChange: (focused) => {
                 this._isChangelistTreeFocused = focused;
                 void vscode.commands.executeCommand('setContext', 'intelli-git.changelistTreeFocus', focused);
             },
-            openConflictResolver: file => {
+            openConflictResolver: (file) => {
                 void openConflictFile(this.options, file);
-            }
+            },
         };
     }
 
@@ -119,16 +121,18 @@ export class CommitViewProvider extends BaseWebviewProvider implements vscode.We
     public resolveWebviewView(
         webviewView: vscode.WebviewView,
         _context: vscode.WebviewViewResolveContext,
-        _token: vscode.CancellationToken,
+        _token: vscode.CancellationToken
     ) {
         this._view = webviewView;
         this._pendingRefresh = undefined;
 
-        this._disposables.push(webviewView.onDidChangeVisibility(() => {
-            if (webviewView.visible) {
-                this.flushRefresh();
-            }
-        }));
+        this._disposables.push(
+            webviewView.onDidChangeVisibility(() => {
+                if (webviewView.visible) {
+                    this.flushRefresh();
+                }
+            })
+        );
 
         this.setupWebview(webviewView.webview, () => !this._view);
         webviewView.webview.html = this.getHtml(webviewView.webview);

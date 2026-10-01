@@ -18,7 +18,7 @@ const defaultBranchInfo: BranchInfo = {
     all: [],
     ahead: 0,
     behind: 0,
-    rebaseStatus: 'none'
+    rebaseStatus: 'none',
 };
 
 const BRANCH_REFRESH_SCOPES: RefreshScope[] = ['branch'];
@@ -29,7 +29,7 @@ type RebaseAction = 'continue' | 'abort';
 function RebaseIndicator({
     status,
     pendingAction,
-    onPendingActionChange
+    onPendingActionChange,
 }: {
     status: 'interactive' | 'merging';
     pendingAction: RebaseAction | null;
@@ -54,7 +54,10 @@ function RebaseIndicator({
 
     return (
         <>
-            <span className="codicon codicon-git-merge" style={{ color: 'var(--vscode-inputValidation-warningForeground)', marginRight: '4px' }}></span>
+            <span
+                className="codicon codicon-git-merge"
+                style={{ color: 'var(--vscode-inputValidation-warningForeground)', marginRight: '4px' }}
+            ></span>
             <span style={{ fontWeight: 'bold', fontSize: '11px', marginRight: '4px' }}>
                 {status === 'interactive' ? t('Rebasing') : t('Merging')}
             </span>
@@ -68,7 +71,9 @@ function RebaseIndicator({
                 disabled={disabled}
                 title={status === 'interactive' ? t('Continue Rebase') : t('Continue Merge')}
             >
-                <span className={`codicon ${pendingAction === 'continue' ? 'codicon-loading codicon-modifier-spin' : 'codicon-play'}`}></span>
+                <span
+                    className={`codicon ${pendingAction === 'continue' ? 'codicon-loading codicon-modifier-spin' : 'codicon-play'}`}
+                ></span>
             </button>
             <button
                 type="button"
@@ -80,13 +85,13 @@ function RebaseIndicator({
                 disabled={disabled}
                 title={status === 'interactive' ? t('Abort Rebase') : t('Abort Merge')}
             >
-                <span className={`codicon ${pendingAction === 'abort' ? 'codicon-loading codicon-modifier-spin' : 'codicon-close'}`}></span>
+                <span
+                    className={`codicon ${pendingAction === 'abort' ? 'codicon-loading codicon-modifier-spin' : 'codicon-close'}`}
+                ></span>
             </button>
         </>
     );
 }
-
-
 
 export function LocalChangesView() {
     const { t } = useTranslation();
@@ -98,18 +103,18 @@ export function LocalChangesView() {
     const { data: branches } = useRpcData(loadBranchInfo, {
         initialValue: defaultBranchInfo,
         cacheKey: 'commit.branchInfo',
-        refreshScopes: BRANCH_REFRESH_SCOPES
+        refreshScopes: BRANCH_REFRESH_SCOPES,
     });
     const { data: worktrees, loading: worktreesLoading } = useRpcData(loadWorktrees, {
         initialValue: [] as WorktreeInfo[],
         enabled: worktreeDrawerOpen,
-        refreshScopes: WORKTREE_REFRESH_SCOPES
+        refreshScopes: WORKTREE_REFRESH_SCOPES,
     });
     const [reviewingCommitPushTarget, setReviewingCommitPushTarget] = useState(false);
     const [rebaseActionPending, setRebaseActionPending] = useState<RebaseAction | null>(null);
     const [commitOptions, setCommitOptions] = useState<CommitOptions>({
         push: false,
-        signOff: false
+        signOff: false,
     });
     // Determine initial tab: use persisted value only if set within 10 seconds
     const [activeTab, setActiveTabState] = useState<'commit' | 'stash' | 'push'>(() => {
@@ -118,11 +123,14 @@ export function LocalChangesView() {
     });
     const pushBranches = usePushBranches(activeTab === 'push' || commitOptions.push || reviewingCommitPushTarget);
 
-    const setActiveTab = useCallback((tab: 'commit' | 'stash' | 'push') => {
-        setActiveTabState(tab);
-        setPersistedTab(tab);
-        setTabTimestamp(Date.now());
-    }, [setPersistedTab, setTabTimestamp]);
+    const setActiveTab = useCallback(
+        (tab: 'commit' | 'stash' | 'push') => {
+            setActiveTabState(tab);
+            setPersistedTab(tab);
+            setTabTimestamp(Date.now());
+        },
+        [setPersistedTab, setTabTimestamp]
+    );
 
     const commitTabRef = useRef<HTMLButtonElement>(null);
     const stashTabRef = useRef<HTMLButtonElement>(null);
@@ -135,7 +143,7 @@ export function LocalChangesView() {
             const tabsRefs = {
                 commit: commitTabRef,
                 stash: stashTabRef,
-                push: pushTabRef
+                push: pushTabRef,
             };
             const activeEl = tabsRefs[activeTab]?.current;
             const indicator = activeIndicatorRef.current;
@@ -153,7 +161,8 @@ export function LocalChangesView() {
         let rafId: number;
         const animate = () => {
             updateIndicator();
-            if (Date.now() - startTime < 400) { // Run slightly longer than transition
+            if (Date.now() - startTime < 400) {
+                // Run slightly longer than transition
                 rafId = requestAnimationFrame(animate);
             }
         };
@@ -164,7 +173,7 @@ export function LocalChangesView() {
         });
 
         // Observe all tabs
-        [commitTabRef, stashTabRef, pushTabRef].forEach(ref => {
+        [commitTabRef, stashTabRef, pushTabRef].forEach((ref) => {
             if (ref.current) {
                 observer.observe(ref.current);
             }
@@ -184,7 +193,7 @@ export function LocalChangesView() {
 
     useEffect(() => {
         return rpcEvents.toggleWorktreesDrawer.subscribe(() => {
-            setWorktreeDrawerOpen(open => !open);
+            setWorktreeDrawerOpen((open) => !open);
         });
     }, []);
 
@@ -228,10 +237,7 @@ export function LocalChangesView() {
             />
             <div className={styles.headerTabs}>
                 <div className={styles.tabsLeft}>
-                    <div
-                        ref={activeIndicatorRef}
-                        className={styles.activeIndicator}
-                    />
+                    <div ref={activeIndicatorRef} className={styles.activeIndicator} />
                     <button
                         ref={commitTabRef}
                         className={`${styles.tab} ${activeTab === 'commit' ? styles.active : ''}`}
@@ -292,7 +298,6 @@ export function LocalChangesView() {
                             </div>
                         )
                     )}
-
                 </div>
             </div>
 
@@ -317,6 +322,6 @@ export function LocalChangesView() {
                     />
                 )}
             </div>
-        </div >
+        </div>
     );
 }

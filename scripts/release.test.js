@@ -7,7 +7,7 @@ const { test } = require('node:test');
 
 const root = path.resolve(__dirname, '..');
 
-test('VSIX checks allow source and maps but reject invalid versions, missing outputs and unwanted files', t => {
+test('VSIX checks allow source and maps but reject invalid versions, missing outputs and unwanted files', (t) => {
     const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'intelli-git-vsix-'));
     t.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
     const files = {
@@ -16,7 +16,7 @@ test('VSIX checks allow source and maps but reject invalid versions, missing out
         'extension/out/webview/index.html': '<html></html>',
         'extension/out/webview/webview.js': 'console.log("test");',
         'extension/src/example.ts': 'export const value = 1;',
-        'extension/out/extension.js.map': '{}'
+        'extension/out/extension.js.map': '{}',
     };
     for (const [file, contents] of Object.entries(files)) {
         fs.mkdirSync(path.dirname(path.join(temporary, file)), { recursive: true });
@@ -28,15 +28,24 @@ test('VSIX checks allow source and maps but reject invalid versions, missing out
         execFileSync('zip', ['-qr', vsix, 'extension'], { cwd: temporary });
     };
     const verify = (version = '0.0.11') => {
-        const result = spawnSync(process.execPath, [path.join(root, 'apps/extension/scripts/verify-vsix.js'),
-            vsix, '--version', version], { encoding: 'utf8' });
+        const result = spawnSync(
+            process.execPath,
+            [path.join(root, 'apps/extension/scripts/verify-vsix.js'), vsix, '--version', version],
+            { encoding: 'utf8' }
+        );
         return { status: result.status, output: result.stdout + result.stderr };
     };
     pack();
     assert.equal(verify().status, 0);
     assert.match(verify('0.0.12').output, /Expected version/);
-    for (const file of ['extension/.env', 'extension/.npmrc', 'extension/private-key.pem',
-        'extension/example.test.ts', 'extension/old.vsix', 'extension/.agents/notes.md']) {
+    for (const file of [
+        'extension/.env',
+        'extension/.npmrc',
+        'extension/private-key.pem',
+        'extension/example.test.ts',
+        'extension/old.vsix',
+        'extension/.agents/notes.md',
+    ]) {
         const location = path.join(temporary, file);
         fs.mkdirSync(path.dirname(location), { recursive: true });
         fs.writeFileSync(location, 'test');
@@ -57,29 +66,57 @@ function fixture(t) {
     const directory = path.join(temporary, 'repo');
     const state = path.join(temporary, 'state');
     const bin = path.join(temporary, 'bin');
-    for (const folder of [directory, state, bin, path.join(directory, 'scripts'), path.join(directory, 'apps/extension/scripts')]) {
+    for (const folder of [
+        directory,
+        state,
+        bin,
+        path.join(directory, 'scripts'),
+        path.join(directory, 'apps/extension/scripts'),
+    ]) {
         fs.mkdirSync(folder, { recursive: true });
     }
     fs.copyFileSync(path.join(root, 'scripts/release.js'), path.join(directory, 'scripts/release.js'));
-    fs.copyFileSync(path.join(root, 'apps/extension/scripts/verify-vsix.js'),
-        path.join(directory, 'apps/extension/scripts/verify-vsix.js'));
+    fs.copyFileSync(
+        path.join(root, 'apps/extension/scripts/verify-vsix.js'),
+        path.join(directory, 'apps/extension/scripts/verify-vsix.js')
+    );
     fs.writeFileSync(path.join(directory, '.gitignore'), 'out/\nnode_modules/\n');
-    fs.writeFileSync(path.join(directory, 'apps/extension/package.json'), JSON.stringify({ name: 'intelli-git', version: '0.0.11' }));
-    fs.writeFileSync(path.join(directory, 'package-lock.json'), JSON.stringify({ packages: { 'apps/extension': { version: '0.0.11' } } }));
-    fs.writeFileSync(path.join(directory, 'apps/extension/CHANGELOG.md'), '# Changelog\n\n## 0.0.11\n\n- Fixed branch switching.\n\n## 0.0.10\n\n- Previous release.\n');
-    const git = (...args) => execFileSync('git', args, { cwd: directory, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+    fs.writeFileSync(
+        path.join(directory, 'apps/extension/package.json'),
+        JSON.stringify({ name: 'intelli-git', version: '0.0.11' })
+    );
+    fs.writeFileSync(
+        path.join(directory, 'package-lock.json'),
+        JSON.stringify({ packages: { 'apps/extension': { version: '0.0.11' } } })
+    );
+    fs.writeFileSync(
+        path.join(directory, 'apps/extension/CHANGELOG.md'),
+        '# Changelog\n\n## 0.0.11\n\n- Fixed branch switching.\n\n## 0.0.10\n\n- Previous release.\n'
+    );
+    const git = (...args) =>
+        execFileSync('git', args, { cwd: directory, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
     git('init', '-q');
     git('config', 'user.name', 'Release Test');
     git('config', 'user.email', 'release-test@example.invalid');
-    const commit = () => { git('add', '.'); git('commit', '-qm', 'Prepare test release'); };
+    const commit = () => {
+        git('add', '.');
+        git('commit', '-qm', 'Prepare test release');
+    };
     commit();
     const execute = (command, value, env = {}) => {
         const result = spawnSync(process.execPath, ['scripts/release.js', command, value], {
             cwd: directory,
-            env: { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}`, FAKE_RELEASE_STATE: state,
-                GITHUB_ACTIONS: 'true', GITHUB_REPOSITORY: 'boyan01/intelli-git',
-                VSCE_PAT: 'test-marketplace', OVSX_PAT: 'test-open-vsx', ...env },
-            encoding: 'utf8'
+            env: {
+                ...process.env,
+                PATH: `${bin}${path.delimiter}${process.env.PATH}`,
+                FAKE_RELEASE_STATE: state,
+                GITHUB_ACTIONS: 'true',
+                GITHUB_REPOSITORY: 'boyan01/intelli-git',
+                VSCE_PAT: 'test-marketplace',
+                OVSX_PAT: 'test-open-vsx',
+                ...env,
+            },
+            encoding: 'utf8',
         });
         return { status: result.status, output: result.stdout + result.stderr };
     };
@@ -157,7 +194,7 @@ if (['vsce', 'ovsx'].includes(path.basename(process.argv[1]))) {
     return { directory, state, git, commit, execute, ready, clearOutput };
 }
 
-test('check validates version alignment and the exact clean annotated tag', t => {
+test('check validates version alignment and the exact clean annotated tag', (t) => {
     const f = fixture(t);
     assert.match(f.execute('check', 'v01.0.0').output, /vX.Y.Z/);
     f.git('tag', 'v0.0.11');
@@ -177,14 +214,14 @@ test('check validates version alignment and the exact clean annotated tag', t =>
     assert.match(f.execute('check', 'v0.0.11').output, /HEAD/);
 });
 
-test('partial publication resumes the original artifact and skips successful channels', t => {
+test('partial publication resumes the original artifact and skips successful channels', (t) => {
     const f = fixture(t);
     f.ready();
     const first = f.execute('publish', 'v0.0.11', { FAIL_OPEN_VSX: 'true' });
     assert.equal(first.status, 1, first.output);
     const stored = () => JSON.parse(fs.readFileSync(path.join(f.state, 'release.json')));
     assert.equal(stored().draft, true);
-    assert.ok(stored().assets.some(asset => asset.name === 'published-marketplace.json'));
+    assert.ok(stored().assets.some((asset) => asset.name === 'published-marketplace.json'));
     const notes = fs.readFileSync(path.join(f.state, 'notes'), 'utf8');
     assert.match(notes, /Fixed branch switching/);
     assert.doesNotMatch(notes, /Previous release/);
@@ -194,8 +231,8 @@ test('partial publication resumes the original artifact and skips successful cha
     assert.equal(retry.status, 0, retry.output);
     assert.equal(stored().draft, false);
     const calls = fs.readFileSync(path.join(f.state, 'calls'), 'utf8').trim().split('\n');
-    assert.equal(calls.filter(call => call === 'package:extension').length, 1);
-    assert.equal(calls.filter(call => call === 'publish:marketplace').length, 1);
+    assert.equal(calls.filter((call) => call === 'package:extension').length, 1);
+    assert.equal(calls.filter((call) => call === 'publish:marketplace').length, 1);
     const published = fs.readFileSync(path.join(f.state, 'published'), 'utf8').trim().split('\n');
     assert.equal(published.length, 2);
     assert.equal(published[0].split(' ')[1], published[1].split(' ')[1]);
@@ -204,7 +241,7 @@ test('partial publication resumes the original artifact and skips successful cha
     assert.equal(fs.readFileSync(path.join(f.state, 'calls'), 'utf8').trim().split('\n').length, calls.length);
 });
 
-test('recovery rejects altered packages, invalid receipts and incomplete historical assets', t => {
+test('recovery rejects altered packages, invalid receipts and incomplete historical assets', (t) => {
     const f = fixture(t);
     f.ready();
     assert.equal(f.execute('publish', 'v0.0.11', { FAIL_OPEN_VSX: 'true' }).status, 1);
@@ -221,11 +258,14 @@ test('recovery rejects altered packages, invalid receipts and incomplete histori
     fs.writeFileSync(receipt, JSON.stringify(saved));
     assert.match(f.execute('publish', 'v0.0.11').output, /Invalid publication receipt/);
     f.clearOutput();
-    fs.writeFileSync(path.join(f.state, 'release.json'), JSON.stringify({ tag_name: 'v0.0.11', draft: false, assets: [] }));
+    fs.writeFileSync(
+        path.join(f.state, 'release.json'),
+        JSON.stringify({ tag_name: 'v0.0.11', draft: false, assets: [] })
+    );
     assert.match(f.execute('publish', 'v0.0.11').output, /lacks managed artifacts/);
 });
 
-test('formal publishing refuses local runs, other repositories and moved remote tags', t => {
+test('formal publishing refuses local runs, other repositories and moved remote tags', (t) => {
     const f = fixture(t);
     f.ready();
     assert.match(f.execute('publish', 'v0.0.11', { GITHUB_ACTIONS: 'false' }).output, /only runs/);

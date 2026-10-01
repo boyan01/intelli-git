@@ -63,9 +63,7 @@ const InlineCommitDetails: React.FC<InlineCommitDetailsProps> = ({ selectedHash,
 
     return (
         <div className={styles.inlineDetailsContent}>
-            {bodyText && (
-                <div className={styles.inlineBody}>{bodyText}</div>
-            )}
+            {bodyText && <div className={styles.inlineBody}>{bodyText}</div>}
             <div className={styles.inlineMeta}>
                 <span title={commit.authorEmail}>
                     <i className="codicon codicon-person" aria-hidden="true" />
@@ -87,9 +85,7 @@ const InlineCommitDetails: React.FC<InlineCommitDetailsProps> = ({ selectedHash,
                     <span className={styles.inlineFilesCount}>
                         {t('{{count}} files', { count: fileSummary.totalCount })}:
                     </span>
-                    <span className={styles.inlineFilePaths}>
-                        {fileSummary.visibleFiles.join(', ')}
-                    </span>
+                    <span className={styles.inlineFilePaths}>{fileSummary.visibleFiles.join(', ')}</span>
                     {fileSummary.moreCount > 0 && (
                         <span className={styles.inlineMoreFiles}>
                             {t('+{{count}} more', { count: fileSummary.moreCount })}
@@ -106,7 +102,7 @@ export const LogListPanel: React.FC<LogListPanelProps> = ({
     externalBranchFilter,
     isNarrowMode = false,
     commitDetails,
-    repositoryPath
+    repositoryPath,
 }) => {
     const { t } = useTranslation();
     const containerRef = useRef<HTMLDivElement>(null);
@@ -121,16 +117,8 @@ export const LogListPanel: React.FC<LogListPanelProps> = ({
     const [expandedCommitDetailsByHash, setExpandedCommitDetailsByHash] = useState<Record<string, CommitDetails>>({});
     const lastToggledHashRef = useRef<string | null>(null);
 
-    const {
-        commits,
-        loading,
-        hasMore,
-        filters,
-        unpushedCommits,
-        latestUnpushedHash,
-        loadMore,
-        setFilters
-    } = useLogCommitLoader(repositoryPath);
+    const { commits, loading, hasMore, filters, unpushedCommits, latestUnpushedHash, loadMore, setFilters } =
+        useLogCommitLoader(repositoryPath);
 
     const expandedLayout = useMemo(() => {
         const offsets: number[] = [];
@@ -149,46 +137,52 @@ export const LogListPanel: React.FC<LogListPanelProps> = ({
         return { offsets, heightByHash, totalExtraHeight };
     }, [commits, expandedCommitDetailsByHash, expandedHashes, isNarrowMode]);
 
-    const getRowTop = useCallback((index: number) => {
-        return index * ROW_HEIGHT + (expandedLayout.offsets[index] ?? 0);
-    }, [expandedLayout]);
+    const getRowTop = useCallback(
+        (index: number) => {
+            return index * ROW_HEIGHT + (expandedLayout.offsets[index] ?? 0);
+        },
+        [expandedLayout]
+    );
 
-    const getCommitBlockHeight = useCallback((commit: typeof commits[number]) => {
-        return ROW_HEIGHT + (expandedLayout.heightByHash.get(commit.hash) ?? 0);
-    }, [expandedLayout]);
+    const getCommitBlockHeight = useCallback(
+        (commit: (typeof commits)[number]) => {
+            return ROW_HEIGHT + (expandedLayout.heightByHash.get(commit.hash) ?? 0);
+        },
+        [expandedLayout]
+    );
 
-    const getFirstIndexAfterOffset = useCallback((offset: number) => {
-        for (let index = 0; index < commits.length; index += 1) {
-            if (getRowTop(index) > offset) {
-                return index;
+    const getFirstIndexAfterOffset = useCallback(
+        (offset: number) => {
+            for (let index = 0; index < commits.length; index += 1) {
+                if (getRowTop(index) > offset) {
+                    return index;
+                }
             }
-        }
-        return commits.length;
-    }, [commits.length, getRowTop]);
+            return commits.length;
+        },
+        [commits.length, getRowTop]
+    );
 
-    const scrollToRow = useCallback((index: number) => {
-        if (!containerRef.current) return;
+    const scrollToRow = useCallback(
+        (index: number) => {
+            if (!containerRef.current) return;
 
-        const centerOffset = clientHeight / 2 - ROW_HEIGHT / 2;
-        containerRef.current.scrollTop = Math.max(0, getRowTop(index) - centerOffset);
-    }, [clientHeight, getRowTop]);
+            const centerOffset = clientHeight / 2 - ROW_HEIGHT / 2;
+            containerRef.current.scrollTop = Math.max(0, getRowTop(index) - centerOffset);
+        },
+        [clientHeight, getRowTop]
+    );
 
     const [cachedSelectedHashes, setCachedSelectedHashes] = usePersistedState('gitLog.selectedHashes');
 
-    const {
-        lastSelectedRef,
-        blinkHash,
-        handleRowClick,
-        handleJumpToCommit,
-        isSelected,
-        setSelectedCommits
-    } = useCommitSelection({
-        commits,
-        onSelectionChange,
-        scrollToRow,
-        initialSelection: cachedSelectedHashes,
-        onSelectionPersist: setCachedSelectedHashes
-    });
+    const { lastSelectedRef, blinkHash, handleRowClick, handleJumpToCommit, isSelected, setSelectedCommits } =
+        useCommitSelection({
+            commits,
+            onSelectionChange,
+            scrollToRow,
+            initialSelection: cachedSelectedHashes,
+            onSelectionPersist: setCachedSelectedHashes,
+        });
     const pendingRevealHashRef = useRef<string | null>(null);
 
     useEffect(() => {
@@ -209,17 +203,17 @@ export const LogListPanel: React.FC<LogListPanelProps> = ({
         for (const hash of expandedHashes) {
             if (expandedCommitDetailsByHash[hash]?.hash === hash) continue;
             if (commitDetails?.hash === hash) {
-                setExpandedCommitDetailsByHash(current => ({ ...current, [hash]: commitDetails }));
+                setExpandedCommitDetailsByHash((current) => ({ ...current, [hash]: commitDetails }));
                 continue;
             }
 
             rpc.getCommitDetails(hash)
-                .then(details => {
+                .then((details) => {
                     if (!cancelled) {
-                        setExpandedCommitDetailsByHash(current => ({ ...current, [hash]: details }));
+                        setExpandedCommitDetailsByHash((current) => ({ ...current, [hash]: details }));
                     }
                 })
-                .catch(error => {
+                .catch((error) => {
                     console.error('Failed to load expanded Git Log commit details', error);
                 });
         }
@@ -231,15 +225,15 @@ export const LogListPanel: React.FC<LogListPanelProps> = ({
 
     useEffect(() => {
         if (!commitDetails || !expandedHashes.has(commitDetails.hash)) return;
-        setExpandedCommitDetailsByHash(current => ({ ...current, [commitDetails.hash]: commitDetails }));
+        setExpandedCommitDetailsByHash((current) => ({ ...current, [commitDetails.hash]: commitDetails }));
     }, [commitDetails, expandedHashes]);
 
     useEffect(() => {
         if (expandedHashes.size === 0) return;
 
-        const visibleHashes = new Set(commits.map(commit => commit.hash));
-        setExpandedHashes(current => {
-            const next = new Set([...current].filter(hash => visibleHashes.has(hash)));
+        const visibleHashes = new Set(commits.map((commit) => commit.hash));
+        setExpandedHashes((current) => {
+            const next = new Set([...current].filter((hash) => visibleHashes.has(hash)));
             return next.size === current.size ? current : next;
         });
     }, [commits, expandedHashes.size]);
@@ -247,12 +241,12 @@ export const LogListPanel: React.FC<LogListPanelProps> = ({
     useEffect(() => {
         let cancelled = false;
         rpc.getPendingGitLogReveal()
-            .then(params => {
+            .then((params) => {
                 if (!cancelled && params) {
                     rpcEvents.revealLog.emit(params);
                 }
             })
-            .catch(error => {
+            .catch((error) => {
                 console.error('Failed to consume pending Git Log reveal', error);
             });
         return () => {
@@ -273,7 +267,7 @@ export const LogListPanel: React.FC<LogListPanelProps> = ({
             }
 
             pendingRevealHashRef.current = hash;
-            const index = commits.findIndex(c => c.hash === hash);
+            const index = commits.findIndex((c) => c.hash === hash);
             if (index !== -1) {
                 handleJumpToCommit(hash);
                 pendingRevealHashRef.current = null;
@@ -285,7 +279,7 @@ export const LogListPanel: React.FC<LogListPanelProps> = ({
         const hash = pendingRevealHashRef.current;
         if (!hash) return;
 
-        const index = commits.findIndex(c => c.hash === hash);
+        const index = commits.findIndex((c) => c.hash === hash);
         if (index === -1) return;
 
         handleJumpToCommit(hash);
@@ -301,7 +295,7 @@ export const LogListPanel: React.FC<LogListPanelProps> = ({
 
     useEffect(() => {
         if (!containerRef.current) return;
-        const observer = new ResizeObserver(entries => {
+        const observer = new ResizeObserver((entries) => {
             for (const entry of entries) {
                 setClientHeight(entry.contentRect.height);
             }
@@ -314,7 +308,7 @@ export const LogListPanel: React.FC<LogListPanelProps> = ({
         const hash = lastToggledHashRef.current;
         if (!hash || !expandedHashes.has(hash) || !containerRef.current) return;
 
-        const index = commits.findIndex(commit => commit.hash === hash);
+        const index = commits.findIndex((commit) => commit.hash === hash);
         if (index === -1) return;
 
         const inlineDetailsHeight = expandedLayout.heightByHash.get(hash) ?? getInlineDetailsHeight();
@@ -351,11 +345,11 @@ export const LogListPanel: React.FC<LogListPanelProps> = ({
         }
     };
 
-    const toggleInlineDetails = (commit: typeof commits[number]) => {
+    const toggleInlineDetails = (commit: (typeof commits)[number]) => {
         if (!isNarrowMode) return;
 
         setFocusedHash(commit.hash);
-        setExpandedHashes(current => {
+        setExpandedHashes((current) => {
             const next = new Set(current);
             if (next.has(commit.hash)) {
                 next.delete(commit.hash);
@@ -367,7 +361,7 @@ export const LogListPanel: React.FC<LogListPanelProps> = ({
         });
     };
 
-    const handleRowClickWithAccordion = (e: React.MouseEvent<HTMLDivElement>, commit: typeof commits[number]) => {
+    const handleRowClickWithAccordion = (e: React.MouseEvent<HTMLDivElement>, commit: (typeof commits)[number]) => {
         setFocusedHash(commit.hash);
         handleRowClick(e, commit);
 
@@ -381,7 +375,7 @@ export const LogListPanel: React.FC<LogListPanelProps> = ({
         let newIndex: number;
 
         const currentIndex = lastSelectedRef.current
-            ? commits.findIndex(c => c.hash === lastSelectedRef.current)
+            ? commits.findIndex((c) => c.hash === lastSelectedRef.current)
             : -1;
 
         if (e.key === 'ArrowDown') {
@@ -521,7 +515,7 @@ export const LogListPanel: React.FC<LogListPanelProps> = ({
                                             top: rowTop,
                                             left: 0,
                                             right: 0,
-                                            height: blockHeight
+                                            height: blockHeight,
                                         }}
                                         onClick={(e) => handleRowClickWithAccordion(e, commit)}
                                         onMouseEnter={() => {
@@ -537,10 +531,13 @@ export const LogListPanel: React.FC<LogListPanelProps> = ({
                                             shortHash: commit.shortHash,
                                             subject: commit.subject,
                                             isUnpushed: unpushedCommits.has(commit.hash),
-                                            isLatestUnpushed: commit.hash === latestUnpushedHash
+                                            isLatestUnpushed: commit.hash === latestUnpushedHash,
                                         } satisfies GitLogCommitContext)}
                                     >
-                                        <div className={styles.graphCol} style={{ width: rowGraphWidth, height: blockHeight }}>
+                                        <div
+                                            className={styles.graphCol}
+                                            style={{ width: rowGraphWidth, height: blockHeight }}
+                                        >
                                             {graphNode && (
                                                 <GraphColumn
                                                     node={graphNode}
@@ -566,9 +563,7 @@ export const LogListPanel: React.FC<LogListPanelProps> = ({
                                                     )}
                                                 </div>
                                                 <span className={styles.author}>{commit.authorName}</span>
-                                                <span className={styles.date}>
-                                                    {formatRelativeDate(commit.date)}
-                                                </span>
+                                                <span className={styles.date}>{formatRelativeDate(commit.date)}</span>
                                             </div>
                                             {isExpanded && (
                                                 <InlineCommitDetails

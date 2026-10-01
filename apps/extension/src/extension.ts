@@ -1,12 +1,29 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { CommitViewProvider, ConflictResolverPanel, GitLogViewProvider, openConflictFile, StashContentProvider, RevisionContentProvider } from './providers';
+import {
+    CommitViewProvider,
+    ConflictResolverPanel,
+    GitLogViewProvider,
+    openConflictFile,
+    StashContentProvider,
+    RevisionContentProvider,
+} from './providers';
 import { RepositoryManager, type RepositoryScope } from './services/RepositoryManager';
 import { createGitWatcher } from './services/GitRepositoryWatcher';
 import { BackgroundFetchService } from './services/BackgroundFetchService';
 import { ParentRepositoryScmIntegrationService } from './services/ParentRepositoryScmIntegrationService';
 import { BranchStatusBar, GitLogStatusBar } from './ui';
-import { registerStashCommands, registerGlobalNavigationCommands, registerWorktreeCommands, registerBranchCommands, registerLogCommands, registerLogFileCommands, registerChangelistCommands, registerAiCommands, registerEditorGitCommands } from './commands';
+import {
+    registerStashCommands,
+    registerGlobalNavigationCommands,
+    registerWorktreeCommands,
+    registerBranchCommands,
+    registerLogCommands,
+    registerLogFileCommands,
+    registerChangelistCommands,
+    registerAiCommands,
+    registerEditorGitCommands,
+} from './commands';
 import { logger } from './utils/logger';
 import { ChangeBlockEditorController } from './editor/ChangeBlockEditorController';
 import type { ConflictResolverContextAction, RefreshScope } from '@shared/messages';
@@ -60,12 +77,12 @@ function createRepositoryQuickPickItem(
         description: descriptionParts.join(' · '),
         detail: repo.path,
         buttons: [openInNewWindowButton],
-        repo
+        repo,
     };
 }
 
 function showRepositoryQuickPick(repositoryManager: RepositoryManager, onRepositoryChanged: () => void): void {
-    const repositories = repositoryManager.getRepositories().filter(repo => repo.kind !== 'worktree');
+    const repositories = repositoryManager.getRepositories().filter((repo) => repo.kind !== 'worktree');
     if (repositories.length === 0) {
         void vscode.window.showInformationMessage(vscode.l10n.t('No repositories available'));
         return;
@@ -74,10 +91,12 @@ function showRepositoryQuickPick(repositoryManager: RepositoryManager, onReposit
     const activeRepoPath = repositoryManager.getActiveRepoPath();
     const openInNewWindowButton: vscode.QuickInputButton = {
         iconPath: new vscode.ThemeIcon('multiple-windows'),
-        tooltip: vscode.l10n.t('Open in New Window')
+        tooltip: vscode.l10n.t('Open in New Window'),
     };
-    const items = repositories.map(repo => createRepositoryQuickPickItem(repo, activeRepoPath, openInNewWindowButton));
-    const activeItem = items.find(item => item.repo.path === activeRepoPath);
+    const items = repositories.map((repo) =>
+        createRepositoryQuickPickItem(repo, activeRepoPath, openInNewWindowButton)
+    );
+    const activeItem = items.find((item) => item.repo.path === activeRepoPath);
     const quickPick = vscode.window.createQuickPick<RepositoryQuickPickItem>();
     const disposables: vscode.Disposable[] = [];
 
@@ -92,17 +111,19 @@ function showRepositoryQuickPick(repositoryManager: RepositoryManager, onReposit
     disposables.push(
         quickPick.onDidAccept(() => {
             const selected = quickPick.selectedItems[0] || quickPick.activeItems[0];
-            if (selected && selected.repo.path !== activeRepoPath && repositoryManager.setActiveRepository(selected.repo.path)) {
+            if (
+                selected &&
+                selected.repo.path !== activeRepoPath &&
+                repositoryManager.setActiveRepository(selected.repo.path)
+            ) {
                 onRepositoryChanged();
             }
             quickPick.hide();
         }),
-        quickPick.onDidTriggerItemButton(event => {
-            void vscode.commands.executeCommand(
-                'vscode.openFolder',
-                vscode.Uri.file(event.item.repo.path),
-                { forceNewWindow: true }
-            );
+        quickPick.onDidTriggerItemButton((event) => {
+            void vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(event.item.repo.path), {
+                forceNewWindow: true,
+            });
             quickPick.hide();
         }),
         quickPick.onDidHide(() => {
@@ -116,12 +137,15 @@ function showRepositoryQuickPick(repositoryManager: RepositoryManager, onReposit
     quickPick.show();
 }
 
-async function addRepositoryFromDialog(repositoryManager: RepositoryManager, onRepositoryChanged: () => void): Promise<void> {
+async function addRepositoryFromDialog(
+    repositoryManager: RepositoryManager,
+    onRepositoryChanged: () => void
+): Promise<void> {
     const selected = await vscode.window.showOpenDialog({
         canSelectFiles: false,
         canSelectFolders: true,
         canSelectMany: false,
-        openLabel: vscode.l10n.t('Add Repository')
+        openLabel: vscode.l10n.t('Add Repository'),
     });
 
     const folder = selected?.[0]?.fsPath;
@@ -138,7 +162,10 @@ async function addRepositoryFromDialog(repositoryManager: RepositoryManager, onR
     onRepositoryChanged();
 }
 
-async function scanWorkspaceRepositories(repositoryManager: RepositoryManager, onRepositoryChanged: () => void): Promise<void> {
+async function scanWorkspaceRepositories(
+    repositoryManager: RepositoryManager,
+    onRepositoryChanged: () => void
+): Promise<void> {
     const candidates = await repositoryManager.discoverWorkspaceRepositories();
     if (candidates.length === 0) {
         void vscode.window.showInformationMessage(vscode.l10n.t('No Git repositories found in this workspace.'));
@@ -146,17 +173,17 @@ async function scanWorkspaceRepositories(repositoryManager: RepositoryManager, o
     }
 
     const selected = await vscode.window.showQuickPick(
-        candidates.map(repo => ({
+        candidates.map((repo) => ({
             label: repo.name,
             description: getRepositoryRefLabel(repo),
             detail: repo.path,
-            repo
+            repo,
         })),
         {
             canPickMany: true,
             matchOnDescription: true,
             matchOnDetail: true,
-            placeHolder: vscode.l10n.t('Select repositories to add')
+            placeHolder: vscode.l10n.t('Select repositories to add'),
         }
     );
 
@@ -179,7 +206,7 @@ function getAdditionalGitWatcherRoots(repositories: RepositoryScope[], workspace
     const roots = new Set<string>();
 
     for (const repo of repositories) {
-        const isWorkspaceBacked = workspaceRoots.some(root => isSameOrDescendantPath(root, repo.workspaceRoot));
+        const isWorkspaceBacked = workspaceRoots.some((root) => isSameOrDescendantPath(root, repo.workspaceRoot));
         if (repo.kind !== 'worktree' && isWorkspaceBacked) {
             continue;
         }
@@ -205,18 +232,22 @@ export async function activate(context: vscode.ExtensionContext) {
     const repositoryManager = new RepositoryManager(context);
     context.subscriptions.push(
         repositoryManager,
-        repositoryManager.onDidFallbackActiveRepo(event => {
+        repositoryManager.onDidFallbackActiveRepo((event) => {
             if (event.nextRepoPath) {
-                void vscode.window.showWarningMessage(vscode.l10n.t(
-                    'The previously active repository is no longer available. Intelli Git switched to {0}.',
-                    path.basename(event.nextRepoPath)
-                ));
+                void vscode.window.showWarningMessage(
+                    vscode.l10n.t(
+                        'The previously active repository is no longer available. Intelli Git switched to {0}.',
+                        path.basename(event.nextRepoPath)
+                    )
+                );
                 return;
             }
 
-            void vscode.window.showWarningMessage(vscode.l10n.t(
-                'The previously active repository is no longer available. Select a repository to continue.'
-            ));
+            void vscode.window.showWarningMessage(
+                vscode.l10n.t(
+                    'The previously active repository is no longer available. Select a repository to continue.'
+                )
+            );
         })
     );
     await repositoryManager.initialize();
@@ -232,7 +263,7 @@ export async function activate(context: vscode.ExtensionContext) {
     const providerOptions = {
         extensionUri: context.extensionUri,
         context,
-        repositoryManager
+        repositoryManager,
     };
     const provider = new CommitViewProvider(providerOptions);
     const gitLogProvider = new GitLogViewProvider(providerOptions);
@@ -276,7 +307,7 @@ export async function activate(context: vscode.ExtensionContext) {
             return;
         }
 
-        const workspaceRoots = folders.map(folder => folder.uri.fsPath);
+        const workspaceRoots = folders.map((folder) => folder.uri.fsPath);
         const additionalRoots = getAdditionalGitWatcherRoots(repositoryManager.getRepositories(), workspaceRoots);
         const watcher = await createGitWatcher(context, workspaceRoots, additionalRoots);
         if (generation !== gitWatcherGeneration) {
@@ -285,7 +316,7 @@ export async function activate(context: vscode.ExtensionContext) {
         }
 
         gitWatcherDisposables.push(
-            watcher.onChange(change => {
+            watcher.onChange((change) => {
                 const activeService = repositoryManager.getActiveService();
                 for (const repository of repositoryManager.getRepositories()) {
                     const service = repositoryManager.getService(repository.repoPath);
@@ -295,16 +326,18 @@ export async function activate(context: vscode.ExtensionContext) {
                 }
 
                 if (change.kind === 'repositories') {
-                    void repositoryManager.initialize()
+                    void repositoryManager
+                        .initialize()
                         .then(() => requestRefresh('repository-watcher', repositoryRefreshScopes, true))
-                        .catch(e => logger.error('Failed to rescan repositories after git watcher change', e));
+                        .catch((e) => logger.error('Failed to rescan repositories after git watcher change', e));
                     return;
                 }
                 if (!activeService) {
                     requestRefresh('git-watcher', gitStateRefreshScopes);
                     return;
                 }
-                void activeService.refreshStatusCache()
+                void activeService
+                    .refreshStatusCache()
                     .then(({ commitChanged, branchChanged }) => {
                         const scopes: RefreshScope[] = ['stash'];
                         if (commitChanged) {
@@ -318,7 +351,7 @@ export async function activate(context: vscode.ExtensionContext) {
                         }
                         requestRefresh('git-watcher', scopes);
                     })
-                    .catch(error => {
+                    .catch((error) => {
                         activeService.invalidateStatusCache();
                         logger.warn('Failed to pre-refresh Git status after watcher change', error);
                         requestRefresh('git-watcher-fallback', gitStateRefreshScopes);
@@ -329,16 +362,28 @@ export async function activate(context: vscode.ExtensionContext) {
     };
 
     const updateRepositoryContext = () => {
-        const repositories = repositoryManager.getRepositories().filter(repo => repo.kind !== 'worktree');
-        void vscode.commands.executeCommand('setContext', 'intelli-git.hasActiveRepository', Boolean(repositoryManager.getActiveService()));
-        void vscode.commands.executeCommand('setContext', 'intelli-git.hasMultipleRepositories', repositories.length > 1);
+        const repositories = repositoryManager.getRepositories().filter((repo) => repo.kind !== 'worktree');
+        void vscode.commands.executeCommand(
+            'setContext',
+            'intelli-git.hasActiveRepository',
+            Boolean(repositoryManager.getActiveService())
+        );
+        void vscode.commands.executeCommand(
+            'setContext',
+            'intelli-git.hasMultipleRepositories',
+            repositories.length > 1
+        );
     };
 
     const updateRemoteProviderContext = async () => {
         const gitService = repositoryManager.getActiveService();
         const remoteLink = gitService ? await gitService.branchRemote.getRemoteLinkInfo() : undefined;
         await vscode.commands.executeCommand('setContext', 'intelli-git.gitRemoteProvider', remoteLink?.provider || '');
-        await vscode.commands.executeCommand('setContext', 'intelli-git.remoteLink.commit', Boolean(remoteLink?.capabilities.commit));
+        await vscode.commands.executeCommand(
+            'setContext',
+            'intelli-git.remoteLink.commit',
+            Boolean(remoteLink?.capabilities.commit)
+        );
     };
 
     const updateChangelistModeContext = () => {
@@ -369,9 +414,9 @@ export async function activate(context: vscode.ExtensionContext) {
             reason,
             scopes: scopes.join(','),
             commitViewVisible: provider.isVisible(),
-            gitLogVisible: gitLogProvider.isVisible()
+            gitLogVisible: gitLogProvider.isVisible(),
         });
-        const localChangesScopes = scopes.filter(scope => scope !== 'gitLog');
+        const localChangesScopes = scopes.filter((scope) => scope !== 'gitLog');
         if (localChangesScopes.length > 0) {
             provider.requestRefresh({ scopes: localChangesScopes, reason });
         }
@@ -410,13 +455,18 @@ export async function activate(context: vscode.ExtensionContext) {
         }
 
         const repoContext = {
-            subscriptions: repoBoundDisposables
+            subscriptions: repoBoundDisposables,
         } as Pick<vscode.ExtensionContext, 'subscriptions'> as vscode.ExtensionContext;
 
         const activeScope = repositoryManager.getActiveScope();
         branchStatusBar = new BranchStatusBar(gitService, activeScope);
         gitLogStatusBar = new GitLogStatusBar(gitService, activeScope);
-        changeBlockEditorController = new ChangeBlockEditorController(gitService, inactiveChangesService, changelistStateService, provider);
+        changeBlockEditorController = new ChangeBlockEditorController(
+            gitService,
+            inactiveChangesService,
+            changelistStateService,
+            provider
+        );
 
         registerStashCommands(repoContext, gitService, provider);
         registerWorktreeCommands(repoContext, gitService, repositoryManager, provider);
@@ -429,7 +479,7 @@ export async function activate(context: vscode.ExtensionContext) {
             inactiveChangesService,
             changelistStateService,
             provider,
-            repoPath => repoPath ? repositoryManager.getService(repoPath) : repositoryManager.getActiveService()
+            (repoPath) => (repoPath ? repositoryManager.getService(repoPath) : repositoryManager.getActiveService())
         );
         registerEditorGitCommands(repoContext, gitService, gitLogProvider);
 
@@ -437,11 +487,15 @@ export async function activate(context: vscode.ExtensionContext) {
             branchStatusBar,
             gitLogStatusBar,
             changeBlockEditorController,
-            gitService.onWillRunGitMutation(() => backgroundFetchService.cancelActiveFetch('interactive-git-operation')),
-            gitService.onDidChange(kind => requestRefresh(
-                kind === 'remote' ? 'git-remote' : 'git-mutation',
-                kind === 'remote' ? ['branch', 'push', 'gitLog'] : gitStateRefreshScopes
-            ))
+            gitService.onWillRunGitMutation(() =>
+                backgroundFetchService.cancelActiveFetch('interactive-git-operation')
+            ),
+            gitService.onDidChange((kind) =>
+                requestRefresh(
+                    kind === 'remote' ? 'git-remote' : 'git-mutation',
+                    kind === 'remote' ? ['branch', 'push', 'gitLog'] : gitStateRefreshScopes
+                )
+            )
         );
 
         updateRepositoryContext();
@@ -459,45 +513,49 @@ export async function activate(context: vscode.ExtensionContext) {
     );
 
     // Register webview providers
+    context.subscriptions.push(vscode.window.registerWebviewViewProvider(CommitViewProvider.viewType, provider));
+    context.subscriptions.push(vscode.window.registerWebviewViewProvider(GitLogViewProvider.viewType, gitLogProvider));
     context.subscriptions.push(
-        vscode.window.registerWebviewViewProvider(CommitViewProvider.viewType, provider)
-    );
-    context.subscriptions.push(
-        vscode.window.registerWebviewViewProvider(GitLogViewProvider.viewType, gitLogProvider)
-    );
-    context.subscriptions.push(
-        vscode.commands.registerCommand('intelli-git.openConflictResolver', (file?: { path?: string; repoPath?: string }) => {
-            if (!file?.path) {
-                return;
-            }
+        vscode.commands.registerCommand(
+            'intelli-git.openConflictResolver',
+            (file?: { path?: string; repoPath?: string }) => {
+                if (!file?.path) {
+                    return;
+                }
 
-            void openConflictFile({
-                extensionUri: context.extensionUri,
-                context,
-                repositoryManager
-            }, { path: file.path, repoPath: file.repoPath });
-        })
+                void openConflictFile(
+                    {
+                        extensionUri: context.extensionUri,
+                        context,
+                        repositoryManager,
+                    },
+                    { path: file.path, repoPath: file.repoPath }
+                );
+            }
+        )
     );
     const conflictResolverContextCommands: ReadonlyArray<[string, ConflictResolverContextAction]> = [
         ['intelli-git.merge.acceptLeft', 'acceptLeft'],
         ['intelli-git.merge.cancelLeft', 'cancelLeft'],
         ['intelli-git.merge.acceptRight', 'acceptRight'],
         ['intelli-git.merge.cancelRight', 'cancelRight'],
-        ['intelli-git.merge.markReviewed', 'markReviewed']
+        ['intelli-git.merge.markReviewed', 'markReviewed'],
     ];
-    context.subscriptions.push(...conflictResolverContextCommands.map(([command, action]) => (
-        vscode.commands.registerCommand(command, (args?: MergeEditorContext) => {
-            if (!args?.path || !args.changeGroupId) {
-                return;
-            }
-            ConflictResolverPanel.dispatchContextAction({
-                path: args.path,
-                repoPath: args.repoPath,
-                groupId: args.changeGroupId,
-                action
-            });
-        })
-    )));
+    context.subscriptions.push(
+        ...conflictResolverContextCommands.map(([command, action]) =>
+            vscode.commands.registerCommand(command, (args?: MergeEditorContext) => {
+                if (!args?.path || !args.changeGroupId) {
+                    return;
+                }
+                ConflictResolverPanel.dispatchContextAction({
+                    path: args.path,
+                    repoPath: args.repoPath,
+                    groupId: args.changeGroupId,
+                    action,
+                });
+            })
+        )
+    );
 
     registerAiCommands(context, provider);
     registerGlobalNavigationCommands(context, {
@@ -510,7 +568,7 @@ export async function activate(context: vscode.ExtensionContext) {
             bindActiveRepository();
             requestRefresh('manual', repositoryRefreshScopes, true);
             void resetGitWatcher();
-        }
+        },
     });
     bindActiveRepository();
 
@@ -552,14 +610,17 @@ export async function activate(context: vscode.ExtensionContext) {
     );
 
     context.subscriptions.push(
-        vscode.commands.registerCommand('intelli-git.repository.removeFromWorkspace', async (args?: { repoPath?: string }) => {
-            if (!args?.repoPath) {
-                return;
+        vscode.commands.registerCommand(
+            'intelli-git.repository.removeFromWorkspace',
+            async (args?: { repoPath?: string }) => {
+                if (!args?.repoPath) {
+                    return;
+                }
+                await repositoryManager.removeRepository(args.repoPath);
+                updateRepositoryContext();
+                requestRefresh('repository-removed', repositoryRefreshScopes, true);
             }
-            await repositoryManager.removeRepository(args.repoPath);
-            updateRepositoryContext();
-            requestRefresh('repository-removed', repositoryRefreshScopes, true);
-        })
+        )
     );
 
     // Git watcher: uses VS Code Git extension API, falls back to FileSystemWatcher.
@@ -580,7 +641,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
     // Watch for diagnostic changes to update file error status in changelist
     context.subscriptions.push(
-        vscode.languages.onDidChangeDiagnostics(event => {
+        vscode.languages.onDidChangeDiagnostics((event) => {
             const gitService = repositoryManager.getActiveService();
             const repoPath = repositoryManager.getActiveRepoPath();
             if (!gitService || !repoPath || !provider.isVisible()) {
@@ -588,7 +649,7 @@ export async function activate(context: vscode.ExtensionContext) {
             }
 
             const workspaceRoot = gitService.getWorkspaceRoot();
-            const files = event.uris.flatMap(uri => {
+            const files = event.uris.flatMap((uri) => {
                 if (uri.scheme !== 'file') {
                     return [];
                 }
@@ -596,8 +657,9 @@ export async function activate(context: vscode.ExtensionContext) {
                 if (!relativePath || relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
                     return [];
                 }
-                const error = vscode.languages.getDiagnostics(uri)
-                    .some(diagnostic => diagnostic.severity === vscode.DiagnosticSeverity.Error);
+                const error = vscode.languages
+                    .getDiagnostics(uri)
+                    .some((diagnostic) => diagnostic.severity === vscode.DiagnosticSeverity.Error);
                 return [{ path: relativePath.replace(/\\/g, '/'), error }];
             });
             if (files.length > 0) {
@@ -617,4 +679,4 @@ export async function activate(context: vscode.ExtensionContext) {
     );
 }
 
-export function deactivate() { }
+export function deactivate() {}
