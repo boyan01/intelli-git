@@ -55,13 +55,13 @@ function ThemeIcon({ icon, className }: { icon: FileIconDefinition | undefined; 
         );
     }
 
-    // Loading, or the theme has no icon for this item (for example file icons are disabled).
+    // Loading, or the theme has no icon for this item (for example Seti has no folder icons).
     return <span className={containerClassName} aria-hidden="true" />;
 }
 
 /**
  * Renders a file icon from the user's active VS Code file icon theme,
- * falling back to the bundled Seti icons when the theme cannot be resolved.
+ * falling back to the bundled Seti icons when no icon theme is set or it cannot be resolved.
  */
 export function FileIcon({ name, className, fallbackColor }: FileIconProps) {
     const themeState = useFileIconTheme();

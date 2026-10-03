@@ -17,19 +17,6 @@ interface IconThemeContribution {
     extensionUri: vscode.Uri;
 }
 
-const EMPTY_THEME: FileIconTheme = {
-    id: '',
-    iconDefinitions: {},
-    fonts: [],
-    fileNames: {},
-    fileExtensions: {},
-    languageIds: {},
-    languageFileNames: {},
-    languageExtensions: {},
-    folderNames: {},
-    folderNamesExpanded: {},
-};
-
 function getColorKind(kind: vscode.ColorThemeKind): IconThemeColorKind {
     switch (kind) {
         case vscode.ColorThemeKind.Light:
@@ -57,7 +44,7 @@ export class FileIconThemeService implements vscode.Disposable {
     private readonly disposables: vscode.Disposable[] = [];
     private colorKind = getColorKind(vscode.window.activeColorTheme.kind);
     private themePromise?: Promise<FileIconTheme | null>;
-    /** Last theme sent to webviews; `null` means file icons are disabled, `undefined` means none yet. */
+    /** Last theme sent to webviews; `null` means no icon theme is set, `undefined` means none yet. */
     private appliedThemeId?: string | null;
 
     constructor() {
@@ -92,7 +79,8 @@ export class FileIconThemeService implements vscode.Disposable {
 
     /**
      * Returns the active theme with resource URIs mapped for the given webview.
-     * Returns an empty theme when file icons are disabled and null when the theme cannot be resolved.
+     * Returns null when no icon theme is set or the theme cannot be resolved, so webviews use
+     * the bundled icons.
      */
     public async getTheme(webview: vscode.Webview): Promise<FileIconTheme | null> {
         this.themePromise ??= this.loadTheme();
@@ -149,7 +137,7 @@ export class FileIconThemeService implements vscode.Disposable {
         const configuredId = vscode.workspace.getConfiguration('workbench').get<string | null>('iconTheme');
         if (configuredId === null) {
             this.appliedThemeId = null;
-            return EMPTY_THEME;
+            return null;
         }
 
         const contributions = this.getIconThemeContributions();
@@ -159,7 +147,7 @@ export class FileIconThemeService implements vscode.Disposable {
             // Like VS Code, keep the applied theme when the configured one is unknown;
             // only the initial load falls back to the default theme.
             if (this.appliedThemeId === null) {
-                return EMPTY_THEME;
+                return null;
             }
             contribution =
                 (this.appliedThemeId ? findContribution(this.appliedThemeId) : undefined) ??
