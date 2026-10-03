@@ -58,7 +58,7 @@ function RebaseIndicator({
                 className="codicon codicon-git-merge"
                 style={{ color: 'var(--vscode-inputValidation-warningForeground)', marginRight: '4px' }}
             ></span>
-            <span style={{ fontWeight: 'bold', fontSize: '11px', marginRight: '4px' }}>
+            <span style={{ fontWeight: 'bold', fontSize: 'var(--ig-font-size-xs)', marginRight: '4px' }}>
                 {status === 'interactive' ? t('Rebasing') : t('Merging')}
             </span>
             <button

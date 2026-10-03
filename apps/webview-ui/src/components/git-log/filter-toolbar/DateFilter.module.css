@@ -5,7 +5,7 @@
 }
 
 .inputLabel {
-    font-size: 11px;
+    font-size: var(--ig-font-size-xs);
     color: var(--vscode-descriptionForeground);
 }
 
@@ -14,7 +14,7 @@
     border: 1px solid var(--vscode-input-border);
     color: var(--vscode-input-foreground);
     padding: 4px;
-    font-size: 12px;
+    font-size: var(--ig-font-size-sm);
     outline: none;
 }
 

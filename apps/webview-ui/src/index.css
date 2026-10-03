@@ -4,6 +4,18 @@
     --vscode-font-family:
         -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji',
         'Segoe UI Emoji', 'Segoe UI Symbol';
+
+    /* Typography follows the workbench (UI) and editor fonts that VS Code injects into webviews. */
+    --ig-font-size: var(--vscode-font-size, 13px);
+    --ig-font-size-xl: calc(var(--ig-font-size) + 2px);
+    --ig-font-size-lg: calc(var(--ig-font-size) + 1px);
+    --ig-font-size-sm: calc(var(--ig-font-size) - 1px);
+    --ig-font-size-xs: calc(var(--ig-font-size) - 2px);
+    --ig-font-size-2xs: calc(var(--ig-font-size) - 3px);
+    --ig-font-size-3xs: calc(var(--ig-font-size) - 4px);
+    --ig-code-font-family: var(--vscode-editor-font-family, Menlo, Monaco, 'Courier New', monospace);
+    --ig-code-font-size: var(--vscode-editor-font-size, 12px);
+    --ig-code-font-size-sm: calc(var(--ig-code-font-size) - 1px);
 }
 
 html,
@@ -16,8 +28,19 @@ body {
     margin: 0;
     padding: 0;
     font-family: var(--vscode-font-family);
+    font-size: var(--ig-font-size);
+    font-weight: var(--vscode-font-weight, normal);
     background-color: var(--vscode-sideBar-background);
     color: var(--vscode-foreground);
+}
+
+/* Form controls do not inherit fonts by default; keep them on the VS Code UI font. */
+button,
+input,
+select,
+textarea {
+    font-family: inherit;
+    font-size: inherit;
 }
 
 /* Scrollbar styling */

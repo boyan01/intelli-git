@@ -19,20 +19,20 @@
     display: flex;
     align-items: center;
     opacity: 0.7;
-    font-size: 12px;
+    font-size: var(--ig-font-size-sm);
     font-weight: bold;
     gap: 4px;
 }
 
 .rebaseHint {
     width: 100%;
-    font-size: 11px;
+    font-size: var(--ig-font-size-xs);
     color: var(--vscode-descriptionForeground);
     opacity: 0.9;
 }
 
 .stats {
-    font-size: 12px;
+    font-size: var(--ig-font-size-sm);
     opacity: 0.9;
     display: flex;
     gap: 8px;
@@ -84,7 +84,7 @@
 
 .btn {
     padding: 4px 12px;
-    font-size: 12px;
+    font-size: var(--ig-font-size-sm);
     border: none;
     border-radius: 3px;
     cursor: pointer;
