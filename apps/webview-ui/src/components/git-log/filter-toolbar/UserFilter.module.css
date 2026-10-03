@@ -17,7 +17,7 @@
 .suggestionItem {
     padding: 4px 8px;
     cursor: pointer;
-    font-size: 12px;
+    font-size: var(--ig-font-size-sm);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -34,7 +34,8 @@
 
 .textarea {
     height: 100px;
-    font-family: var(--vscode-editor-font-family);
+    font-family: var(--ig-code-font-family);
+    font-size: var(--ig-code-font-size);
     resize: vertical;
     width: 100%;
     box-sizing: border-box;
@@ -46,6 +47,6 @@
 
 .hint {
     flex: 1;
-    font-size: 11px;
+    font-size: var(--ig-font-size-xs);
     color: var(--vscode-descriptionForeground);
 }

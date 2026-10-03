@@ -452,6 +452,7 @@ export interface ExtensionMethods {
     getCurrentUser: () => Promise<string>;
     getUnpushedCommits: () => Promise<string[]>;
     getWorkspaceRoot: () => Promise<string>;
+    getFileIconTheme: () => Promise<FileIconTheme | null>;
     getLastCommitInfo: () => Promise<LastCommitInfo | null>;
     showErrorMessage: (message: string) => Promise<void>;
     markHunkInactive: (params: { path: string; repoPath?: string; hunkId: string }) => Promise<void>;
@@ -517,8 +518,44 @@ export interface FileDiagnosticsChange {
     }>;
 }
 
+export interface FileIconDefinition {
+    iconUri?: string;
+    fontCharacter?: string;
+    fontColor?: string;
+    fontSize?: string;
+    fontFamily?: string;
+}
+
+export interface FileIconFont {
+    family: string;
+    sources: Array<{ uri: string; format?: string }>;
+    weight?: string;
+    style?: string;
+}
+
+/**
+ * The active VS Code file icon theme, flattened for the current color theme kind.
+ * Association keys are lower-cased; extension keys have no leading dot.
+ */
+export interface FileIconTheme {
+    id: string;
+    iconDefinitions: Record<string, FileIconDefinition>;
+    fonts: FileIconFont[];
+    file?: string;
+    fileNames: Record<string, string>;
+    fileExtensions: Record<string, string>;
+    languageIds: Record<string, string>;
+    languageFileNames: Record<string, string>;
+    languageExtensions: Record<string, string>;
+    folder?: string;
+    folderExpanded?: string;
+    folderNames: Record<string, string>;
+    folderNamesExpanded: Record<string, string>;
+}
+
 export interface WebviewMethods {
     activeFileChange: (params: { path: string; commitHash?: string }) => void;
+    fileIconThemeChange: () => void;
     revealConflictResolverFile: (params: ConflictResolverOpenRequest) => void;
     triggerConflictResolverAction: (params: ConflictResolverContextActionRequest) => void;
     revealLog: (params: GitLogRevealRequest) => void;

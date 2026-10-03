@@ -1,9 +1,9 @@
 import React, { useMemo, useCallback } from 'react';
 import type { FileStatus } from '@shared/messages';
-import { getFileIcon } from '../../lib/fileIcons';
+import { FileIcon, FolderIcon } from '../common/FileIcon';
 import styles from './BaseFileTree.module.css';
 import { BasicTreeView } from '../common/BasicTreeView';
-import type { TreeNode, BasicTreeViewRef } from '../common/BasicTreeView';
+import type { TreeNode, BasicTreeViewRef, TreeNodeRenderState } from '../common/BasicTreeView';
 import { compactSingleChildFolders } from './treeUtils';
 // import { getDirPath, getStatusColor } from '../../utils/fileUtils'; // Removed, will define locally
 
@@ -295,7 +295,7 @@ export const BaseFileTree = React.forwardRef<BaseFileTreeRef, BaseFileTreeProps>
         }, []);
 
         const renderLabel = useCallback(
-            (node: TreeNode<FileNodeData>) => {
+            (node: TreeNode<FileNodeData>, { expanded }: TreeNodeRenderState) => {
                 const isFile = node.data?.isFile;
                 const status = node.data?.status;
                 const isDeleted = status === 'D';
@@ -317,7 +317,6 @@ export const BaseFileTree = React.forwardRef<BaseFileTreeRef, BaseFileTreeProps>
                                   : '';
 
                 const showPath = viewMode === 'list' && isFile;
-                const fileIcon = getFileIcon(node.label);
 
                 return (
                     <div className={styles.fileItemContent}>
@@ -330,11 +329,7 @@ export const BaseFileTree = React.forwardRef<BaseFileTreeRef, BaseFileTreeProps>
                                         style={{ color: statusColor }}
                                     ></span>
                                 ) : (
-                                    <span
-                                        className={styles.fileIconSvg}
-                                        style={{ color: fileIcon.color }}
-                                        dangerouslySetInnerHTML={{ __html: fileIcon.svg }}
-                                    />
+                                    <FileIcon name={node.label} className={styles.fileIconSvg} />
                                 )}
 
                                 <span
@@ -354,7 +349,12 @@ export const BaseFileTree = React.forwardRef<BaseFileTreeRef, BaseFileTreeProps>
                             <span className={styles.name}>{node.label}</span>
                         ) : (
                             <>
-                                <span className={`codicon codicon-folder ${styles.icon}`}></span>
+                                <FolderIcon
+                                    name={node.label}
+                                    expanded={expanded}
+                                    className={styles.fileIconSvg}
+                                    fallbackClassName={styles.icon}
+                                />
                                 <span className={styles.name}>{node.label}</span>
                             </>
                         )}

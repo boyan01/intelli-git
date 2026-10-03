@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import type { ExtensionMethods, WebviewMethods } from '@shared/messages';
 import { RpcPeer } from '@shared/rpc';
 import { RepositoryManager } from '../services/RepositoryManager';
+import type { FileIconThemeService } from '../services/FileIconThemeService';
 import { getWebviewHtml } from '../utils/webviewHtml';
 import { createRpc, ExtensionRpcHandler, type ExtensionRpcHandlerOptions } from '../rpc';
 
@@ -9,6 +10,7 @@ export interface WebviewProviderOptions {
     extensionUri: vscode.Uri;
     context: vscode.ExtensionContext;
     repositoryManager: RepositoryManager;
+    fileIconThemeService?: FileIconThemeService;
 }
 
 /**
@@ -24,10 +26,8 @@ export abstract class BaseWebviewProvider {
      * Sets up the webview with RPC and message handling.
      */
     protected setupWebview(webview: vscode.Webview, onDisposed: () => boolean): void {
-        webview.options = {
-            enableScripts: true,
-            localResourceRoots: [this.options.extensionUri],
-        };
+        const fileIconThemeService = this.options.fileIconThemeService;
+        let resourceRootsKey = this.applyWebviewOptions(webview);
 
         this._rpc = createRpc({ webview, onDisposed });
 
@@ -35,6 +35,7 @@ export abstract class BaseWebviewProvider {
             context: this.options.context,
             repositoryManager: this.options.repositoryManager,
             onDispose: this.getOnDispose(),
+            getFileIconTheme: fileIconThemeService ? () => fileIconThemeService.getTheme(webview) : undefined,
             ...this.getRpcHandlerOptions(),
         });
         handler.registerAll(this._rpc);
@@ -44,6 +45,37 @@ export abstract class BaseWebviewProvider {
                 this._rpc?.handleMessage(msg);
             })
         );
+
+        if (fileIconThemeService) {
+            this._disposables.push(
+                fileIconThemeService.onDidChange(() => {
+                    if (onDisposed()) {
+                        return;
+                    }
+                    // A newly installed icon theme extension needs its folder added as a resource root.
+                    const nextKey = this.getLocalResourceRoots()
+                        .map((root) => root.toString())
+                        .join('|');
+                    if (nextKey !== resourceRootsKey) {
+                        resourceRootsKey = this.applyWebviewOptions(webview);
+                    }
+                    void this._rpc?.proxy.fileIconThemeChange();
+                })
+            );
+        }
+    }
+
+    private getLocalResourceRoots(): vscode.Uri[] {
+        return [this.options.extensionUri, ...(this.options.fileIconThemeService?.getLocalResourceRoots() ?? [])];
+    }
+
+    private applyWebviewOptions(webview: vscode.Webview): string {
+        const localResourceRoots = this.getLocalResourceRoots();
+        webview.options = {
+            enableScripts: true,
+            localResourceRoots,
+        };
+        return localResourceRoots.map((root) => root.toString()).join('|');
     }
 
     protected getHtml(webview: vscode.Webview): string {

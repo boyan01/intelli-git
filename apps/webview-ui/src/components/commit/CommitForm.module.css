@@ -24,7 +24,7 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    font-size: 12px;
+    font-size: var(--ig-font-size-sm);
     cursor: pointer;
     user-select: none;
     color: var(--vscode-foreground);
@@ -94,7 +94,7 @@
     padding: 6px 8px;
     border: 1px solid var(--vscode-panel-border);
     border-radius: 4px;
-    font-size: 12px;
+    font-size: var(--ig-font-size-sm);
     line-height: 16px;
     word-break: break-word;
 }
@@ -116,7 +116,7 @@
 }
 
 .stats {
-    font-size: 12px;
+    font-size: var(--ig-font-size-sm);
     opacity: 0.9;
     display: flex;
     gap: 8px;
@@ -145,7 +145,7 @@
     resize: vertical;
     background: var(--vscode-input-background);
     color: var(--vscode-input-foreground);
-    font-size: 12px;
+    font-size: var(--ig-font-size-sm);
     box-sizing: border-box;
 }
 
@@ -164,7 +164,7 @@
     border: 1px solid var(--vscode-panel-border);
     border-radius: 4px;
     background: var(--vscode-sideBarSectionHeader-background);
-    font-size: 12px;
+    font-size: var(--ig-font-size-sm);
 }
 
 .commitPlanTitle {
@@ -189,7 +189,7 @@
     border: 1px solid var(--vscode-panel-border);
     border-radius: 4px;
     background: var(--vscode-sideBarSectionHeader-background);
-    font-size: 12px;
+    font-size: var(--ig-font-size-sm);
 }
 
 .pushTargetWarning {
@@ -222,7 +222,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-family: var(--vscode-editor-font-family);
+    font-family: var(--ig-code-font-family);
 }
 
 .pushTargetButton {
@@ -232,7 +232,7 @@
     padding: 2px 6px;
     background: transparent;
     color: var(--vscode-textLink-foreground);
-    font-size: 12px;
+    font-size: var(--ig-font-size-sm);
     cursor: pointer;
 }
 
@@ -250,7 +250,7 @@
     background: var(--vscode-inputValidation-warningBackground);
     border: 1px solid var(--vscode-inputValidation-warningBorder);
     border-radius: 4px;
-    font-size: 12px;
+    font-size: var(--ig-font-size-sm);
     color: var(--vscode-inputValidation-warningForeground, var(--vscode-foreground));
 }
 
@@ -288,7 +288,7 @@
     padding: 2px 6px;
     background: transparent;
     color: var(--vscode-textLink-foreground);
-    font-size: 12px;
+    font-size: var(--ig-font-size-sm);
     cursor: pointer;
 }
 
@@ -312,7 +312,7 @@
 .mainBtn {
     composes: splitMainButton from '../common/ControlStyles.module.css';
     padding: 6px 12px;
-    font-size: 12px;
+    font-size: var(--ig-font-size-sm);
 }
 
 /* Options trigger button */

@@ -38,7 +38,7 @@
     border: none;
     outline: none;
     color: var(--vscode-input-foreground);
-    font-size: 13px;
+    font-size: var(--ig-font-size);
     padding: 0 4px;
     min-width: 0;
 }
@@ -61,10 +61,10 @@
     padding: 0 3px;
     min-width: 20px;
     height: 20px;
-    font-size: 11px;
+    font-size: var(--ig-font-size-xs);
     border-radius: 2px;
     opacity: 0.6;
-    font-family: monospace;
+    font-family: var(--ig-code-font-family);
     outline: none;
     flex-shrink: 0;
 }
@@ -83,7 +83,7 @@
     color: var(--vscode-foreground);
     cursor: pointer;
     padding: 0 2px;
-    font-size: 12px;
+    font-size: var(--ig-font-size-sm);
     white-space: nowrap;
     height: 24px;
     border-radius: 2px;
@@ -280,7 +280,7 @@
     color: var(--vscode-foreground);
     cursor: pointer;
     font: inherit;
-    font-size: 11px;
+    font-size: var(--ig-font-size-xs);
 }
 
 .filterChip:hover {
@@ -319,7 +319,7 @@
     color: var(--vscode-textLink-foreground);
     cursor: pointer;
     font: inherit;
-    font-size: 11px;
+    font-size: var(--ig-font-size-xs);
 }
 
 .clearAllButton:hover {

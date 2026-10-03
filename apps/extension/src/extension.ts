@@ -11,6 +11,7 @@ import {
 import { RepositoryManager, type RepositoryScope } from './services/RepositoryManager';
 import { createGitWatcher } from './services/GitRepositoryWatcher';
 import { BackgroundFetchService } from './services/BackgroundFetchService';
+import { FileIconThemeService } from './services/FileIconThemeService';
 import { ParentRepositoryScmIntegrationService } from './services/ParentRepositoryScmIntegrationService';
 import { BranchStatusBar, GitLogStatusBar } from './ui';
 import {
@@ -260,10 +261,13 @@ export async function activate(context: vscode.ExtensionContext) {
     }
 
     // Initialize providers
+    const fileIconThemeService = new FileIconThemeService();
+    context.subscriptions.push(fileIconThemeService);
     const providerOptions = {
         extensionUri: context.extensionUri,
         context,
         repositoryManager,
+        fileIconThemeService,
     };
     const provider = new CommitViewProvider(providerOptions);
     const gitLogProvider = new GitLogViewProvider(providerOptions);
@@ -523,14 +527,7 @@ export async function activate(context: vscode.ExtensionContext) {
                     return;
                 }
 
-                void openConflictFile(
-                    {
-                        extensionUri: context.extensionUri,
-                        context,
-                        repositoryManager,
-                    },
-                    { path: file.path, repoPath: file.repoPath }
-                );
+                void openConflictFile(providerOptions, { path: file.path, repoPath: file.repoPath });
             }
         )
     );

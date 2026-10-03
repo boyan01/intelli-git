@@ -31,8 +31,8 @@
     box-sizing: border-box;
     border-top: 1px solid var(--vscode-panel-border);
     color: var(--vscode-descriptionForeground);
-    font-family: var(--vscode-editor-font-family);
-    font-size: var(--vscode-editor-font-size);
+    font-family: var(--ig-code-font-family);
+    font-size: var(--ig-code-font-size);
     font-style: italic;
     line-height: 18px;
 }

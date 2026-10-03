@@ -26,7 +26,7 @@
     padding: 3px 8px;
     background: var(--vscode-button-secondaryBackground);
     color: var(--vscode-button-secondaryForeground);
-    font-size: 11px;
+    font-size: var(--ig-font-size-xs);
     cursor: pointer;
 }
 
@@ -65,7 +65,7 @@
 }
 
 .pushTargetLabel {
-    font-size: 10px;
+    font-size: var(--ig-font-size-2xs);
     color: var(--vscode-descriptionForeground);
     text-transform: uppercase;
     font-weight: bold;
@@ -74,8 +74,8 @@
 
 /* Unified Font Style for Remote/Branch text */
 .unifiedFont {
-    font-size: 13px;
-    font-family: var(--vscode-editor-font-family);
+    font-size: var(--ig-code-font-size);
+    font-family: var(--ig-code-font-family);
     line-height: 1.4;
 }
 
@@ -251,7 +251,7 @@
 .suggestionItem {
     padding: 4px 8px;
     cursor: pointer;
-    font-size: 11px;
+    font-size: var(--ig-font-size-xs);
     white-space: nowrap;
 }
 
@@ -268,7 +268,7 @@
     flex: 0 0 auto;
     background-color: var(--vscode-badge-background);
     color: var(--vscode-badge-foreground);
-    font-size: 9px;
+    font-size: var(--ig-font-size-3xs);
     padding: 0 5px;
     border-radius: 2px;
     font-weight: 600;

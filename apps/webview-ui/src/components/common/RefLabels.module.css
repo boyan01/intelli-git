@@ -37,7 +37,7 @@
     min-width: 0;
     padding: 0 5px;
     border-radius: 4px;
-    font-size: 11px;
+    font-size: var(--ig-font-size-xs);
     line-height: 16px;
     border: 1px solid transparent;
     white-space: nowrap;
@@ -94,7 +94,7 @@
     border-radius: 4px;
     background-color: color-mix(in srgb, var(--vscode-badge-background, #4d4d4d) 16%, transparent);
     color: var(--vscode-descriptionForeground);
-    font-size: 9px;
+    font-size: var(--ig-font-size-3xs);
     line-height: 14px;
     font-weight: 600;
     box-sizing: border-box;
@@ -118,7 +118,7 @@
     display: inline-flex;
     align-items: center;
     gap: 5px;
-    font-size: 12px;
+    font-size: var(--ig-font-size-sm);
     line-height: 18px;
     white-space: nowrap;
     background: none !important;

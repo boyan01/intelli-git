@@ -24,7 +24,7 @@
     align-items: center;
     height: 22px;
     padding-right: 8px;
-    font-size: 13px;
+    font-size: var(--ig-font-size);
     line-height: 22px;
     cursor: pointer;
     user-select: none;
@@ -139,7 +139,7 @@
     display: flex;
     align-items: center;
     gap: 4px;
-    font-size: 11px;
+    font-size: var(--ig-font-size-xs);
     opacity: 0.85;
 }
 

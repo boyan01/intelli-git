@@ -27,7 +27,7 @@
     color: var(--vscode-foreground);
     cursor: pointer;
     font: inherit;
-    font-size: 12px;
+    font-size: var(--ig-font-size-sm);
 }
 
 .repositoryButton:hover {
@@ -86,7 +86,7 @@
     background-color: transparent;
     color: var(--vscode-input-foreground);
     border: none;
-    font-size: 13px;
+    font-size: var(--ig-font-size);
     outline: none;
     min-width: 0;
 }
@@ -112,5 +112,5 @@
     justify-content: center;
     gap: 8px;
     color: var(--vscode-descriptionForeground);
-    font-size: 12px;
+    font-size: var(--ig-font-size-sm);
 }
