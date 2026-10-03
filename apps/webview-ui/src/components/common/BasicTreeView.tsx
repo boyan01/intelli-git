@@ -19,6 +19,10 @@ export interface TreeNode<T = unknown> {
     data?: T;
 }
 
+export interface TreeNodeRenderState {
+    expanded: boolean;
+}
+
 export interface BasicTreeViewProps<T = unknown> {
     nodes: TreeNode<T>[];
     expandedIds?: Set<string>;
@@ -33,7 +37,8 @@ export interface BasicTreeViewProps<T = unknown> {
     onContextMenu?: (e: React.MouseEvent, node: TreeNode<T>) => void;
     onFocusNodeChange?: (node: TreeNode<T>) => void;
     onFocusChange?: (focused: boolean) => void;
-    renderLabel?: (node: TreeNode<T>) => React.ReactNode;
+    renderIcon?: (node: TreeNode<T>, state: TreeNodeRenderState) => React.ReactNode;
+    renderLabel?: (node: TreeNode<T>, state: TreeNodeRenderState) => React.ReactNode;
     renderTrailing?: (node: TreeNode<T>) => React.ReactNode;
     getNodeClassName?: (node: TreeNode<T>) => string | undefined;
     getContextData?: (node: TreeNode<T>) => Record<string, unknown> | undefined;
@@ -86,7 +91,8 @@ interface TreeNodeItemProps<T> {
     onContextMenu?: (e: React.MouseEvent, node: TreeNode<T>) => void;
     onFocusNodeChange?: (node: TreeNode<T>) => void;
     onFocusChange?: (focused: boolean) => void;
-    renderLabel?: (node: TreeNode<T>) => React.ReactNode;
+    renderIcon?: (node: TreeNode<T>, state: TreeNodeRenderState) => React.ReactNode;
+    renderLabel?: (node: TreeNode<T>, state: TreeNodeRenderState) => React.ReactNode;
     renderTrailing?: (node: TreeNode<T>) => React.ReactNode;
     getNodeClassName?: (node: TreeNode<T>) => string | undefined;
     getContextData?: (node: TreeNode<T>) => Record<string, unknown> | undefined;
@@ -320,6 +326,7 @@ const TreeNodeItem = <T,>(props: TreeNodeItemProps<T>) => {
         onDoubleClick,
         onContextMenu,
         onFocusNodeChange,
+        renderIcon,
         renderLabel,
         renderTrailing,
         getNodeClassName,
@@ -356,6 +363,7 @@ const TreeNodeItem = <T,>(props: TreeNodeItemProps<T>) => {
     const contextData = getContextData?.(node);
     const nodeClassName = getNodeClassName?.(node);
     const leadingContent = renderLeading?.(node);
+    const customIcon = renderIcon?.(node, { expanded: isExpanded });
     const canDrag = isDraggable?.(node) ?? false;
     const canDrop = isDropTarget?.(node) ?? false;
     const isDragOver = dragOverId === node.id;
@@ -524,14 +532,18 @@ const TreeNodeItem = <T,>(props: TreeNodeItemProps<T>) => {
 
             {leadingContent && <div className={styles.leading}>{leadingContent}</div>}
 
-            {node.icon && (
-                <div className={styles.icon}>
-                    <i className={`codicon codicon-${node.icon}`} />
-                </div>
+            {customIcon != null ? (
+                <div className={styles.icon}>{customIcon}</div>
+            ) : (
+                node.icon && (
+                    <div className={styles.icon}>
+                        <i className={`codicon codicon-${node.icon}`} />
+                    </div>
+                )
             )}
 
             <div className={styles.label} title={node.title ?? node.label}>
-                {renderLabel ? renderLabel(node) : node.label}
+                {renderLabel ? renderLabel(node, { expanded: isExpanded }) : node.label}
             </div>
 
             {renderTrailing && <div className={styles.trailing}>{renderTrailing(node)}</div>}
@@ -554,6 +566,7 @@ function BasicTreeViewInner<T>(props: BasicTreeViewProps<T>, ref: React.Forwarde
         onContextMenu,
         onFocusNodeChange,
         onFocusChange,
+        renderIcon,
         renderLabel,
         renderTrailing,
         getNodeClassName,
@@ -1063,6 +1076,7 @@ function BasicTreeViewInner<T>(props: BasicTreeViewProps<T>, ref: React.Forwarde
                         onDoubleClick={onDoubleClick}
                         onContextMenu={onContextMenu}
                         onFocusNodeChange={onFocusNodeChange}
+                        renderIcon={renderIcon}
                         renderLabel={renderLabel}
                         renderTrailing={renderTrailing}
                         getNodeClassName={getNodeClassName}
@@ -1106,6 +1120,7 @@ function BasicTreeViewInner<T>(props: BasicTreeViewProps<T>, ref: React.Forwarde
                     onDoubleClick={onDoubleClick}
                     onContextMenu={onContextMenu}
                     onFocusNodeChange={onFocusNodeChange}
+                    renderIcon={renderIcon}
                     renderLabel={renderLabel}
                     renderTrailing={renderTrailing}
                     getNodeClassName={getNodeClassName}

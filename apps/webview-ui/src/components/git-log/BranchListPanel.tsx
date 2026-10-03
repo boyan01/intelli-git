@@ -3,8 +3,9 @@ import { useTranslation } from 'react-i18next';
 import type { BranchListData, LocalBranchInfo } from '@shared/messages';
 import { rpc } from '../../lib/rpc_client';
 import { usePersistedState } from '../../hooks/usePersistedState';
-import { BasicTreeView, type TreeNode, type BasicTreeViewRef } from '../common/BasicTreeView';
+import { BasicTreeView, type TreeNode, type BasicTreeViewRef, type TreeNodeRenderState } from '../common/BasicTreeView';
 import { BranchStatus } from '../common/BranchStatus';
+import { FolderIcon } from '../common/FileIcon';
 import { LoadingProgressBar } from '../common/LoadingProgressBar';
 import styles from './BranchListPanel.module.css';
 import treeStyles from '../common/BasicTreeView.module.css';
@@ -340,6 +341,14 @@ export const BranchListPanel: React.FC<BranchListPanelProps> = ({ data, isLoadin
         [filterText]
     );
 
+    // Branch group folders follow the active file icon theme
+    const renderIcon = useCallback((node: TreeNode<BranchNodeData>, { expanded }: TreeNodeRenderState) => {
+        if (node.icon !== 'folder') {
+            return undefined;
+        }
+        return <FolderIcon name={node.label} expanded={expanded} />;
+    }, []);
+
     // Render trailing (ahead/behind indicator)
     const renderTrailing = useCallback((node: TreeNode<BranchNodeData>) => {
         const info = node.data?.branchInfo;
@@ -404,6 +413,7 @@ export const BranchListPanel: React.FC<BranchListPanelProps> = ({ data, isLoadin
                 onSelect={handleSelect}
                 onAction={handleBranchAction}
                 onDoubleClick={handleBranchAction}
+                renderIcon={renderIcon}
                 renderLabel={renderLabel}
                 renderTrailing={renderTrailing}
                 getContextData={getContextData}
