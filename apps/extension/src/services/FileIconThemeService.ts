@@ -57,6 +57,8 @@ export class FileIconThemeService implements vscode.Disposable {
     private readonly disposables: vscode.Disposable[] = [];
     private colorKind = getColorKind(vscode.window.activeColorTheme.kind);
     private themePromise?: Promise<FileIconTheme | null>;
+    /** Last theme sent to webviews; `null` means file icons are disabled, `undefined` means none yet. */
+    private appliedThemeId?: string | null;
 
     constructor() {
         this.disposables.push(
@@ -146,17 +148,28 @@ export class FileIconThemeService implements vscode.Disposable {
     private async loadTheme(): Promise<FileIconTheme | null> {
         const configuredId = vscode.workspace.getConfiguration('workbench').get<string | null>('iconTheme');
         if (configuredId === null) {
+            this.appliedThemeId = null;
             return EMPTY_THEME;
         }
 
         const contributions = this.getIconThemeContributions();
-        const contribution =
-            contributions.find((candidate) => candidate.id === configuredId) ??
-            contributions.find((candidate) => candidate.id === DEFAULT_ICON_THEME_ID);
+        const findContribution = (id: string) => contributions.find((candidate) => candidate.id === id);
+        let contribution = configuredId ? findContribution(configuredId) : undefined;
+        if (!contribution) {
+            // Like VS Code, keep the applied theme when the configured one is unknown;
+            // only the initial load falls back to the default theme.
+            if (this.appliedThemeId === null) {
+                return EMPTY_THEME;
+            }
+            contribution =
+                (this.appliedThemeId ? findContribution(this.appliedThemeId) : undefined) ??
+                findContribution(DEFAULT_ICON_THEME_ID);
+        }
         if (!contribution) {
             logger.warn(`File icon theme "${configuredId}" was not found; using bundled file icons.`);
             return null;
         }
+        this.appliedThemeId = contribution.id;
 
         try {
             const documentUri = vscode.Uri.joinPath(contribution.extensionUri, contribution.path);
