@@ -58,9 +58,106 @@ describe('buildFileIconTheme', () => {
         expect(theme.fileNames).toEqual({ 'package.json': '_pkg' });
         expect(theme.fileExtensions).toEqual({ ts: '_ts', 'd.ts': '_dts' });
         expect(theme.iconDefinitions._ts).toEqual({ iconUri: 'file:///themes/icons/ts.svg' });
-        expect(theme.languageExtensions).toEqual({ md: 'markdown', markdown: 'markdown' });
+        expect(theme.languageExtensions).toEqual({ md: 'markdown', markdown: 'markdown', ts: 'typescript' });
         expect(theme.languageFileNames).toEqual({ readme: 'markdown' });
         expect(theme.languageIds.typescript).toBeUndefined();
+        expect(theme.usesCurrentColor).toBeUndefined();
+    });
+
+    it('keeps every language association so later registrations win, including file name patterns', () => {
+        const theme = buildFileIconTheme({
+            id: 'vs-seti',
+            document,
+            colorKind: 'dark',
+            languages: [
+                ...languages,
+                {
+                    id: 'dockerfile',
+                    extensions: ['.dockerfile'],
+                    filenames: ['Dockerfile'],
+                    filenamePatterns: ['Dockerfile.*', '**/docker/*.conf'],
+                },
+                { id: 'mdx', extensions: ['.md'] },
+            ],
+            resolveResource,
+        });
+
+        expect(theme.languageFileNames).toEqual({ readme: 'markdown', dockerfile: 'dockerfile' });
+        expect(theme.languageExtensions).toMatchObject({ md: 'mdx', dockerfile: 'dockerfile' });
+        expect(theme.languageFilenamePatterns).toEqual([
+            { pattern: '**/docker/*.conf', languageId: 'dockerfile' },
+            { pattern: 'dockerfile.*', languageId: 'dockerfile' },
+        ]);
+    });
+
+    it('omits language tables when the theme has no language icons', () => {
+        const theme = buildFileIconTheme({
+            id: 't',
+            document: { ...document, languageIds: {} },
+            colorKind: 'dark',
+            languages,
+            resolveResource,
+        });
+
+        expect(theme.languageFileNames).toEqual({});
+        expect(theme.languageExtensions).toEqual({});
+        expect(theme.languageFilenamePatterns).toEqual([]);
+    });
+
+    it('reuses the JSON language icon for JSON with Comments', () => {
+        const theme = buildFileIconTheme({
+            id: 't',
+            document: {
+                ...document,
+                languageIds: { json: '_markdown' },
+                light: { languageIds: { json: '_ts' } },
+            },
+            colorKind: 'light',
+            languages,
+            resolveResource,
+        });
+
+        expect(theme.languageIds).toEqual({ json: '_ts', jsonc: '_ts' });
+
+        const explicit = buildFileIconTheme({
+            id: 't',
+            document: { ...document, languageIds: { json: '_markdown', jsonc: '_ts' } },
+            colorKind: 'dark',
+            languages,
+            resolveResource,
+        });
+        expect(explicit.languageIds).toEqual({ json: '_markdown', jsonc: '_ts' });
+    });
+
+    it('keeps parent folder qualifiers on association keys', () => {
+        const theme = buildFileIconTheme({
+            id: 't',
+            document: {
+                ...document,
+                fileNames: { 'System/Win.ini': '_pkg' },
+                fileExtensions: { '.github/YML': '_ts', '.TS': '_ts' },
+                folderNames: { '.github/Workflows': '_file' },
+            },
+            colorKind: 'dark',
+            languages,
+            resolveResource,
+        });
+
+        expect(theme.fileNames).toEqual({ 'system/win.ini': '_pkg' });
+        expect(theme.fileExtensions).toEqual({ '.github/yml': '_ts', ts: '_ts' });
+        expect(theme.folderNames).toEqual({ '.github/workflows': '_file' });
+    });
+
+    it('marks themes whose image icons use the current color', () => {
+        const theme = buildFileIconTheme({
+            id: 't',
+            document: { ...document, usesCurrentColor: true },
+            colorKind: 'dark',
+            languages,
+            resolveResource,
+        });
+
+        expect(theme.usesCurrentColor).toBe(true);
     });
 
     it('resolves font glyphs against the default font', () => {
@@ -81,6 +178,38 @@ describe('buildFileIconTheme', () => {
             fontFamily: 'intelli-git-icon-vs-seti-seti',
         });
         expect(theme.iconDefinitions._missing_font).toMatchObject({ fontSize: '120%' });
+    });
+
+    it('sizes font glyphs like VS Code', () => {
+        const build = (fonts: unknown[]) =>
+            buildFileIconTheme({
+                id: 't',
+                document: {
+                    iconDefinitions: {
+                        _default: { fontCharacter: 'a' },
+                        _other: { fontCharacter: 'b', fontId: 'other' },
+                        _same: { fontCharacter: 'c', fontId: 'same' },
+                        _own: { fontCharacter: 'd', fontId: 'other', fontSize: '90%' },
+                    },
+                    fonts,
+                    file: '_default',
+                    fileExtensions: { b: '_other', c: '_same', d: '_own' },
+                },
+                colorKind: 'dark',
+                languages: [],
+                resolveResource,
+            }).iconDefinitions;
+        const font = (id: string, size?: string) => ({ id, src: [{ path: `./${id}.woff` }], size });
+
+        const unsized = build([font('main'), font('other', '26px'), font('same', '150%')]);
+        expect(unsized._default.fontSize).toBe('150%');
+        expect(unsized._other.fontSize).toBe('200%');
+        expect(unsized._same.fontSize).toBe('150%');
+        expect(unsized._own.fontSize).toBe('90%');
+
+        const pixels = build([font('main', '13px'), font('other', '13px')]);
+        expect(pixels._default.fontSize).toBe('100%');
+        expect(pixels._other.fontSize).toBe('100%');
     });
 
     it('applies light overrides only for light color themes', () => {

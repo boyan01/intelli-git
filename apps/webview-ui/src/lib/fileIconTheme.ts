@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react';
 import type { FileIconFont, FileIconTheme } from '@shared/messages';
+import { hasFolderIcons } from './fileIconThemeResolver';
 import { rpc, rpcEvents } from './rpc_client';
 
 export type FileIconThemeState =
@@ -75,4 +76,13 @@ rpcEvents.fileIconThemeChange.subscribe(() => {
 
 export function useFileIconTheme(): FileIconThemeState {
     return useSyncExternalStore(subscribe, getSnapshot);
+}
+
+/**
+ * True when the active icon theme draws no folder icons (for example Seti). File trees then use the
+ * VS Code Explorer layout: 8px indentation and no empty twistie slot before file icons.
+ */
+export function useCompactFileTreeLayout(): boolean {
+    const themeState = useFileIconTheme();
+    return themeState.status === 'ready' && !hasFolderIcons(themeState.theme);
 }

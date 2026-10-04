@@ -114,6 +114,15 @@
     padding-left: 4px;
 }
 
+/* Rows without a twistie (hideTwistie) start directly at the indentation. */
+.leading:first-child {
+    margin-left: 0;
+}
+
+.label:first-child {
+    padding-left: 0;
+}
+
 .trailing {
     display: flex;
     align-items: center;

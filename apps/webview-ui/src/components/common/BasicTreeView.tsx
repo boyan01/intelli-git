@@ -38,6 +38,8 @@ export interface BasicTreeViewProps<T = unknown> {
     onFocusNodeChange?: (node: TreeNode<T>) => void;
     onFocusChange?: (focused: boolean) => void;
     renderIcon?: (node: TreeNode<T>, state: TreeNodeRenderState) => React.ReactNode;
+    /** Drops the empty twistie slot for matching leaf rows, like VS Code trees with hideTwistiesOfChildlessElements. */
+    hideTwistie?: (node: TreeNode<T>) => boolean;
     renderLabel?: (node: TreeNode<T>, state: TreeNodeRenderState) => React.ReactNode;
     renderTrailing?: (node: TreeNode<T>) => React.ReactNode;
     getNodeClassName?: (node: TreeNode<T>) => string | undefined;
@@ -92,6 +94,7 @@ interface TreeNodeItemProps<T> {
     onFocusNodeChange?: (node: TreeNode<T>) => void;
     onFocusChange?: (focused: boolean) => void;
     renderIcon?: (node: TreeNode<T>, state: TreeNodeRenderState) => React.ReactNode;
+    hideTwistie?: (node: TreeNode<T>) => boolean;
     renderLabel?: (node: TreeNode<T>, state: TreeNodeRenderState) => React.ReactNode;
     renderTrailing?: (node: TreeNode<T>) => React.ReactNode;
     getNodeClassName?: (node: TreeNode<T>) => string | undefined;
@@ -327,6 +330,7 @@ const TreeNodeItem = <T,>(props: TreeNodeItemProps<T>) => {
         onContextMenu,
         onFocusNodeChange,
         renderIcon,
+        hideTwistie,
         renderLabel,
         renderTrailing,
         getNodeClassName,
@@ -520,15 +524,17 @@ const TreeNodeItem = <T,>(props: TreeNodeItemProps<T>) => {
             }}
             {...(contextData ? { 'data-vscode-context': JSON.stringify(contextData) } : {})}
         >
-            <div
-                className={styles.twistie}
-                onClick={(e) => {
-                    e.stopPropagation();
-                    if (hasChildren) toggleNode(node.id);
-                }}
-            >
-                {hasChildren && <i className={`codicon codicon-chevron-${isExpanded ? 'down' : 'right'}`} />}
-            </div>
+            {!(isLeaf && hideTwistie?.(node)) && (
+                <div
+                    className={styles.twistie}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        if (hasChildren) toggleNode(node.id);
+                    }}
+                >
+                    {hasChildren && <i className={`codicon codicon-chevron-${isExpanded ? 'down' : 'right'}`} />}
+                </div>
+            )}
 
             {leadingContent && <div className={styles.leading}>{leadingContent}</div>}
 
@@ -567,6 +573,7 @@ function BasicTreeViewInner<T>(props: BasicTreeViewProps<T>, ref: React.Forwarde
         onFocusNodeChange,
         onFocusChange,
         renderIcon,
+        hideTwistie,
         renderLabel,
         renderTrailing,
         getNodeClassName,
@@ -1077,6 +1084,7 @@ function BasicTreeViewInner<T>(props: BasicTreeViewProps<T>, ref: React.Forwarde
                         onContextMenu={onContextMenu}
                         onFocusNodeChange={onFocusNodeChange}
                         renderIcon={renderIcon}
+                        hideTwistie={hideTwistie}
                         renderLabel={renderLabel}
                         renderTrailing={renderTrailing}
                         getNodeClassName={getNodeClassName}
@@ -1121,6 +1129,7 @@ function BasicTreeViewInner<T>(props: BasicTreeViewProps<T>, ref: React.Forwarde
                     onContextMenu={onContextMenu}
                     onFocusNodeChange={onFocusNodeChange}
                     renderIcon={renderIcon}
+                    hideTwistie={hideTwistie}
                     renderLabel={renderLabel}
                     renderTrailing={renderTrailing}
                     getNodeClassName={getNodeClassName}

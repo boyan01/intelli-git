@@ -18,6 +18,7 @@ import { useTranslation } from 'react-i18next';
 import { BasicTreeView } from '../common/BasicTreeView';
 import type { TreeNode, BasicTreeViewRef, TreeNodeRenderState } from '../common/BasicTreeView';
 import { FileIcon, FolderIcon } from '../common/FileIcon';
+import { useCompactFileTreeLayout } from '@/lib/fileIconTheme';
 import { emitRefresh, rpc } from '@/lib/rpc_client';
 import { logger } from '@/utils/logger';
 import styles from '../file-tree/BaseFileTree.module.css';
@@ -55,6 +56,8 @@ interface FileNodeData {
     repository?: RepositoryInfo;
     workspaceRoot?: string;
     path: string;
+    /** Repository-relative folder path for folder nodes. */
+    folderPath?: string;
     isFile: boolean;
     isRepositoryRoot?: boolean;
     hunkIds?: string[];
@@ -81,6 +84,10 @@ const getDirPath = (fullPath: string): string => {
     const lastSlash = fullPath.lastIndexOf('/');
     return lastSlash > 0 ? fullPath.substring(0, lastSlash) : '';
 };
+
+// Include the repository folder so top-level items see it as their parent folder, as in the Explorer.
+const getIconPath = (repoPath: string | undefined, relativePath: string): string =>
+    repoPath ? `${repoPath.replace(/[\\/]+$/, '')}/${relativePath}` : relativePath;
 
 const getStatusColor = (status?: string) => {
     if (status === 'C' || status === 'U') return 'var(--vscode-gitDecoration-conflictingResourceForeground)';
@@ -124,6 +131,7 @@ const buildTree = (
                         repository,
                         workspaceRoot,
                         path: file.path,
+                        folderPath: isLast ? undefined : currentPath,
                         isFile: isLast,
                         status: isLast ? file.status : undefined,
                         staged: isLast ? file.staged : undefined,
@@ -516,6 +524,8 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
             [changelistState, t]
         );
 
+        const compactLayout = useCompactFileTreeLayout();
+
         const renderLabel = useCallback(
             (node: TreeNode<FileNodeData>, { expanded }: TreeNodeRenderState) => {
                 const status = node.data?.status;
@@ -609,7 +619,12 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
 
                     return (
                         <div className={styles.fileItemContent} data-drag-label="true">
-                            <FileIcon name={node.label} className={styles.fileIconSvg} fallbackColor={statusColor} />
+                            <FileIcon
+                                path={getIconPath(node.data.repoPath, node.data.path)}
+                                className={styles.fileIconSvg}
+                                fallbackColor={statusColor}
+                                labelColor={isDeleted ? undefined : statusColor}
+                            />
                             <span
                                 className={`${styles.name} ${statusClass}`}
                                 style={isDeleted ? undefined : { color: statusColor }}
@@ -642,7 +657,7 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
                 return (
                     <div className={styles.fileItemContent}>
                         <FolderIcon
-                            name={node.label}
+                            path={getIconPath(node.data?.repoPath, node.data?.folderPath ?? node.label)}
                             expanded={expanded}
                             className={styles.fileIconSvg}
                             fallbackClassName={styles.icon}
@@ -928,7 +943,8 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
                 renderTrailing={renderTrailing}
                 getContextData={getContextData}
                 getNodeClassName={(node) => (node.data?.showInDragMode ? 'dropOnlyGroup' : undefined)}
-                indent={16}
+                indent={compactLayout ? 8 : 16}
+                hideTwistie={compactLayout ? (node) => Boolean(node.data?.isFile) : undefined}
                 baseIndent={8}
                 isDraggable={isDraggable}
                 isDropTarget={isDropTarget}

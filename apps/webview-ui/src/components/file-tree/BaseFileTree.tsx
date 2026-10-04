@@ -1,6 +1,7 @@
 import React, { useMemo, useCallback } from 'react';
 import type { FileStatus } from '@shared/messages';
 import { FileIcon, FolderIcon } from '../common/FileIcon';
+import { useCompactFileTreeLayout } from '@/lib/fileIconTheme';
 import styles from './BaseFileTree.module.css';
 import { BasicTreeView } from '../common/BasicTreeView';
 import type { TreeNode, BasicTreeViewRef, TreeNodeRenderState } from '../common/BasicTreeView';
@@ -294,6 +295,8 @@ export const BaseFileTree = React.forwardRef<BaseFileTreeRef, BaseFileTreeProps>
             return null;
         }, []);
 
+        const compactLayout = useCompactFileTreeLayout();
+
         const renderLabel = useCallback(
             (node: TreeNode<FileNodeData>, { expanded }: TreeNodeRenderState) => {
                 const isFile = node.data?.isFile;
@@ -329,7 +332,11 @@ export const BaseFileTree = React.forwardRef<BaseFileTreeRef, BaseFileTreeProps>
                                         style={{ color: statusColor }}
                                     ></span>
                                 ) : (
-                                    <FileIcon name={node.label} className={styles.fileIconSvg} />
+                                    <FileIcon
+                                        path={node.data?.displayPath || node.data?.path || node.label}
+                                        className={styles.fileIconSvg}
+                                        labelColor={isDeleted ? undefined : statusColor}
+                                    />
                                 )}
 
                                 <span
@@ -350,7 +357,7 @@ export const BaseFileTree = React.forwardRef<BaseFileTreeRef, BaseFileTreeProps>
                         ) : (
                             <>
                                 <FolderIcon
-                                    name={node.label}
+                                    path={node.data?.displayPath || node.data?.path || node.label}
                                     expanded={expanded}
                                     className={styles.fileIconSvg}
                                     fallbackClassName={styles.icon}
@@ -394,7 +401,8 @@ export const BaseFileTree = React.forwardRef<BaseFileTreeRef, BaseFileTreeProps>
                 renderLabel={renderLabel}
                 renderTrailing={renderTrailing}
                 getContextData={getContextData}
-                indent={16}
+                indent={compactLayout ? 8 : 16}
+                hideTwistie={compactLayout ? (node) => Boolean(node.data?.isFile) : undefined}
                 baseIndent={8}
                 stickyHeaders={stickyHeaders}
                 isStickyHeader={isStickyHeader}

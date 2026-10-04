@@ -1,4 +1,4 @@
-import type { FileIconDefinition, FileIconFont, FileIconTheme } from '@shared/messages';
+import type { FileIconDefinition, FileIconFont, FileIconLanguagePattern, FileIconTheme } from '@shared/messages';
 
 export type IconThemeColorKind = 'light' | 'dark' | 'highContrast';
 
@@ -6,7 +6,10 @@ export interface LanguageContribution {
     id: string;
     extensions?: string[];
     filenames?: string[];
+    filenamePatterns?: string[];
 }
+
+const DEFAULT_FONT_SIZE = '150%';
 
 interface RawIconDefinition {
     iconPath?: unknown;
@@ -38,6 +41,7 @@ interface RawAssociations {
 interface RawIconTheme extends RawAssociations {
     iconDefinitions?: unknown;
     fonts?: unknown;
+    usesCurrentColor?: unknown;
     light?: unknown;
     highContrast?: unknown;
 }
@@ -61,6 +65,62 @@ function asString(value: unknown): string | undefined {
 
 function normalizeExtensionKey(key: string): string {
     return key.replace(/^\.+/, '').toLowerCase();
+}
+
+/** Normalizes an extension key that may be qualified by a parent folder, such as "system/ini". */
+function normalizeQualifiedExtensionKey(key: string): string {
+    const separator = key.lastIndexOf('/');
+    if (separator === -1) {
+        return normalizeExtensionKey(key);
+    }
+    const extension = normalizeExtensionKey(key.slice(separator + 1));
+    return extension ? `${key.slice(0, separator).toLowerCase()}/${extension}` : '';
+}
+
+/** Converts pixel font sizes to percentages of the 13px tree font, matching VS Code. */
+function normalizeFontSize(size: string | undefined): string | undefined {
+    if (size?.endsWith('px')) {
+        const pixels = Number.parseInt(size, 10);
+        return Number.isFinite(pixels) ? `${Math.round((pixels / 13) * 100)}%` : undefined;
+    }
+    return size;
+}
+
+function withJsoncAlias(languageIds: unknown): unknown {
+    // VS Code reuses the JSON icon for JSON with Comments when a theme does not define one.
+    if (isRecord(languageIds) && languageIds.jsonc === undefined && languageIds.json !== undefined) {
+        return { ...languageIds, jsonc: languageIds.json };
+    }
+    return languageIds;
+}
+
+function buildLanguageTables(
+    languages: LanguageContribution[]
+): Pick<FileIconTheme, 'languageFileNames' | 'languageExtensions' | 'languageFilenamePatterns'> {
+    const languageFileNames: Record<string, string> = {};
+    const languageExtensions: Record<string, string> = {};
+    const languageFilenamePatterns: FileIconLanguagePattern[] = [];
+    // Later registrations override earlier ones, as in VS Code's language association lookup.
+    for (const language of languages) {
+        for (const fileName of language.filenames ?? []) {
+            const key = typeof fileName === 'string' ? fileName.toLowerCase() : '';
+            if (key) {
+                languageFileNames[key] = language.id;
+            }
+        }
+        for (const extension of language.extensions ?? []) {
+            const key = typeof extension === 'string' ? normalizeExtensionKey(extension) : '';
+            if (key) {
+                languageExtensions[key] = language.id;
+            }
+        }
+        for (const pattern of language.filenamePatterns ?? []) {
+            if (typeof pattern === 'string' && pattern) {
+                languageFilenamePatterns.unshift({ pattern: pattern.toLowerCase(), languageId: language.id });
+            }
+        }
+    }
+    return { languageFileNames, languageExtensions, languageFilenamePatterns };
 }
 
 function mergeAssociationMap(
@@ -172,12 +232,14 @@ export function buildFileIconTheme(options: BuildFileIconThemeOptions): FileIcon
         mergeAssociationMap(folderNames, associations.folderNames, (key) => key.toLowerCase());
         mergeAssociationMap(folderNamesExpanded, associations.folderNamesExpanded, (key) => key.toLowerCase());
         mergeAssociationMap(fileNames, associations.fileNames, (key) => key.toLowerCase());
-        mergeAssociationMap(fileExtensions, associations.fileExtensions, normalizeExtensionKey);
-        mergeAssociationMap(languageIds, associations.languageIds, (key) => key);
+        mergeAssociationMap(fileExtensions, associations.fileExtensions, normalizeQualifiedExtensionKey);
+        mergeAssociationMap(languageIds, withJsoncAlias(associations.languageIds), (key) => key);
     }
 
     const fontsById = new Map<string, { font: FileIconFont; size?: string }>();
     const fonts: FileIconFont[] = [];
+    // VS Code applies the first font's size (default 150%) to every icon; other fonts only override it when different.
+    let defaultFontSize = DEFAULT_FONT_SIZE;
     if (Array.isArray(raw.fonts)) {
         for (const rawFont of raw.fonts as RawFont[]) {
             const fontId = isRecord(rawFont) ? asString(rawFont.id) : undefined;
@@ -201,8 +263,12 @@ export function buildFileIconTheme(options: BuildFileIconThemeOptions): FileIcon
                 weight: asString(rawFont.weight),
                 style: asString(rawFont.style),
             };
+            const size = normalizeFontSize(asString(rawFont.size));
+            if (fonts.length === 0) {
+                defaultFontSize = size ?? DEFAULT_FONT_SIZE;
+            }
             fonts.push(font);
-            fontsById.set(fontId, { font, size: asString(rawFont.size) });
+            fontsById.set(fontId, { font, size: size !== defaultFontSize ? size : undefined });
         }
     }
     const defaultFont = fontsById.values().next().value;
@@ -233,7 +299,7 @@ export function buildFileIconTheme(options: BuildFileIconThemeOptions): FileIcon
             iconDefinitions[iconId] = {
                 fontCharacter: decodeFontCharacter(fontCharacter),
                 fontColor: asString(definition.fontColor),
-                fontSize: asString(definition.fontSize) ?? font?.size,
+                fontSize: asString(definition.fontSize) ?? font?.size ?? defaultFontSize,
                 fontFamily: font?.font.family,
             };
             return true;
@@ -245,36 +311,22 @@ export function buildFileIconTheme(options: BuildFileIconThemeOptions): FileIcon
         Object.fromEntries(Object.entries(associations).filter(([, iconId]) => resolveDefinition(iconId)));
 
     const resolvedLanguageIds = keepResolvable(languageIds);
-    const languageFileNames: Record<string, string> = {};
-    const languageExtensions: Record<string, string> = {};
-    for (const language of languages) {
-        if (!resolvedLanguageIds[language.id]) {
-            continue;
-        }
-        for (const fileName of language.filenames ?? []) {
-            const key = typeof fileName === 'string' ? fileName.toLowerCase() : '';
-            if (key && !languageFileNames[key]) {
-                languageFileNames[key] = language.id;
-            }
-        }
-        for (const extension of language.extensions ?? []) {
-            const key = typeof extension === 'string' ? normalizeExtensionKey(extension) : '';
-            if (key && !languageExtensions[key]) {
-                languageExtensions[key] = language.id;
-            }
-        }
-    }
+    // Detection must consider every language: a later language without an icon still claims its files.
+    const languageTables =
+        Object.keys(resolvedLanguageIds).length > 0
+            ? buildLanguageTables(languages)
+            : { languageFileNames: {}, languageExtensions: {}, languageFilenamePatterns: [] };
 
     return {
         id,
         iconDefinitions,
         fonts,
+        ...(raw.usesCurrentColor === true ? { usesCurrentColor: true } : {}),
         file: resolveDefinition(file) ? file : undefined,
         fileNames: keepResolvable(fileNames),
         fileExtensions: keepResolvable(fileExtensions),
         languageIds: resolvedLanguageIds,
-        languageFileNames,
-        languageExtensions,
+        ...languageTables,
         folder: resolveDefinition(folder) ? folder : undefined,
         folderExpanded: resolveDefinition(folderExpanded) ? folderExpanded : undefined,
         folderNames: keepResolvable(folderNames),

@@ -118,7 +118,7 @@ export class FileIconThemeService implements vscode.Disposable {
                 return [];
             }
             return languages.flatMap((language: unknown) => {
-                const { id, extensions, filenames } = (language ?? {}) as Record<string, unknown>;
+                const { id, extensions, filenames, filenamePatterns } = (language ?? {}) as Record<string, unknown>;
                 if (typeof id !== 'string') {
                     return [];
                 }
@@ -127,6 +127,7 @@ export class FileIconThemeService implements vscode.Disposable {
                         id,
                         extensions: Array.isArray(extensions) ? extensions : undefined,
                         filenames: Array.isArray(filenames) ? filenames : undefined,
+                        filenamePatterns: Array.isArray(filenamePatterns) ? filenamePatterns : undefined,
                     },
                 ];
             });

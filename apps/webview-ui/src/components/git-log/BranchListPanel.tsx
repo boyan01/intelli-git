@@ -346,7 +346,8 @@ export const BranchListPanel: React.FC<BranchListPanelProps> = ({ data, isLoadin
         if (node.icon !== 'folder') {
             return undefined;
         }
-        return <FolderIcon name={node.label} expanded={expanded} />;
+        // Branch groups are not file system folders; resolve them by name only.
+        return <FolderIcon path={node.label.split('/').pop() ?? node.label} expanded={expanded} />;
     }, []);
 
     // Render trailing (ahead/behind indicator)

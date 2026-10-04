@@ -14,6 +14,19 @@
     pointer-events: none;
 }
 
+.mask {
+    width: 16px;
+    height: 16px;
+    background-color: currentColor;
+    mask-repeat: no-repeat;
+    mask-position: left center;
+    mask-size: 16px;
+    -webkit-mask-repeat: no-repeat;
+    -webkit-mask-position: left center;
+    -webkit-mask-size: 16px;
+    pointer-events: none;
+}
+
 .glyph {
     line-height: 1;
     -webkit-font-smoothing: antialiased;
