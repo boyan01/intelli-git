@@ -22,6 +22,7 @@ import type {
     CommitMessageGenerationRequest,
     CommitMessageGenerationResult,
     ConflictResolverOpenRequest,
+    FileIconTheme,
     PushFailedResult,
     PushFailureCode,
     PushRequest,
@@ -228,6 +229,7 @@ export interface ExtensionRpcHandlerOptions {
     consumePendingGitLogReveal?: () => GitLogRevealRequest | undefined;
     openConflictResolver?: (file: ConflictResolverOpenRequest) => void;
     updateConflictResolverTitle?: (file: RepositoryFileReference) => void;
+    getFileIconTheme?: () => Promise<FileIconTheme | null>;
 }
 
 /**
@@ -242,6 +244,7 @@ export class ExtensionRpcHandler {
     private onChangelistFocusChange?: (focused: boolean) => void;
     private openConflictResolverPanel?: (file: ConflictResolverOpenRequest) => void;
     private updateConflictResolverPanelTitle?: (file: RepositoryFileReference) => void;
+    private fileIconThemeProvider?: () => Promise<FileIconTheme | null>;
     private gitReadRpcHandler: GitReadRpcHandler;
     private changelistRpcHandler: ChangelistRpcHandler;
     private _lastRebaseStatus?: string;
@@ -254,6 +257,7 @@ export class ExtensionRpcHandler {
         this.onChangelistFocusChange = options.onChangelistFocusChange;
         this.openConflictResolverPanel = options.openConflictResolver;
         this.updateConflictResolverPanelTitle = options.updateConflictResolverTitle;
+        this.fileIconThemeProvider = options.getFileIconTheme;
         this.gitReadRpcHandler = new GitReadRpcHandler(this.repositoryManager, options.consumePendingGitLogReveal);
         this.changelistRpcHandler = new ChangelistRpcHandler(
             (repoPath) => this.getChangelistOperationsForRepo(repoPath),
@@ -718,6 +722,7 @@ export class ExtensionRpcHandler {
             getCurrentUser: this.gitReadRpcHandler.getCurrentUser,
             getUnpushedCommits: this.gitReadRpcHandler.getUnpushedCommits,
             getWorkspaceRoot: this.gitReadRpcHandler.getWorkspaceRoot,
+            getFileIconTheme: this.getFileIconTheme,
             getLastCommitInfo: this.gitReadRpcHandler.getLastCommitInfo,
             showErrorMessage: this.showErrorMessage,
             markHunkInactive: this.changelistRpcHandler.markHunkInactive,
@@ -1862,6 +1867,10 @@ export class ExtensionRpcHandler {
 
     openCommitPromptSettings = async (): Promise<void> => {
         await vscode.commands.executeCommand('intelli-git.ai.openCommitPromptSettings');
+    };
+
+    getFileIconTheme = async (): Promise<FileIconTheme | null> => {
+        return this.fileIconThemeProvider ? this.fileIconThemeProvider() : null;
     };
 
     showErrorMessage = async (message: string): Promise<void> => {

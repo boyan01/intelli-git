@@ -30,14 +30,14 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    font-size: 12px;
+    font-size: var(--ig-font-size-sm);
 }
 
 .stashItemBranch {
     display: flex;
     align-items: center;
     gap: 4px;
-    font-size: 11px;
+    font-size: var(--ig-font-size-xs);
     color: var(--vscode-descriptionForeground);
     flex-shrink: 0;
 }
@@ -75,7 +75,7 @@
 }
 
 .previewTitle {
-    font-size: 11px;
+    font-size: var(--ig-font-size-xs);
     font-weight: 500;
     text-transform: uppercase;
     color: var(--vscode-descriptionForeground);
@@ -95,7 +95,7 @@
     padding: 20px;
     text-align: center;
     opacity: 0.6;
-    font-size: 12px;
+    font-size: var(--ig-font-size-sm);
 }
 
 .iconBtn {

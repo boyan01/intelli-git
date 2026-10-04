@@ -64,7 +64,7 @@
 }
 
 .commitMessage {
-    font-size: 13px;
+    font-size: var(--ig-font-size);
     font-weight: 500;
     color: var(--vscode-foreground);
     overflow: hidden;
@@ -74,7 +74,7 @@
 }
 
 .commitDate {
-    font-size: 11px;
+    font-size: var(--ig-font-size-xs);
     color: var(--vscode-descriptionForeground);
     white-space: nowrap;
     flex-shrink: 0;
@@ -84,7 +84,7 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    font-size: 11px;
+    font-size: var(--ig-font-size-xs);
     color: var(--vscode-descriptionForeground);
     margin-top: 2px;
 }
@@ -120,13 +120,12 @@
 
 .commitExtraMessage {
     white-space: pre-wrap;
-    font-family: var(--vscode-editor-font-family);
     margin-bottom: 8px;
     color: var(--vscode-foreground);
 }
 
 .commitBody {
-    font-size: 11px;
+    font-size: var(--ig-font-size-xs);
     line-height: 1.4;
     opacity: 0.9;
     white-space: pre-wrap;
@@ -140,8 +139,8 @@
     margin-bottom: 0;
     white-space: pre-wrap;
     word-break: break-word;
-    font-family: var(--vscode-editor-font-family);
-    font-size: 11px;
+    font-family: var(--ig-code-font-family);
+    font-size: var(--ig-code-font-size-sm);
     line-height: 1.4;
     color: var(--vscode-foreground);
     opacity: 0.8;
@@ -151,7 +150,7 @@
     display: flex;
     flex-wrap: wrap;
     gap: 12px;
-    font-size: 11px;
+    font-size: var(--ig-font-size-xs);
     color: var(--vscode-descriptionForeground);
 }
 
@@ -175,7 +174,7 @@
 }
 
 .filesCount {
-    font-size: 11px;
+    font-size: var(--ig-font-size-xs);
     color: var(--vscode-descriptionForeground);
     font-weight: 500;
 }

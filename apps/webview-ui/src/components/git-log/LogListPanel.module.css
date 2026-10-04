@@ -5,7 +5,7 @@
     overflow: hidden;
     background-color: var(--vscode-sideBar-background);
     color: var(--vscode-editor-foreground);
-    font-size: 13px;
+    font-size: var(--ig-font-size);
     position: relative;
 }
 
@@ -45,7 +45,7 @@
 .emptyTitle {
     composes: emptyTitle from '../common/ControlStyles.module.css';
     max-width: 420px;
-    font-size: 14px;
+    font-size: var(--ig-font-size-lg);
     line-height: 20px;
 }
 
@@ -68,7 +68,7 @@
     padding: 4px 10px;
     box-sizing: border-box;
     font: inherit;
-    font-size: 12px;
+    font-size: var(--ig-font-size-sm);
     line-height: 18px;
 }
 
@@ -103,8 +103,7 @@
     max-height: 51px;
     overflow: hidden;
     color: var(--vscode-descriptionForeground);
-    font-family: var(--vscode-editor-font-family);
-    font-size: 11px;
+    font-size: var(--ig-font-size-xs);
     line-height: 17px;
     white-space: pre-wrap;
     word-break: break-word;
@@ -118,7 +117,7 @@
     align-items: center;
     flex-wrap: wrap;
     color: var(--vscode-descriptionForeground);
-    font-size: 11px;
+    font-size: var(--ig-font-size-xs);
     line-height: 17px;
 }
 
@@ -138,7 +137,7 @@
 
 .inlineStats {
     color: var(--vscode-gitDecoration-addedResourceForeground);
-    font-family: var(--vscode-editor-font-family);
+    font-family: var(--ig-code-font-family);
 }
 
 .inlineFilesSummary {
@@ -147,7 +146,7 @@
     gap: 5px;
     overflow: hidden;
     color: var(--vscode-descriptionForeground);
-    font-size: 11px;
+    font-size: var(--ig-font-size-xs);
     line-height: 18px;
 }
 
@@ -175,7 +174,7 @@
     justify-content: center;
     gap: 8px;
     color: var(--vscode-descriptionForeground);
-    font-size: 11px;
+    font-size: var(--ig-font-size-xs);
     line-height: 34px;
 }
 
@@ -253,7 +252,8 @@
 }
 
 .hash {
-    font-family: monospace;
+    font-family: var(--ig-code-font-family);
+    font-size: var(--ig-code-font-size);
     color: var(--vscode-textPreformat-foreground);
     margin-right: 8px;
     min-width: 60px;
@@ -289,7 +289,7 @@
     color: var(--vscode-descriptionForeground);
     min-width: 80px;
     text-align: right;
-    font-size: 11px;
+    font-size: var(--ig-font-size-xs);
 }
 
 .blink {

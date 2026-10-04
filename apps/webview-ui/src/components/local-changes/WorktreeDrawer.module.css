@@ -33,7 +33,7 @@
     align-items: center;
     gap: 6px;
     color: var(--vscode-sideBarSectionHeader-foreground, var(--vscode-descriptionForeground));
-    font-size: 10px;
+    font-size: var(--ig-font-size-2xs);
     font-weight: 600;
     letter-spacing: 0;
     text-transform: uppercase;
@@ -126,7 +126,7 @@
 .path {
     flex: 1 1 auto;
     color: var(--vscode-descriptionForeground);
-    font-size: 11px;
+    font-size: var(--ig-font-size-xs);
     line-height: 22px;
 }
 
@@ -149,5 +149,5 @@
     gap: 6px;
     padding: 0 8px;
     color: var(--vscode-descriptionForeground);
-    font-size: 11px;
+    font-size: var(--ig-font-size-xs);
 }

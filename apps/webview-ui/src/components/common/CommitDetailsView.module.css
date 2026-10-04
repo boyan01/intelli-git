@@ -3,7 +3,7 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    font-size: 13px;
+    font-size: var(--ig-font-size);
     min-width: 0;
 }
 
@@ -59,7 +59,7 @@
 }
 
 .filesCount {
-    font-size: 11px;
+    font-size: var(--ig-font-size-xs);
     color: var(--vscode-descriptionForeground);
 }
 
@@ -81,19 +81,18 @@
 
 .detailMessage {
     white-space: pre-wrap;
-    font-family: var(--vscode-editor-font-family);
     margin-bottom: 8px;
     color: var(--vscode-foreground);
 }
 
 .subject {
-    font-size: 13px;
+    font-size: var(--ig-font-size);
     font-weight: 600;
     line-height: 1.4;
 }
 
 .body {
-    font-size: 11px;
+    font-size: var(--ig-font-size-xs);
     margin-top: 4px;
     line-height: 1.4;
     opacity: 0.9;
@@ -103,7 +102,7 @@
     display: flex;
     flex-direction: column;
     gap: 4px;
-    font-size: 12px;
+    font-size: var(--ig-font-size-sm);
     color: var(--vscode-descriptionForeground);
 }
 
@@ -135,9 +134,9 @@
 }
 
 .metaHash {
-    font-family: var(--vscode-editor-font-family);
+    font-family: var(--ig-code-font-family);
     opacity: 0.8;
-    font-size: 11px;
+    font-size: var(--ig-code-font-size);
 }
 
 .metaLabel {
