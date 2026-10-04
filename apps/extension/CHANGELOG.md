@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.0.11
+
+- Follow the active VS Code file icon theme for file and folder icons in Commit and Git Log webviews.
+- Use VS Code UI fonts for webview controls and commit messages, and editor fonts for commit hashes and code.
+- Use compact file tree spacing for icon themes without folder icons.
+
 ## 0.0.10
 
 - Open-sourced Intelli Git, with source code and contribution guidance in the Intelli Git repository.
