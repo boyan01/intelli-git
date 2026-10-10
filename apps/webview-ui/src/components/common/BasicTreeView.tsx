@@ -1,8 +1,10 @@
 import React, { useState, useCallback, useRef, useMemo, useLayoutEffect, useEffect } from 'react';
 import styles from './BasicTreeView.module.css';
+import { flattenVisibleNodes, getStickyHeaderStates, TREE_ROW_HEIGHT as ROW_HEIGHT } from './treeViewport';
+import type { FlatTreeNode, StickyHeaderState } from './treeViewport';
 
-const ROW_HEIGHT = 22;
 const OVERSCAN_ROWS = 8;
+const MIN_SCROLLABLE_ROW_CONTENT_WIDTH = 200;
 const DRAG_AUTO_SCROLL_EDGE = 72;
 const DRAG_AUTO_SCROLL_MAX_SPEED = 18;
 
@@ -17,6 +19,7 @@ export interface TreeNode<T = unknown> {
     icon?: string;
     children?: TreeNode<T>[];
     data?: T;
+    showOnlyOnDrag?: boolean;
 }
 
 export interface TreeNodeRenderState {
@@ -29,6 +32,8 @@ export interface BasicTreeViewProps<T = unknown> {
     selectedId?: string;
     defaultExpandAll?: boolean;
     stickyHeaders?: boolean;
+    horizontalScroll?: boolean;
+    indentGuides?: boolean;
     isStickyHeader?: (node: TreeNode<T>) => boolean;
     onToggle?: (id: string, expanded: boolean) => void;
     onSelect?: (node: TreeNode<T>) => void;
@@ -81,6 +86,8 @@ function getAllExpandableIds<T>(nodes: TreeNode<T>[]): Set<string> {
 interface TreeNodeItemProps<T> {
     node: TreeNode<T>;
     depth: number;
+    activeIndentDepth: number;
+    continuesGuide: boolean;
     isStickyClone?: boolean;
     expandedIds: Set<string>;
     selectedId?: string;
@@ -123,140 +130,14 @@ interface TreeNodeItemProps<T> {
     setNodeElement: (nodeId: string, element: HTMLDivElement | null) => void;
 }
 
-interface FlatTreeNode<T> {
-    node: TreeNode<T>;
-    depth: number;
-    ancestorIds: string[];
-}
-
-interface StickyHeaderState<T> {
-    item: FlatTreeNode<T>;
-    offset: number;
-}
-
-function flattenVisibleNodes<T>(nodes: TreeNode<T>[], expandedIds: Set<string>): FlatTreeNode<T>[] {
-    const result: FlatTreeNode<T>[] = [];
-    const stack = nodes.map((node) => ({ node, depth: 0, ancestorIds: [] as string[] })).reverse();
-
-    while (stack.length > 0) {
-        const item = stack.pop()!;
-        result.push(item);
-
-        const children = item.node.children;
-        if (children && children.length > 0 && expandedIds.has(item.node.id)) {
-            for (let i = children.length - 1; i >= 0; i--) {
-                stack.push({
-                    node: children[i],
-                    depth: item.depth + 1,
-                    ancestorIds: [...item.ancestorIds, item.node.id],
-                });
-            }
-        }
-    }
-
-    return result;
-}
-
-function getStickyHeaderStates<T>(
-    flatNodes: FlatTreeNode<T>[],
-    flatNodeIndexById: Map<string, number>,
-    visibleTop: number,
-    stickyHeaders: boolean,
-    isStickyHeader?: (node: TreeNode<T>) => boolean
-): StickyHeaderState<T>[] {
-    if (!stickyHeaders || flatNodes.length === 0) {
-        return [];
-    }
-
-    const canStick = (node: TreeNode<T>) => {
-        if (!node.children || node.children.length === 0) {
-            return false;
-        }
-        return isStickyHeader ? isStickyHeader(node) : true;
-    };
-
-    const getStickyDepth = (item: FlatTreeNode<T>) => {
-        let depth = 0;
-        for (const ancId of item.ancestorIds) {
-            const ancIndex = flatNodeIndexById.get(ancId);
-            if (ancIndex !== undefined && canStick(flatNodes[ancIndex].node)) {
-                depth++;
-            }
-        }
-        return depth;
-    };
-
-    const topIndex = Math.min(flatNodes.length - 1, Math.max(0, Math.floor(visibleTop / ROW_HEIGHT)));
-
-    let lastActiveIndex = topIndex;
-    while (lastActiveIndex + 1 < flatNodes.length) {
-        const nextNode = flatNodes[lastActiveIndex + 1];
-        const stickyDepth = getStickyDepth(nextNode);
-        const naturalPos = (lastActiveIndex + 1) * ROW_HEIGHT - visibleTop;
-        const stickyPos = stickyDepth * ROW_HEIGHT;
-        if (naturalPos <= stickyPos) {
-            lastActiveIndex++;
-        } else {
-            break;
-        }
-    }
-
-    const lastActiveNode = flatNodes[lastActiveIndex];
-    if (!lastActiveNode) return [];
-
-    const candidateIds = [
-        ...lastActiveNode.ancestorIds,
-        ...(canStick(lastActiveNode.node) ? [lastActiveNode.node.id] : []),
-    ];
-
-    const result: StickyHeaderState<T>[] = [];
-
-    for (const candidateId of candidateIds) {
-        const candidateIndex = flatNodeIndexById.get(candidateId);
-        if (candidateIndex === undefined) {
-            continue;
-        }
-        const candidate = flatNodes[candidateIndex];
-        if (!canStick(candidate.node)) {
-            continue;
-        }
-
-        let termIndex = flatNodes.length;
-        for (let i = candidateIndex + 1; i < flatNodes.length; i++) {
-            if (flatNodes[i].depth <= candidate.depth) {
-                termIndex = i;
-                break;
-            }
-        }
-
-        const stickyDepth = getStickyDepth(candidate);
-        const targetOffset = stickyDepth * ROW_HEIGHT;
-        const termDist = termIndex * ROW_HEIGHT - visibleTop;
-        const offset = Math.min(targetOffset, termDist - ROW_HEIGHT);
-
-        result.push({
-            item: candidate,
-            offset,
-        });
-    }
-
-    return result;
-}
-
-function applyStickyHeaderTransforms<T>(
-    elements: Map<string, HTMLDivElement>,
-    states: StickyHeaderState<T>[],
-    hideMissing = true
-) {
+function applyStickyHeaderTransforms<T>(elements: Map<string, HTMLDivElement>, states: StickyHeaderState<T>[]) {
     const stateById = new Map(states.map((state) => [state.item.node.id, state]));
     elements.forEach((element, id) => {
         const state = stateById.get(id);
+        element.style.visibility = state ? '' : 'hidden';
         if (state) {
             element.style.transform = `translateY(${state.offset}px)`;
             element.style.zIndex = `${100 - state.item.depth}`;
-        } else if (hideMissing) {
-            element.style.transform = 'translateY(-100%)';
-            element.style.zIndex = '1';
         }
     });
 }
@@ -318,6 +199,8 @@ const TreeNodeItem = <T,>(props: TreeNodeItemProps<T>) => {
     const {
         node,
         depth,
+        activeIndentDepth,
+        continuesGuide,
         isStickyClone = false,
         expandedIds,
         selectedId,
@@ -403,10 +286,8 @@ const TreeNodeItem = <T,>(props: TreeNodeItemProps<T>) => {
             e.dataTransfer.setDragImage(ghost, -10, -10);
         }
 
-        const root = e.currentTarget.closest('[data-basic-tree-root="true"]');
         window.setTimeout(() => {
             if (draggedNodeRef.current) {
-                root?.classList.add(styles.dragging);
                 startDragAutoScrollTracking();
             }
         }, 0);
@@ -463,7 +344,6 @@ const TreeNodeItem = <T,>(props: TreeNodeItemProps<T>) => {
         }
         draggedNodeRef.current = null;
         stopDragAutoScrollTracking();
-        e.currentTarget.closest('[data-basic-tree-root="true"]')?.classList.remove(styles.dragging);
     };
 
     return (
@@ -483,18 +363,26 @@ const TreeNodeItem = <T,>(props: TreeNodeItemProps<T>) => {
             aria-setsize={isStickyClone ? undefined : ariaSetSize}
             aria-posinset={isStickyClone ? undefined : ariaPosInSet}
             tabIndex={isStickyClone ? undefined : focusedId === node.id ? 0 : -1}
-            style={{ paddingLeft: `${baseIndent + depth * indent}px` }}
+            style={
+                {
+                    paddingLeft: `${baseIndent + depth * indent}px`,
+                    '--tree-depth': depth,
+                    '--tree-guide-continuation-height': continuesGuide ? `${ROW_HEIGHT / 2}px` : '0px',
+                    '--tree-active-guide-offset': `${Math.max(0, activeIndentDepth) * indent}px`,
+                    '--tree-active-guide-opacity': activeIndentDepth >= 0 ? 1 : 0,
+                    '--tree-active-guide-height': activeIndentDepth === depth ? `${ROW_HEIGHT / 2}px` : '100%',
+                } as React.CSSProperties
+            }
             draggable={canDrag}
             onDragStart={handleDragStartWrapped}
             onDragOver={handleDragOver}
             onDragEnter={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
-            onDragEnd={(e) => {
+            onDragEnd={() => {
                 draggedNodeRef.current = null;
                 setDragOverId(null);
                 stopDragAutoScrollTracking();
-                e.currentTarget.closest('[data-basic-tree-root="true"]')?.classList.remove(styles.dragging);
             }}
             onClick={(e) => {
                 e.stopPropagation();
@@ -529,7 +417,12 @@ const TreeNodeItem = <T,>(props: TreeNodeItemProps<T>) => {
                     className={styles.twistie}
                     onClick={(e) => {
                         e.stopPropagation();
-                        if (hasChildren) toggleNode(node.id);
+                        if (hasChildren) {
+                            focusTree();
+                            setFocusedId(node.id);
+                            onFocusNodeChange?.(node);
+                            toggleNode(node.id);
+                        }
                     }}
                 >
                     {hasChildren && <i className={`codicon codicon-chevron-${isExpanded ? 'down' : 'right'}`} />}
@@ -564,6 +457,8 @@ function BasicTreeViewInner<T>(props: BasicTreeViewProps<T>, ref: React.Forwarde
         selectedId,
         defaultExpandAll = false,
         stickyHeaders = false,
+        horizontalScroll = false,
+        indentGuides = true,
         isStickyHeader,
         onToggle,
         onSelect,
@@ -596,7 +491,9 @@ function BasicTreeViewInner<T>(props: BasicTreeViewProps<T>, ref: React.Forwarde
     const nodeElementRefs = useRef(new Map<string, HTMLDivElement>());
     const dragGhostRef = useRef<HTMLDivElement>(null);
     const [focusedId, setFocusedId] = useState<string | null>(null);
+    const lastFocusedItemRef = useRef<FlatTreeNode<T> | undefined>(undefined);
     const [isTreeFocused, setIsTreeFocused] = useState(false);
+    const [isDragging, setIsDragging] = useState(false);
     const [dragOverId, setDragOverId] = useState<string | null>(null);
     const draggedNodeRef = useRef<TreeNode<T> | null>(null);
     const clearDragTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -607,10 +504,19 @@ function BasicTreeViewInner<T>(props: BasicTreeViewProps<T>, ref: React.Forwarde
         if (controlledExpandedIds) return controlledExpandedIds;
         return defaultExpandAll ? getAllExpandableIds(nodes) : new Set();
     });
-    const [visibleRange, setVisibleRange] = useState({ start: 0, end: 80, visibleTop: 0 });
+    const [visibleRange, setVisibleRange] = useState({ start: 0, end: 80, visibleTop: 0, viewportHeight: 0 });
 
     const expandedIds = controlledExpandedIds ?? internalExpandedIds;
-    const flatNodes = useMemo(() => flattenVisibleNodes(nodes, expandedIds), [nodes, expandedIds]);
+    const flatNodes = useMemo(
+        () => flattenVisibleNodes(nodes, expandedIds, isDragging),
+        [nodes, expandedIds, isDragging]
+    );
+    // Include offscreen rows so virtualization does not change the horizontal scroll range.
+    const scrollableMinWidth = useMemo(() => {
+        if (!horizontalScroll) return undefined;
+        const maxDepth = flatNodes.reduce((maximum, item) => Math.max(maximum, item.depth), 0);
+        return `max(100%, ${baseIndent + maxDepth * indent + MIN_SCROLLABLE_ROW_CONTENT_WIDTH}px)`;
+    }, [horizontalScroll, flatNodes, baseIndent, indent]);
     const totalHeight = flatNodes.length * ROW_HEIGHT;
     const rangeStart = Math.min(visibleRange.start, flatNodes.length);
     const rangeEnd = Math.min(Math.max(visibleRange.end, rangeStart), flatNodes.length);
@@ -622,11 +528,37 @@ function BasicTreeViewInner<T>(props: BasicTreeViewProps<T>, ref: React.Forwarde
         flatNodes.forEach((item, index) => result.set(item.node.id, index));
         return result;
     }, [flatNodes]);
+    const guideFocusIndex =
+        flatNodeIndexById.get((isTreeFocused ? focusedId : selectedId) ?? '') ?? flatNodeIndexById.get(focusedId ?? '');
+    const guideFocusItem = guideFocusIndex === undefined ? undefined : flatNodes[guideFocusIndex];
+    const activeGuideNodeId =
+        guideFocusItem && expandedIds.has(guideFocusItem.node.id) && guideFocusItem.node.children?.length
+            ? guideFocusItem.node.id
+            : guideFocusItem?.ancestorIds.at(-1);
+    const getIndentGuideProps = (item: FlatTreeNode<T>, index: number) => {
+        const previous = flatNodes[index - 1];
+        const continuesGuide =
+            !!previous &&
+            item.depth > 0 &&
+            previous.depth > item.depth &&
+            previous.ancestorIds[item.depth - 1] === item.ancestorIds[item.depth - 1];
+        const ancestorDepth = item.ancestorIds.indexOf(activeGuideNodeId ?? '');
+        return {
+            continuesGuide,
+            activeIndentDepth:
+                ancestorDepth >= 0
+                    ? ancestorDepth
+                    : continuesGuide && previous.ancestorIds[item.depth] === activeGuideNodeId
+                      ? item.depth
+                      : -1,
+        };
+    };
     const stickyHeaderStates = getStickyHeaderStates(
         flatNodes,
         flatNodeIndexById,
         visibleRange.visibleTop,
         stickyHeaders,
+        visibleRange.viewportHeight,
         isStickyHeader
     );
 
@@ -830,25 +762,37 @@ function BasicTreeViewInner<T>(props: BasicTreeViewProps<T>, ref: React.Forwarde
             flatNodeIndexById,
             visibleTop,
             stickyHeaders,
+            viewportHeight,
             isStickyHeader
         );
 
-        applyStickyHeaderTransforms(stickyHeaderRefs.current, nextStickyHeaderStates, false);
+        applyStickyHeaderTransforms(stickyHeaderRefs.current, nextStickyHeaderStates);
 
         setVisibleRange((prev) =>
-            prev.start === nextStart && prev.end === end && prev.visibleTop === visibleTop
+            prev.start === nextStart &&
+            prev.end === end &&
+            prev.visibleTop === visibleTop &&
+            prev.viewportHeight === viewportHeight
                 ? prev
-                : { start: nextStart, end, visibleTop }
+                : { start: nextStart, end, visibleTop, viewportHeight }
         );
     }, [flatNodeIndexById, flatNodes, isStickyHeader, stickyHeaders, totalHeight]);
 
     useEffect(() => {
-        if (focusedId && flatNodeIndexById.has(focusedId)) {
+        const focusedIndex = focusedId ? flatNodeIndexById.get(focusedId) : undefined;
+        if (focusedIndex !== undefined) {
+            lastFocusedItemRef.current = flatNodes[focusedIndex];
             return;
         }
 
+        const visibleAncestorId = lastFocusedItemRef.current?.ancestorIds
+            .slice()
+            .reverse()
+            .find((id) => flatNodeIndexById.has(id));
         const selectedIndex = selectedId ? flatNodeIndexById.get(selectedId) : undefined;
-        const fallbackItem = flatNodes[selectedIndex ?? 0];
+        const ancestorIndex = visibleAncestorId ? flatNodeIndexById.get(visibleAncestorId) : undefined;
+        const fallbackItem = flatNodes[ancestorIndex ?? selectedIndex ?? 0];
+        lastFocusedItemRef.current = fallbackItem;
         setFocusedId(fallbackItem?.node.id ?? null);
     }, [flatNodeIndexById, flatNodes, focusedId, selectedId]);
 
@@ -898,6 +842,7 @@ function BasicTreeViewInner<T>(props: BasicTreeViewProps<T>, ref: React.Forwarde
     }, []);
 
     const stopDragAutoScrollTracking = useCallback(() => {
+        setIsDragging(false);
         stopDragAutoScroll();
         if (dragAutoScrollListenerRef.current) {
             document.removeEventListener('dragover', dragAutoScrollListenerRef.current, true);
@@ -953,6 +898,7 @@ function BasicTreeViewInner<T>(props: BasicTreeViewProps<T>, ref: React.Forwarde
     );
 
     const startDragAutoScrollTracking = useCallback(() => {
+        setIsDragging(true);
         if (dragAutoScrollListenerRef.current) {
             return;
         }
@@ -983,15 +929,17 @@ function BasicTreeViewInner<T>(props: BasicTreeViewProps<T>, ref: React.Forwarde
             const rootRect = latestRoot.getBoundingClientRect();
             const viewportTop = scrollParent instanceof Window ? 0 : scrollParent.getBoundingClientRect().top;
             const visibleTop = Math.max(0, viewportTop - rootRect.top);
+            const viewportHeight = scrollParent instanceof Window ? window.innerHeight : scrollParent.clientHeight;
             const nextStickyHeaderStates = getStickyHeaderStates(
                 flatNodes,
                 flatNodeIndexById,
                 visibleTop,
                 stickyHeaders,
+                viewportHeight,
                 isStickyHeader
             );
 
-            applyStickyHeaderTransforms(stickyHeaderRefs.current, nextStickyHeaderStates, false);
+            applyStickyHeaderTransforms(stickyHeaderRefs.current, nextStickyHeaderStates);
         };
 
         const scheduleUpdate = () => {
@@ -1045,7 +993,7 @@ function BasicTreeViewInner<T>(props: BasicTreeViewProps<T>, ref: React.Forwarde
     return (
         <div
             ref={rootRef}
-            className={styles.root}
+            className={`${styles.root} ${indentGuides ? styles.indentGuides : ''}`}
             role="tree"
             aria-label={ariaLabel}
             aria-activedescendant={activeDescendantId}
@@ -1055,6 +1003,13 @@ function BasicTreeViewInner<T>(props: BasicTreeViewProps<T>, ref: React.Forwarde
             onKeyDown={handleKeyDown}
             {...(rootContextData ? { 'data-vscode-context': JSON.stringify(rootContextData) } : {})}
             data-basic-tree-root="true"
+            style={
+                {
+                    minWidth: scrollableMinWidth,
+                    '--tree-indent': `${indent}px`,
+                    '--tree-guide-left': `${baseIndent + 7}px`,
+                } as React.CSSProperties
+            }
         >
             {stickyHeaderStates.map((stickyHeaderState) => (
                 <div
@@ -1072,6 +1027,7 @@ function BasicTreeViewInner<T>(props: BasicTreeViewProps<T>, ref: React.Forwarde
                     <TreeNodeItem
                         node={stickyHeaderState.item.node}
                         depth={stickyHeaderState.item.depth}
+                        {...getIndentGuideProps(stickyHeaderState.item, -1)}
                         isStickyClone={true}
                         expandedIds={expandedIds}
                         selectedId={selectedId}
@@ -1113,11 +1069,12 @@ function BasicTreeViewInner<T>(props: BasicTreeViewProps<T>, ref: React.Forwarde
                 </div>
             ))}
             <div className={styles.virtualSpacer} style={{ height: `${topSpacerHeight}px` }} />
-            {visibleItems.map(({ node, depth }) => (
+            {visibleItems.map((item, index) => (
                 <TreeNodeItem
-                    key={node.id}
-                    node={node}
-                    depth={depth}
+                    key={item.node.id}
+                    node={item.node}
+                    depth={item.depth}
+                    {...getIndentGuideProps(item, rangeStart + index)}
                     expandedIds={expandedIds}
                     selectedId={selectedId}
                     focusedId={focusedId}
@@ -1152,7 +1109,7 @@ function BasicTreeViewInner<T>(props: BasicTreeViewProps<T>, ref: React.Forwarde
                     scheduleDragAutoScroll={scheduleDragAutoScroll}
                     startDragAutoScrollTracking={startDragAutoScrollTracking}
                     stopDragAutoScrollTracking={stopDragAutoScrollTracking}
-                    nodeElementId={getTreeNodeElementId(node.id)}
+                    nodeElementId={getTreeNodeElementId(item.node.id)}
                     setNodeElement={setNodeElement}
                 />
             ))}

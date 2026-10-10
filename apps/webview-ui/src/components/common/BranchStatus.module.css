@@ -1,5 +1,6 @@
 .container {
     display: flex;
+    min-width: 0;
     align-items: center;
     gap: 1px;
 }
@@ -14,6 +15,12 @@
     transition:
         background-color 0.1s,
         border-color 0.1s;
+    flex-shrink: 0;
+}
+
+.branch {
+    min-width: 0;
+    flex-shrink: 1;
 }
 
 .section:hover {

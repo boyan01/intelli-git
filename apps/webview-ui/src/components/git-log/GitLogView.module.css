@@ -111,6 +111,7 @@
 }
 
 .popoverContent {
+    composes: scrollable from '../common/Scrollbar.module.css';
     height: 100%;
     max-height: 400px;
     overflow: auto;

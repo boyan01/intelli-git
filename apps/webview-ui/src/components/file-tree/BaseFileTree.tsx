@@ -405,6 +405,8 @@ export const BaseFileTree = React.forwardRef<BaseFileTreeRef, BaseFileTreeProps>
                 hideTwistie={compactLayout ? (node) => Boolean(node.data?.isFile) : undefined}
                 baseIndent={8}
                 stickyHeaders={stickyHeaders}
+                horizontalScroll={viewMode === 'tree'}
+                indentGuides={viewMode === 'tree'}
                 isStickyHeader={isStickyHeader}
                 ariaLabel={rootLabel}
             />

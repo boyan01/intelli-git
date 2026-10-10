@@ -421,6 +421,7 @@ export const BranchListPanel: React.FC<BranchListPanelProps> = ({ data, isLoadin
                 baseIndent={8}
                 ariaLabel={t('Branches')}
                 stickyHeaders={true}
+                horizontalScroll={true}
             />
         );
     };

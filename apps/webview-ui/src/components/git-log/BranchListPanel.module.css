@@ -100,6 +100,7 @@
 }
 
 .treeContainer {
+    composes: scrollable from '../common/Scrollbar.module.css';
     flex: 1;
     overflow-y: auto;
 }

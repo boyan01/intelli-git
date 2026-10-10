@@ -64,6 +64,7 @@
 }
 
 .filesTreeWrapper {
+    composes: scrollable from './Scrollbar.module.css';
     flex: 1;
     overflow-y: auto;
 }
@@ -75,6 +76,7 @@
 }
 
 .detailsContent {
+    composes: scrollable from './Scrollbar.module.css';
     padding: 12px;
     overflow-y: auto;
 }

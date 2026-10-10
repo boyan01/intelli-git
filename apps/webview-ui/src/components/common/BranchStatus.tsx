@@ -28,6 +28,7 @@ export const BranchStatus: React.FC<BranchStatusProps> = ({
     const branchIcon = repositoryDetached ? 'codicon-warning' : 'codicon-git-branch';
     const branchSectionClassName = [
         styles.section,
+        styles.branch,
         isWorktreeRepository ? styles.worktree : '',
         repositoryDetached ? styles.detached : '',
     ]
@@ -38,7 +39,7 @@ export const BranchStatus: React.FC<BranchStatusProps> = ({
         : isWorktreeRepository
           ? t('Worktree: {{branch}}', { branch: current })
           : undefined;
-    const branchTitle = [t('Switch Branch'), branchContext].filter(Boolean).join('\n');
+    const branchTitle = [t('Switch Branch'), branchContext || current].filter(Boolean).join('\n');
 
     return (
         <div className={styles.container}>

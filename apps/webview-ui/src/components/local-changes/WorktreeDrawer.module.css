@@ -81,6 +81,7 @@
 }
 
 .list {
+    composes: scrollable from '../common/Scrollbar.module.css';
     max-height: 156px;
     overflow-y: auto;
     padding-bottom: 4px;

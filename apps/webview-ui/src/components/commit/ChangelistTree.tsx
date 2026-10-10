@@ -76,7 +76,6 @@ interface FileNodeData {
     changelistId?: string;
     isActiveChangelist?: boolean;
     isChangelistGroup?: boolean;
-    showInDragMode?: boolean;
     splitInfo?: SplitFileInfo;
 }
 
@@ -354,6 +353,9 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
                 result.push({
                     id: `__root__${group.id}`,
                     label: group.name,
+                    showOnlyOnDrag:
+                        group.items.length === 0 &&
+                        (group.id === 'staged-changes' || group.id === 'changes' || group.id === 'inactive-changes'),
                     data: {
                         path: '',
                         isFile: false,
@@ -369,11 +371,6 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
                             group.id !== 'staged-changes' &&
                             group.id !== 'untracked-changes' &&
                             group.id !== CONFLICTING_CHANGES_ID,
-                        showInDragMode:
-                            group.items.length === 0 &&
-                            (group.id === 'staged-changes' ||
-                                group.id === 'changes' ||
-                                group.id === 'inactive-changes'),
                     },
                     children,
                 });
@@ -934,6 +931,8 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
                 onToggle={onToggle}
                 defaultExpandAll={true}
                 stickyHeaders={true}
+                horizontalScroll={viewMode === 'tree'}
+                indentGuides={viewMode === 'tree'}
                 selectedId={activeFile || undefined}
                 onSelect={handleNodeClick}
                 onDoubleClick={handleNodeDoubleClick}
@@ -942,7 +941,6 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
                 renderLabel={renderLabel}
                 renderTrailing={renderTrailing}
                 getContextData={getContextData}
-                getNodeClassName={(node) => (node.data?.showInDragMode ? 'dropOnlyGroup' : undefined)}
                 indent={compactLayout ? 8 : 16}
                 hideTwistie={compactLayout ? (node) => Boolean(node.data?.isFile) : undefined}
                 baseIndent={8}

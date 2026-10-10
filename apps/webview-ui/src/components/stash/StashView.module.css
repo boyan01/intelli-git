@@ -1,4 +1,5 @@
 .stashList {
+    composes: scrollable from '../common/Scrollbar.module.css';
     flex: 1;
     overflow-y: auto;
     padding: 4px 0;
@@ -87,6 +88,7 @@
 }
 
 .previewContent {
+    composes: scrollable from '../common/Scrollbar.module.css';
     flex: 1;
     overflow-y: auto;
 }

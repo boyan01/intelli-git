@@ -30,6 +30,15 @@
     min-width: 0;
 }
 
+.tabsLeft {
+    flex-shrink: 0;
+}
+
+.branchStatus {
+    min-width: 0;
+    margin-right: 4px;
+}
+
 .tab {
     height: 100%;
     padding: 0 8px;

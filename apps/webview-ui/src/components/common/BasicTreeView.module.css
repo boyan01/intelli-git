@@ -35,6 +35,50 @@
     pointer-events: auto;
 }
 
+.indentGuides .node {
+    position: relative;
+    --tree-inactive-guide-color: var(--vscode-tree-inactiveIndentGuidesStroke, var(--vscode-panel-border));
+}
+
+.indentGuides .node::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: var(--tree-guide-left);
+    width: calc(var(--tree-depth) * var(--tree-indent) + 1px);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 100ms linear;
+    background:
+        linear-gradient(var(--tree-inactive-guide-color), var(--tree-inactive-guide-color))
+            calc(var(--tree-depth) * var(--tree-indent)) 0 / 1px var(--tree-guide-continuation-height) no-repeat,
+        repeating-linear-gradient(to right, var(--tree-inactive-guide-color) 0 1px, transparent 1px var(--tree-indent))
+            0 0 / calc(var(--tree-depth) * var(--tree-indent)) 100% no-repeat;
+}
+
+.indentGuides:hover .node::before {
+    opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .indentGuides .node::before {
+        transition: none;
+    }
+}
+
+.indentGuides .node::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    height: var(--tree-active-guide-height);
+    left: calc(var(--tree-guide-left) + var(--tree-active-guide-offset));
+    width: 1px;
+    pointer-events: none;
+    opacity: var(--tree-active-guide-opacity);
+    background: var(--vscode-tree-indentGuidesStroke, var(--vscode-panel-border));
+}
+
 .node:hover {
     background-color: var(--vscode-sideBar-background, var(--vscode-editor-background));
     box-shadow: inset 0 0 0 9999px var(--vscode-list-hoverBackground, transparent);
@@ -171,25 +215,6 @@
 }
 
 /* Drag and drop */
-.node:global(.dropOnlyGroup) {
-    height: 0;
-    overflow: hidden;
-    opacity: 0;
-    pointer-events: none;
-    transform: translateY(-4px);
-    transition:
-        height 120ms ease-out,
-        opacity 120ms ease-out,
-        transform 120ms ease-out;
-}
-
-.root.dragging .node:global(.dropOnlyGroup) {
-    height: 22px;
-    opacity: 1;
-    pointer-events: auto;
-    transform: translateY(0);
-}
-
 .node.dragOver {
     background-color: var(--vscode-sideBar-background, var(--vscode-editor-background));
     box-shadow: inset 0 0 0 9999px var(--vscode-list-dropBackground, transparent);

@@ -1,0 +1,26 @@
+.scrollable {
+    --scrollbar-thumb: transparent;
+    /* Override VS Code's inherited native overlay scrollbar to support hover visibility. */
+    scrollbar-color: auto;
+}
+
+.scrollable::-webkit-scrollbar-thumb {
+    background-color: var(--scrollbar-thumb);
+}
+
+.scrollable:hover,
+.scrollable:focus-within {
+    --scrollbar-thumb: var(--vscode-scrollbarSlider-background);
+}
+
+.scrollable::-webkit-scrollbar-thumb:hover {
+    background-color: var(--vscode-scrollbarSlider-hoverBackground);
+}
+
+.scrollable::-webkit-scrollbar-thumb:active {
+    background-color: var(--vscode-scrollbarSlider-activeBackground);
+}
+
+.scrollable::-webkit-scrollbar-corner {
+    background-color: transparent;
+}

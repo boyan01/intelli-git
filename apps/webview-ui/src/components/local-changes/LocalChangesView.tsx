@@ -286,7 +286,7 @@ export function LocalChangesView() {
                         </div>
                     ) : (
                         branches?.current && (
-                            <div style={{ marginRight: '4px' }}>
+                            <div className={styles.branchStatus}>
                                 <BranchStatus
                                     current={branches.current}
                                     ahead={branches.ahead}
