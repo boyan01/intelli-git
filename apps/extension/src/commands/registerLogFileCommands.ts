@@ -36,7 +36,9 @@ export function registerLogFileCommands(context: vscode.ExtensionContext, gitSer
             const data = getCommandArgs(arg);
             if (!data || !data.isFile) return;
 
-            const leftRef = data.status?.startsWith('A') ? '' : data.parentHash || `${data.commitHash}^`;
+            const leftRef = data.status?.startsWith('A')
+                ? '4b825dc642cb6eb9a060e54bf8d69288fbee4904'
+                : data.parentHash || `${data.commitHash}^`;
             const rightRef = data.status?.startsWith('D')
                 ? '4b825dc642cb6eb9a060e54bf8d69288fbee4904'
                 : data.commitHash;

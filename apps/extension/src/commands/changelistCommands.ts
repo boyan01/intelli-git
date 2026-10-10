@@ -292,7 +292,7 @@ async function showDiffForChangelistFile(gitService: GitService, args: Changelis
     }
 
     if (args.status === 'D') {
-        const leftUri = createRevisionContentUri(gitService, args.path, { ref: 'HEAD', preferStaged: false });
+        const leftUri = createRevisionContentUri(gitService, args.path, { ref: '', preferStaged: false });
         const rightUri = createRevisionContentUri(gitService, args.path, { ref: 'WORKTREE', preferStaged: false });
         await vscode.commands.executeCommand('vscode.diff', leftUri, rightUri, path.basename(args.path));
         return;
@@ -301,7 +301,8 @@ async function showDiffForChangelistFile(gitService: GitService, args: Changelis
     const workspaceRoot = gitService.getWorkspaceRoot();
     if (workspaceRoot) {
         const uri = vscode.Uri.file(`${workspaceRoot}/${args.path}`);
-        await vscode.commands.executeCommand('git.openChange', uri);
+        const leftUri = createRevisionContentUri(gitService, args.path, { ref: '' });
+        await vscode.commands.executeCommand('vscode.diff', leftUri, uri, path.basename(args.path));
     }
 }
 

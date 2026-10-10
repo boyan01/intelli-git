@@ -2144,3 +2144,33 @@ function createInactiveChangesService(options: {
         syncWithStatus(_status: FileStatus[]): void {},
     } as unknown as InactiveChangesService;
 }
+
+describe('GitService binary revision content', () => {
+    it('reads HEAD, index, and stash without UTF-8 conversion', async () => {
+        const root = fs.mkdtempSync(path.join(os.tmpdir(), 'intelli-git-image-'));
+        try {
+            const git = simpleGit(root);
+            await git.init();
+            await git.addConfig('user.name', 'Intelli Git Test');
+            await git.addConfig('user.email', 'test@example.com');
+            await git.addConfig('commit.gpgsign', 'false');
+            const before = Buffer.from([0x89, 0xff, 0, 0x80]);
+            const after = Buffer.from([0xff, 0xd8, 0, 0x81]);
+            fs.writeFileSync(path.join(root, 'image.png'), before);
+            await git.add('image.png');
+            await git.commit('Add image');
+            const service = new GitService(root, root, git);
+            fs.writeFileSync(path.join(root, 'image.png'), after);
+            await git.add('image.png');
+            expect(await service.getFileContentBuffer('HEAD', 'image.png')).toEqual(before);
+            expect(await service.getFileContentBuffer('', 'image.png')).toEqual(after);
+            expect(await service.getFileContentBuffer('HEAD', 'missing.png')).toBeNull();
+            await git.stash();
+            expect(await service.getFileContentBuffer('stash@{0}', 'image.png')).toEqual(after);
+            expect(await service.getFileContentBuffer('stash@{0}^', 'image.png')).toEqual(before);
+            await expect(service.getFileContentBuffer('invalid-ref', 'image.png')).rejects.toThrow();
+        } finally {
+            fs.rmSync(root, { recursive: true, force: true });
+        }
+    });
+});

@@ -1346,7 +1346,7 @@ export class ExtensionRpcHandler {
                 status.find((file) => file.path === filePath && !file.staged) ||
                 status.find((file) => file.path === filePath);
             if (target?.status === 'D') {
-                const leftUri = createRevisionContentUri(gitService, filePath, { ref: 'HEAD', preferStaged: false });
+                const leftUri = createRevisionContentUri(gitService, filePath, { ref: '', preferStaged: false });
                 const rightUri = createRevisionContentUri(gitService, filePath, {
                     ref: 'WORKTREE',
                     preferStaged: false,
@@ -1357,7 +1357,8 @@ export class ExtensionRpcHandler {
 
             const workspaceRoot = gitService.getWorkspaceRoot();
             const uri = vscode.Uri.file(`${workspaceRoot}/${filePath}`);
-            await vscode.commands.executeCommand('git.openChange', uri);
+            const leftUri = createRevisionContentUri(gitService, filePath, { ref: '' });
+            await vscode.commands.executeCommand('vscode.diff', leftUri, uri, path.basename(filePath));
         }
     };
 

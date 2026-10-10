@@ -5,8 +5,7 @@ import {
     ConflictResolverPanel,
     GitLogViewProvider,
     openConflictFile,
-    StashContentProvider,
-    RevisionContentProvider,
+    RepositoryFileSystemProvider,
 } from './providers';
 import { RepositoryManager, type RepositoryScope } from './services/RepositoryManager';
 import { createGitWatcher } from './services/GitRepositoryWatcher';
@@ -271,8 +270,8 @@ export async function activate(context: vscode.ExtensionContext) {
     };
     const provider = new CommitViewProvider(providerOptions);
     const gitLogProvider = new GitLogViewProvider(providerOptions);
-    const stashContentProvider = new StashContentProvider(repositoryManager);
-    const revisionContentProvider = new RevisionContentProvider(repositoryManager);
+    const stashContentProvider = new RepositoryFileSystemProvider(repositoryManager, 'stash');
+    const revisionContentProvider = new RepositoryFileSystemProvider(repositoryManager, 'revision');
 
     let branchStatusBar: BranchStatusBar | undefined;
     let gitLogStatusBar: GitLogStatusBar | undefined;
@@ -420,6 +419,8 @@ export async function activate(context: vscode.ExtensionContext) {
             commitViewVisible: provider.isVisible(),
             gitLogVisible: gitLogProvider.isVisible(),
         });
+        revisionContentProvider.refresh();
+        stashContentProvider.refresh();
         const localChangesScopes = scopes.filter((scope) => scope !== 'gitLog');
         if (localChangesScopes.length > 0) {
             provider.requestRefresh({ scopes: localChangesScopes, reason });
@@ -510,10 +511,18 @@ export async function activate(context: vscode.ExtensionContext) {
 
     // Register content providers
     context.subscriptions.push(
-        vscode.workspace.registerTextDocumentContentProvider('intelli-git-stash', stashContentProvider)
+        vscode.workspace.registerFileSystemProvider('intelli-git-stash', stashContentProvider, {
+            isReadonly: true,
+            isCaseSensitive: true,
+        }),
+        stashContentProvider
     );
     context.subscriptions.push(
-        vscode.workspace.registerTextDocumentContentProvider('intelli-git-revision', revisionContentProvider)
+        vscode.workspace.registerFileSystemProvider('intelli-git-revision', revisionContentProvider, {
+            isReadonly: true,
+            isCaseSensitive: true,
+        }),
+        revisionContentProvider
     );
 
     // Register webview providers

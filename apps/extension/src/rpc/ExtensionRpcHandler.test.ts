@@ -1108,8 +1108,34 @@ describe('ExtensionRpcHandler openDiff', () => {
         const commands = vscodeTestMock.__getExecutedCommands();
         expect(commands).toHaveLength(1);
         expect(commands[0].command).toBe('vscode.diff');
-        expect(String(commands[0].args[0])).toContain('"ref":"HEAD"');
+        expect(String(commands[0].args[0])).toContain('"ref":""');
         expect(String(commands[0].args[0])).toContain('"preferStaged":false');
         expect(String(commands[0].args[1])).toContain('"ref":"WORKTREE"');
+    });
+});
+
+describe('ExtensionRpcHandler native diff comparisons', () => {
+    it('compares index with worktree for unstaged files', async () => {
+        vscodeTestMock.__resetExecutedCommands();
+        const handler = createHandler({
+            getStatus: vi.fn().mockResolvedValue([{ path: 'image.png', status: 'M', staged: false }]),
+        });
+        await handler.openDiff({ path: 'image.png', staged: false });
+        const commands = vscodeTestMock.__getExecutedCommands();
+        expect(commands).toHaveLength(1);
+        expect(commands[0].command).toBe('vscode.diff');
+        expect(String(commands[0].args[0])).toContain('"ref":""');
+        expect(String(commands[0].args[1])).toBe('file:///workspace/image.png');
+    });
+
+    it('compares HEAD with index for staged files', async () => {
+        vscodeTestMock.__resetExecutedCommands();
+        const handler = createHandler({});
+        await handler.openDiff({ path: 'image.png', staged: true });
+        const commands = vscodeTestMock.__getExecutedCommands();
+        expect(commands).toHaveLength(1);
+        expect(commands[0].command).toBe('vscode.diff');
+        expect(String(commands[0].args[0])).toContain('"ref":"HEAD"');
+        expect(String(commands[0].args[1])).toContain('"ref":""');
     });
 });

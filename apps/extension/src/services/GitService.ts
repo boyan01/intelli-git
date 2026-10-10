@@ -1573,21 +1573,15 @@ export class GitService implements vscode.Disposable {
         }
     }
 
-    public async getFileContent(ref: string, repoPath: string): Promise<string> {
+    public async getFileContentBuffer(ref: string, repoPath: string): Promise<Buffer | null> {
         try {
-            return await this.git.show([`${ref}:${repoPath}`]);
-        } catch (e: any) {
-            // If file doesn't exist in the revision (e.g. Added file), return empty string
-            if (
-                e.message &&
-                (e.message.includes('broken fragment') ||
-                    e.message.includes('does not exist') ||
-                    e.message.includes('exists on disk'))
-            ) {
-                return '';
+            return await this.git.showBuffer([`${ref}:${repoPath}`]);
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            if (/does not exist|exists on disk|path .* not in|invalid object name 'HEAD'/.test(message)) {
+                return null;
             }
-            console.error('getFileContent error:', e, 'ref:', ref, 'path:', repoPath);
-            return '';
+            throw error;
         }
     }
 

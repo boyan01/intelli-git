@@ -87,7 +87,7 @@ export const CommitAccordionItem: React.FC<CommitAccordionItemProps> = ({
             let rightRef = commit.hash;
 
             if (file.status.startsWith('A')) {
-                leftRef = '';
+                leftRef = '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
             } else if (file.status.startsWith('D')) {
                 rightRef = '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
             }

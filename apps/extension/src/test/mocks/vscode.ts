@@ -385,3 +385,18 @@ export function __getCreatedTerminals(): Array<{ options: unknown; sentText: str
 export function __resetCreatedTerminals(): void {
     createdTerminals.length = 0;
 }
+
+export const FileType = { Unknown: 0, File: 1, Directory: 2, SymbolicLink: 64 } as const;
+export class FileSystemError extends Error {
+    constructor(public readonly code: string) {
+        super(code);
+    }
+    static FileNotFound(_uri?: unknown) {
+        return new FileSystemError('FileNotFound');
+    }
+    static NoPermissions() {
+        return new FileSystemError('NoPermissions');
+    }
+}
+
+export const FileChangeType = { Changed: 1, Created: 2, Deleted: 3 } as const;
