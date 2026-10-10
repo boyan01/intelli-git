@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.0.12
+
+- Preview image changes with VS Code's native image diff editor, including staged, unstaged, history, and stash comparisons.
+- Compare unstaged deletions against the index and keep added history files separate from the current index.
+- Improve tree hierarchy guides and horizontal scrolling for deeply nested changes, commits, stashes, and branches.
+- Keep long branch names within the Commit header and show their full names in tooltips.
+- Limit sticky folders and prevent scroll jumps caused by hidden drag targets.
+
 ## 0.0.11
 
 - Follow the active VS Code file icon theme for file and folder icons in Commit and Git Log webviews.
