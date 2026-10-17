@@ -1,6 +1,6 @@
 ---
 name: intelli-git-debug
-description: Launch, control, inspect, reload, and stop a real Intelli Git VS Code Extension Development Host entirely from commands, with an isolated fixture, Extension Host Node inspector, renderer/webview CDP, owned process state, and direct log access. Use when Codex must reproduce or verify extension-host or webview behavior without clicking the source VS Code Run Extension UI or relying on Debug Console, especially for Monaco, focus, layout, CSP, rendering, lifecycle, and interaction bugs.
+description: Launch, control, inspect, reload, and stop a real Intelli Git VS Code Extension Development Host entirely from commands, with an isolated fixture, Extension Host Node inspector, renderer/webview CDP, owned process state, and direct log access. Use when Codex must reproduce or verify extension-host or webview behavior without clicking the source VS Code Run Extension UI or relying on Debug Console, especially for focus, layout, CSP, rendering, lifecycle, and interaction bugs.
 ---
 
 # Intelli Git Debug
@@ -102,7 +102,7 @@ node "$CONTROL" workbench-eval --state "$STATE" \
 node "$CONTROL" webview-targets --state "$STATE"
 ```
 
-Open the standard merge-conflict resolver deterministically:
+Open a conflicted file from `Conflicting Changes` deterministically:
 
 ```bash
 node "$CONTROL" webview-eval --state "$STATE" --contains 'Conflicting Changes' \
@@ -115,14 +115,14 @@ node "$CONTROL" webview-eval --state "$STATE" --contains 'Conflicting Changes' \
   '(() => { const item = [...document.querySelectorAll(`[role="treeitem"]`)].find((element) => element.textContent?.trim() === "conflict.txt"); item?.click(); return { found: Boolean(item), selected: item?.getAttribute("aria-selected") }; })()'
 ```
 
-Then enumerate targets again and select the context whose URL contains `#/conflict-resolver` or whose title is `Merge: conflict.txt`.
+The file opens in the standard VS Code text editor, not in a webview.
 
 Select a context by visible text or route and evaluate real DOM state:
 
 ```bash
 node "$CONTROL" webview-eval \
   --state "$STATE" \
-  --contains 'Conflict Resolver' \
+  --contains 'Conflicting Changes' \
   '(() => {
     const element = document.querySelector("<selector>");
     const style = getComputedStyle(element);
@@ -140,8 +140,6 @@ node "$CONTROL" webview-eval \
 ```
 
 VS Code often exposes an outer webview frame plus a rendered inner frame. The controller selects rendered contexts by actual visible text; do not assume the first iframe is interactive.
-
-For Monaco issues, inspect both the target node and its positioned parent before interaction, after focus, and after blur. Check CSP errors and CSSOM state before changing Monaco layout code.
 
 ## Reload Without UI Automation
 

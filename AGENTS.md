@@ -267,12 +267,11 @@ Improve AI provider setup flow
 - File items 不得显示 hunk child nodes。
 - 如果已支持，changelist roots 之间的 drag and drop 文件重分配行为应继续可用。
 
-### Conflict Resolver Behavior
-- 点击或双击 conflict file 时，必须在 VS Code editor 区域打开 Intelli Git 自己的 conflict resolver webview，不应走普通 open file 路径，也不得把 merge editor 嵌在 commit view 侧边栏里。
-- Conflict resolver 通过 shared RPC 从 Git index stages 读取 base/current/incoming，通过 worktree 读取 result；webview 不得直接推断 Git stages。
-- `Accept Current Change` / `Accept Incoming Change` 必须保留 `repoPath` 并路由到对应 repository 的 Git service。
-- `Mark as Resolved` 必须写入 result content、执行 `git add`、刷新 commit view；失败时 resolver 不能关闭。
-- 二进制 conflict files 可以显示在 `Conflicting Changes` root 下，但 inline editing 可以禁用并给出明确反馈。
+### Conflict File Behavior
+- Intelli Git 不提供自己的 merge editor。点击或双击 conflict file 时，在 VS Code 标准 editor 中打开该文件，由 VS Code 自带的 conflict 能力处理内容编辑。
+- Commit view 的 `Accept Current Change` / `Accept Incoming Change` 必须保留 `repoPath` 并路由到对应 repository 的 Git service。
+- `Mark as Resolved` 只对 `resolvedCandidate` 文件执行 `git add` 并刷新 commit view。
+- 二进制 conflict files 可以显示在 `Conflicting Changes` root 下，通过 whole-side accept 解决。
 - Rebase continue 只能在没有 unresolved conflict files 时可用；只有存在、非二进制、无 conflict markers 的文本文件才能作为 `resolvedCandidate` 自动放行。
 
 ### Changes Mode Context Menu Rules
@@ -288,7 +287,7 @@ Improve AI provider setup flow
 - Changelist mode、changelist state、changelist operations 的 shared contracts 必须保留在 `packages/shared/messages.ts`。
 - "某个改动属于哪个 changelist" 的路由规则只有一份，放在 `packages/shared/changelistRouting.ts`，webview 分组（`buildChangelists`）和 extension commit plan（`ChangelistStateService.buildCommitPlan`）都必须复用它，保证显示的 changelist 与实际提交的内容一致。
 - 发给 webview 的 commit view payload 只携带 hunk identity 和行号范围，`fileHeader` / `content` 留在 extension 侧。
-- Conflict resolver 的 shared RPC contract 必须保留在 `packages/shared/messages.ts`，Git stage 读取和保存必须在 extension-side `GitService` 内完成；editor-area panel 生命周期由 extension provider 管理。
+- Conflict 的 Git stage 读取和 whole-side resolution 必须在 extension-side `GitService` 内完成。
 - 任何新增的 commit view 用户可见文本都必须遵守仓库的 l10n 规则。
 - 如果 commit view context menu 行为发生变化，必须同时更新 webview 的 `data-vscode-context` shape 和 `apps/extension/package.json` 中的 menu contributions。
 
@@ -296,7 +295,7 @@ Improve AI provider setup flow
 - 在 `staged` 和 `changes` mode 之间切换时，toolbar 和 context menu 行为必须正确。
 - `changes` mode 绝不能显示 staged/unstaged split groups。
 - Conflict files 必须只出现在 `Conflicting Changes` root 下。
-- 点击 conflict file 必须在 editor 区域打开 Intelli Git conflict resolver。
+- 点击 conflict file 必须在 VS Code 标准 editor 中打开该文件。
 - `changes` mode 绝不能在 changelist root 上显示 active badge。
 - `changes` mode 下 root hover 绝不能显示 inline operation icons。
 - File items 绝不能显示 child hunk nodes。

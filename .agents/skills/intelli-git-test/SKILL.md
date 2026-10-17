@@ -1,6 +1,6 @@
 ---
 name: intelli-git-test
-description: Create and open reproducible Intelli Git VS Code extension test repositories. Use when testing Intelli Git checkout, branch switch, rebase, merge conflict resolver, stash-pop conflict, dirty worktree protection, index.lock race, or when the user asks to build a conflicted fixture repo and open it with the current debug extension.
+description: Create and open reproducible Intelli Git VS Code extension test repositories. Use when testing Intelli Git checkout, branch switch, rebase, merge conflicts, stash-pop conflict, dirty worktree protection, index.lock race, or when the user asks to build a conflicted fixture repo and open it with the current debug extension.
 ---
 
 # Intelli Git Test

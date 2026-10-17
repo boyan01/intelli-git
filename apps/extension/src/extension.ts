@@ -1,12 +1,6 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
-import {
-    CommitViewProvider,
-    ConflictResolverPanel,
-    GitLogViewProvider,
-    openConflictFile,
-    RepositoryFileSystemProvider,
-} from './providers';
+import { CommitViewProvider, GitLogViewProvider, RepositoryFileSystemProvider } from './providers';
 import { RepositoryManager, type RepositoryScope } from './services/RepositoryManager';
 import { createGitWatcher } from './services/GitRepositoryWatcher';
 import { BackgroundFetchService } from './services/BackgroundFetchService';
@@ -26,8 +20,7 @@ import {
 } from './commands';
 import { logger } from './utils/logger';
 import { ChangeBlockEditorController } from './editor/ChangeBlockEditorController';
-import type { ConflictResolverContextAction, RefreshScope } from '@shared/messages';
-import type { MergeEditorContext } from '@shared/webviewContext';
+import type { RefreshScope } from '@shared/messages';
 
 interface RepositoryQuickPickItem extends vscode.QuickPickItem {
     repo: RepositoryScope;
@@ -517,41 +510,6 @@ export async function activate(context: vscode.ExtensionContext) {
     // Register webview providers
     context.subscriptions.push(vscode.window.registerWebviewViewProvider(CommitViewProvider.viewType, provider));
     context.subscriptions.push(vscode.window.registerWebviewViewProvider(GitLogViewProvider.viewType, gitLogProvider));
-    context.subscriptions.push(
-        vscode.commands.registerCommand(
-            'intelli-git.openConflictResolver',
-            (file?: { path?: string; repoPath?: string }) => {
-                if (!file?.path) {
-                    return;
-                }
-
-                void openConflictFile(providerOptions, { path: file.path, repoPath: file.repoPath });
-            }
-        )
-    );
-    const conflictResolverContextCommands: ReadonlyArray<[string, ConflictResolverContextAction]> = [
-        ['intelli-git.merge.acceptLeft', 'acceptLeft'],
-        ['intelli-git.merge.cancelLeft', 'cancelLeft'],
-        ['intelli-git.merge.acceptRight', 'acceptRight'],
-        ['intelli-git.merge.cancelRight', 'cancelRight'],
-        ['intelli-git.merge.markReviewed', 'markReviewed'],
-    ];
-    context.subscriptions.push(
-        ...conflictResolverContextCommands.map(([command, action]) =>
-            vscode.commands.registerCommand(command, (args?: MergeEditorContext) => {
-                if (!args?.path || !args.changeGroupId) {
-                    return;
-                }
-                ConflictResolverPanel.dispatchContextAction({
-                    path: args.path,
-                    repoPath: args.repoPath,
-                    groupId: args.changeGroupId,
-                    action,
-                });
-            })
-        )
-    );
-
     registerAiCommands(context, provider);
     registerGlobalNavigationCommands(context, {
         gitLogProvider,

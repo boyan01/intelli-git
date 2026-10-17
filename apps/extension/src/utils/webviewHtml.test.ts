@@ -3,7 +3,7 @@ import * as vscode from 'vscode';
 import { getWebviewHtml } from './webviewHtml';
 
 describe('webview HTML', () => {
-    it('allows Monaco row layout styles without allowing inline scripts', () => {
+    it('restricts styles and scripts to the webview source and nonce', () => {
         const uri = vscode.Uri as unknown as {
             joinPath(base: vscode.Uri, ...segments: string[]): vscode.Uri;
         };
@@ -18,8 +18,8 @@ describe('webview HTML', () => {
             title: 'Test',
         });
 
-        expect(html).toContain("style-src https://webview.test; style-src-attr 'unsafe-inline';");
+        expect(html).toContain('style-src https://webview.test;');
+        expect(html).not.toContain('unsafe-inline');
         expect(html).toMatch(/script-src 'nonce-[A-Za-z0-9]{32}' https:\/\/webview\.test;/);
-        expect(html).not.toContain("script-src 'unsafe-inline'");
     });
 });

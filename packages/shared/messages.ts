@@ -102,16 +102,6 @@ export interface RepositoryFileReference {
     path: string;
 }
 
-export type ConflictResolverOpenRequest = RepositoryFileReference;
-
-export type ConflictResolverContextAction =
-    'acceptLeft' | 'cancelLeft' | 'acceptRight' | 'cancelRight' | 'markReviewed';
-
-export interface ConflictResolverContextActionRequest extends RepositoryFileReference {
-    groupId: string;
-    action: ConflictResolverContextAction;
-}
-
 export type FileReferenceInput = string | RepositoryFileReference;
 
 export interface ChangelistGroup {
@@ -214,55 +204,6 @@ export interface ChangelistFileSelection {
     status?: string;
     staged?: boolean;
     isConflict?: boolean;
-}
-
-export interface ConflictSideContent {
-    exists: boolean;
-    content: string;
-    objectId?: string;
-}
-
-export type ConflictFileKind = 'text' | 'binary' | 'submodule' | 'unsupported';
-
-export interface ConflictChange {
-    id: string;
-    baseStart: number;
-    baseLineCount: number;
-    sideStart: number;
-    sideLineCount: number;
-}
-
-export interface ConflictFileContent {
-    repoPath?: string;
-    path: string;
-    baseLabel?: string;
-    currentLabel?: string;
-    incomingLabel?: string;
-    base: ConflictSideContent;
-    current: ConflictSideContent;
-    incoming: ConflictSideContent;
-    currentChanges: ConflictChange[];
-    incomingChanges: ConflictChange[];
-    result: string;
-    stageSignature: string;
-    resultFingerprint: string;
-    resolvedCandidate: boolean;
-    isBinary: boolean;
-    kind: ConflictFileKind;
-}
-
-export interface ConflictResolutionSnapshot {
-    stageSignature: string;
-    resultFingerprint: string;
-}
-
-export interface SaveConflictResolutionRequest extends RepositoryFileReference, ConflictResolutionSnapshot {
-    content: string;
-    resultExists: boolean;
-}
-
-export interface ResolveConflictRequest extends RepositoryFileReference, ConflictResolutionSnapshot {
-    side: 'ours' | 'theirs';
 }
 
 export interface BranchInfo {
@@ -436,12 +377,6 @@ export interface ExtensionMethods {
     pickBranch: () => Promise<void>;
     continueRebase: (params: { message?: string; files?: string[] }) => Promise<void>;
     abortRebase: () => Promise<void>;
-    openConflictResolver: (params: ConflictResolverOpenRequest) => Promise<void>;
-    updateConflictResolverTitle: (params: { path: string; repoPath?: string }) => Promise<void>;
-    getConflictFileContent: (params: { path: string; repoPath?: string }) => Promise<ConflictFileContent>;
-    confirmConflictResolverRestart: () => Promise<boolean>;
-    saveConflictResolution: (params: SaveConflictResolutionRequest) => Promise<void>;
-    resolveConflict: (params: ResolveConflictRequest) => Promise<void>;
     openFile: (params: { path: string; repoPath?: string; preserveFocus?: boolean }) => Promise<void>;
     openStashDiff: (params: { index: number; path: string }) => Promise<void>;
     getBranchListData: () => Promise<BranchListData>;
@@ -567,8 +502,6 @@ export interface FileIconTheme {
 export interface WebviewMethods {
     activeFileChange: (params: { path: string; commitHash?: string }) => void;
     fileIconThemeChange: () => void;
-    revealConflictResolverFile: (params: ConflictResolverOpenRequest) => void;
-    triggerConflictResolverAction: (params: ConflictResolverContextActionRequest) => void;
     revealLog: (params: GitLogRevealRequest) => void;
     filterLogByBranch: (params: { branch: string }) => void;
     refresh: (event: RefreshEvent) => void;

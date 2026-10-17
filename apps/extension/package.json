@@ -62,13 +62,6 @@
           "fontPath": "resources/intelli-git-icons.woff",
           "fontCharacter": "\\E003"
         }
-      },
-      "intelli-git-merge": {
-        "description": "Intelli Git merge conflict resolver icon",
-        "default": {
-          "fontPath": "resources/intelli-git-icons.woff",
-          "fontCharacter": "\\E004"
-        }
       }
     },
     "viewsContainers": {
@@ -369,26 +362,6 @@
       {
         "command": "intelli-git.changelist.markResolved",
         "title": "%intelli-git.commands.changelist.markResolved.title%"
-      },
-      {
-        "command": "intelli-git.merge.acceptLeft",
-        "title": "%intelli-git.commands.merge.acceptLeft.title%"
-      },
-      {
-        "command": "intelli-git.merge.cancelLeft",
-        "title": "%intelli-git.commands.merge.cancelLeft.title%"
-      },
-      {
-        "command": "intelli-git.merge.acceptRight",
-        "title": "%intelli-git.commands.merge.acceptRight.title%"
-      },
-      {
-        "command": "intelli-git.merge.cancelRight",
-        "title": "%intelli-git.commands.merge.cancelRight.title%"
-      },
-      {
-        "command": "intelli-git.merge.markReviewed",
-        "title": "%intelli-git.commands.merge.markReviewed.title%"
       },
       {
         "command": "intelli-git.copyAuthorEmail",
@@ -709,26 +682,6 @@
         },
         {
           "command": "intelli-git.changelist.markResolved",
-          "when": "false"
-        },
-        {
-          "command": "intelli-git.merge.acceptLeft",
-          "when": "false"
-        },
-        {
-          "command": "intelli-git.merge.cancelLeft",
-          "when": "false"
-        },
-        {
-          "command": "intelli-git.merge.acceptRight",
-          "when": "false"
-        },
-        {
-          "command": "intelli-git.merge.cancelRight",
-          "when": "false"
-        },
-        {
-          "command": "intelli-git.merge.markReviewed",
           "when": "false"
         },
         {
@@ -1137,31 +1090,6 @@
           "group": "1_modification@2"
         },
         {
-          "command": "intelli-git.merge.acceptLeft",
-          "when": "(webviewSection == 'mergeEditorLeft' || webviewSection == 'mergeEditorResult') && canReviewLeft == true",
-          "group": "1_left@1"
-        },
-        {
-          "command": "intelli-git.merge.cancelLeft",
-          "when": "(webviewSection == 'mergeEditorLeft' || webviewSection == 'mergeEditorResult') && canReviewLeft == true",
-          "group": "1_left@2"
-        },
-        {
-          "command": "intelli-git.merge.acceptRight",
-          "when": "(webviewSection == 'mergeEditorRight' || webviewSection == 'mergeEditorResult') && canReviewRight == true",
-          "group": "2_right@1"
-        },
-        {
-          "command": "intelli-git.merge.cancelRight",
-          "when": "(webviewSection == 'mergeEditorRight' || webviewSection == 'mergeEditorResult') && canReviewRight == true",
-          "group": "2_right@2"
-        },
-        {
-          "command": "intelli-git.merge.markReviewed",
-          "when": "webviewSection == 'mergeEditorResult' && canMarkReviewed == true",
-          "group": "3_review@1"
-        },
-        {
           "command": "intelli-git.changelist.markReviewed",
           "when": "(webviewSection == 'changelistFile' || webviewSection == 'changelistFolder' || webviewSection == 'changelistRoot') && allReviewed != true && hasConflict != true",
           "group": "3_review@1"
@@ -1403,12 +1331,6 @@
             "%intelli-git.config.changelist.mode.changes%"
           ],
           "description": "%intelli-git.config.changelist.mode.description%"
-        },
-        "intelli-git.mergeEditor.enabled": {
-          "type": "boolean",
-          "default": false,
-          "scope": "window",
-          "description": "%intelli-git.config.mergeEditor.enabled.description%"
         },
         "intelli-git.push.confirmProtectedBranch": {
           "type": "boolean",
