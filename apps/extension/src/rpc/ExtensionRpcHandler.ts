@@ -36,7 +36,6 @@ import type {
 import { GitService } from '../services/GitService';
 import { RepositoryManager } from '../services/RepositoryManager';
 import { ChangelistStateService } from '../services/ChangelistStateService';
-import { InactiveChangesService } from '../services/InactiveChangesService';
 import { AnthropicService } from '../services/AnthropicService';
 import { GoogleAiService } from '../services/GoogleAiService';
 import { CodexCliLanguageModel } from '../services/CodexCliService';
@@ -314,10 +313,6 @@ export class ExtensionRpcHandler {
         );
     }
 
-    private get inactiveChangesService(): InactiveChangesService | undefined {
-        return this.repositoryManager.getActiveService()?.inactiveChangesService;
-    }
-
     private get changelistStateService(): ChangelistStateService | undefined {
         return this.repositoryManager.getActiveService()?.changelistStateService;
     }
@@ -326,16 +321,14 @@ export class ExtensionRpcHandler {
         const gitService = repoPath
             ? this.repositoryManager.getService(repoPath)
             : this.repositoryManager.getActiveService();
-        const inactiveChangesService = gitService?.inactiveChangesService;
         const changelistStateService = gitService?.changelistStateService;
-        if (!gitService || !inactiveChangesService || !changelistStateService) {
+        if (!gitService || !changelistStateService) {
             return undefined;
         }
 
         return new ChangelistOperations({
-            gitService,
-            inactiveChangesService,
             changelistStateService,
+            reviewedStateService: gitService.reviewedStateService,
             refreshDecorations: createDefaultRefreshDecorations(),
         });
     }
@@ -725,10 +718,7 @@ export class ExtensionRpcHandler {
             getFileIconTheme: this.getFileIconTheme,
             getLastCommitInfo: this.gitReadRpcHandler.getLastCommitInfo,
             showErrorMessage: this.showErrorMessage,
-            markHunkInactive: this.changelistRpcHandler.markHunkInactive,
-            markHunkActive: this.changelistRpcHandler.markHunkActive,
-            markFilesInactive: this.changelistRpcHandler.markFilesInactive,
-            markFilesActive: this.changelistRpcHandler.markFilesActive,
+            setFilesReviewed: this.changelistRpcHandler.setFilesReviewed,
             setChangelistMode: this.changelistRpcHandler.setChangelistMode,
             createChangelist: this.changelistRpcHandler.createChangelist,
             renameChangelist: this.changelistRpcHandler.renameChangelist,
@@ -1205,10 +1195,8 @@ export class ExtensionRpcHandler {
         }
 
         const status = await gitService.getStatusForView();
-        gitService.inactiveChangesService?.syncWithStatus(status);
         gitService.changelistStateService?.syncWithStatus(status);
-
-        return this.decorateStatus(status, gitService.inactiveChangesService);
+        return status;
     }
 
     getStatus = async (): Promise<FileStatus[]> => {
@@ -1252,7 +1240,7 @@ export class ExtensionRpcHandler {
             activeRepository && activeService
                 ? {
                       repository: activeRepository,
-                      files: await this.getStatusWithStateForService(activeService),
+                      files: await this.getCommitViewFiles(activeService),
                       changelistState: this.getCurrentChangelistState(activeService),
                       workspaceRoot: activeService.getWorkspaceRoot(),
                   }
@@ -1299,28 +1287,13 @@ export class ExtensionRpcHandler {
         );
     }
 
-    private decorateStatus(status: FileStatus[], inactiveChangesService = this.inactiveChangesService): FileStatus[] {
-        return status.map((file) => {
-            const isFileInactive = !!inactiveChangesService?.isInactive(file.path);
-            const inactiveHunkIds = inactiveChangesService?.getInactiveHunkIds(file.path) || [];
-            const inactiveHunkIdSet = new Set(inactiveHunkIds);
-            const hasStagedInactive =
-                file.staged &&
-                (isFileInactive ||
-                    file.hunks?.some(
-                        (hunk) =>
-                            inactiveHunkIdSet.has(hunk.id) ||
-                            inactiveHunkIdSet.has(hunk.id.replace(':index:', ':worktree:')) ||
-                            inactiveHunkIdSet.has(hunk.id.replace(':worktree:', ':index:'))
-                    ));
-
-            return {
-                ...file,
-                inactive: isFileInactive,
-                inactiveHunkIds,
-                hasStagedInactive,
-            };
-        });
+    /** Status for the webview: reviewed marks applied, change block content left in the extension. */
+    private async getCommitViewFiles(gitService: GitService): Promise<FileStatus[]> {
+        const status = await this.getStatusWithStateForService(gitService);
+        const files = (await gitService.reviewedStateService?.apply(status)) || status;
+        return files.map((file) =>
+            file.hunks ? { ...file, hunks: file.hunks.map((hunk) => ({ ...hunk, fileHeader: '', content: '' })) } : file
+        );
     }
 
     openDiff = async (
@@ -1899,7 +1872,7 @@ export class ExtensionRpcHandler {
             // During merge/rebase continue, once no unmerged entries remain,
             // auto-stage tracked unresolved->resolved files so Git can continue.
             currentStatus
-                .filter((file) => !file.inactive && !file.staged && file.status !== '?')
+                .filter((file) => !file.staged && file.status !== '?')
                 .forEach((file) => filesToStage.add(file.path));
 
             for (const file of filesToStage) {

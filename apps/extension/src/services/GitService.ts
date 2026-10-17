@@ -23,10 +23,9 @@ import { parseDiffToFileHunks, parseDiffToHunks } from '../utils/diffParser';
 import { GitLogService } from './GitLogService';
 import { GitBranchRemoteService } from './GitBranchRemoteService';
 import type { ChangelistStateService, ChangelistStateSnapshot, CommitPlan } from './ChangelistStateService';
-import type { InactiveChangesService, InactiveChangesSnapshot } from './InactiveChangesService';
+import type { ReviewedStateService } from './ReviewedStateService';
 
 interface ExtensionGitStateSnapshot {
-    inactiveChanges?: InactiveChangesSnapshot;
     changelists?: ChangelistStateSnapshot;
 }
 
@@ -201,8 +200,8 @@ export class GitService implements vscode.Disposable {
     private git: SimpleGit;
     private _workspaceRoot: string;
     private _gitRoot: string;
-    private _inactiveChangesService?: InactiveChangesService;
     private _changelistStateService?: ChangelistStateService;
+    private _reviewedStateService?: ReviewedStateService;
     private _onDidChange = new vscode.EventEmitter<'local' | 'remote'>();
     private _onWillRunGitMutation = new vscode.EventEmitter<void>();
     private gitMutationQueue: Promise<void> = Promise.resolve();
@@ -222,26 +221,26 @@ export class GitService implements vscode.Disposable {
     public readonly onDidChange = this._onDidChange.event;
     public readonly onWillRunGitMutation = this._onWillRunGitMutation.event;
 
-    public get inactiveChangesService(): InactiveChangesService | undefined {
-        return this._inactiveChangesService;
-    }
-
     public get changelistStateService(): ChangelistStateService | undefined {
         return this._changelistStateService;
+    }
+
+    public get reviewedStateService(): ReviewedStateService | undefined {
+        return this._reviewedStateService;
     }
 
     constructor(
         workspaceRoot: string,
         gitRoot: string,
         git: SimpleGit,
-        inactiveChangesService?: InactiveChangesService,
-        changelistStateService?: ChangelistStateService
+        changelistStateService?: ChangelistStateService,
+        reviewedStateService?: ReviewedStateService
     ) {
         this._workspaceRoot = normalizeExistingPath(workspaceRoot);
         this._gitRoot = normalizeExistingPath(gitRoot);
         this.git = git;
-        this._inactiveChangesService = inactiveChangesService;
         this._changelistStateService = changelistStateService;
+        this._reviewedStateService = reviewedStateService;
         this.log = new GitLogService(this.git, {
             toRepoPath: (filePath) => this.toRepoPath(filePath),
             toWorkspacePath: (repoPath) => this.toWorkspacePath(repoPath),
@@ -260,8 +259,8 @@ export class GitService implements vscode.Disposable {
 
     public static async create(
         workspaceRoot: string,
-        inactiveChangesService?: InactiveChangesService,
-        changelistStateService?: ChangelistStateService
+        changelistStateService?: ChangelistStateService,
+        reviewedStateService?: ReviewedStateService
     ): Promise<GitService> {
         const tempGit = createQueuedSimpleGit(workspaceRoot);
         let gitRoot = workspaceRoot;
@@ -280,7 +279,7 @@ export class GitService implements vscode.Disposable {
             console.error('Failed to resolve git root, assuming workspace root:', e);
         }
 
-        return new GitService(workspaceRoot, gitRoot, finalGit, inactiveChangesService, changelistStateService);
+        return new GitService(workspaceRoot, gitRoot, finalGit, changelistStateService, reviewedStateService);
     }
 
     public toRepoPath(filePath: string): string {
@@ -324,7 +323,6 @@ export class GitService implements vscode.Disposable {
         return files.map((file) => ({
             ...file,
             hunks: file.hunks?.map((hunk) => ({ ...hunk })),
-            inactiveHunkIds: file.inactiveHunkIds ? [...file.inactiveHunkIds] : undefined,
         }));
     }
 
@@ -423,7 +421,7 @@ export class GitService implements vscode.Disposable {
                     `+${content.replace(/\n/g, '\n+')}`,
                 ].join('\n');
                 hunks = parseDiffToFileHunks(diff, (repoPath) => this.toWorkspacePath(repoPath), {
-                    idPrefix: 'worktree',
+                    idPrefix: 'head',
                 }).get(filePath);
             } finally {
                 await handle.close();
@@ -515,7 +513,6 @@ export class GitService implements vscode.Disposable {
 
     private createExtensionGitStateSnapshot(): ExtensionGitStateSnapshot {
         return {
-            inactiveChanges: this._inactiveChangesService?.createSnapshot(),
             changelists: this._changelistStateService?.createSnapshot(),
         };
     }
@@ -524,18 +521,13 @@ export class GitService implements vscode.Disposable {
         snapshot: ExtensionGitStateSnapshot,
         reconcile: boolean = false
     ): Promise<void> {
-        if (snapshot.inactiveChanges) {
-            await this._inactiveChangesService?.restoreSnapshot(snapshot.inactiveChanges);
-        }
-
         if (snapshot.changelists) {
             await this._changelistStateService?.restoreSnapshot(snapshot.changelists);
         }
 
-        if (reconcile && (this._inactiveChangesService || this._changelistStateService)) {
+        if (reconcile && this._changelistStateService) {
             const status = await this.getStatus();
-            this._inactiveChangesService?.syncWithStatus(status);
-            this._changelistStateService?.syncWithStatus(status);
+            this._changelistStateService.syncWithStatus(status);
         }
     }
 
@@ -611,6 +603,13 @@ export class GitService implements vscode.Disposable {
             const stagedEntry = entries.find((entry) => entry.staged && entry.status !== 'D' && entry.status !== '?');
             const worktreeEntry = entries.find((entry) => !entry.staged);
 
+            // Committing a rename also removes the old path, which the HEAD-based index still has.
+            for (const entry of entries) {
+                if (entry.originalPath) {
+                    filesToRemove.push(this.toRepoPath(entry.originalPath));
+                }
+            }
+
             if (stagedEntry) {
                 filesToCopyFromIndex.push(repoPath);
             }
@@ -631,7 +630,8 @@ export class GitService implements vscode.Disposable {
         }
 
         if (filesToRemove.length > 0) {
-            await git.raw(['update-index', '--remove', '--', ...filesToRemove]);
+            // --force-remove also drops a rename source that was re-created in the worktree.
+            await git.raw(['update-index', '--force-remove', '--', ...filesToRemove]);
         }
 
         if (filesToDirectAdd.length > 0) {
@@ -1055,10 +1055,15 @@ export class GitService implements vscode.Disposable {
         const previousStatusFingerprint = this.viewStatusFingerprint;
         const previousBranchFingerprint = this.viewBranchFingerprint;
         this.invalidateStatusCache();
-        await this.getStatusForView();
+        const files = await this.getStatusForView();
+        // Content edits to untracked or binary files leave the status fingerprint unchanged,
+        // but must still clear their reviewed marks in the commit view.
+        const reviewedChanged = (await this._reviewedStateService?.prune(files)) ?? false;
         return {
             commitChanged:
-                previousStatusFingerprint === undefined || previousStatusFingerprint !== this.viewStatusFingerprint,
+                reviewedChanged ||
+                previousStatusFingerprint === undefined ||
+                previousStatusFingerprint !== this.viewStatusFingerprint,
             branchChanged:
                 previousBranchFingerprint === undefined || previousBranchFingerprint !== this.viewBranchFingerprint,
         };
@@ -1101,10 +1106,12 @@ export class GitService implements vscode.Disposable {
 
                 // 2. Staged part (Index)
                 if (file.index !== ' ' && file.index !== '?') {
+                    const originalPath = file.index === 'R' && file.from ? this.toWorkspacePath(file.from) : null;
                     files.push({
                         path: wsPath,
                         status: file.index as GitStatusCode,
                         staged: true,
+                        ...(originalPath ? { originalPath } : {}),
                     });
                 }
 
@@ -1129,37 +1136,30 @@ export class GitService implements vscode.Disposable {
             logger.error('Error getting status:', e);
         }
 
-        // 4. Resolve hunks in bulk. This keeps status refresh responsive for large diffs by
-        // avoiding one `git diff` process per changed file.
+        // 4. Resolve change blocks in bulk with one HEAD-relative diff. Each change has exactly one
+        // identity whether it is staged or not, which keeps changelist assignments stable across
+        // staging. The blocks are attached to the first status entry of each path only.
         const diffStartedAt = Date.now();
         const shouldResolveGitHunks = (file: FileStatus) =>
-            file.status === 'M' || (file.status === 'A' && file.staged) || file.status === 'D';
-
-        const hasStagedDiff = files.some((file) => file.staged && shouldResolveGitHunks(file));
-        const hasWorktreeDiff = files.some((file) => !file.staged && shouldResolveGitHunks(file));
-        const workspacePathspec = this.getWorkspacePathspecArgs();
+            file.status === 'M' || file.status === 'A' || file.status === 'D' || file.status === 'R';
 
         try {
-            const stagedHunks = hasStagedDiff
-                ? await this.parseWorkspaceDiff(['--cached', 'HEAD', ...workspacePathspec], 'index')
+            const headHunks = files.some(shouldResolveGitHunks)
+                ? // Rename detection would give change blocks a rename header that reverse-applies to the
+                  // old path, so a renamed file is identified by its new path as a whole-file addition.
+                  await this.parseWorkspaceDiff(['--no-renames', 'HEAD', ...this.getWorkspacePathspecArgs()], 'head')
                 : new Map<string, GitHunk[]>();
-            const worktreeHunks = hasWorktreeDiff
-                ? await this.parseWorkspaceDiff(workspacePathspec, 'worktree')
-                : new Map<string, GitHunk[]>();
+            const resolvedPaths = new Set<string>();
 
             for (const file of files) {
-                if (this._inactiveChangesService) {
-                    file.inactive = this._inactiveChangesService.isInactive(file.path);
-                    file.inactiveHunkIds = this._inactiveChangesService.getInactiveHunkIds(file.path);
-                }
-
-                if (!shouldResolveGitHunks(file)) {
+                if (!shouldResolveGitHunks(file) || resolvedPaths.has(file.path)) {
                     continue;
                 }
 
-                const hunks = file.staged ? stagedHunks.get(file.path) : worktreeHunks.get(file.path);
+                const hunks = headHunks.get(file.path);
                 if (hunks) {
                     file.hunks = hunks;
+                    resolvedPaths.add(file.path);
                     hunkFileCount++;
                 }
             }
@@ -1244,7 +1244,6 @@ export class GitService implements vscode.Disposable {
 
         const filesToDirectAdd: string[] = [];
         const filesToUpdate: string[] = [];
-        const filesWithPartialStaging: FileStatus[] = [];
 
         for (const filePath of filePaths) {
             const fileStatus = statusMap.get(filePath);
@@ -1259,13 +1258,7 @@ export class GitService implements vscode.Disposable {
                 continue;
             }
 
-            // Exclude entirely inactive files if this is from a bulk operation?
-            // Usually stageFiles/stageFile is an explicit user action on these files.
-            // But we still respect hunk-level inactivity.
-            const hasInactiveHunks = fileStatus.inactiveHunkIds && fileStatus.inactiveHunkIds.length > 0;
-            if (hasInactiveHunks && fileStatus.hunks) {
-                filesWithPartialStaging.push(fileStatus);
-            } else if (fileStatus.status === 'D') {
+            if (fileStatus.status === 'D') {
                 filesToUpdate.push(this.toRepoPath(filePath));
             } else {
                 filesToDirectAdd.push(this.toRepoPath(filePath));
@@ -1279,25 +1272,6 @@ export class GitService implements vscode.Disposable {
 
         if (filesToUpdate.length > 0) {
             await this.git.raw(['add', '-u', '--', ...filesToUpdate]);
-        }
-
-        // Handle partial staging files
-        for (const fileStatus of filesWithPartialStaging) {
-            const filePath = fileStatus.path;
-            const repoPath = this.toRepoPath(filePath);
-
-            await this.git.add(repoPath);
-
-            const inactiveHunks = fileStatus.hunks!.filter((h) => fileStatus.inactiveHunkIds?.includes(h.id));
-            if (inactiveHunks.length > 0) {
-                const combinedPatch = this.buildPatchFromHunks(inactiveHunks);
-
-                try {
-                    await this.applyPatchWithGit(this.git, combinedPatch, true, true);
-                } catch (e) {
-                    console.error(`Failed to exclude hunks for ${filePath}:`, e);
-                }
-            }
         }
     }
 
@@ -1397,8 +1371,7 @@ export class GitService implements vscode.Disposable {
     public async stageAll(): Promise<void> {
         return this.runGitMutation(async () => {
             const currentStatus = await this.getStatus();
-            // Get all files that are not already staged and NOT entirely inactive
-            const filesToStage = currentStatus.filter((f) => !f.staged && !f.inactive).map((f) => f.path);
+            const filesToStage = currentStatus.filter((f) => !f.staged).map((f) => f.path);
 
             if (filesToStage.length > 0) {
                 await this._stageFilesWithSupport(filesToStage);
@@ -1410,10 +1383,7 @@ export class GitService implements vscode.Disposable {
     public async stageTracked(): Promise<void> {
         return this.runGitMutation(async () => {
             const currentStatus = await this.getStatus();
-            // Get all tracked files (not status '?') that are not already staged and NOT entirely inactive
-            const filesToStage = currentStatus
-                .filter((f) => !f.staged && f.status !== '?' && !f.inactive)
-                .map((f) => f.path);
+            const filesToStage = currentStatus.filter((f) => !f.staged && f.status !== '?').map((f) => f.path);
 
             if (filesToStage.length > 0) {
                 await this._stageFilesWithSupport(filesToStage);
@@ -1637,30 +1607,6 @@ export class GitService implements vscode.Disposable {
         return `${hunks[0].fileHeader}\n${hunks.map((h) => h.content).join('\n')}\n`;
     }
 
-    private async _excludeInactiveFromIndex(): Promise<void> {
-        const currentStatus = await this.getStatus();
-        const stagedEntries = currentStatus.filter((file) => file.staged);
-
-        for (const file of stagedEntries) {
-            if (file.inactive) {
-                await this.unstageFile(file.path);
-                continue;
-            }
-
-            const inactiveHunks = file.hunks?.filter((h) => file.inactiveHunkIds?.includes(h.id)) || [];
-            if (inactiveHunks.length === 0) {
-                continue;
-            }
-
-            try {
-                await this.applyPatchWithGit(this.git, this.buildPatchFromHunks(inactiveHunks), true, true);
-            } catch (e) {
-                console.error(`Failed to exclude inactive hunks from index for ${file.path}:`, e);
-                throw e;
-            }
-        }
-    }
-
     public async applyStash(index: number): Promise<void> {
         return this.runGitMutation(async () => {
             await this.git.stash(['apply', `stash@{${index}}`]);
@@ -1708,12 +1654,7 @@ export class GitService implements vscode.Disposable {
                 }
 
                 await this._stageFilesWithSupport(filesToCommit);
-
-                // To ensure Hunk-level exclusions (partial staging) are respected,
-                // we must commit what is currently in the index.
-                // Using a file list with 'git commit' will bypass the index changes we just made via 'apply --cached'.
             }
-            await this._excludeInactiveFromIndex();
             await this.git.commit(message);
             this.fireChange();
         });
@@ -1743,7 +1684,18 @@ export class GitService implements vscode.Disposable {
                 await tempGit.raw(args);
             });
 
-            await this.git.reset(['-q', 'HEAD', '--', ...plan.files.map((filePath) => this.toRepoPath(filePath))]);
+            const committedPaths = new Set(plan.files);
+            for (const file of status) {
+                if (file.originalPath && committedPaths.has(file.path)) {
+                    committedPaths.add(file.originalPath);
+                }
+            }
+            await this.git.reset([
+                '-q',
+                'HEAD',
+                '--',
+                ...Array.from(committedPaths, (filePath) => this.toRepoPath(filePath)),
+            ]);
             this.fireChange();
         });
     }
@@ -1816,8 +1768,6 @@ export class GitService implements vscode.Disposable {
 
             if (files && files.length === 0) {
                 args.push('--only');
-            } else {
-                await this._excludeInactiveFromIndex();
             }
 
             if (message) {

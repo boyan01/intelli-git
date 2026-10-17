@@ -6,7 +6,7 @@ import * as path from 'node:path';
 import type { FileStatus } from '@shared/messages';
 import { GitService } from './GitService';
 import { GitBranchRemoteService } from './GitBranchRemoteService';
-import type { InactiveChangesService } from './InactiveChangesService';
+import { ReviewedStateService } from './ReviewedStateService';
 
 interface GitServiceInternals {
     createEditorGit(envOverrides: NodeJS.ProcessEnv): SimpleGit;
@@ -881,7 +881,7 @@ describe('GitService conflict resolution', () => {
     });
 });
 
-describe('GitService staging inactive changes', () => {
+describe('GitService change blocks and changelist plans', () => {
     let tempDir: string;
     let git: SimpleGit;
 
@@ -897,27 +897,7 @@ describe('GitService staging inactive changes', () => {
         fs.rmSync(tempDir, { recursive: true, force: true });
     });
 
-    it('skips fully inactive files when staging all tracked changes', async () => {
-        fs.writeFileSync(path.join(tempDir, 'active.txt'), 'base\n');
-        fs.writeFileSync(path.join(tempDir, 'inactive.txt'), 'base\n');
-        await git.add(['active.txt', 'inactive.txt']);
-        await git.commit('Initial commit');
-
-        fs.writeFileSync(path.join(tempDir, 'active.txt'), 'active\n');
-        fs.writeFileSync(path.join(tempDir, 'inactive.txt'), 'inactive\n');
-
-        const inactiveChangesService = createInactiveChangesService({
-            inactiveFiles: new Set(['inactive.txt']),
-        });
-        const service = new GitService(tempDir, tempDir, git, inactiveChangesService);
-
-        await service.stageTracked();
-
-        const cachedDiff = await git.diff(['--cached', '--name-only']);
-        expect(cachedDiff.trim().split('\n')).toEqual(['active.txt']);
-    });
-
-    it('keeps inactive hunks out of the index when staging all tracked changes', async () => {
+    it('gives each change one HEAD-relative identity whether it is staged or not', async () => {
         fs.writeFileSync(
             path.join(tempDir, 'partial.txt'),
             [
@@ -941,8 +921,30 @@ describe('GitService staging inactive changes', () => {
 
         fs.writeFileSync(
             path.join(tempDir, 'partial.txt'),
+            ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', '']
+                .map((line) => (line === 'one' ? 'one staged' : line === 'ten' ? 'ten unstaged' : line))
+                .join('\n')
+        );
+        const service = new GitService(tempDir, tempDir, git);
+        const before = (await service.getStatus()).flatMap((file) => file.hunks || []).map((hunk) => hunk.id);
+        expect(before).toHaveLength(2);
+        expect(before.every((id) => id.includes(':head:'))).toBe(true);
+
+        await git.add('partial.txt');
+        fs.appendFileSync(path.join(tempDir, 'partial.txt'), 'appended\n');
+        const status = (await service.getStatus()).filter((file) => file.path === 'partial.txt');
+        expect(status.map((file) => file.staged)).toEqual([true, false]);
+        expect(status[1].hunks).toBeUndefined();
+        const after = status[0].hunks!.map((hunk) => hunk.id);
+        expect(after).toHaveLength(3);
+        expect(after).toEqual(expect.arrayContaining(before));
+    });
+
+    it('commits only the change blocks of the target changelist across staged and unstaged edits', async () => {
+        fs.writeFileSync(
+            path.join(tempDir, 'partial.txt'),
             [
-                'one active',
+                'one',
                 'two',
                 'three',
                 'four',
@@ -951,77 +953,128 @@ describe('GitService staging inactive changes', () => {
                 'seven',
                 'eight',
                 'nine',
-                'ten inactive',
+                'ten',
                 'eleven',
                 'twelve',
                 '',
             ].join('\n')
         );
-
-        const inactiveHunkIds = new Map<string, string[]>();
-        const inactiveChangesService = createInactiveChangesService({ inactiveHunkIds });
-        const service = new GitService(tempDir, tempDir, git, inactiveChangesService);
-        const partialStatus = (await service.getStatus()).find((file) => file.path === 'partial.txt' && !file.staged);
-        expect(partialStatus?.hunks).toHaveLength(2);
-
-        inactiveHunkIds.set('partial.txt', [partialStatus!.hunks![1].id]);
-
-        await service.stageTracked();
-
-        const cachedDiff = await git.diff(['--cached', '--', 'partial.txt']);
-        expect(cachedDiff).toContain('one active');
-        expect(cachedDiff).not.toContain('ten inactive');
-    });
-
-    it('stages active change blocks when nearby blocks share one git hunk', async () => {
-        fs.writeFileSync(path.join(tempDir, 'shared.txt'), ['shared-on-main', 'main-second-line', ''].join('\n'));
-        await git.add('shared.txt');
+        await git.add('partial.txt');
         await git.commit('Initial commit');
 
         fs.writeFileSync(
-            path.join(tempDir, 'shared.txt'),
-            ['', '1 let 2414', 'shared-on-main', '12ce', 'main-second-line', '', '2', '12'].join('\n')
+            path.join(tempDir, 'partial.txt'),
+            ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', '']
+                .map((line) => (line === 'one' ? 'one staged' : line))
+                .join('\n')
+        );
+        await git.add('partial.txt');
+        fs.writeFileSync(
+            path.join(tempDir, 'partial.txt'),
+            ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', '']
+                .map((line) => (line === 'one' ? 'one staged' : line === 'ten' ? 'ten later' : line))
+                .join('\n')
         );
 
-        const inactiveHunkIds = new Map<string, string[]>();
-        const inactiveChangesService = createInactiveChangesService({ inactiveHunkIds });
-        const service = new GitService(tempDir, tempDir, git, inactiveChangesService);
-        const sharedStatus = (await service.getStatus()).find((file) => file.path === 'shared.txt' && !file.staged);
-        expect(sharedStatus?.hunks).toHaveLength(3);
+        const service = new GitService(tempDir, tempDir, git);
+        const status = await service.getStatus();
+        const hunks = status.flatMap((file) => file.hunks || []);
+        const laterHunk = hunks.find((hunk) => hunk.content.includes('ten later'));
+        expect(hunks).toHaveLength(2);
+        expect(laterHunk).toBeTruthy();
 
-        inactiveHunkIds.set('shared.txt', [sharedStatus!.hunks![2].id]);
+        await service.commitChangelistPlan(
+            'Commit first change only',
+            false,
+            {
+                files: ['partial.txt'],
+                excludedFiles: [],
+                excludedHunkIdsByPath: { 'partial.txt': [laterHunk!.id] },
+            },
+            status
+        );
 
-        await service.stageTracked();
-
-        const cachedDiff = await git.diff(['--cached', '--', 'shared.txt']);
-        expect(cachedDiff).toContain('1 let 2414');
-        expect(cachedDiff).toContain('12ce');
-        expect(cachedDiff).not.toMatch(/^\+2$/m);
-        expect(cachedDiff).not.toMatch(/^\+12$/m);
+        const committedContent = await git.show(['HEAD:partial.txt']);
+        expect(committedContent).toContain('one staged');
+        expect(committedContent).not.toContain('ten later');
+        expect(await git.diff(['--cached'])).toBe('');
+        expect(await git.diff(['--', 'partial.txt'])).toContain('ten later');
     });
 
-    it('matches a staged inactive hunk after it is removed from the index', async () => {
-        fs.writeFileSync(path.join(tempDir, 'staged.txt'), 'base\n');
-        await git.add('staged.txt');
+    it('reports a commit view change when a reviewed untracked file is edited again', async () => {
+        fs.writeFileSync(path.join(tempDir, 'tracked.txt'), 'base\n');
+        await git.add('tracked.txt');
+        await git.commit('Initial commit');
+        fs.writeFileSync(path.join(tempDir, 'new.txt'), 'first\n');
+
+        const values: Record<string, unknown> = {};
+        const workspaceState = {
+            get: (key: string) => values[key],
+            update: async (key: string, value: unknown) => {
+                values[key] = value;
+            },
+        };
+        const reviewed = new ReviewedStateService({ workspaceState } as never, tempDir);
+        const service = new GitService(tempDir, tempDir, git, undefined, reviewed);
+        await service.refreshStatusCache();
+        await reviewed.setReviewed(['new.txt'], true);
+        expect((await service.refreshStatusCache()).commitChanged).toBe(false);
+
+        fs.writeFileSync(path.join(tempDir, 'new.txt'), 'second\n');
+        expect((await service.refreshStatusCache()).commitChanged).toBe(true);
+        expect((await reviewed.apply(await service.getStatusForView()))[0].reviewed).toBeUndefined();
+    });
+
+    it('commits a staged rename from a changelist plan without leaving the old path behind', async () => {
+        fs.writeFileSync(path.join(tempDir, 'old.txt'), 'one\ntwo\nthree\n');
+        fs.writeFileSync(path.join(tempDir, 'other.txt'), 'base\n');
+        await git.add(['old.txt', 'other.txt']);
         await git.commit('Initial commit');
 
-        fs.writeFileSync(path.join(tempDir, 'staged.txt'), 'changed\n');
-        await git.add('staged.txt');
+        await git.mv('old.txt', 'new.txt');
+        fs.writeFileSync(path.join(tempDir, 'new.txt'), 'one\ntwo changed\nthree\n');
+        fs.writeFileSync(path.join(tempDir, 'other.txt'), 'later\n');
 
-        const inactiveHunkIds = new Map<string, string[]>();
-        const inactiveChangesService = createInactiveChangesService({ inactiveHunkIds });
-        const service = new GitService(tempDir, tempDir, git, inactiveChangesService);
-        const stagedStatus = (await service.getStatus()).find((file) => file.path === 'staged.txt' && file.staged);
-        expect(stagedStatus?.hunks).toHaveLength(1);
+        const service = new GitService(tempDir, tempDir, git);
+        const status = await service.getStatus();
+        const renamed = status.find((file) => file.path === 'new.txt' && file.staged);
+        expect(renamed?.originalPath).toBe('old.txt');
+        const renamedHunks = status.filter((file) => file.path === 'new.txt').flatMap((file) => file.hunks || []);
+        expect(renamedHunks).toHaveLength(1);
+        expect(renamedHunks[0].fileHeader).not.toContain('rename from');
 
-        const stagedHunk = stagedStatus!.hunks![0];
-        const worktreeHunkId = stagedHunk.id.replace(':index:', ':worktree:');
-        await service.applyPatch(service.buildPatchFromHunks([stagedHunk]), true, true);
-        inactiveHunkIds.set('staged.txt', [worktreeHunkId]);
+        await service.commitChangelistPlan(
+            'Rename file',
+            false,
+            { files: ['new.txt'], excludedFiles: ['other.txt'], excludedHunkIdsByPath: {} },
+            status
+        );
 
-        const worktreeStatus = (await service.getStatus()).find((file) => file.path === 'staged.txt' && !file.staged);
-        expect(worktreeStatus?.hunks?.[0].id).toBe(worktreeHunkId);
-        expect(worktreeStatus?.inactiveHunkIds).toContain(worktreeHunkId);
+        expect(await git.raw(['ls-tree', '--name-only', 'HEAD'])).toBe('new.txt\nother.txt\n');
+        expect(await git.show(['HEAD:new.txt'])).toBe('one\ntwo changed\nthree\n');
+        expect(await git.show(['HEAD:other.txt'])).toBe('base\n');
+        expect(await git.diff(['--cached', '--name-only'])).toBe('');
+    });
+
+    it('removes a rename source from the commit even when the old path was re-created', async () => {
+        fs.writeFileSync(path.join(tempDir, 'old.txt'), 'one\n');
+        await git.add('old.txt');
+        await git.commit('Initial commit');
+
+        await git.mv('old.txt', 'new.txt');
+        fs.writeFileSync(path.join(tempDir, 'old.txt'), 'unrelated new content\n');
+
+        const service = new GitService(tempDir, tempDir, git);
+        const status = await service.getStatus();
+        await service.commitChangelistPlan(
+            'Rename only',
+            false,
+            { files: ['new.txt'], excludedFiles: ['old.txt'], excludedHunkIdsByPath: {} },
+            status
+        );
+
+        expect(await git.raw(['ls-tree', '--name-only', 'HEAD'])).toBe('new.txt\n');
+        expect(fs.readFileSync(path.join(tempDir, 'old.txt'), 'utf8')).toBe('unrelated new content\n');
     });
 
     it('commits deleted files from a changelist plan', async () => {
@@ -1134,42 +1187,6 @@ describe('GitService staging inactive changes', () => {
 
         const headNameStatus = await git.show(['--name-status', '--format=', 'HEAD']);
         expect(headNameStatus.trim()).toBe('A\tsrc/new.txt');
-    });
-
-    it('commits a staged added file when its worktree deletion is excluded', async () => {
-        fs.mkdirSync(path.join(tempDir, 'src'));
-        fs.writeFileSync(path.join(tempDir, 'tracked.txt'), 'base\n');
-        await git.add('tracked.txt');
-        await git.commit('Initial commit');
-
-        fs.writeFileSync(path.join(tempDir, 'src', 'added.txt'), 'new\n');
-        await git.add('src/added.txt');
-        fs.rmSync(path.join(tempDir, 'src', 'added.txt'));
-
-        const service = new GitService(tempDir, tempDir, git);
-        const status = await service.getStatus();
-        const stagedAdd = status.find((file) => file.path === 'src/added.txt' && file.staged && file.status === 'A');
-        const worktreeDelete = status.find(
-            (file) => file.path === 'src/added.txt' && !file.staged && file.status === 'D'
-        );
-        expect(stagedAdd?.hunks).toHaveLength(1);
-        expect(worktreeDelete?.hunks).toHaveLength(1);
-
-        await service.commitChangelistPlan(
-            'Add staged file',
-            false,
-            {
-                files: ['src/added.txt'],
-                excludedFiles: [],
-                excludedHunkIdsByPath: {
-                    'src/added.txt': [worktreeDelete!.hunks![0].id],
-                },
-            },
-            status
-        );
-
-        const headNameStatus = await git.show(['--name-status', '--format=', 'HEAD']);
-        expect(headNameStatus.trim()).toBe('A\tsrc/added.txt');
     });
 
     it('does not apply excluded hunks for files outside the changelist plan', async () => {
@@ -2129,21 +2146,6 @@ describe('GitService branch remote workflows', () => {
         expect(preview.commits[0].files.map((file) => file.path)).toEqual(['feature.txt']);
     });
 });
-
-function createInactiveChangesService(options: {
-    inactiveFiles?: Set<string>;
-    inactiveHunkIds?: Map<string, string[]>;
-}): InactiveChangesService {
-    return {
-        isInactive(filePath: string): boolean {
-            return options.inactiveFiles?.has(filePath) || false;
-        },
-        getInactiveHunkIds(filePath: string): string[] {
-            return options.inactiveHunkIds?.get(filePath) || [];
-        },
-        syncWithStatus(_status: FileStatus[]): void {},
-    } as unknown as InactiveChangesService;
-}
 
 describe('GitService binary revision content', () => {
     it('reads HEAD, index, and stash without UTF-8 conversion', async () => {

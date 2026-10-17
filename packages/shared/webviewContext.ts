@@ -82,8 +82,8 @@ export interface ChangelistRootContext extends BaseWebviewContext {
     canSetActiveChangelist: boolean;
     canDeleteChangelist: boolean;
     hasConflict: boolean;
-    hasInactive: boolean;
-    allInactive: boolean;
+    hasReviewed: boolean;
+    allReviewed: boolean;
     hasStaged: boolean;
     allStaged: boolean;
     hasUntracked: boolean;
@@ -97,8 +97,8 @@ export interface ChangelistRepositoryContext extends BaseWebviewContext {
     repoPath: string;
     paths: string[];
     hasConflict: boolean;
-    hasInactive: boolean;
-    allInactive: boolean;
+    hasReviewed: boolean;
+    allReviewed: boolean;
     hasStaged: boolean;
     allStaged: boolean;
     hasUntracked: boolean;
@@ -114,8 +114,8 @@ export interface ChangelistFolderContext extends BaseWebviewContext {
     path: string;
     paths: string[];
     hasConflict: boolean;
-    hasInactive: boolean;
-    allInactive: boolean;
+    hasReviewed: boolean;
+    allReviewed: boolean;
     hasStaged: boolean;
     allStaged: boolean;
     hasUntracked: boolean;
@@ -136,11 +136,10 @@ export interface ChangelistFileContext extends BaseWebviewContext {
     isConflict: boolean;
     resolvedCandidate?: boolean;
     hasResolvedCandidate?: boolean;
-    isInactive: boolean;
     isUntracked: boolean;
     hasConflict: boolean;
-    hasInactive: boolean;
-    allInactive: boolean;
+    hasReviewed: boolean;
+    allReviewed: boolean;
     hasStaged: boolean;
     allStaged: boolean;
     hasUntracked: boolean;

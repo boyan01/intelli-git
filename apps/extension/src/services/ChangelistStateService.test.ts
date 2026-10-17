@@ -94,24 +94,18 @@ describe('ChangelistStateService', () => {
 
         expect(service.getState()).toEqual({
             mode: 'changes',
-            activeListId: 'review',
+            activeListId: 'changes',
             lists: [
-                {
-                    id: 'review',
-                    name: 'Review',
-                    isDefault: false,
-                    isActive: true,
-                },
                 {
                     id: 'changes',
                     name: 'Changes',
                     isDefault: true,
-                    isActive: false,
+                    isActive: true,
                 },
                 {
-                    id: 'inactive-changes',
-                    name: 'Inactive Changes',
-                    isDefault: true,
+                    id: 'review',
+                    name: 'Review',
+                    isDefault: false,
                     isActive: false,
                 },
             ],
@@ -120,6 +114,148 @@ describe('ChangelistStateService', () => {
                 'src/hunks.ts': { hunkListIds: { keep: 'review' } },
             },
         });
+    });
+
+    it('migrates legacy inactive changes into an ordinary Inactive Changes changelist', () => {
+        const { service, workspaceState } = createServiceWithWorkspaceState({
+            'ideaCommitPanel.changelists.v1._repo': {
+                lists: [{ id: 'changes', name: 'Changes' }],
+                activeListId: 'changes',
+                assignments: {},
+            },
+            'ideaCommitPanel.inactiveChangesV2._repo': {
+                files: {
+                    'src/whole.ts': { all: true },
+                    'src/partial.ts': { hunkIds: ['src/partial.ts:worktree:1:1:1:1:abc'] },
+                },
+            },
+        });
+        const repoService = new ChangelistStateService({ workspaceState } as never, '/repo');
+
+        expect(repoService.getState()).toMatchObject({
+            activeListId: 'changes',
+            lists: [
+                { id: 'changes', isDefault: true },
+                { id: 'inactive-changes', name: 'Inactive Changes', isDefault: false },
+            ],
+            assignments: {
+                'src/whole.ts': { fileListId: 'inactive-changes' },
+                'src/partial.ts': { hunkListIds: { 'src/partial.ts:worktree:1:1:1:1:abc': 'inactive-changes' } },
+            },
+        });
+        expect(workspaceState.values['ideaCommitPanel.inactiveChangesV2._repo']).toBeUndefined();
+        expect(service.getState().lists.map((list) => list.id)).toEqual(['changes']);
+
+        // Legacy index/worktree change block ids are remapped onto HEAD-relative ids.
+        repoService.syncWithStatus([
+            status('src/whole.ts'),
+            status('src/partial.ts', [
+                { ...hunk('src/partial.ts:head:1:1:1:1:def'), oldStart: 1, newStart: 1 },
+                { ...hunk('src/partial.ts:head:40:1:40:1:xyz'), oldStart: 40, newStart: 40 },
+            ]),
+        ]);
+        expect(repoService.getState().assignments['src/partial.ts']).toEqual({
+            hunkListIds: {
+                'src/partial.ts:head:1:1:1:1:def': 'inactive-changes',
+                'src/partial.ts:head:40:1:40:1:xyz': 'changes',
+            },
+        });
+    });
+
+    it('keeps a merged legacy staged and inactive block out of the active changelist', () => {
+        const workspaceState = createWorkspaceState({
+            'ideaCommitPanel.changelists.v1._repo': {
+                lists: [{ id: 'changes', name: 'Changes' }],
+                activeListId: 'changes',
+                assignments: { 'src/a.ts': { hunkListIds: { 'src/a.ts:index:5:1:5:1:aaa': 'changes' } } },
+            },
+            'ideaCommitPanel.inactiveChangesV2._repo': {
+                files: { 'src/a.ts': { hunkIds: ['src/a.ts:worktree:5:1:5:2:bbb'] } },
+            },
+        });
+        const service = new ChangelistStateService({ workspaceState } as never, '/repo');
+
+        service.syncWithStatus([
+            status('src/a.ts', [{ ...hunk('src/a.ts:head:5:1:5:2:ccc'), oldStart: 5, newStart: 5, newLineCount: 2 }]),
+        ]);
+
+        expect(service.getState().assignments['src/a.ts']).toEqual({
+            hunkListIds: { 'src/a.ts:head:5:1:5:2:ccc': 'inactive-changes' },
+        });
+        expect(service.buildCommitPlan([status('src/a.ts', [hunk('src/a.ts:head:5:1:5:2:ccc')])]).files).toEqual([]);
+    });
+
+    it('keeps the changelist of a renamed file and never moves a split source into the active list', async () => {
+        const service = createService();
+        const review = await service.createList('Review');
+        await service.moveFiles(['src/whole.ts'], review.id);
+        await service.moveHunks('src/split.ts', ['h1'], review.id);
+        await service.moveHunks('src/split.ts', ['h2'], 'changes');
+
+        service.syncWithStatus([
+            { path: 'src/whole-renamed.ts', status: 'R', staged: true, originalPath: 'src/whole.ts' },
+            {
+                path: 'src/split-renamed.ts',
+                status: 'R',
+                staged: true,
+                originalPath: 'src/split.ts',
+                hunks: [hunk('src/split-renamed.ts:head:0:0:1:3:abc')],
+            },
+        ]);
+
+        expect(service.getState().assignments).toEqual({
+            'src/whole-renamed.ts': { fileListId: review.id },
+            'src/split-renamed.ts': { hunkListIds: { 'src/split-renamed.ts:head:0:0:1:3:abc': review.id } },
+        });
+    });
+
+    it('migrates legacy inactive changes even when no changelist state was saved yet', () => {
+        const workspaceState = createWorkspaceState({
+            'ideaCommitPanel.inactiveChangesV2._repo': { files: { 'src/whole.ts': { all: true } } },
+        });
+        const service = new ChangelistStateService({ workspaceState } as never, '/repo');
+
+        expect(service.getState().assignments).toEqual({ 'src/whole.ts': { fileListId: 'inactive-changes' } });
+        expect(service.getState().lists.map((list) => list.id)).toEqual(['changes', 'inactive-changes']);
+    });
+
+    it('drops the reserved Inactive Changes list from older states when nothing uses it', () => {
+        const legacyState = (listId: string) => ({
+            lists: [
+                { id: 'changes', name: 'Changes' },
+                { id: 'inactive-changes', name: 'Inactive Changes' },
+                { id: 'review', name: 'Review' },
+            ],
+            activeListId: 'changes',
+            assignments: { 'src/a.ts': { fileListId: listId } },
+        });
+        const listIds = (state: unknown) =>
+            createService(state)
+                .getState()
+                .lists.map((list) => list.id);
+
+        expect(listIds(legacyState('review'))).toEqual(['changes', 'review']);
+        expect(listIds(legacyState('inactive-changes'))).toEqual(['changes', 'review', 'inactive-changes']);
+    });
+
+    it('lets any changelist except the default one be renamed, deleted, or made active', async () => {
+        const service = createService({
+            version: 2,
+            lists: [
+                { id: 'changes', name: 'Changes' },
+                { id: 'inactive-changes', name: 'Inactive Changes' },
+            ],
+            activeListId: 'changes',
+            assignments: {},
+        });
+
+        await service.setActiveList('inactive-changes');
+        expect(service.getState().activeListId).toBe('inactive-changes');
+        await service.renameList('inactive-changes', 'Later');
+        expect(service.getState().lists.find((list) => list.id === 'inactive-changes')?.name).toBe('Later');
+        await service.deleteList('inactive-changes');
+        expect(service.getState()).toMatchObject({ activeListId: 'changes', lists: [{ id: 'changes' }] });
+        await expect(service.renameList('changes', 'Renamed')).rejects.toThrow();
     });
 
     it('stores mode in extension workspace state instead of workspace settings', async () => {
@@ -195,10 +331,6 @@ describe('ChangelistStateService', () => {
                     id: 'changes',
                     isActive: true,
                 },
-                {
-                    id: 'inactive-changes',
-                    isActive: false,
-                },
             ],
             assignments: {
                 'src/file.ts': { fileListId: 'changes' },
@@ -207,7 +339,7 @@ describe('ChangelistStateService', () => {
         });
     });
 
-    it('syncs tracked files to the active changelist and drops stale or untracked assignments', async () => {
+    it('syncs new tracked and untracked files to the active changelist and drops stale assignments', async () => {
         const service = createService();
         const review = await service.createList('Review');
         await service.setActiveList(review.id);
@@ -220,11 +352,22 @@ describe('ChangelistStateService', () => {
                 status: '?',
                 staged: false,
             },
+            {
+                path: 'src/new.ts',
+                status: '?',
+                staged: false,
+            },
+            {
+                path: 'src/conflict.ts',
+                status: 'C',
+                staged: true,
+            },
         ]);
 
         expect(service.getState().assignments).toEqual({
             'src/untracked.ts': { fileListId: 'changes' },
             'src/tracked.ts': { fileListId: review.id },
+            'src/new.ts': { fileListId: review.id },
         });
     });
 
@@ -260,21 +403,20 @@ describe('ChangelistStateService', () => {
             status('src/file.ts', [hunk('h1'), hunk('h2')]),
             status('src/other.ts'),
             {
-                path: 'src/inactive.ts',
-                status: 'M',
-                staged: false,
-                inactive: true,
-            },
-            {
                 path: 'src/untracked.ts',
                 status: '?',
                 staged: false,
             },
+            {
+                path: 'src/conflict.ts',
+                status: 'C',
+                staged: true,
+            },
         ]);
 
         expect(plan).toEqual({
-            files: ['src/file.ts', 'src/other.ts'],
-            excludedFiles: ['src/inactive.ts'],
+            files: ['src/file.ts', 'src/other.ts', 'src/untracked.ts'],
+            excludedFiles: ['src/conflict.ts'],
             excludedHunkIdsByPath: {
                 'src/file.ts': ['h2'],
             },

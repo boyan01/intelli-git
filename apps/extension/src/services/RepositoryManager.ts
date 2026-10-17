@@ -3,8 +3,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 import simpleGit, { type SimpleGit } from 'simple-git';
 import { GitService } from './GitService';
-import { InactiveChangesService } from './InactiveChangesService';
 import { ChangelistStateService } from './ChangelistStateService';
+import { ReviewedStateService } from './ReviewedStateService';
 import { logger } from '../utils/logger';
 
 export interface RepositoryScope {
@@ -245,17 +245,13 @@ export class RepositoryManager implements vscode.Disposable {
             if (!this.repositories.has(repoPath)) {
                 try {
                     const shouldMigrateGlobalState = repoPath === globalStateMigrationRepoPath;
-                    const inactiveService = new InactiveChangesService(
-                        this.context,
-                        repoPath,
-                        shouldMigrateGlobalState
-                    );
                     const changelistService = new ChangelistStateService(
                         this.context,
                         repoPath,
                         shouldMigrateGlobalState
                     );
-                    const gitService = await GitService.create(info.workspaceRoot, inactiveService, changelistService);
+                    const reviewedService = new ReviewedStateService(this.context, info.workspaceRoot, repoPath);
+                    const gitService = await GitService.create(info.workspaceRoot, changelistService, reviewedService);
                     this.repositories.set(repoPath, { service: gitService, info });
                     changed = true;
                 } catch (e) {

@@ -68,6 +68,10 @@ export interface CommitMessageGenerationResult {
     hunkCount: number;
 }
 
+/**
+ * A change block relative to HEAD. Commit view payloads sent to the webview carry only the
+ * identity and line ranges; `fileHeader` and `content` are empty there and stay extension-side.
+ */
 export interface GitHunk {
     id: string; // File path + change block signature (e.g., oldStart/newStart/content hash)
     lineRange: string; // e.g., "L10-20"
@@ -84,12 +88,13 @@ export interface FileStatus {
     displayPath?: string;
     status: GitStatusCode;
     staged: boolean;
-    inactive?: boolean;
+    /** Previous workspace-relative path of a staged rename. */
+    originalPath?: string;
     hunks?: GitHunk[];
-    inactiveHunkIds?: string[];
     resolvedCandidate?: boolean;
     error?: boolean;
-    hasStagedInactive?: boolean;
+    /** The user reviewed the current content of this file; cleared when the file changes again. */
+    reviewed?: boolean;
 }
 
 export interface RepositoryFileReference {
@@ -114,7 +119,6 @@ export interface ChangelistGroup {
     name: string;
     isDefault: boolean;
     items: FileStatus[];
-    hasWarning?: boolean;
     isActive?: boolean;
 }
 
@@ -209,7 +213,6 @@ export interface ChangelistFileSelection {
     path: string;
     status?: string;
     staged?: boolean;
-    inactive?: boolean;
     isConflict?: boolean;
 }
 
@@ -341,7 +344,6 @@ export interface ChangelistMoveRequest {
     targetListId: string;
     paths?: string[];
     hunksByPath?: Record<string, string[]>;
-    activateInactive?: boolean;
 }
 
 export interface WorktreeInfo {
@@ -455,10 +457,7 @@ export interface ExtensionMethods {
     getFileIconTheme: () => Promise<FileIconTheme | null>;
     getLastCommitInfo: () => Promise<LastCommitInfo | null>;
     showErrorMessage: (message: string) => Promise<void>;
-    markHunkInactive: (params: { path: string; repoPath?: string; hunkId: string }) => Promise<void>;
-    markHunkActive: (params: { path: string; repoPath?: string; hunkId: string }) => Promise<void>;
-    markFilesInactive: (paths: FileReferenceInput[]) => Promise<void>;
-    markFilesActive: (paths: FileReferenceInput[]) => Promise<void>;
+    setFilesReviewed: (params: { files: FileReferenceInput[]; reviewed: boolean }) => Promise<void>;
     setChangelistMode: (mode: ChangelistMode) => Promise<void>;
     createChangelist: (name?: string) => Promise<ChangelistInfo | null>;
     renameChangelist: (params: { id: string; name?: string }) => Promise<ChangelistInfo | null>;

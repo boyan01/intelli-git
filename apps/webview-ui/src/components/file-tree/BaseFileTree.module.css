@@ -352,3 +352,34 @@
 .hoverAction[data-action='unstage']:disabled {
     color: color-mix(in srgb, var(--vscode-disabledForeground) 82%, var(--vscode-descriptionForeground));
 }
+
+.reviewedName {
+    opacity: 0.6;
+}
+
+.reviewedMark {
+    width: 17px;
+    height: 17px;
+    border: none;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--vscode-gitDecoration-addedResourceForeground);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+    padding: 0;
+}
+
+.reviewedMark:hover {
+    background: var(--vscode-toolbar-hoverBackground);
+}
+
+.reviewedMark:focus-visible {
+    outline: 1px solid var(--vscode-focusBorder);
+}
+
+.hoverAction[data-action='review'] {
+    color: var(--vscode-descriptionForeground);
+}

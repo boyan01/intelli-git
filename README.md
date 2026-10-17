@@ -17,7 +17,7 @@ Intelli Git brings an IntelliJ IDEA-style Git workflow to VS Code. Organize chan
 ## ✨ Key Features
 
 - 📑 **IntelliJ-Style Changelists:** Organize code into multiple independent changelists. Work on multiple tasks or quick fixes simultaneously, and commit only the active changelist.
-- ⚡ **Dedicated Commit Panel:** Review diffs, stage files, mark changes as inactive, and review conflicts in a separate group. Commit and push from the same panel.
+- ⚡ **Dedicated Commit Panel:** Review diffs, stage files, mark files as reviewed, and review conflicts in a separate group. Commit and push from the same panel.
 - 🌲 **Interactive Git Log & Commit Graph:** Browse commit lanes and topology, filter by branch/author/path, inspect commit diffs, and perform cherry-pick, revert, or branch operations directly from the graph.
 - 🌿 **First-Class Git Worktree Support:** Manage parallel worktrees via a dedicated drawer—switch, reveal, open, or prune stale worktrees.
 - 📦 **Stash & Multi-Repo Tools:** Inspect stash diffs, pop, apply, drop, and switch between multiple workspace repositories.
@@ -57,13 +57,15 @@ Intelli Git supports two commit workflows. Choose one in settings:
 | Feature           | `changes` Mode (IntelliJ Style)                                       | `staged` Mode (Classic Git Style, Default)          |
 | :---------------- | :-------------------------------------------------------------------- | :-------------------------------------------------- |
 | **Commit Target** | Only changes in the **Active Changelist**                             | All changes currently in the **Git Index (Staged)** |
-| **Multitasking**  | Move files/hunks across named changelists                             | Use `Mark as Inactive Changes` to set work aside    |
-| **Context Menus** | `Create Changelist`, `Set Active Changelist`, `Move to Changelist...` | `Stage`, `Unstage`, `Mark as Inactive Changes`      |
+| **Multitasking**  | Move files/hunks across named changelists                             | Keep unstaged work out of the index                 |
+| **Context Menus** | `Create Changelist`, `Set Active Changelist`, `Move to Changelist...` | `Stage`, `Unstage`, `Mark as Reviewed`              |
 | **Best For**      | Parallel tasks, bugfixes mid-feature, clean commits                   | Traditional git add / git commit mental models      |
 
 Move files between changelists from the commit panel. To move an individual hunk, hover over its change block in the editor and choose `Move to Changelist...`.
 
-Inactive changes remain in the working tree and can be moved back to active changes when needed.
+New files appear next to modified files: under `Changes` in `staged` mode, and in their changelist in `changes` mode.
+
+When reviewing changes made by an AI agent, hover a file and click the check mark (or use `Mark as Reviewed`) to dim it. The mark clears automatically when the file changes again.
 
 ---
 
@@ -77,7 +79,7 @@ Group changes by task, isolate work-in-progress, and commit only what is ready.
 
 ### Staged Mode
 
-Stage, unstage, and mark changes as inactive without losing diff context.
+Stage and unstage changes without losing diff context.
 
 ![Intelli Git commit view in staged mode](assets/intelli-git-commit-staged.png)
 

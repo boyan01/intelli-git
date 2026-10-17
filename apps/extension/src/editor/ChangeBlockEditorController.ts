@@ -1,7 +1,6 @@
 import * as vscode from 'vscode';
 import { GitService } from '../services/GitService';
 import { ChangelistStateService } from '../services/ChangelistStateService';
-import { InactiveChangesService } from '../services/InactiveChangesService';
 import { CommitViewProvider } from '../providers/CommitViewProvider';
 import { i18n } from '../utils/i18n';
 import { logger } from '../utils/logger';
@@ -13,18 +12,16 @@ export class ChangeBlockEditorController implements vscode.Disposable {
     private readonly resolver: EditorHunkResolver;
     private readonly statusBarItem: vscode.StatusBarItem;
     private readonly decorationType: vscode.TextEditorDecorationType;
-    private readonly inactiveDecorationType: vscode.TextEditorDecorationType;
     private readonly disposables: vscode.Disposable[] = [];
     private decorationUpdateTimer?: NodeJS.Timeout;
     private contextUpdateTimer?: NodeJS.Timeout;
 
     constructor(
         private readonly gitService: GitService,
-        inactiveChangesService: InactiveChangesService,
         changelistStateService: ChangelistStateService,
         private readonly provider: CommitViewProvider
     ) {
-        this.resolver = new EditorHunkResolver(gitService, inactiveChangesService, changelistStateService);
+        this.resolver = new EditorHunkResolver(gitService, changelistStateService);
         this.statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 95);
         this.statusBarItem.command = 'intelli-git.currentChangeBlock.actions';
         this.decorationType = vscode.window.createTextEditorDecorationType({
@@ -34,16 +31,10 @@ export class ChangeBlockEditorController implements vscode.Disposable {
                 fontStyle: 'normal',
             },
         });
-        this.inactiveDecorationType = vscode.window.createTextEditorDecorationType({
-            backgroundColor: new vscode.ThemeColor('editorUnnecessaryCode.opacity'),
-            overviewRulerColor: new vscode.ThemeColor('editorOverviewRuler.deletedForeground'),
-            overviewRulerLane: vscode.OverviewRulerLane.Right,
-        });
 
         this.disposables.push(
             this.statusBarItem,
             this.decorationType,
-            this.inactiveDecorationType,
             vscode.window.onDidChangeVisibleTextEditors(() => this.scheduleUpdate()),
             vscode.window.onDidChangeActiveTextEditor(() => this.scheduleUpdate()),
             vscode.window.onDidChangeTextEditorSelection(() => this.scheduleUpdateContext()),
@@ -87,7 +78,6 @@ export class ChangeBlockEditorController implements vscode.Disposable {
             clearTimeout(this.contextUpdateTimer);
         }
         void vscode.commands.executeCommand('setContext', 'intelli-git.hasCurrentChangeBlock', false);
-        void vscode.commands.executeCommand('setContext', 'intelli-git.currentChangeBlockInactive', false);
         for (const disposable of this.disposables) {
             disposable.dispose();
         }
@@ -131,23 +121,14 @@ export class ChangeBlockEditorController implements vscode.Disposable {
         const scope = this.getDecorationScope();
         if (scope === 'off' || (scope === 'diffOnly' && !this.isDiffLikeEditor(editor))) {
             editor.setDecorations(this.decorationType, []);
-            editor.setDecorations(this.inactiveDecorationType, []);
             return;
         }
 
         const decorations = await this.resolver.getDecorations(editor);
-        const labelOptions = decorations.map((decoration) => this.createLabelDecoration(editor, decoration));
-        const inactiveOptions = decorations
-            .filter((decoration) => decoration.inactive)
-            .map((decoration) => {
-                const startLine = decoration.startLine - 1;
-                const endLine = decoration.endLine - 1;
-                const endCharacter = editor.document.lineAt(endLine).range.end.character;
-                return new vscode.Range(startLine, 0, endLine, endCharacter);
-            });
-
-        editor.setDecorations(this.decorationType, labelOptions);
-        editor.setDecorations(this.inactiveDecorationType, inactiveOptions);
+        editor.setDecorations(
+            this.decorationType,
+            decorations.map((decoration) => this.createLabelDecoration(editor, decoration))
+        );
     }
 
     private createLabelDecoration(
@@ -170,42 +151,13 @@ export class ChangeBlockEditorController implements vscode.Disposable {
     private createHover(info: EditorHunkInfo): vscode.MarkdownString {
         const markdown = new vscode.MarkdownString(undefined, true);
         markdown.isTrusted = true;
-        const parts: string[] = [];
+        const listName = info.changelist && !info.isActiveChangelist ? info.changelist.name : undefined;
 
-        if (info.mode === 'staged') {
-            parts.push(info.fileStatus.staged ? i18n.t('Staged') : i18n.t('Unstaged'));
-            if (info.inactive) {
-                parts.push(i18n.t('Inactive'));
-            }
-        } else {
-            if (info.changelist && !info.isActiveChangelist) {
-                parts.push(info.changelist.name);
-            }
-            if (info.inactive) {
-                parts.push(i18n.t('Inactive'));
-            }
-        }
-
-        markdown.appendMarkdown(
-            `**Intelli Git**  \n${parts.length > 0 ? parts.join(' · ') : i18n.t('Default change block')}`
-        );
+        markdown.appendMarkdown(`**Intelli Git**  \n${listName || i18n.t('Default change block')}`);
         markdown.appendMarkdown('\n\n');
-
-        if (info.mode === 'changes') {
-            markdown.appendMarkdown(
-                `[${i18n.t('Move to Changelist...')}](${this.createCommandUri('intelli-git.changelist.moveToList', this.createMoveCommandArg(info))})`
-            );
-        } else {
-            markdown.appendMarkdown(
-                `[${info.inactive ? i18n.t('Move to Active Changes') : i18n.t('Mark as Inactive Changes')}](${this.createCommandUri(
-                    info.inactive ? 'intelli-git.moveHunkToActive' : 'intelli-git.moveHunkToInactive',
-                    {
-                        path: info.path,
-                        hunkId: info.hunk.id,
-                    }
-                )})`
-            );
-        }
+        markdown.appendMarkdown(
+            `[${i18n.t('Move to Changelist...')}](${this.createCommandUri('intelli-git.changelist.moveToList', this.createMoveCommandArg(info))})`
+        );
 
         return markdown;
     }
@@ -214,11 +166,6 @@ export class ChangeBlockEditorController implements vscode.Disposable {
         const editor = vscode.window.activeTextEditor;
         const info = editor ? await this.resolver.resolveCurrent(editor) : undefined;
         await vscode.commands.executeCommand('setContext', 'intelli-git.hasCurrentChangeBlock', Boolean(info));
-        await vscode.commands.executeCommand(
-            'setContext',
-            'intelli-git.currentChangeBlockInactive',
-            Boolean(info?.inactive)
-        );
 
         if (!info) {
             this.statusBarItem.hide();
@@ -231,18 +178,6 @@ export class ChangeBlockEditorController implements vscode.Disposable {
     }
 
     private getStatusBarText(info: EditorHunkInfo): string {
-        if (info.mode === 'staged') {
-            const parts = [info.fileStatus.staged ? i18n.t('Staged') : i18n.t('Unstaged')];
-            if (info.inactive) {
-                parts.push(i18n.t('Inactive'));
-            }
-            return parts.join(' · ');
-        }
-
-        if (info.inactive) {
-            return i18n.t('Inactive');
-        }
-
         if (info.changelist && !info.isDefaultChangelist) {
             return info.changelist.name;
         }
@@ -251,11 +186,7 @@ export class ChangeBlockEditorController implements vscode.Disposable {
     }
 
     private getStatusBarTooltip(info: EditorHunkInfo): string {
-        if (info.mode === 'changes') {
-            const listName = info.changelist?.name || 'Changes';
-            return `Intelli Git: ${listName}${info.inactive ? ` · ${i18n.t('Inactive')}` : ''}`;
-        }
-        return `Intelli Git: ${info.fileStatus.staged ? i18n.t('Staged') : i18n.t('Unstaged')}${info.inactive ? ` · ${i18n.t('Inactive')}` : ''}`;
+        return `Intelli Git: ${info.changelist?.name || 'Changes'}`;
     }
 
     private async showCurrentActions(): Promise<void> {
@@ -267,17 +198,9 @@ export class ChangeBlockEditorController implements vscode.Disposable {
         }
 
         const actions: Array<{ label: string; command: string }> = [
+            { label: i18n.t('Move to Changelist...'), command: 'intelli-git.changelist.moveToList' },
             { label: i18n.t('Reveal in Commit Panel'), command: 'intelli-git.revealCurrentChangeBlock' },
         ];
-
-        if (info.mode === 'staged') {
-            actions.unshift({
-                label: info.inactive ? i18n.t('Move to Active Changes') : i18n.t('Mark as Inactive Changes'),
-                command: info.inactive ? 'intelli-git.moveHunkToActive' : 'intelli-git.moveHunkToInactive',
-            });
-        } else {
-            actions.unshift({ label: i18n.t('Move to Changelist...'), command: 'intelli-git.changelist.moveToList' });
-        }
 
         const picked = await vscode.window.showQuickPick(actions, {
             placeHolder: this.getStatusBarTooltip(info),
@@ -308,24 +231,13 @@ export class ChangeBlockEditorController implements vscode.Disposable {
 
         const actions: vscode.CodeAction[] = [];
 
-        if (info.mode === 'changes') {
-            const moveAction = new vscode.CodeAction(i18n.t('Move to Changelist...'), vscode.CodeActionKind.QuickFix);
-            moveAction.command = {
-                command: 'intelli-git.changelist.moveToList',
-                title: i18n.t('Move to Changelist...'),
-                arguments: [this.createMoveCommandArg(info)],
-            };
-            actions.push(moveAction);
-        } else {
-            const inactiveTitle = info.inactive ? i18n.t('Move to Active Changes') : i18n.t('Mark as Inactive Changes');
-            const inactiveAction = new vscode.CodeAction(inactiveTitle, vscode.CodeActionKind.QuickFix);
-            inactiveAction.command = {
-                command: info.inactive ? 'intelli-git.moveHunkToActive' : 'intelli-git.moveHunkToInactive',
-                title: inactiveTitle,
-                arguments: [{ path: info.path, hunkId: info.hunk.id }],
-            };
-            actions.push(inactiveAction);
-        }
+        const moveAction = new vscode.CodeAction(i18n.t('Move to Changelist...'), vscode.CodeActionKind.QuickFix);
+        moveAction.command = {
+            command: 'intelli-git.changelist.moveToList',
+            title: i18n.t('Move to Changelist...'),
+            arguments: [this.createMoveCommandArg(info)],
+        };
+        actions.push(moveAction);
 
         const revealAction = new vscode.CodeAction(i18n.t('Reveal in Commit Panel'), vscode.CodeActionKind.QuickFix);
         revealAction.command = {

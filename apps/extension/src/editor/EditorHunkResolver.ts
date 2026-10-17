@@ -3,15 +3,12 @@ import * as vscode from 'vscode';
 import type { ChangelistInfo, FileStatus, GitHunk } from '@shared/messages';
 import { GitService } from '../services/GitService';
 import { ChangelistStateService } from '../services/ChangelistStateService';
-import { InactiveChangesService } from '../services/InactiveChangesService';
-import { i18n } from '../utils/i18n';
 
 export type EditorDiffSide = 'original' | 'modified';
 
 export interface EditorDocumentTarget {
     relativePath: string;
     side: EditorDiffSide;
-    preferStaged?: boolean;
 }
 
 export interface EditorHunkInfo {
@@ -19,7 +16,6 @@ export interface EditorHunkInfo {
     fileStatus: FileStatus;
     hunk: GitHunk;
     side: EditorDiffSide;
-    inactive: boolean;
     changelist?: ChangelistInfo;
     isDefaultChangelist: boolean;
     isActiveChangelist: boolean;
@@ -37,19 +33,6 @@ export interface EditorHunkMatchTarget extends EditorHunkInfo {
     targetLine: number;
 }
 
-interface LineChangeLike {
-    originalStartLineNumber: number;
-    originalEndLineNumber: number;
-    modifiedStartLineNumber: number;
-    modifiedEndLineNumber: number;
-}
-
-function normalizeLineRange(start: number, end: number): [number, number] {
-    const normalizedStart = start <= 0 ? 1 : start;
-    const normalizedEnd = end <= 0 ? normalizedStart : end;
-    return [normalizedStart, Math.max(normalizedStart, normalizedEnd)];
-}
-
 function lineRangeDistance(lineStart: number, lineEnd: number, hunkStart: number, hunkEnd: number): number {
     if (lineEnd < hunkStart) {
         return hunkStart - lineEnd;
@@ -58,32 +41,6 @@ function lineRangeDistance(lineStart: number, lineEnd: number, hunkStart: number
         return lineStart - hunkEnd;
     }
     return 0;
-}
-
-function scoreHunkLineChange(hunk: GitHunk, lineChange: LineChangeLike | undefined, fallbackLine: number): number {
-    const oldEnd = hunk.oldStart + Math.max(0, hunk.oldLineCount - 1);
-    const newEnd = hunk.newStart + Math.max(0, hunk.newLineCount - 1);
-
-    if (!lineChange) {
-        return Math.min(
-            lineRangeDistance(fallbackLine, fallbackLine, hunk.oldStart, oldEnd),
-            lineRangeDistance(fallbackLine, fallbackLine, hunk.newStart, newEnd)
-        );
-    }
-
-    const [oldStart, oldLineEnd] = normalizeLineRange(
-        lineChange.originalStartLineNumber,
-        lineChange.originalEndLineNumber
-    );
-    const [newStart, newLineEnd] = normalizeLineRange(
-        lineChange.modifiedStartLineNumber,
-        lineChange.modifiedEndLineNumber
-    );
-
-    return Math.min(
-        lineRangeDistance(oldStart, oldLineEnd, hunk.oldStart, oldEnd),
-        lineRangeDistance(newStart, newLineEnd, hunk.newStart, newEnd)
-    );
 }
 
 function scoreHunkLine(hunk: GitHunk, line: number, side: EditorDiffSide): number {
@@ -95,30 +52,16 @@ function scoreHunkLine(hunk: GitHunk, line: number, side: EditorDiffSide): numbe
 
 export function findBestHunkMatch(
     fileStatuses: FileStatus[],
-    lineChange: LineChangeLike | undefined,
-    fallbackLine: number,
-    preferStaged?: boolean,
-    side?: EditorDiffSide
+    line: number,
+    side: EditorDiffSide
 ): { fileStatus: FileStatus; hunk: GitHunk } | undefined {
     let bestMatch: { fileStatus: FileStatus; hunk: GitHunk } | undefined;
     let bestScore = Number.MAX_SAFE_INTEGER;
 
     for (const fileStatus of fileStatuses) {
         for (const hunk of fileStatus.hunks || []) {
-            const score = side
-                ? scoreHunkLine(hunk, fallbackLine, side)
-                : scoreHunkLineChange(hunk, lineChange, fallbackLine);
-            if (score > 1) {
-                continue;
-            }
-
-            if (
-                score < bestScore ||
-                (score === bestScore &&
-                    preferStaged !== undefined &&
-                    fileStatus.staged === preferStaged &&
-                    bestMatch?.fileStatus.staged !== preferStaged)
-            ) {
+            const score = scoreHunkLine(hunk, line, side);
+            if (score <= 1 && score < bestScore) {
                 bestScore = score;
                 bestMatch = { fileStatus, hunk };
             }
@@ -128,16 +71,11 @@ export function findBestHunkMatch(
     return bestMatch;
 }
 
-function getEquivalentHunkIds(hunkId: string): string[] {
-    return [hunkId, hunkId.replace(':index:', ':worktree:'), hunkId.replace(':worktree:', ':index:')];
-}
-
 export class EditorHunkResolver {
     private statusCache?: { status: FileStatus[]; time: number };
 
     constructor(
         private readonly gitService: GitService,
-        private readonly inactiveChangesService: InactiveChangesService,
         private readonly changelistStateService: ChangelistStateService
     ) {}
 
@@ -154,26 +92,21 @@ export class EditorHunkResolver {
         const uri = document.uri;
         let filePath = uri.fsPath;
         let side: EditorDiffSide = 'modified';
-        let preferStaged: boolean | undefined;
 
         if (uri.scheme === 'file') {
-            preferStaged = false;
+            // Worktree files use the modified side of HEAD-relative change blocks.
         } else if (uri.scheme === 'intelli-git-revision') {
             let ref: string;
-            let queryPreferStaged: boolean | undefined;
             try {
                 const query = uri.query ? JSON.parse(uri.query) : {};
                 ref = query.ref || '';
-                queryPreferStaged = typeof query.preferStaged === 'boolean' ? query.preferStaged : undefined;
             } catch {
                 ref = '';
             }
             filePath = path.join(workspaceRoot, uri.path.startsWith('/') ? uri.path.substring(1) : uri.path);
             side = ref === 'HEAD' ? 'original' : 'modified';
-            preferStaged = queryPreferStaged ?? true;
         } else if (uri.scheme === 'git') {
             filePath = uri.path;
-            preferStaged = uri.authority === 'index';
             side = uri.authority === 'HEAD' ? 'original' : 'modified';
         } else {
             return undefined;
@@ -188,7 +121,7 @@ export class EditorHunkResolver {
             return undefined;
         }
 
-        return { relativePath, side, preferStaged };
+        return { relativePath, side };
     }
 
     public async resolveCurrent(editor: vscode.TextEditor): Promise<EditorHunkInfo | undefined> {
@@ -214,20 +147,13 @@ export class EditorHunkResolver {
         line: number
     ): Promise<EditorHunkMatchTarget | undefined> {
         const target = this.getDocumentTarget(document);
-        if (!target) {
+        if (!target || !this.isChangesMode()) {
             return undefined;
         }
 
         const status = await this.getStatus();
         const matchingFiles = await this.gitService.getFileStatusWithHunks(target.relativePath, status);
-        const mode = this.changelistStateService.getState().mode;
-        const match = findBestHunkMatch(
-            matchingFiles,
-            undefined,
-            line,
-            mode === 'staged' ? target.preferStaged : undefined,
-            target.side
-        );
+        const match = findBestHunkMatch(matchingFiles, line, target.side);
 
         if (!match) {
             return undefined;
@@ -240,34 +166,21 @@ export class EditorHunkResolver {
         };
     }
 
+    /** Change block labels only exist in changes mode, where blocks can belong to other changelists. */
     public async getDecorations(editor: vscode.TextEditor): Promise<EditorHunkDecoration[]> {
         const target = this.getDocumentTarget(editor.document);
-        if (!target) {
+        if (!target || !this.isChangesMode()) {
             return [];
         }
 
         const status = await this.getStatus();
         const matchingFiles = await this.gitService.getFileStatusWithHunks(target.relativePath, status);
-        const mode = this.changelistStateService.getState().mode;
         const result: EditorHunkDecoration[] = [];
 
         for (const fileStatus of matchingFiles) {
-            const allowStagedWholeFileInWorktreeEditor =
-                target.preferStaged === false && fileStatus.staged && this.isWholeFileStatus(fileStatus.status);
-
-            if (
-                mode === 'staged' &&
-                target.preferStaged !== undefined &&
-                fileStatus.staged !== target.preferStaged &&
-                !allowStagedWholeFileInWorktreeEditor
-            ) {
-                continue;
-            }
-
             for (const hunk of fileStatus.hunks || []) {
                 const info = this.createHunkInfo(target.relativePath, target.side, fileStatus, hunk);
-                const label = this.getDecorationLabel(info);
-                if (!label) {
+                if (!info.changelist || info.isActiveChangelist) {
                     continue;
                 }
 
@@ -280,12 +193,16 @@ export class EditorHunkResolver {
                     ...info,
                     startLine: line,
                     endLine: end,
-                    label,
+                    label: info.changelist.name,
                 });
             }
         }
 
         return result;
+    }
+
+    private isChangesMode(): boolean {
+        return this.changelistStateService.getState().mode === 'changes';
     }
 
     private async getStatus(): Promise<FileStatus[]> {
@@ -295,7 +212,6 @@ export class EditorHunkResolver {
         }
 
         const status = await this.gitService.getStatus();
-        this.inactiveChangesService.syncWithStatus(status);
         this.changelistStateService.syncWithStatus(status);
         this.statusCache = { status, time: now };
         return status;
@@ -304,17 +220,7 @@ export class EditorHunkResolver {
     private createHunkInfo(path: string, side: EditorDiffSide, fileStatus: FileStatus, hunk: GitHunk): EditorHunkInfo {
         const state = this.changelistStateService.getState();
         const assignment = state.assignments[path];
-        const equivalentHunkIds = getEquivalentHunkIds(hunk.id);
-        const inactiveHunkIds = new Set(
-            fileStatus.inactiveHunkIds || this.inactiveChangesService.getInactiveHunkIds(path)
-        );
-        const inactive = !!fileStatus.inactive || equivalentHunkIds.some((hunkId) => inactiveHunkIds.has(hunkId));
-        const listId =
-            equivalentHunkIds
-                .map((hunkId) => assignment?.hunkListIds?.[hunkId])
-                .find((id): id is string => Boolean(id)) ||
-            assignment?.fileListId ||
-            state.activeListId;
+        const listId = assignment?.hunkListIds?.[hunk.id] || assignment?.fileListId || state.activeListId;
         const changelist = state.lists.find((list) => list.id === listId);
         const isDefaultChangelist = !changelist || changelist.id === 'changes';
         const isActiveChangelist = listId === state.activeListId;
@@ -324,37 +230,10 @@ export class EditorHunkResolver {
             fileStatus,
             hunk,
             side,
-            inactive,
             changelist,
             isDefaultChangelist,
             isActiveChangelist,
             mode: state.mode,
         };
-    }
-
-    private getDecorationLabel(info: EditorHunkInfo): string | undefined {
-        if (info.mode === 'staged') {
-            if (info.inactive && info.fileStatus.staged) {
-                return `${i18n.t('Staged')} · ${i18n.t('Inactive')}`;
-            }
-            if (info.inactive) {
-                return i18n.t('Inactive');
-            }
-            return undefined;
-        }
-
-        if (info.inactive) {
-            return i18n.t('Inactive');
-        }
-
-        if (info.changelist && !info.isActiveChangelist) {
-            return info.changelist.name;
-        }
-
-        return undefined;
-    }
-
-    private isWholeFileStatus(status: string): boolean {
-        return status === '?' || status === 'A' || status === 'D';
     }
 }

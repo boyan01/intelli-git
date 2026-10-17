@@ -5,10 +5,10 @@ import * as path from 'node:path';
 import { ExtensionRpcHandler } from './ExtensionRpcHandler';
 import { GitReadRpcHandler } from './GitReadRpcHandler';
 import { CodexCliLanguageModel } from '../services/CodexCliService';
-import type { ChangelistState } from '@shared/messages';
+import type { ChangelistState, FileStatus } from '@shared/messages';
+import { createHunk } from '../testSupport/hunks';
 import type { ChangelistStateService } from '../services/ChangelistStateService';
 import type { GitService } from '../services/GitService';
-import type { InactiveChangesService } from '../services/InactiveChangesService';
 import type * as vscode from 'vscode';
 import * as vscodeMock from 'vscode';
 
@@ -70,10 +70,7 @@ function createStagedChangelistState(): ChangelistState {
     return {
         mode: 'staged',
         activeListId: 'changes',
-        lists: [
-            { id: 'changes', name: 'Changes', isDefault: true, isActive: true },
-            { id: 'inactive-changes', name: 'Inactive Changes', isDefault: true, isActive: false },
-        ],
+        lists: [{ id: 'changes', name: 'Changes', isDefault: true, isActive: true }],
         assignments: {},
     };
 }
@@ -87,10 +84,7 @@ function createHandler(
     if (!gitServiceMock.getWorkspaceRoot) {
         (gitServiceMock as unknown as { getWorkspaceRoot: () => string }).getWorkspaceRoot = () => '/workspace';
     }
-    // We mock properties accessed via get inactiveChangesService / changelistStateService
-    Object.defineProperty(gitServiceMock, 'inactiveChangesService', {
-        get: () => ({}) as InactiveChangesService,
-    });
+    // We mock properties accessed via get changelistStateService
     Object.defineProperty(gitServiceMock, 'changelistStateService', {
         get: () =>
             ({
@@ -151,9 +145,6 @@ describe('ExtensionRpcHandler commit', () => {
         } as Partial<GitService>;
 
         for (const service of [serviceA, serviceB]) {
-            Object.defineProperty(service, 'inactiveChangesService', {
-                get: () => ({}) as InactiveChangesService,
-            });
             Object.defineProperty(service, 'changelistStateService', {
                 get: () =>
                     ({
@@ -818,19 +809,23 @@ describe('ExtensionRpcHandler no repository state', () => {
             getWorkspaceRoot: () => '/workspace/repo-a',
         } as Partial<GitService>;
         const serviceB = {
-            getStatusForView: vi.fn().mockResolvedValue([{ path: 'b.txt', status: 'M', staged: false }]),
+            getStatusForView: vi.fn().mockResolvedValue([
+                {
+                    path: 'b.txt',
+                    status: 'M',
+                    staged: false,
+                    hunks: [createHunk('b.txt:head:1:1:1:1:abc', 1, 1, 1, 1)],
+                },
+            ]),
             getWorkspaceRoot: () => '/workspace/repo-b',
         } as Partial<GitService>;
+        Object.defineProperty(serviceB, 'reviewedStateService', {
+            get: () => ({
+                apply: async (files: FileStatus[]) => files.map((file) => ({ ...file, reviewed: true })),
+            }),
+        });
 
         for (const service of [serviceA, serviceB]) {
-            Object.defineProperty(service, 'inactiveChangesService', {
-                get: () =>
-                    ({
-                        syncWithStatus: vi.fn(),
-                        isInactive: vi.fn().mockReturnValue(false),
-                        getInactiveHunkIds: vi.fn().mockReturnValue([]),
-                    }) as Partial<InactiveChangesService>,
-            });
             Object.defineProperty(service, 'changelistStateService', {
                 get: () =>
                     ({
@@ -855,14 +850,14 @@ describe('ExtensionRpcHandler no repository state', () => {
 
         expect(state.activeRepository).toEqual(repositoryB);
         expect(state.repositories?.map((item) => item.repository.repoPath)).toEqual([repositoryB.repoPath]);
+        // Reviewed marks are applied and change block content stays in the extension host.
         expect(state.files).toEqual([
             {
                 path: 'b.txt',
                 status: 'M',
                 staged: false,
-                inactive: false,
-                inactiveHunkIds: [],
-                hasStagedInactive: false,
+                reviewed: true,
+                hunks: [{ ...createHunk('b.txt:head:1:1:1:1:abc', 1, 1, 1, 1), fileHeader: '', content: '' }],
             },
         ]);
         expect(serviceA.getStatusForView).not.toHaveBeenCalled();

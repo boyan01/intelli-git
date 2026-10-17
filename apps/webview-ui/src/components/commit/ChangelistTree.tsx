@@ -15,6 +15,7 @@ import type {
     ChangelistRootContext,
 } from '@shared/webviewContext';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { BasicTreeView } from '../common/BasicTreeView';
 import type { TreeNode, BasicTreeViewRef, TreeNodeRenderState } from '../common/BasicTreeView';
 import { FileIcon, FolderIcon } from '../common/FileIcon';
@@ -62,15 +63,13 @@ interface FileNodeData {
     isRepositoryRoot?: boolean;
     hunkIds?: string[];
     isRoot?: boolean;
-    isInactiveGroup?: boolean;
     isStagedGroup?: boolean;
     isConflictGroup?: boolean;
     status?: string;
     staged?: boolean;
-    inactive?: boolean;
+    reviewed?: boolean;
     resolvedCandidate?: boolean;
     fileCount: number;
-    hasWarning?: boolean;
     isAmendCommit?: boolean;
     isAmendFile?: boolean;
     changelistId?: string;
@@ -134,7 +133,7 @@ const buildTree = (
                         isFile: isLast,
                         status: isLast ? file.status : undefined,
                         staged: isLast ? file.staged : undefined,
-                        inactive: isLast ? file.inactive : undefined,
+                        reviewed: isLast ? file.reviewed : undefined,
                         hunkIds: isLast && file.status !== '?' ? file.hunks?.map((hunk) => hunk.id) : undefined,
                         resolvedCandidate: isLast ? file.resolvedCandidate : undefined,
                         splitInfo: isLast
@@ -241,6 +240,85 @@ function getCommonChangelistId(group: WorkspaceChangelistGroup): string | undefi
     return ids.length === 1 ? ids[0] : undefined;
 }
 
+function renderReviewAction(file: FileNodeData, t: TFunction) {
+    if (file.status === 'C' || file.status === 'U') {
+        return null;
+    }
+
+    const title = file.reviewed ? t('Mark as Unreviewed') : t('Mark as Reviewed');
+    return (
+        <button
+            type="button"
+            className={file.reviewed ? styles.reviewedMark : styles.hoverAction}
+            data-action="review"
+            title={title}
+            aria-label={title}
+            aria-pressed={Boolean(file.reviewed)}
+            onClick={async (event) => {
+                event.stopPropagation();
+                await rpc.setFilesReviewed({
+                    files: [{ repoPath: file.repoPath, path: file.path }],
+                    reviewed: !file.reviewed,
+                });
+                emitRefresh(['commit'], 'files-reviewed');
+            }}
+        >
+            <i className="codicon codicon-check" />
+        </button>
+    );
+}
+
+function renderStageAction(node: TreeNode<FileNodeData>, mode: ChangelistState['mode'], t: TFunction) {
+    if (mode !== 'staged') {
+        return null;
+    }
+
+    const actionableFileNodes = getDescendantFiles(node).filter(
+        (file) => (file.status !== 'C' && file.status !== 'U') || Boolean(file.resolvedCandidate)
+    );
+    if (actionableFileNodes.length === 0) {
+        return null;
+    }
+
+    const isAllStaged = actionableFileNodes.every((file) => file.staged);
+    const action = isAllStaged
+        ? {
+              kind: 'unstage' as const,
+              title: t('Unstage'),
+          }
+        : {
+              kind: 'stage' as const,
+              title: t('Stage'),
+          };
+    const refs = Array.from(
+        new Map(
+            actionableFileNodes.map((file) => [
+                getSelectionKey(file.repoPath, file.path),
+                { repoPath: file.repoPath, path: file.path },
+            ])
+        ).values()
+    );
+
+    return (
+        <button
+            type="button"
+            className={styles.hoverAction}
+            title={action.title}
+            onClick={async (event) => {
+                event.stopPropagation();
+                if (action.kind === 'stage') {
+                    await rpc.stageFiles(refs);
+                } else {
+                    await rpc.unstageFiles(refs);
+                }
+                emitRefresh(['commit'], 'files-staged');
+            }}
+        >
+            <i className={`codicon ${action.kind === 'stage' ? 'codicon-add' : 'codicon-remove'}`} />
+        </button>
+    );
+}
+
 export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTreeProps>(
     (
         {
@@ -304,7 +382,7 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
                                       isFile: true,
                                       status: file.status,
                                       staged: file.staged,
-                                      inactive: file.inactive,
+                                      reviewed: file.reviewed,
                                       hunkIds: file.status !== '?' ? file.hunks?.map((hunk) => hunk.id) : undefined,
                                       resolvedCandidate: file.resolvedCandidate,
                                       fileCount: 1,
@@ -354,23 +432,17 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
                     id: `__root__${group.id}`,
                     label: group.name,
                     showOnlyOnDrag:
-                        group.items.length === 0 &&
-                        (group.id === 'staged-changes' || group.id === 'changes' || group.id === 'inactive-changes'),
+                        group.items.length === 0 && (group.id === 'staged-changes' || group.id === 'changes'),
                     data: {
                         path: '',
                         isFile: false,
                         isRoot: true,
-                        isInactiveGroup: group.id === 'inactive-changes',
                         isStagedGroup: group.id === 'staged-changes',
                         isConflictGroup: group.id === CONFLICTING_CHANGES_ID,
                         fileCount: group.repositories.reduce((sum, repoGroup) => sum + repoGroup.group.items.length, 0),
-                        hasWarning: group.hasWarning,
                         changelistId,
                         isActiveChangelist: group.isActive,
-                        isChangelistGroup:
-                            group.id !== 'staged-changes' &&
-                            group.id !== 'untracked-changes' &&
-                            group.id !== CONFLICTING_CHANGES_ID,
+                        isChangelistGroup: group.id !== 'staged-changes' && group.id !== CONFLICTING_CHANGES_ID,
                     },
                     children,
                 });
@@ -449,76 +521,34 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
                 path: node.data.path,
                 status: node.data.status,
                 staged: node.data.staged,
-                inactive: node.data.inactive,
                 isConflict: node.data.status === 'C' || node.data.status === 'U',
             });
         }, []);
 
         const renderTrailing = useCallback(
             (node: TreeNode<FileNodeData>) => {
-                if (node.data?.isRoot && node.data.isChangelistGroup && changelistState.mode === 'changes') {
+                if (!node.data || node.data.isAmendCommit || node.data.isAmendFile) {
                     return null;
                 }
 
-                if (node.data?.isAmendCommit || node.data?.isAmendFile) {
+                if (node.data.isRoot && node.data.isChangelistGroup && changelistState.mode === 'changes') {
                     return null;
                 }
 
-                if (changelistState.mode === 'changes') {
+                const reviewAction = node.data.isFile ? renderReviewAction(node.data, t) : null;
+                const stageAction = renderStageAction(node, changelistState.mode, t);
+                if (!reviewAction && !stageAction) {
                     return null;
                 }
-
-                const fileNodes = getDescendantFiles(node);
-                const actionableFileNodes = fileNodes.filter(
-                    (file) =>
-                        !file.inactive &&
-                        ((file.status !== 'C' && file.status !== 'U') || Boolean(file.resolvedCandidate))
-                );
-                if (actionableFileNodes.length === 0) {
-                    return null;
-                }
-
-                const isAllStaged = actionableFileNodes.every((file) => file.staged);
-                const action = isAllStaged
-                    ? {
-                          kind: 'unstage' as const,
-                          title: t('Unstage'),
-                      }
-                    : {
-                          kind: 'stage' as const,
-                          title: t('Stage'),
-                      };
-                const refs = Array.from(
-                    new Map(
-                        actionableFileNodes.map((file) => [
-                            getSelectionKey(file.repoPath, file.path),
-                            { repoPath: file.repoPath, path: file.path },
-                        ])
-                    ).values()
-                );
 
                 return (
                     <div className={styles.groupTrailing}>
-                        <button
-                            type="button"
-                            className={styles.hoverAction}
-                            title={action.title}
-                            onClick={async (event) => {
-                                event.stopPropagation();
-                                if (action.kind === 'stage') {
-                                    await rpc.stageFiles(refs);
-                                } else {
-                                    await rpc.unstageFiles(refs);
-                                }
-                                emitRefresh(['commit'], 'files-staged');
-                            }}
-                        >
-                            <i className={`codicon ${action.kind === 'stage' ? 'codicon-add' : 'codicon-remove'}`} />
-                        </button>
+                        {reviewAction}
+                        {stageAction}
                     </div>
                 );
             },
-            [changelistState, t]
+            [changelistState.mode, t]
         );
 
         const compactLayout = useCompactFileTreeLayout();
@@ -560,18 +590,6 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
                                         marginLeft: '4px',
                                     }}
                                     aria-hidden="true"
-                                ></span>
-                            )}
-                            {node.data.hasWarning && (
-                                <span
-                                    className={`codicon codicon-warning ${styles.icon}`}
-                                    style={{
-                                        color: 'var(--vscode-notificationsWarningIcon-foreground)',
-                                        marginLeft: '4px',
-                                    }}
-                                    title={t(
-                                        'Some inactive changes in this group are staged externally. They will be automatically excluded by the plugin during commit.'
-                                    )}
                                 ></span>
                             )}
                         </div>
@@ -623,7 +641,7 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
                                 labelColor={isDeleted ? undefined : statusColor}
                             />
                             <span
-                                className={`${styles.name} ${statusClass}`}
+                                className={`${styles.name} ${statusClass} ${node.data.reviewed ? styles.reviewedName : ''}`}
                                 style={isDeleted ? undefined : { color: statusColor }}
                             >
                                 {node.label}
@@ -671,9 +689,9 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
                 const descendantFiles = getDescendantFiles(node);
                 const paths = Array.from(new Set(descendantFiles.map((file) => file.path)));
                 const hasConflict = descendantFiles.some((file) => file.status === 'C' || file.status === 'U');
-                const hasInactive = descendantFiles.some((file) => Boolean(file.inactive));
-                const allInactive =
-                    descendantFiles.length > 0 && descendantFiles.every((file) => Boolean(file.inactive));
+                const hasReviewed = descendantFiles.some((file) => Boolean(file.reviewed));
+                const allReviewed =
+                    descendantFiles.length > 0 && descendantFiles.every((file) => Boolean(file.reviewed));
                 const hasStaged = descendantFiles.some((file) => Boolean(file.staged));
                 const allStaged = descendantFiles.length > 0 && descendantFiles.every((file) => Boolean(file.staged));
                 const hasUntracked = descendantFiles.some((file) => file.status === '?');
@@ -687,8 +705,8 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
                             repoPath: node.data.repoPath,
                             paths,
                             hasConflict,
-                            hasInactive,
-                            allInactive,
+                            hasReviewed,
+                            allReviewed,
                             hasStaged,
                             allStaged,
                             hasUntracked,
@@ -707,15 +725,11 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
                             changelistId: node.data.changelistId,
                             paths,
                             isActiveChangelist: Boolean(node.data.isActiveChangelist),
-                            canSetActiveChangelist: Boolean(
-                                changelist &&
-                                !node.data.isActiveChangelist &&
-                                node.data.changelistId !== 'inactive-changes'
-                            ),
+                            canSetActiveChangelist: Boolean(changelist && !node.data.isActiveChangelist),
                             canDeleteChangelist: Boolean(changelist && !changelist.isDefault),
                             hasConflict,
-                            hasInactive,
-                            allInactive,
+                            hasReviewed,
+                            allReviewed,
                             hasStaged,
                             allStaged,
                             hasUntracked,
@@ -731,8 +745,8 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
                         path: node.id,
                         paths,
                         hasConflict,
-                        hasInactive,
-                        allInactive,
+                        hasReviewed,
+                        allReviewed,
                         hasStaged,
                         allStaged,
                         hasUntracked,
@@ -752,14 +766,10 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
                     isStaged: Boolean(node.data.staged),
                     isConflict: node.data.status === 'C' || node.data.status === 'U',
                     resolvedCandidate: node.data.resolvedCandidate,
-                    isInactive:
-                        changelistState.mode === 'staged'
-                            ? Boolean(node.data.inactive || node.id.startsWith('inactive-changes/'))
-                            : false,
                     isUntracked: node.data.status === '?',
                     hasConflict,
-                    hasInactive,
-                    allInactive,
+                    hasReviewed,
+                    allReviewed,
                     hasStaged,
                     allStaged,
                     hasUntracked,
@@ -782,7 +792,6 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
                 }
 
                 if (changelistState.mode === 'staged') {
-                    if (node.id.startsWith('untracked-changes/')) return false;
                     return Boolean(node.data?.isFile || (!node.data?.isRoot && node.children));
                 }
 
@@ -801,11 +810,7 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
                 }
 
                 if (changelistState.mode === 'staged') {
-                    return (
-                        changelistId === 'staged-changes' ||
-                        changelistId === 'changes' ||
-                        changelistId === 'inactive-changes'
-                    );
+                    return changelistId === 'staged-changes' || changelistId === 'changes';
                 }
 
                 return false;
@@ -824,11 +829,7 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
                     return `__root__${changelistId}`;
                 }
                 if (changelistState.mode === 'staged') {
-                    if (
-                        changelistId === 'staged-changes' ||
-                        changelistId === 'changes' ||
-                        changelistId === 'inactive-changes'
-                    ) {
+                    if (changelistId === 'staged-changes' || changelistId === 'changes') {
                         return `__root__${changelistId}`;
                     }
                 }
@@ -854,33 +855,22 @@ export const ChangelistTree = React.forwardRef<ChangelistTreeRef, ChangelistTree
                 const paths = moveData.paths;
 
                 if (changelistState.mode === 'changes') {
-                    const sourceChangelistId = draggedNode.data?.changelistId;
                     await rpc.moveChangesToChangelist({
                         repoPath: sourceRepoPath,
                         targetListId,
                         paths,
                         hunksByPath: moveData.hunkMap,
-                        activateInactive:
-                            sourceChangelistId === 'inactive-changes' && targetListId !== 'inactive-changes',
                     });
                 } else if (changelistState.mode === 'staged') {
                     if (paths.length === 0) return;
 
                     const sourceChangelistId = draggedNode.data?.changelistId;
+                    const refs = paths.map((path) => ({ repoPath: sourceRepoPath, path }));
 
-                    if (targetListId === 'staged-changes') {
-                        if (sourceChangelistId === 'inactive-changes') {
-                            await rpc.markFilesActive(paths.map((path) => ({ repoPath: sourceRepoPath, path })));
-                        }
-                        await rpc.stageFiles(paths.map((path) => ({ repoPath: sourceRepoPath, path })));
-                    } else if (targetListId === 'changes') {
-                        if (sourceChangelistId === 'staged-changes') {
-                            await rpc.unstageFiles(paths.map((path) => ({ repoPath: sourceRepoPath, path })));
-                        } else if (sourceChangelistId === 'inactive-changes') {
-                            await rpc.markFilesActive(paths.map((path) => ({ repoPath: sourceRepoPath, path })));
-                        }
-                    } else if (targetListId === 'inactive-changes') {
-                        await rpc.markFilesInactive(paths.map((path) => ({ repoPath: sourceRepoPath, path })));
+                    if (targetListId === 'staged-changes' && sourceChangelistId !== 'staged-changes') {
+                        await rpc.stageFiles(refs);
+                    } else if (targetListId === 'changes' && sourceChangelistId === 'staged-changes') {
+                        await rpc.unstageFiles(refs);
                     }
                 }
 

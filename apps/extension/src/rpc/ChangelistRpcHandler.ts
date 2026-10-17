@@ -34,23 +34,9 @@ export class ChangelistRpcHandler {
         return new Map(Array.from(grouped.entries()).map(([repoPath, paths]) => [repoPath, Array.from(paths)]));
     }
 
-    markHunkInactive = async (params: { path: string; repoPath?: string; hunkId: string }): Promise<void> => {
-        await this.getOperations(params.repoPath)?.markHunksInactive(params.path, [params.hunkId]);
-    };
-
-    markHunkActive = async (params: { path: string; repoPath?: string; hunkId: string }): Promise<void> => {
-        await this.getOperations(params.repoPath)?.markHunksActive(params.path, [params.hunkId]);
-    };
-
-    markFilesInactive = async (paths: FileReferenceInput[]): Promise<void> => {
-        for (const [repoPath, repoPaths] of this.groupFileReferences(paths)) {
-            await this.getOperations(repoPath)?.markFilesInactive(repoPaths);
-        }
-    };
-
-    markFilesActive = async (paths: FileReferenceInput[]): Promise<void> => {
-        for (const [repoPath, repoPaths] of this.groupFileReferences(paths)) {
-            await this.getOperations(repoPath)?.markFilesActive(repoPaths);
+    setFilesReviewed = async (params: { files: FileReferenceInput[]; reviewed: boolean }): Promise<void> => {
+        for (const [repoPath, repoPaths] of this.groupFileReferences(params.files)) {
+            await this.getOperations(repoPath)?.setFilesReviewed(repoPaths, params.reviewed);
         }
     };
 

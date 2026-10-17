@@ -343,12 +343,12 @@
         "title": "%intelli-git.commands.changelist.delete.title%"
       },
       {
-        "command": "intelli-git.changelist.markInactive",
-        "title": "%intelli-git.commands.changelist.markInactive.title%"
+        "command": "intelli-git.changelist.markReviewed",
+        "title": "%intelli-git.commands.changelist.markReviewed.title%"
       },
       {
-        "command": "intelli-git.changelist.markActive",
-        "title": "%intelli-git.commands.changelist.markActive.title%"
+        "command": "intelli-git.changelist.markUnreviewed",
+        "title": "%intelli-git.commands.changelist.markUnreviewed.title%"
       },
       {
         "command": "intelli-git.changelist.stage",
@@ -475,14 +475,6 @@
         "title": "%intelli-git.commands.createPatch.save.title%"
       },
       {
-        "command": "intelli-git.moveHunkToInactive",
-        "title": "%intelli-git.commands.moveHunkToInactive.title%"
-      },
-      {
-        "command": "intelli-git.moveHunkToActive",
-        "title": "%intelli-git.commands.moveHunkToActive.title%"
-      },
-      {
         "command": "intelli-git.changelist.createList",
         "title": "%intelli-git.commands.changelist.createList.title%"
       },
@@ -505,11 +497,6 @@
       {
         "command": "intelli-git.revealCurrentChangeBlock",
         "title": "%intelli-git.commands.revealCurrentChangeBlock.title%"
-      },
-      {
-        "command": "intelli-git.hunk.toggleInactive",
-        "title": "%intelli-git.commands.hunk.toggleInactive.title%",
-        "icon": "$(eye-closed)"
       }
     ],
     "keybindings": [
@@ -697,11 +684,11 @@
           "when": "false"
         },
         {
-          "command": "intelli-git.changelist.markInactive",
+          "command": "intelli-git.changelist.markReviewed",
           "when": "false"
         },
         {
-          "command": "intelli-git.changelist.markActive",
+          "command": "intelli-git.changelist.markUnreviewed",
           "when": "false"
         },
         {
@@ -781,14 +768,6 @@
           "when": "false"
         },
         {
-          "command": "intelli-git.moveHunkToInactive",
-          "when": "false"
-        },
-        {
-          "command": "intelli-git.moveHunkToActive",
-          "when": "false"
-        },
-        {
           "command": "intelli-git.changelist.renameList",
           "when": "false"
         },
@@ -806,10 +785,6 @@
         },
         {
           "command": "intelli-git.revealCurrentChangeBlock",
-          "when": "false"
-        },
-        {
-          "command": "intelli-git.hunk.toggleInactive",
           "when": "false"
         },
         {
@@ -1118,7 +1093,7 @@
         },
         {
           "submenu": "intelli-git.createPatch",
-          "when": "((webviewSection == 'changelistFile' || webviewSection == 'changelistFolder' || webviewSection == 'changelistRoot') && (changelistMode == 'changes' || changelistMode == 'staged') && changelistId != 'inactive-changes' && hasConflict != true) || webviewSection == 'gitLogCommitFile'",
+          "when": "((webviewSection == 'changelistFile' || webviewSection == 'changelistFolder' || webviewSection == 'changelistRoot') && (changelistMode == 'changes' || changelistMode == 'staged') && hasConflict != true) || webviewSection == 'gitLogCommitFile'",
           "group": "1_modification@3"
         },
         {
@@ -1138,7 +1113,7 @@
         },
         {
           "command": "intelli-git.changelist.stage",
-          "when": "(webviewSection == 'changelistFile' || webviewSection == 'changelistFolder' || webviewSection == 'changelistRoot') && changelistMode == 'staged' && allInactive != true && allStaged != true && hasConflict != true",
+          "when": "(webviewSection == 'changelistFile' || webviewSection == 'changelistFolder' || webviewSection == 'changelistRoot') && changelistMode == 'staged' && allStaged != true && hasConflict != true",
           "group": "1_modification@0"
         },
         {
@@ -1187,18 +1162,18 @@
           "group": "3_review@1"
         },
         {
-          "command": "intelli-git.changelist.markInactive",
-          "when": "(webviewSection == 'changelistFile' || webviewSection == 'changelistFolder' || webviewSection == 'changelistRoot') && changelistMode == 'staged' && allInactive != true && hasConflict != true",
-          "group": "3_other@1"
+          "command": "intelli-git.changelist.markReviewed",
+          "when": "(webviewSection == 'changelistFile' || webviewSection == 'changelistFolder' || webviewSection == 'changelistRoot') && allReviewed != true && hasConflict != true",
+          "group": "3_review@1"
         },
         {
-          "command": "intelli-git.changelist.markActive",
-          "when": "(webviewSection == 'changelistFile' || webviewSection == 'changelistFolder' || webviewSection == 'changelistRoot') && changelistMode == 'staged' && allInactive == true && hasConflict != true",
-          "group": "3_other"
+          "command": "intelli-git.changelist.markUnreviewed",
+          "when": "(webviewSection == 'changelistFile' || webviewSection == 'changelistFolder' || webviewSection == 'changelistRoot') && hasReviewed == true && hasConflict != true",
+          "group": "3_review@2"
         },
         {
           "command": "intelli-git.changelist.moveToList",
-          "when": "(webviewSection == 'changelistFile' || webviewSection == 'changelistHunk') && changelistMode == 'changes' && isConflict != true && isInactive != true",
+          "when": "(webviewSection == 'changelistFile' || webviewSection == 'changelistHunk') && changelistMode == 'changes' && isConflict != true",
           "group": "1_modification@0"
         },
         {
@@ -1321,16 +1296,6 @@
           "group": "1_history@2"
         },
         {
-          "command": "intelli-git.moveHunkToInactive",
-          "when": "intelli-git.hasCurrentChangeBlock && intelli-git.currentChangeBlockInactive != true && intelli-git.changelistMode == 'staged'",
-          "group": "2_changes@1"
-        },
-        {
-          "command": "intelli-git.moveHunkToActive",
-          "when": "intelli-git.hasCurrentChangeBlock && intelli-git.currentChangeBlockInactive == true && intelli-git.changelistMode == 'staged'",
-          "group": "2_changes@2"
-        },
-        {
           "command": "intelli-git.changelist.moveToList",
           "when": "intelli-git.hasCurrentChangeBlock && intelli-git.changelistMode == 'changes'",
           "group": "2_changes@1"
@@ -1366,12 +1331,12 @@
       "intelli-git.createPatch": [
         {
           "command": "intelli-git.changelist.createPatch.copy",
-          "when": "(webviewSection == 'changelistFile' || webviewSection == 'changelistFolder' || webviewSection == 'changelistRoot') && (changelistMode == 'changes' || changelistMode == 'staged') && changelistId != 'inactive-changes' && hasConflict != true",
+          "when": "(webviewSection == 'changelistFile' || webviewSection == 'changelistFolder' || webviewSection == 'changelistRoot') && (changelistMode == 'changes' || changelistMode == 'staged') && hasConflict != true",
           "group": "1_export@1"
         },
         {
           "command": "intelli-git.changelist.createPatch.save",
-          "when": "(webviewSection == 'changelistFile' || webviewSection == 'changelistFolder' || webviewSection == 'changelistRoot') && (changelistMode == 'changes' || changelistMode == 'staged') && changelistId != 'inactive-changes' && hasConflict != true",
+          "when": "(webviewSection == 'changelistFile' || webviewSection == 'changelistFolder' || webviewSection == 'changelistRoot') && (changelistMode == 'changes' || changelistMode == 'staged') && hasConflict != true",
           "group": "1_export@2"
         },
         {
@@ -1383,13 +1348,6 @@
           "command": "intelli-git.log.file.createPatch.save",
           "when": "webviewSection == 'gitLogCommitFile'",
           "group": "1_export@2"
-        }
-      ],
-      "scm/change/title": [
-        {
-          "command": "intelli-git.hunk.toggleInactive",
-          "when": "originalResourceScheme == 'git'",
-          "group": "navigation@10"
         }
       ]
     },

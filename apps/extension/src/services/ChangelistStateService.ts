@@ -6,9 +6,12 @@ import type {
     ChangelistState,
     FileStatus,
 } from '@shared/messages';
+import { buildLogicalFiles, isConflictStatus, splitFileByChangelist } from '@shared/changelistRouting';
 import { remapHunkValues } from '../utils/hunkIdentity';
 
 interface PersistedChangelistState {
+    /** Absent in states written before inactive changes became an ordinary changelist. */
+    version?: number;
     lists: Array<{ id: string; name: string }>;
     activeListId: string;
     assignments: Record<string, ChangelistAssignment>;
@@ -22,36 +25,20 @@ export interface CommitPlan {
     excludedHunkIdsByPath: Record<string, string[]>;
 }
 
-function hasEquivalentHunkId(hunkId: string, hunkIds: Set<string>): boolean {
-    return (
-        hunkIds.has(hunkId) ||
-        hunkIds.has(hunkId.replace(':index:', ':worktree:')) ||
-        hunkIds.has(hunkId.replace(':worktree:', ':index:'))
-    );
-}
-
-function getEquivalentHunkAssignment(hunkId: string, hunkListIds?: Record<string, string>): string | undefined {
-    if (!hunkListIds) {
-        return undefined;
-    }
-
-    return (
-        hunkListIds[hunkId] ||
-        hunkListIds[hunkId.replace(':index:', ':worktree:')] ||
-        hunkListIds[hunkId.replace(':worktree:', ':index:')]
-    );
+/** Inactive changes data written by releases before inactive changes became an ordinary changelist. */
+interface LegacyInactiveData {
+    files?: Record<string, { all?: boolean; hunkIds?: string[] }>;
 }
 
 export class ChangelistStateService {
     private static readonly STORAGE_KEY = 'ideaCommitPanel.changelists.v1';
     private static readonly MODE_STORAGE_KEY = 'ideaCommitPanel.changelistMode.v1';
+    private static readonly LEGACY_INACTIVE_STORAGE_KEY = 'ideaCommitPanel.inactiveChangesV2';
     private static readonly DEFAULT_LIST_ID = 'changes';
-    private static readonly INACTIVE_LIST_ID = 'inactive-changes';
+    private static readonly LEGACY_INACTIVE_LIST_ID = 'inactive-changes';
+    private static readonly STATE_VERSION = 2;
     private state: PersistedChangelistState = {
-        lists: [
-            { id: ChangelistStateService.DEFAULT_LIST_ID, name: 'Changes' },
-            { id: ChangelistStateService.INACTIVE_LIST_ID, name: 'Inactive Changes' },
-        ],
+        lists: [{ id: ChangelistStateService.DEFAULT_LIST_ID, name: 'Changes' }],
         activeListId: ChangelistStateService.DEFAULT_LIST_ID,
         assignments: {},
     };
@@ -64,13 +51,16 @@ export class ChangelistStateService {
         private readonly migrateGlobalState = false
     ) {
         if (repoPath) {
-            const hash = repoPath.replace(/[^a-zA-Z0-9]/g, '_');
-            this.storageKey = `${ChangelistStateService.STORAGE_KEY}.${hash}`;
+            this.storageKey = `${ChangelistStateService.STORAGE_KEY}.${ChangelistStateService.hashRepoPath(repoPath)}`;
         } else {
             this.storageKey = ChangelistStateService.STORAGE_KEY;
         }
         this.loadState();
         this.ensureInvariants();
+    }
+
+    private static hashRepoPath(repoPath: string): string {
+        return repoPath.replace(/[^a-zA-Z0-9]/g, '_');
     }
 
     private loadState() {
@@ -89,6 +79,60 @@ export class ChangelistStateService {
         if (saved) {
             this.state = saved;
         }
+
+        this.migrateLegacyInactiveChanges();
+    }
+
+    /**
+     * Inactive changes used to live in a separate store and a reserved "Inactive Changes" list.
+     * They are now an ordinary changelist: previously inactive files and change blocks move into
+     * that list, and the reserved list is dropped when nothing was assigned to it.
+     */
+    private migrateLegacyInactiveChanges() {
+        if (this.state.version === ChangelistStateService.STATE_VERSION) {
+            return;
+        }
+
+        const legacyKey = this.repoPath
+            ? `${ChangelistStateService.LEGACY_INACTIVE_STORAGE_KEY}.${ChangelistStateService.hashRepoPath(this.repoPath)}`
+            : ChangelistStateService.LEGACY_INACTIVE_STORAGE_KEY;
+        let legacy = this.context.workspaceState.get<LegacyInactiveData>(legacyKey);
+        if (!legacy && this.repoPath && this.migrateGlobalState) {
+            legacy = this.context.workspaceState.get<LegacyInactiveData>(
+                ChangelistStateService.LEGACY_INACTIVE_STORAGE_KEY
+            );
+        }
+        const listId = ChangelistStateService.LEGACY_INACTIVE_LIST_ID;
+        this.state.assignments = this.state.assignments || {};
+        for (const [path, info] of Object.entries(legacy?.files || {})) {
+            if (info?.all) {
+                this.state.assignments[path] = { fileListId: listId };
+            } else if (info?.hunkIds && info.hunkIds.length > 0) {
+                const assignment = this.state.assignments[path] || {};
+                assignment.hunkListIds = assignment.hunkListIds || {};
+                for (const hunkId of info.hunkIds) {
+                    assignment.hunkListIds[hunkId] = listId;
+                }
+                this.state.assignments[path] = assignment;
+            }
+        }
+
+        const isUsed =
+            this.state.activeListId === listId ||
+            Object.values(this.state.assignments).some(
+                (assignment) =>
+                    assignment?.fileListId === listId || Object.values(assignment?.hunkListIds || {}).includes(listId)
+            );
+        this.state.lists = (this.state.lists || []).filter((list) => list.id !== listId);
+        if (isUsed) {
+            this.state.lists.push({ id: listId, name: 'Inactive Changes' });
+        }
+
+        this.state.version = ChangelistStateService.STATE_VERSION;
+        if (legacy) {
+            void this.context.workspaceState.update(legacyKey, undefined);
+        }
+        void this.saveState();
     }
 
     private async saveState() {
@@ -107,21 +151,8 @@ export class ChangelistStateService {
     }
 
     private ensureInvariants() {
-        if (!this.state.lists || this.state.lists.length === 0) {
-            this.state.lists = [];
-        }
-
-        const ensureList = (id: string, name: string) => {
-            if (!this.state.lists.some((list) => list.id === id)) {
-                this.state.lists.push({ id, name });
-            }
-        };
-
-        ensureList(ChangelistStateService.DEFAULT_LIST_ID, 'Changes');
-        ensureList(ChangelistStateService.INACTIVE_LIST_ID, 'Inactive Changes');
-
         const seen = new Set<string>();
-        this.state.lists = this.state.lists.filter((list) => {
+        this.state.lists = (this.state.lists || []).filter((list) => {
             if (!list.id || seen.has(list.id)) {
                 return false;
             }
@@ -129,17 +160,16 @@ export class ChangelistStateService {
             return true;
         });
 
-        if (!this.state.lists.some((list) => list.id === this.state.activeListId)) {
-            this.state.activeListId =
-                this.state.lists.find((list) => list.id !== ChangelistStateService.INACTIVE_LIST_ID)?.id ||
-                ChangelistStateService.DEFAULT_LIST_ID;
+        if (!this.hasList(ChangelistStateService.DEFAULT_LIST_ID)) {
+            this.state.lists.unshift({ id: ChangelistStateService.DEFAULT_LIST_ID, name: 'Changes' });
         }
 
-        if (this.state.activeListId === ChangelistStateService.INACTIVE_LIST_ID) {
+        if (!this.hasList(this.state.activeListId)) {
             this.state.activeListId = ChangelistStateService.DEFAULT_LIST_ID;
         }
 
-        for (const [path, assignment] of Object.entries(this.state.assignments || {})) {
+        this.state.assignments = this.state.assignments || {};
+        for (const [path, assignment] of Object.entries(this.state.assignments)) {
             if (!assignment) {
                 delete this.state.assignments[path];
                 continue;
@@ -175,9 +205,7 @@ export class ChangelistStateService {
         return this.state.lists.map((list) => ({
             id: list.id,
             name: list.name,
-            isDefault:
-                list.id === ChangelistStateService.DEFAULT_LIST_ID ||
-                list.id === ChangelistStateService.INACTIVE_LIST_ID,
+            isDefault: list.id === ChangelistStateService.DEFAULT_LIST_ID,
             isActive: list.id === this.state.activeListId,
         }));
     }
@@ -214,11 +242,7 @@ export class ChangelistStateService {
 
     public async renameList(id: string, name: string): Promise<ChangelistInfo> {
         const target = this.state.lists.find((list) => list.id === id);
-        if (
-            !target ||
-            id === ChangelistStateService.DEFAULT_LIST_ID ||
-            id === ChangelistStateService.INACTIVE_LIST_ID
-        ) {
+        if (!target || id === ChangelistStateService.DEFAULT_LIST_ID) {
             throw new Error(`Unknown changelist: ${id}`);
         }
 
@@ -228,16 +252,7 @@ export class ChangelistStateService {
     }
 
     public async deleteList(id: string): Promise<void> {
-        if (id === ChangelistStateService.DEFAULT_LIST_ID || id === ChangelistStateService.INACTIVE_LIST_ID) {
-            return;
-        }
-
-        if (this.state.lists.length <= 2) {
-            return;
-        }
-
-        const target = this.state.lists.find((list) => list.id === id);
-        if (!target) {
+        if (id === ChangelistStateService.DEFAULT_LIST_ID || !this.hasList(id)) {
             return;
         }
 
@@ -266,7 +281,7 @@ export class ChangelistStateService {
     }
 
     public async setActiveList(id: string): Promise<void> {
-        if (!this.hasList(id) || id === ChangelistStateService.INACTIVE_LIST_ID) {
+        if (!this.hasList(id)) {
             return;
         }
         this.state.activeListId = id;
@@ -279,10 +294,7 @@ export class ChangelistStateService {
         }
 
         for (const path of paths) {
-            const assignment = this.state.assignments[path] || {};
-            assignment.fileListId = targetListId;
-            delete assignment.hunkListIds;
-            this.state.assignments[path] = assignment;
+            this.state.assignments[path] = { fileListId: targetListId };
         }
 
         await this.saveState();
@@ -305,39 +317,58 @@ export class ChangelistStateService {
         await this.saveState();
     }
 
+    /**
+     * Assigns every new change, including untracked files, to the active changelist and
+     * carries existing change block assignments over when line positions shift.
+     */
     public syncWithStatus(status: FileStatus[]) {
-        const grouped = new Map<string, FileStatus[]>();
-        for (const file of status) {
-            const list = grouped.get(file.path) || [];
-            list.push(file);
-            grouped.set(file.path, list);
-        }
-
+        const files = buildLogicalFiles(status);
+        const paths = new Set(files.map((file) => file.path));
         let changed = false;
 
+        // A rename keeps the changelist of its source path. Change blocks of a renamed file are one
+        // whole-file block, so a source split across lists moves to a non-active list instead of
+        // being committed with the active one.
+        for (const file of files) {
+            const originalPath = file.entries.find((entry) => entry.originalPath)?.originalPath;
+            const source = originalPath ? this.state.assignments[originalPath] : undefined;
+            if (!source || this.state.assignments[file.path]) {
+                continue;
+            }
+
+            const listIds = new Set([
+                ...(source.fileListId ? [source.fileListId] : []),
+                ...Object.values(source.hunkListIds || {}),
+            ]);
+            const listId = Array.from(listIds).find((id) => id !== this.state.activeListId) || this.state.activeListId;
+            this.state.assignments[file.path] = { fileListId: listId };
+            changed = true;
+        }
+
         for (const path of Object.keys(this.state.assignments)) {
-            if (!grouped.has(path)) {
+            if (!paths.has(path)) {
                 delete this.state.assignments[path];
                 changed = true;
             }
         }
 
-        for (const [path, entries] of grouped.entries()) {
-            if (entries.some((entry) => entry.status === '?')) {
+        for (const file of files) {
+            if (isConflictStatus(file.status)) {
                 continue;
             }
 
-            const hunks = Array.from(
-                new Map(entries.flatMap((entry) => (entry.hunks || []).map((hunk) => [hunk.id, hunk]))).values()
-            );
-            const assignment = this.state.assignments[path] || {};
+            const assignment = this.state.assignments[file.path] || {};
 
-            if (hunks.length > 0) {
+            if (file.hunks.length > 0) {
                 const inheritedListId = assignment.fileListId;
+                const activeListId = this.state.activeListId;
                 const nextHunkIds = remapHunkValues(
-                    hunks,
+                    file.hunks,
                     assignment.hunkListIds,
-                    () => inheritedListId || this.state.activeListId
+                    () => inheritedListId || activeListId,
+                    // A block merged from blocks of different lists stays out of the active list
+                    // rather than being committed by accident.
+                    (current, merged) => (current === activeListId ? merged : current)
                 );
 
                 if (JSON.stringify(nextHunkIds) !== JSON.stringify(assignment.hunkListIds || {})) {
@@ -349,17 +380,22 @@ export class ChangelistStateService {
                     delete assignment.fileListId;
                     changed = true;
                 }
-            } else if (!assignment.fileListId) {
-                assignment.fileListId = this.state.activeListId;
-                changed = true;
+            } else {
+                if (!assignment.fileListId) {
+                    // A whole-file change keeps the list of the change blocks it had before.
+                    const previousListIds = new Set(Object.values(assignment.hunkListIds || {}));
+                    assignment.fileListId =
+                        previousListIds.size === 1 ? Array.from(previousListIds)[0] : this.state.activeListId;
+                    changed = true;
+                }
+
+                if (assignment.hunkListIds) {
+                    delete assignment.hunkListIds;
+                    changed = true;
+                }
             }
 
-            if (assignment.hunkListIds && hunks.length === 0) {
-                delete assignment.hunkListIds;
-                changed = true;
-            }
-
-            this.state.assignments[path] = assignment;
+            this.state.assignments[file.path] = assignment;
         }
 
         this.ensureInvariants();
@@ -393,78 +429,42 @@ export class ChangelistStateService {
     ): CommitPlan {
         const requestedFileValues = requestedFiles ? Array.from(requestedFiles) : [];
         const requestedFileSet = requestedFileValues.length > 0 ? new Set(requestedFileValues) : undefined;
-        const grouped = new Map<string, FileStatus[]>();
-        for (const file of status) {
-            const list = grouped.get(file.path) || [];
-            list.push(file);
-            grouped.set(file.path, list);
-        }
 
-        const files = new Set<string>();
-        const excludedFiles = new Set<string>();
+        const files: string[] = [];
+        const excludedFiles: string[] = [];
         const excludedHunkIdsByPath: Record<string, string[]> = {};
 
-        for (const [path, entries] of grouped.entries()) {
-            if (requestedFileSet && !requestedFileSet.has(path)) {
+        for (const file of buildLogicalFiles(status)) {
+            if (requestedFileSet && !requestedFileSet.has(file.path)) {
                 continue;
             }
 
-            const assignment = this.state.assignments[path];
-            if (entries.some((entry) => entry.status === '?')) {
-                const listId = assignment?.fileListId || (requestedFileSet?.has(path) ? targetListId : undefined);
-                if (listId === targetListId) {
-                    files.add(path);
-                } else if (listId) {
-                    excludedFiles.add(path);
-                }
+            if (isConflictStatus(file.status)) {
+                excludedFiles.push(file.path);
                 continue;
             }
 
-            const hunks = Array.from(
-                new Map(entries.flatMap((entry) => (entry.hunks || []).map((hunk) => [hunk.id, hunk]))).values()
+            const slices = splitFileByChangelist(
+                file.hunks,
+                this.state.assignments[file.path],
+                this.state.activeListId
             );
-            const inactiveHunkIds = new Set(entries.flatMap((entry) => entry.inactiveHunkIds || []));
-            const isInactiveFile = entries.some((entry) => entry.inactive);
-
-            if (isInactiveFile) {
-                excludedFiles.add(path);
+            const target = slices.find((slice) => slice.listId === targetListId);
+            if (!target) {
+                excludedFiles.push(file.path);
                 continue;
             }
 
-            if (hunks.length > 0) {
-                const excludedHunks = hunks
-                    .filter(
-                        (hunk) =>
-                            hasEquivalentHunkId(hunk.id, inactiveHunkIds) ||
-                            (getEquivalentHunkAssignment(hunk.id, assignment?.hunkListIds) ||
-                                this.state.activeListId) !== targetListId
-                    )
-                    .map((hunk) => hunk.id);
-
-                if (excludedHunks.length < hunks.length) {
-                    files.add(path);
-                } else {
-                    excludedFiles.add(path);
-                }
-
-                if (excludedHunks.length > 0 && excludedHunks.length < hunks.length) {
-                    excludedHunkIdsByPath[path] = excludedHunks;
-                }
-
-                continue;
-            }
-
-            if ((assignment?.fileListId || this.state.activeListId) === targetListId) {
-                files.add(path);
-            } else {
-                excludedFiles.add(path);
+            files.push(file.path);
+            const excludedHunkIds = slices
+                .filter((slice) => slice !== target)
+                .flatMap((slice) => slice.hunks || [])
+                .map((hunk) => hunk.id);
+            if (excludedHunkIds.length > 0) {
+                excludedHunkIdsByPath[file.path] = excludedHunkIds;
             }
         }
 
-        return {
-            files: Array.from(files),
-            excludedFiles: Array.from(excludedFiles),
-            excludedHunkIdsByPath,
-        };
+        return { files, excludedFiles, excludedHunkIdsByPath };
     }
 }

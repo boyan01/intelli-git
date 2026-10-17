@@ -27,7 +27,6 @@ import {
     getWorkspaceFileStats,
     getWorkspaceSelectedFiles,
     hasWorkspaceTrackedChanges,
-    INACTIVE_CHANGELIST_ID,
     type WorkspaceChangelistGroup,
 } from './changelistModel';
 
@@ -168,10 +167,7 @@ export function CommitView({
             ({
                 mode: 'staged',
                 activeListId: 'changes',
-                lists: [
-                    { id: 'changes', name: t('Changes'), isDefault: true, isActive: true },
-                    { id: INACTIVE_CHANGELIST_ID, name: t('Inactive Changes'), isDefault: true, isActive: false },
-                ],
+                lists: [{ id: 'changes', name: t('Changes'), isDefault: true, isActive: true }],
                 assignments: {},
             }) as ChangelistState,
         [t]

@@ -449,9 +449,8 @@ export async function activate(context: vscode.ExtensionContext) {
         disposeRepoBoundDisposables();
 
         const gitService = repositoryManager.getActiveService();
-        const inactiveChangesService = gitService?.inactiveChangesService;
         const changelistStateService = gitService?.changelistStateService;
-        if (!gitService || !inactiveChangesService || !changelistStateService) {
+        if (!gitService || !changelistStateService) {
             updateRepositoryContext();
             void updateRemoteProviderContext();
             updateChangelistModeContext();
@@ -466,25 +465,15 @@ export async function activate(context: vscode.ExtensionContext) {
         const activeScope = repositoryManager.getActiveScope();
         branchStatusBar = new BranchStatusBar(gitService, activeScope);
         gitLogStatusBar = new GitLogStatusBar(gitService, activeScope);
-        changeBlockEditorController = new ChangeBlockEditorController(
-            gitService,
-            inactiveChangesService,
-            changelistStateService,
-            provider
-        );
+        changeBlockEditorController = new ChangeBlockEditorController(gitService, changelistStateService, provider);
 
         registerStashCommands(repoContext, gitService, provider);
         registerWorktreeCommands(repoContext, gitService, repositoryManager, provider);
         registerBranchCommands(repoContext, gitService, gitLogProvider);
         registerLogCommands(repoContext, gitService);
         registerLogFileCommands(repoContext, gitService);
-        registerChangelistCommands(
-            repoContext,
-            gitService,
-            inactiveChangesService,
-            changelistStateService,
-            provider,
-            (repoPath) => (repoPath ? repositoryManager.getService(repoPath) : repositoryManager.getActiveService())
+        registerChangelistCommands(repoContext, gitService, changelistStateService, provider, (repoPath) =>
+            repoPath ? repositoryManager.getService(repoPath) : repositoryManager.getActiveService()
         );
         registerEditorGitCommands(repoContext, gitService, gitLogProvider);
 

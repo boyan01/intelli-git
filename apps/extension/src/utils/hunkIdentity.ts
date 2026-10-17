@@ -2,7 +2,6 @@ import type { GitHunk } from '@shared/messages';
 
 export interface HunkSignature {
     id: string;
-    side?: 'index' | 'worktree';
     oldStart: number;
     oldLineCount?: number;
     newStart: number;
@@ -12,15 +11,16 @@ export interface HunkSignature {
 const HUNK_MATCH_THRESHOLD = 24;
 
 export function parseHunkSignature(hunkId: string): HunkSignature | null {
-    const newFormatMatch = hunkId.match(/(?::|^)(index|worktree):(\d+):(\d+):(\d+):(\d+):[a-z0-9]+$/);
+    // Older releases tracked index and worktree change blocks separately; their ids still
+    // carry an `index:` or `worktree:` prefix and are remapped onto HEAD-relative blocks.
+    const newFormatMatch = hunkId.match(/(?::|^)(?:head|index|worktree):(\d+):(\d+):(\d+):(\d+):[a-z0-9]+$/);
     if (newFormatMatch) {
         return {
             id: hunkId,
-            side: newFormatMatch[1] as 'index' | 'worktree',
-            oldStart: Number(newFormatMatch[2]),
-            oldLineCount: Number(newFormatMatch[3]),
-            newStart: Number(newFormatMatch[4]),
-            newLineCount: Number(newFormatMatch[5]),
+            oldStart: Number(newFormatMatch[1]),
+            oldLineCount: Number(newFormatMatch[2]),
+            newStart: Number(newFormatMatch[3]),
+            newLineCount: Number(newFormatMatch[4]),
         };
     }
 
@@ -39,7 +39,6 @@ export function parseHunkSignature(hunkId: string): HunkSignature | null {
 export function signatureFromHunk(hunk: GitHunk): HunkSignature {
     return {
         id: hunk.id,
-        side: hunk.id.includes(':index:') ? 'index' : hunk.id.includes(':worktree:') ? 'worktree' : undefined,
         oldStart: hunk.oldStart,
         oldLineCount: hunk.oldLineCount,
         newStart: hunk.newStart,
@@ -48,23 +47,24 @@ export function signatureFromHunk(hunk: GitHunk): HunkSignature {
 }
 
 export function getHunkMatchScore(previous: HunkSignature, current: HunkSignature): number {
-    if (previous.side && current.side && previous.side !== current.side) {
-        return Number.MAX_SAFE_INTEGER;
-    }
-
-    const sidePenalty = previous.side || current.side ? 0 : 4;
     const oldStartDelta = Math.abs(previous.oldStart - current.oldStart);
     const newStartDelta = Math.abs(previous.newStart - current.newStart);
     const oldCountDelta = Math.abs((previous.oldLineCount ?? 1) - (current.oldLineCount ?? 1));
     const newCountDelta = Math.abs((previous.newLineCount ?? 1) - (current.newLineCount ?? 1));
 
-    return sidePenalty + oldStartDelta * 2 + newStartDelta * 2 + oldCountDelta + newCountDelta;
+    return oldStartDelta * 2 + newStartDelta * 2 + oldCountDelta + newCountDelta;
 }
 
+/**
+ * Carries values over from previous change block ids to the current ones by line position.
+ * When several previous blocks merge into one current block (for example a staged and an
+ * unstaged edit of the same lines), `mergeValues` decides which value the merged block keeps.
+ */
 export function remapHunkValues<T>(
     hunks: GitHunk[],
     previousValues: Record<string, T> | undefined,
-    createDefaultValue: (hunkId: string) => T
+    createDefaultValue: (hunkId: string) => T,
+    mergeValues: (current: T, merged: T) => T = (current) => current
 ): Record<string, T> {
     const nextValues: Record<string, T> = {};
     if (!previousValues) {
@@ -76,6 +76,7 @@ export function remapHunkValues<T>(
 
     const currentIds = new Set(hunks.map((hunk) => hunk.id));
     const unmatchedHunks = new Map(hunks.map((hunk) => [hunk.id, signatureFromHunk(hunk)]));
+    const remappedHunks = new Map<string, HunkSignature>();
     const staleEntries: Array<[HunkSignature, T]> = [];
 
     for (const [hunkId, value] of Object.entries(previousValues)) {
@@ -91,11 +92,11 @@ export function remapHunkValues<T>(
         }
     }
 
-    for (const [previousSignature, value] of staleEntries) {
+    const findBestMatch = (previousSignature: HunkSignature, candidates: Iterable<HunkSignature>) => {
         let bestMatch: HunkSignature | null = null;
         let bestScore = Number.MAX_SAFE_INTEGER;
 
-        for (const currentSignature of unmatchedHunks.values()) {
+        for (const currentSignature of candidates) {
             const score = getHunkMatchScore(previousSignature, currentSignature);
             if (score < bestScore) {
                 bestScore = score;
@@ -103,9 +104,21 @@ export function remapHunkValues<T>(
             }
         }
 
-        if (bestMatch && bestScore <= HUNK_MATCH_THRESHOLD) {
-            nextValues[bestMatch.id] = value;
-            unmatchedHunks.delete(bestMatch.id);
+        return bestMatch && bestScore <= HUNK_MATCH_THRESHOLD ? bestMatch : null;
+    };
+
+    for (const [previousSignature, value] of staleEntries) {
+        const unmatched = findBestMatch(previousSignature, unmatchedHunks.values());
+        if (unmatched) {
+            nextValues[unmatched.id] = value;
+            unmatchedHunks.delete(unmatched.id);
+            remappedHunks.set(unmatched.id, unmatched);
+            continue;
+        }
+
+        const merged = findBestMatch(previousSignature, remappedHunks.values());
+        if (merged) {
+            nextValues[merged.id] = mergeValues(nextValues[merged.id], value);
         }
     }
 
@@ -114,44 +127,4 @@ export function remapHunkValues<T>(
     }
 
     return nextValues;
-}
-
-export function remapHunkIdSet(hunks: GitHunk[], previousHunkIds: string[]): string[] {
-    const currentIds = new Set(hunks.map((hunk) => hunk.id));
-    const unmatchedHunks = new Map(hunks.map((hunk) => [hunk.id, signatureFromHunk(hunk)]));
-    const nextHunkIds = new Set<string>();
-    const staleSignatures: HunkSignature[] = [];
-
-    for (const hunkId of previousHunkIds) {
-        if (currentIds.has(hunkId)) {
-            nextHunkIds.add(hunkId);
-            unmatchedHunks.delete(hunkId);
-            continue;
-        }
-
-        const signature = parseHunkSignature(hunkId);
-        if (signature) {
-            staleSignatures.push(signature);
-        }
-    }
-
-    for (const previousSignature of staleSignatures) {
-        let bestMatch: HunkSignature | null = null;
-        let bestScore = Number.MAX_SAFE_INTEGER;
-
-        for (const currentSignature of unmatchedHunks.values()) {
-            const score = getHunkMatchScore(previousSignature, currentSignature);
-            if (score < bestScore) {
-                bestScore = score;
-                bestMatch = currentSignature;
-            }
-        }
-
-        if (bestMatch && bestScore <= HUNK_MATCH_THRESHOLD) {
-            nextHunkIds.add(bestMatch.id);
-            unmatchedHunks.delete(bestMatch.id);
-        }
-    }
-
-    return Array.from(nextHunkIds);
 }
