@@ -3,6 +3,8 @@ import { AI_GENERATION_TIMEOUT_MS } from '@shared/messages';
 import { vscode } from './vscode';
 import type {
     CommitAiAction,
+    ConflictResolverContextActionRequest,
+    ConflictResolverOpenRequest,
     ExtensionMethods,
     FileDiagnosticsChange,
     GitLogRevealRequest,
@@ -28,6 +30,8 @@ export class EventStream<T> {
 
 export const rpcEvents = {
     activeFileChange: new EventStream<{ path: string; commitHash?: string }>(),
+    revealConflictResolverFile: new EventStream<ConflictResolverOpenRequest>(),
+    conflictResolverAction: new EventStream<ConflictResolverContextActionRequest>(),
     revealLog: new EventStream<GitLogRevealRequest>(),
     filterLogByBranch: new EventStream<{ branch: string }>(),
     refresh: new EventStream<RefreshEvent>(),
@@ -63,6 +67,8 @@ export const rpc = _rpc.proxy;
 
 _rpc.registerAll({
     activeFileChange: (params) => rpcEvents.activeFileChange.emit(params),
+    revealConflictResolverFile: (params) => rpcEvents.revealConflictResolverFile.emit(params),
+    triggerConflictResolverAction: (params) => rpcEvents.conflictResolverAction.emit(params),
     revealLog: (params) => rpcEvents.revealLog.emit(params),
     filterLogByBranch: (params) => rpcEvents.filterLogByBranch.emit(params),
     refresh: (event) => rpcEvents.refresh.emit(event),

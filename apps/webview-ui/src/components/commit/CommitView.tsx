@@ -351,7 +351,7 @@ export function CommitView({
     }, []);
 
     const handleOpenConflict = useCallback((file: RepositoryFileReference) => {
-        void rpc.openFile(file);
+        void rpc.openConflictResolver(file);
     }, []);
 
     const hasUnresolvedConflicts = useMemo(
