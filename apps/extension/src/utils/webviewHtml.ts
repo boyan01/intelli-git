@@ -39,9 +39,7 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
     // Monaco replaces visible rows with HTML that contains inline layout attributes and
     // runs its worker from a blob URL. Only the Monaco webview gets those relaxations;
     // every script stays nonce-restricted in both policies.
-    const monacoPolicy = monacoEditor
-        ? ` style-src-attr 'unsafe-inline'; worker-src ${webview.cspSource} blob:;`
-        : '';
+    const monacoPolicy = monacoEditor ? ` style-src-attr 'unsafe-inline'; worker-src ${webview.cspSource} blob:;` : '';
     const csp =
         `default-src 'none'; style-src ${webview.cspSource}; font-src ${webview.cspSource}; ` +
         `img-src ${webview.cspSource}; script-src 'nonce-${nonce}' ${webview.cspSource}; ` +
