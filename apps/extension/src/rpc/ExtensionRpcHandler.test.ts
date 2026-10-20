@@ -589,6 +589,60 @@ describe('ExtensionRpcHandler push', () => {
     });
 });
 
+describe('ExtensionRpcHandler conflict resolver', () => {
+    it('pins a resolver opened without repoPath to the current repository', async () => {
+        const openConflictResolver = vi.fn();
+        const gitService = {
+            getWorkspaceRoot: () => '/workspace/repository',
+        } as Partial<GitService>;
+        const handler = new ExtensionRpcHandler({
+            context: {} as vscode.ExtensionContext,
+            repositoryManager: { getActiveService: () => gitService as GitService } as any,
+            openConflictResolver,
+        });
+
+        await handler.openConflictResolver({ path: 'conflict.txt' });
+
+        expect(openConflictResolver).toHaveBeenCalledWith({
+            path: 'conflict.txt',
+            repoPath: '/workspace/repository',
+        });
+    });
+
+    it('always forwards the complete conflict snapshot for whole-side resolution', async () => {
+        const resolveConflict = vi.fn().mockResolvedValue(undefined);
+        const handler = createHandler({ resolveConflict });
+
+        await handler.resolveConflict({
+            path: 'conflict.txt',
+            side: 'ours',
+            stageSignature: 'stage-signature',
+            resultFingerprint: 'result-fingerprint',
+        });
+
+        expect(resolveConflict).toHaveBeenCalledWith('conflict.txt', 'ours', {
+            stageSignature: 'stage-signature',
+            resultFingerprint: 'result-fingerprint',
+        });
+    });
+
+    it('confirms discarding merge edits before restarting whitespace comparison', async () => {
+        vscodeTestMock.__resetWindowMessages();
+        vscodeTestMock.__setWarningMessageResponse('Discard Changes and Restart');
+        const handler = createHandler({});
+
+        await expect(handler.confirmConflictResolverRestart()).resolves.toBe(true);
+
+        expect(vscodeTestMock.__getWarningMessages()).toEqual([
+            {
+                message:
+                    'Changing whitespace comparison requires restarting the merge. Reviewed changes and result edits will be discarded.',
+                args: [{ modal: true }, 'Discard Changes and Restart'],
+            },
+        ]);
+    });
+});
+
 describe('ExtensionRpcHandler review branch', () => {
     it('persists review branch options in workspace state scoped to the repository', async () => {
         const storageKey = 'ideaCommitPanel.reviewBranchOptions.v1._workspace_repo';

@@ -21,12 +21,16 @@ import type {
     CommitMessageGenerationMode,
     CommitMessageGenerationRequest,
     CommitMessageGenerationResult,
+    ConflictResolverOpenRequest,
     FileIconTheme,
     PushFailedResult,
     PushFailureCode,
     PushRequest,
     PublishReviewBranchResult,
     CommitDetails,
+    ConflictFileContent,
+    ResolveConflictRequest,
+    SaveConflictResolutionRequest,
     PublishReviewBranchRequest,
 } from '@shared/messages';
 import { GitService } from '../services/GitService';
@@ -222,6 +226,8 @@ export interface ExtensionRpcHandlerOptions {
     onChangelistSelectionChange?: (selection: ChangelistFileSelection | null) => void;
     onChangelistFocusChange?: (focused: boolean) => void;
     consumePendingGitLogReveal?: () => GitLogRevealRequest | undefined;
+    openConflictResolver?: (file: ConflictResolverOpenRequest) => void;
+    updateConflictResolverTitle?: (file: RepositoryFileReference) => void;
     getFileIconTheme?: () => Promise<FileIconTheme | null>;
 }
 
@@ -235,6 +241,8 @@ export class ExtensionRpcHandler {
     private onDispose: () => void;
     private onChangelistSelectionChange?: (selection: ChangelistFileSelection | null) => void;
     private onChangelistFocusChange?: (focused: boolean) => void;
+    private openConflictResolverPanel?: (file: ConflictResolverOpenRequest) => void;
+    private updateConflictResolverPanelTitle?: (file: RepositoryFileReference) => void;
     private fileIconThemeProvider?: () => Promise<FileIconTheme | null>;
     private gitReadRpcHandler: GitReadRpcHandler;
     private changelistRpcHandler: ChangelistRpcHandler;
@@ -246,6 +254,8 @@ export class ExtensionRpcHandler {
         this.onDispose = options.onDispose || (() => {});
         this.onChangelistSelectionChange = options.onChangelistSelectionChange;
         this.onChangelistFocusChange = options.onChangelistFocusChange;
+        this.openConflictResolverPanel = options.openConflictResolver;
+        this.updateConflictResolverPanelTitle = options.updateConflictResolverTitle;
         this.fileIconThemeProvider = options.getFileIconTheme;
         this.gitReadRpcHandler = new GitReadRpcHandler(this.repositoryManager, options.consumePendingGitLogReveal);
         this.changelistRpcHandler = new ChangelistRpcHandler(
@@ -687,6 +697,12 @@ export class ExtensionRpcHandler {
             pickBranch: this.pickBranch,
             continueRebase: this.continueRebase,
             abortRebase: this.abortRebase,
+            openConflictResolver: this.openConflictResolver,
+            updateConflictResolverTitle: this.updateConflictResolverTitle,
+            getConflictFileContent: this.getConflictFileContent,
+            confirmConflictResolverRestart: this.confirmConflictResolverRestart,
+            saveConflictResolution: this.saveConflictResolution,
+            resolveConflict: this.resolveConflict,
             openFile: this.openFile,
             openStashDiff: this.openStashDiff,
             getBranchListData: this.gitReadRpcHandler.getBranchListData,
@@ -757,6 +773,19 @@ export class ExtensionRpcHandler {
                 'Force push to {0}/{1}? This can overwrite remote commits. Intelli Git will use --force-with-lease to avoid overwriting newer remote updates.',
                 params.remote,
                 params.branch
+            ),
+            { modal: true },
+            action
+        );
+
+        return selected === action;
+    };
+
+    confirmConflictResolverRestart = async (): Promise<boolean> => {
+        const action = i18n.t('Discard Changes and Restart');
+        const selected = await vscode.window.showWarningMessage(
+            i18n.t(
+                'Changing whitespace comparison requires restarting the merge. Reviewed changes and result edits will be discarded.'
             ),
             { modal: true },
             action
@@ -1873,6 +1902,62 @@ export class ExtensionRpcHandler {
             vscode.window.showInformationMessage(i18n.t('extension.rebaseAborted'));
         } catch (e) {
             vscode.window.showErrorMessage(i18n.t('extension.abortRebaseFailed', `${e}`));
+        }
+    };
+
+    openConflictResolver = async (params: ConflictResolverOpenRequest): Promise<void> => {
+        const request = params.repoPath ? params : { ...params, repoPath: this.gitService.getWorkspaceRoot() };
+        if (this.openConflictResolverPanel) {
+            this.openConflictResolverPanel(request);
+            return;
+        }
+
+        await vscode.commands.executeCommand('intelli-git.openConflictResolver', request);
+    };
+
+    updateConflictResolverTitle = async (params: { path: string; repoPath?: string }): Promise<void> => {
+        this.updateConflictResolverPanelTitle?.({
+            path: params.path,
+            repoPath: params.repoPath,
+        });
+    };
+
+    getConflictFileContent = async (params: { path: string; repoPath?: string }): Promise<ConflictFileContent> => {
+        const content = await this.getServiceForRepo(params.repoPath).getConflictFileContent(params.path);
+        return {
+            ...content,
+            repoPath: params.repoPath,
+        };
+    };
+
+    saveConflictResolution = async (params: SaveConflictResolutionRequest): Promise<void> => {
+        try {
+            await this.getServiceForRepo(params.repoPath).saveConflictResolution(
+                params.path,
+                params.content,
+                {
+                    stageSignature: params.stageSignature,
+                    resultFingerprint: params.resultFingerprint,
+                },
+                params.resultExists
+            );
+            await vscode.commands.executeCommand('intelli-git.refresh');
+        } catch (e) {
+            vscode.window.showErrorMessage(i18n.t('extension.resolveConflictFailed', `${e}`));
+            throw e;
+        }
+    };
+
+    resolveConflict = async (params: ResolveConflictRequest): Promise<void> => {
+        try {
+            await this.getServiceForRepo(params.repoPath).resolveConflict(params.path, params.side, {
+                stageSignature: params.stageSignature,
+                resultFingerprint: params.resultFingerprint,
+            });
+            await vscode.commands.executeCommand('intelli-git.refresh');
+        } catch (e) {
+            vscode.window.showErrorMessage(i18n.t('extension.resolveConflictFailed', `${e}`));
+            throw e;
         }
     };
 
