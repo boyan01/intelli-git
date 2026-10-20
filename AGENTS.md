@@ -267,13 +267,20 @@ Improve AI provider setup flow
 - File items 不得显示 hunk child nodes。
 - 如果已支持，changelist roots 之间的 drag and drop 文件重分配行为应继续可用。
 
-### Conflict Resolver Behavior
-- 点击或双击 conflict file 时，必须在 VS Code editor 区域打开 Intelli Git 自己的 conflict resolver webview，不应走普通 open file 路径，也不得把 merge editor 嵌在 commit view 侧边栏里。
-- Conflict resolver 通过 shared RPC 从 Git index stages 读取 base/current/incoming，通过 worktree 读取 result；webview 不得直接推断 Git stages。
-- `Accept Current Change` / `Accept Incoming Change` 必须保留 `repoPath` 并路由到对应 repository 的 Git service。
-- `Mark as Resolved` 必须写入 result content、执行 `git add`、刷新 commit view；失败时 resolver 不能关闭。
-- 二进制 conflict files 可以显示在 `Conflicting Changes` root 下，但 inline editing 可以禁用并给出明确反馈。
-- Rebase continue 只能在没有 unresolved conflict files 时可用；只有存在、非二进制、无 conflict markers 的文本文件才能作为 `resolvedCandidate` 自动放行。
+### Conflict File Behavior
+- Intelli Git 的 three-way merge editor（conflict resolver）是 opt-in 功能，由配置项 `intelli-git.mergeEditor.enabled` 控制，默认关闭。点击时读取该配置，修改后无需 reload。
+- 配置关闭（默认）时：点击或双击 conflict file 在 VS Code 标准 editor 中打开该文件，由 VS Code 自带的 conflict 能力处理内容编辑；commit view 的 `Mark as Resolved` 只对 `resolvedCandidate` 文件执行 `git add` 并刷新 commit view。
+- 配置开启时：点击或双击 conflict file 必须在 VS Code editor 区域打开 Intelli Git conflict resolver webview，不得把 merge editor 嵌在 commit view 侧边栏里。
+  - Conflict resolver 通过 shared RPC 从 Git index stages 读取 base/current/incoming，通过 worktree 读取 result；webview 不得直接推断 Git stages。
+  - Resolver 的 `Apply` 必须写入 result content、执行 `git add`、刷新 commit view；失败时 resolver 不能关闭。
+  - 二进制 conflict files 在 resolver 中可以禁用 inline editing，但必须给出明确反馈并支持 whole-side accept。
+- 两种配置共用：commit view 的 `Accept Current Change` / `Accept Incoming Change` 必须保留 `repoPath` 并路由到对应 repository 的 Git service；二进制 conflict files 显示在 `Conflicting Changes` root 下，可通过 whole-side accept 解决。
+- Rebase continue 只能在没有 unresolved conflict files 时可用；只有存在、非二进制、无 conflict markers 的文本文件才能作为 `resolvedCandidate` 自动放行。该规则与 merge editor 配置无关。
+
+### Webview CSP and Monaco Isolation
+- Monaco 只允许出现在 conflict resolver 自己的 editor-area webview（`ConflictResolverPanel`）中。
+- Commit view、log view、push panel 等其他 webview 必须使用 strict CSP：不允许 `style-src-attr 'unsafe-inline'`，不允许 `worker-src blob:`。只有 `ConflictResolverPanel` 通过 `usesMonacoEditor()` 打开 `getWebviewHtml({ monacoEditor: true })` 的放宽策略；任何情况下 script 都只能通过 nonce 和 `cspSource` 加载。
+- Conflict resolver route 必须通过 `React.lazy` 加载；Monaco、`MonacoEnvironment` worker setup 和 Monaco CSS 只能出现在 lazy chunks 中，不得进入 `webview.js` entry bundle。
 
 ### Changes Mode Context Menu Rules
 - 右键 changelist root 时，必须打开原生 VS Code webview context menu。
@@ -296,7 +303,8 @@ Improve AI provider setup flow
 - 在 `staged` 和 `changes` mode 之间切换时，toolbar 和 context menu 行为必须正确。
 - `changes` mode 绝不能显示 staged/unstaged split groups。
 - Conflict files 必须只出现在 `Conflicting Changes` root 下。
-- 点击 conflict file 必须在 editor 区域打开 Intelli Git conflict resolver。
+- `intelli-git.mergeEditor.enabled` 关闭时，点击 conflict file 必须在 VS Code 标准 editor 中打开该文件；开启时必须在 editor 区域打开 Intelli Git conflict resolver。
+- Commit view 和 log view 必须保持 strict CSP，且 `webview.js` entry bundle 中不得包含 Monaco 或 `MonacoEnvironment`。
 - `changes` mode 绝不能在 changelist root 上显示 active badge。
 - `changes` mode 下 root hover 绝不能显示 inline operation icons。
 - File items 绝不能显示 child hunk nodes。

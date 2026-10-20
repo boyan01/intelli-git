@@ -33,7 +33,7 @@ bash .agents/skills/intelli-git-test/scripts/open-checkout-scenario.sh --list
 Prefer these scenarios for conflict testing:
 
 - `rebase-conflict`: starts clean on `feature/smart-checkout`; trigger rebase onto `main` in Intelli Git, then abort and switch branches.
-- `merge-conflict`: opens a repo already in real `UU`, `UD`, `DU`, and `AA` conflict states, including one rich 500-line file with normal, asymmetric, whitespace-only, and auto-merged changes.
+- `merge-conflict`: opens a repo already in real `UU`, `UD`, `DU`, and `AA` conflict states, including one rich 500-line file with normal, asymmetric, whitespace-only, and auto-merged changes. Conflict files open in the standard editor by default; set `"intelli-git.mergeEditor.enabled": true` in the test user settings to open the Intelli Git merge editor instead.
 - `stash-pop-conflict`: opens a repo after `stash pop` has created a real conflict.
 - `conflict`, `untracked`, `staged`, `mixed`: checkout overwrite conflicts, not merge conflicts.
 
