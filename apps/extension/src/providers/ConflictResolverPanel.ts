@@ -58,6 +58,10 @@ export class ConflictResolverPanel extends BaseWebviewProvider {
         return '/conflict-resolver';
     }
 
+    protected usesMonacoEditor(): boolean {
+        return true;
+    }
+
     protected getInitialState(): unknown {
         const conflictFile: RepositoryFileReference = {
             path: this.file.path,

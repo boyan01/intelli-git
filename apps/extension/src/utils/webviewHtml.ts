@@ -6,6 +6,8 @@ export interface WebviewHtmlOptions {
     title: string;
     initialRoute?: string;
     initialState?: unknown;
+    /** Relax the CSP for Monaco. Only the conflict resolver panel should enable this. */
+    monacoEditor?: boolean;
 }
 
 export function generateNonce(): string {
@@ -18,12 +20,11 @@ export function generateNonce(): string {
 }
 
 export function getWebviewHtml(options: WebviewHtmlOptions): string {
-    const { webview, extensionUri, title, initialRoute, initialState } = options;
+    const { webview, extensionUri, title, initialRoute, initialState, monacoEditor = false } = options;
     const nonce = generateNonce();
 
     const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'out', 'webview', 'webview.js'));
     const styleUri = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'out', 'webview', 'index.css'));
-    const editorStyleUri = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'out', 'webview', 'editor.css'));
     const iconStyleUri = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'media', 'intelli-git-icons.css'));
 
     const language = vscode.env.language;
@@ -35,17 +36,23 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
             window.initialState = ${initialStateJson};
         </script>`;
 
-    // Monaco replaces visible rows with HTML that contains inline layout attributes.
-    // Allow style attributes while keeping every script nonce-restricted.
+    // Monaco replaces visible rows with HTML that contains inline layout attributes and
+    // runs its worker from a blob URL. Only the Monaco webview gets those relaxations;
+    // every script stays nonce-restricted in both policies.
+    const monacoPolicy = monacoEditor ? ` style-src-attr 'unsafe-inline'; worker-src ${webview.cspSource} blob:;` : '';
+    const csp =
+        `default-src 'none'; style-src ${webview.cspSource}; font-src ${webview.cspSource}; ` +
+        `img-src ${webview.cspSource}; script-src 'nonce-${nonce}' ${webview.cspSource}; ` +
+        `connect-src ${webview.cspSource};${monacoPolicy}`;
+
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource}; style-src-attr 'unsafe-inline'; font-src ${webview.cspSource}; img-src ${webview.cspSource}; script-src 'nonce-${nonce}' ${webview.cspSource}; connect-src ${webview.cspSource}; worker-src ${webview.cspSource} blob:;">
+    <meta http-equiv="Content-Security-Policy" content="${csp}">
     <link href="${iconStyleUri}" rel="stylesheet">
     <link href="${styleUri}" rel="stylesheet">
-    <link href="${editorStyleUri}" rel="stylesheet">
     <title>${title}</title>
 </head>
 <body data-vscode-context='{"preventDefaultContextMenuItems": true}'>

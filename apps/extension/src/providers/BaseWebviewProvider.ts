@@ -85,7 +85,12 @@ export abstract class BaseWebviewProvider {
             title: this.getTitle(),
             initialRoute: this.getInitialRoute(),
             initialState: this.getInitialState(),
+            monacoEditor: this.usesMonacoEditor(),
         });
+    }
+
+    protected usesMonacoEditor(): boolean {
+        return false;
     }
 
     protected getOnDispose(): (() => void) | undefined {

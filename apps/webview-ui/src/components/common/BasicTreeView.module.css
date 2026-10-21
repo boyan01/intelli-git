@@ -142,6 +142,11 @@
     color: var(--vscode-icon-foreground);
 }
 
+/* A custom icon that renders nothing (for example a folder under Seti) takes no space, as in VS Code. */
+.icon:empty {
+    display: none;
+}
+
 .icon .codicon {
     display: flex;
     align-items: center;

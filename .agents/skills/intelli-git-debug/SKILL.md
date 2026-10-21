@@ -102,7 +102,9 @@ node "$CONTROL" workbench-eval --state "$STATE" \
 node "$CONTROL" webview-targets --state "$STATE"
 ```
 
-Open the standard merge-conflict resolver deterministically:
+The Intelli Git merge editor is opt-in. Before opening it, set `"intelli-git.mergeEditor.enabled": true` in the Dev Host user settings (`<base-dir>/vscode-user-data/User/settings.json`). The setting is read on click, so no reload is needed. With the setting off, the same clicks open the file in the standard VS Code editor, which is the default behavior to verify.
+
+Open the merge-conflict resolver deterministically:
 
 ```bash
 node "$CONTROL" webview-eval --state "$STATE" --contains 'Conflicting Changes' \

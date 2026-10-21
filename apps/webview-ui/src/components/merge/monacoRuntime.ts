@@ -111,10 +111,11 @@ function getThemeBase(): Monaco.editor.BuiltinTheme {
 }
 
 export async function loadMonaco(): Promise<MonacoApi> {
-    monacoLoadPromise ??= import('monaco-editor/esm/vs/editor/editor.main').then(async () => {
-        const monaco = await import('monaco-editor/esm/vs/editor/editor.api');
-        return monaco;
-    });
+    monacoLoadPromise ??= (async () => {
+        await import('./monacoEnvironment');
+        await import('monaco-editor/esm/vs/editor/editor.main');
+        return import('monaco-editor/esm/vs/editor/editor.api');
+    })();
 
     return monacoLoadPromise;
 }
