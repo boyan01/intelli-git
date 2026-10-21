@@ -1,7 +1,6 @@
 import type { TreeNode } from './BasicTreeView';
 
 export const TREE_ROW_HEIGHT = 22;
-const ROW_HEIGHT = TREE_ROW_HEIGHT;
 const MAX_STICKY_ROWS = 7;
 const MAX_STICKY_VIEWPORT_RATIO = 0.4;
 
@@ -22,13 +21,14 @@ export function getStickyHeaderStates<T>(
     visibleTop: number,
     stickyHeaders: boolean,
     viewportHeight: number,
-    isStickyHeader?: (node: TreeNode<T>) => boolean
+    isStickyHeader?: (node: TreeNode<T>) => boolean,
+    rowHeight = TREE_ROW_HEIGHT
 ): StickyHeaderState<T>[] {
     const maxStickyRows = Math.min(
         MAX_STICKY_ROWS,
-        Math.floor((viewportHeight * MAX_STICKY_VIEWPORT_RATIO) / ROW_HEIGHT)
+        Math.floor((viewportHeight * MAX_STICKY_VIEWPORT_RATIO) / rowHeight)
     );
-    if (!stickyHeaders || maxStickyRows < 1 || visibleTop <= 0 || visibleTop >= flatNodes.length * ROW_HEIGHT) {
+    if (!stickyHeaders || maxStickyRows < 1 || visibleTop <= 0 || visibleTop >= flatNodes.length * rowHeight) {
         return [];
     }
 
@@ -50,15 +50,15 @@ export function getStickyHeaderStates<T>(
         return depth;
     };
 
-    const topIndex = Math.min(flatNodes.length - 1, Math.max(0, Math.floor(visibleTop / ROW_HEIGHT)));
+    const topIndex = Math.min(flatNodes.length - 1, Math.max(0, Math.floor(visibleTop / rowHeight)));
 
     let lastActiveIndex = topIndex;
     while (lastActiveIndex + 1 < flatNodes.length) {
         const nextNode = flatNodes[lastActiveIndex + 1];
         const stickyDepth = getStickyDepth(nextNode);
         if (stickyDepth >= maxStickyRows) break;
-        const naturalPos = (lastActiveIndex + 1) * ROW_HEIGHT - visibleTop;
-        const stickyPos = stickyDepth * ROW_HEIGHT;
+        const naturalPos = (lastActiveIndex + 1) * rowHeight - visibleTop;
+        const stickyPos = stickyDepth * rowHeight;
         if (naturalPos <= stickyPos) {
             lastActiveIndex++;
         } else {
@@ -96,9 +96,9 @@ export function getStickyHeaderStates<T>(
         }
 
         const stickyDepth = getStickyDepth(candidate);
-        const targetOffset = stickyDepth * ROW_HEIGHT;
-        const termDist = termIndex * ROW_HEIGHT - visibleTop;
-        const offset = Math.min(targetOffset, termDist - ROW_HEIGHT);
+        const targetOffset = stickyDepth * rowHeight;
+        const termDist = termIndex * rowHeight - visibleTop;
+        const offset = Math.min(targetOffset, termDist - rowHeight);
 
         result.push({
             item: candidate,

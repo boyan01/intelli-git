@@ -5,8 +5,12 @@ import type { WorktreeItemContext } from '@shared/webviewContext';
 import { BasicTreeView, type TreeNode } from '../common/BasicTreeView';
 import { LoadingProgressBar } from '../common/LoadingProgressBar';
 import { emitRefresh, rpc } from '../../lib/rpc_client';
-import { getShortestUniqueSuffixes, sortWorktrees } from './worktreeDisplay';
+import { sortWorktrees, splitFolderPath } from './worktreeDisplay';
 import styles from './WorktreeDrawer.module.css';
+
+// Two text lines (branch, path) per row.
+const WORKTREE_ROW_HEIGHT = 40;
+const hideTwistie = () => true;
 
 interface WorktreeDrawerProps {
     open: boolean;
@@ -23,7 +27,6 @@ interface WorktreeKind {
 interface WorktreeNodeData {
     worktree: WorktreeInfo;
     kind: WorktreeKind;
-    displayPath: string;
 }
 
 type TranslateFn = (key: string, options?: Record<string, string>) => string;
@@ -65,10 +68,6 @@ function getWorktreeStatusLabel(worktree: WorktreeInfo, t: TranslateFn): string 
 export function WorktreeDrawer({ open, worktrees, loading, onClose }: WorktreeDrawerProps) {
     const { t } = useTranslation();
     const sortedWorktrees = useMemo(() => sortWorktrees(worktrees), [worktrees]);
-    const displayPaths = useMemo(
-        () => getShortestUniqueSuffixes(worktrees.map((worktree) => worktree.path)),
-        [worktrees]
-    );
 
     const nodes = useMemo<TreeNode<WorktreeNodeData>[]>(
         () =>
@@ -89,14 +88,10 @@ export function WorktreeDrawer({ open, worktrees, loading, onClose }: WorktreeDr
                     id: worktree.path,
                     label: ref,
                     title: tooltip,
-                    data: {
-                        worktree,
-                        kind: getWorktreeKind(worktree),
-                        displayPath: displayPaths.get(worktree.path) ?? worktree.path,
-                    },
+                    data: { worktree, kind: getWorktreeKind(worktree) },
                 };
             }),
-        [sortedWorktrees, displayPaths, t]
+        [sortedWorktrees, t]
     );
 
     const selectedId = useMemo(() => {
@@ -156,28 +151,28 @@ export function WorktreeDrawer({ open, worktrees, loading, onClose }: WorktreeDr
                 return node.label;
             }
 
-            const { worktree, kind, displayPath } = node.data;
+            const { worktree, kind } = node.data;
+            const { parent, folder } = splitFolderPath(worktree.displayPath);
 
             return (
                 <span className={styles.worktreeLabel}>
                     <span className={`${styles.kindIcon} ${kind.className}`} aria-hidden="true">
                         <i className={`codicon ${kind.icon}`}></i>
                     </span>
-                    <span className={`${styles.ref} ${worktree.isActiveRepository ? styles.activeRef : ''}`}>
-                        {node.label}
+                    <span className={styles.text}>
+                        <span className={`${styles.ref} ${worktree.isActiveRepository ? styles.activeRef : ''}`}>
+                            {node.label}
+                        </span>
+                        <span className={styles.pathLine}>
+                            {!worktree.pathExists && <span className={styles.missingLabel}>{t('Missing')}</span>}
+                            <span className={styles.path}>
+                                <bdi>
+                                    <span className={styles.pathParent}>{parent}</span>
+                                    <span className={styles.pathFolder}>{folder}</span>
+                                </bdi>
+                            </span>
+                        </span>
                     </span>
-                    {worktree.isDirty && (
-                        <span className={styles.dirtyMark} role="img" aria-label={t('Dirty')}>
-                            <i className="codicon codicon-circle-filled"></i>
-                        </span>
-                    )}
-                    {worktree.pathExists ? (
-                        <span className={styles.path}>
-                            <bdi>{displayPath}</bdi>
-                        </span>
-                    ) : (
-                        <span className={`${styles.path} ${styles.missingPath}`}>{t('Missing')}</span>
-                    )}
                 </span>
             );
         },
@@ -187,28 +182,42 @@ export function WorktreeDrawer({ open, worktrees, loading, onClose }: WorktreeDr
     const renderTrailing = useCallback(
         (node: TreeNode<WorktreeNodeData>) => {
             const worktree = node.data?.worktree;
-            // Opening the worktree that already backs this window would only duplicate it.
-            if (!worktree?.pathExists || worktree.isCurrent) {
+            if (!worktree) {
                 return null;
             }
 
+            // Opening the worktree that already backs this window would only duplicate it.
+            const canOpen = worktree.pathExists && !worktree.isCurrent;
+
+            // Dirty dot and hover action share one fixed column so markers line up across rows.
             return (
-                <button
-                    type="button"
-                    className={styles.rowAction}
-                    title={t('Open in New Window')}
-                    aria-label={t('Open in New Window')}
-                    onClick={(event) => {
-                        event.stopPropagation();
-                        void rpc.openWorktree(worktree.path);
-                    }}
-                >
-                    <i className="codicon codicon-empty-window"></i>
-                </button>
+                <span className={styles.status}>
+                    {worktree.isDirty && (
+                        <span className={styles.dirtyMark} role="img" aria-label={t('Dirty')}>
+                            <i className="codicon codicon-circle-filled"></i>
+                        </span>
+                    )}
+                    {canOpen && (
+                        <button
+                            type="button"
+                            className={styles.rowAction}
+                            title={t('Open in New Window')}
+                            aria-label={t('Open in New Window')}
+                            onClick={(event) => {
+                                event.stopPropagation();
+                                void rpc.openWorktree(worktree.path);
+                            }}
+                        >
+                            <i className="codicon codicon-empty-window"></i>
+                        </button>
+                    )}
+                </span>
             );
         },
         [t]
     );
+
+    const getNodeClassName = useCallback(() => styles.worktreeNode, []);
 
     const handlePrune = async () => {
         await rpc.pruneWorktrees();
@@ -264,7 +273,10 @@ export function WorktreeDrawer({ open, worktrees, loading, onClose }: WorktreeDr
                         renderLabel={renderLabel}
                         renderTrailing={renderTrailing}
                         getContextData={getContextData}
-                        baseIndent={0}
+                        getNodeClassName={getNodeClassName}
+                        hideTwistie={hideTwistie}
+                        rowHeight={WORKTREE_ROW_HEIGHT}
+                        baseIndent={8}
                         ariaLabel={t('Worktrees')}
                     />
                 )}

@@ -13,7 +13,7 @@
 }
 
 .drawer.open {
-    max-height: 200px;
+    max-height: 240px;
     opacity: 1;
     border-bottom: 1px solid var(--vscode-panel-border);
     pointer-events: auto;
@@ -72,7 +72,8 @@
 
 .list {
     composes: scrollable from '../common/Scrollbar.module.css';
-    max-height: 156px;
+    /* Five two-line rows before scrolling. */
+    max-height: 204px;
     overflow-y: auto;
     padding-bottom: 4px;
     container-type: inline-size;
@@ -81,14 +82,13 @@
 .worktreeLabel {
     display: flex;
     min-width: 0;
-    align-items: center;
-    gap: 4px;
+    gap: 6px;
 }
 
 .kindIcon {
     display: flex;
     width: 16px;
-    height: 22px;
+    height: 20px;
     flex-shrink: 0;
     align-items: center;
     justify-content: center;
@@ -106,27 +106,71 @@
     color: var(--vscode-errorForeground);
 }
 
+.text {
+    display: flex;
+    min-width: 0;
+    flex: 1;
+    flex-direction: column;
+}
+
 .ref,
 .path {
-    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    line-height: 22px;
 }
 
-/* The branch name is the primary identifier, so the path column gives up width first. */
 .ref {
-    flex: 0 1 auto;
+    line-height: 20px;
 }
 
 .activeRef {
     font-weight: 600;
 }
 
+.pathLine {
+    display: flex;
+    min-width: 0;
+    gap: 6px;
+    font-size: var(--ig-font-size-xs);
+    line-height: 16px;
+}
+
+/* Truncate from the start so the folder name, the part that tells worktrees apart, stays visible. */
+.path {
+    min-width: 0;
+    direction: rtl;
+    text-align: left;
+}
+
+.pathParent {
+    color: var(--vscode-descriptionForeground);
+    opacity: 0.65;
+}
+
+.pathFolder {
+    color: color-mix(in srgb, var(--vscode-foreground) 60%, var(--vscode-descriptionForeground));
+}
+
+.missingLabel,
+.missingLabel ~ .path .pathParent,
+.missingLabel ~ .path .pathFolder {
+    flex-shrink: 0;
+    color: var(--vscode-errorForeground);
+}
+
+/* Spans both text lines but keeps its marker on the branch line. */
+.status {
+    display: flex;
+    width: 20px;
+    height: 36px;
+    align-items: flex-start;
+    justify-content: center;
+}
+
 .dirtyMark {
     display: flex;
-    flex-shrink: 0;
+    height: 20px;
     align-items: center;
     color: var(--vscode-gitDecoration-modifiedResourceForeground);
 }
@@ -135,31 +179,11 @@
     font-size: 8px;
 }
 
-/* Right-aligned and truncated at the start so the distinguishing folder name stays visible. */
-.path {
-    flex: 1 1 0;
-    margin-left: 8px;
-    color: var(--vscode-descriptionForeground);
-    font-size: var(--ig-font-size-xs);
-    direction: rtl;
-    text-align: right;
-}
-
-.missingPath {
-    color: var(--vscode-errorForeground);
-}
-
-@container (max-width: 200px) {
-    .path {
-        display: none;
-    }
-}
-
 .rowAction {
     width: 20px;
     height: 20px;
     padding: 0;
-    display: flex;
+    display: none;
     align-items: center;
     justify-content: center;
     border: none;
@@ -167,12 +191,18 @@
     background: transparent;
     color: var(--vscode-icon-foreground, var(--vscode-foreground));
     cursor: pointer;
-    opacity: 0;
-    pointer-events: none;
 }
 
 .rowAction:hover {
     background: var(--vscode-toolbar-hoverBackground);
+}
+
+.worktreeNode:hover .rowAction {
+    display: flex;
+}
+
+.worktreeNode:hover .dirtyMark:has(+ .rowAction) {
+    display: none;
 }
 
 .empty {

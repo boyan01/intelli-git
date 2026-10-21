@@ -289,6 +289,8 @@ export interface ChangelistMoveRequest {
 
 export interface WorktreeInfo {
     path: string;
+    /** `path` with the home directory shortened to `~`. */
+    displayPath: string;
     branch?: string;
     head?: string;
     isDetached?: boolean;

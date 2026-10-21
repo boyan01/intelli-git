@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { WorktreeInfo } from '@shared/messages';
-import { getShortestUniqueSuffixes, sortWorktrees } from './worktreeDisplay';
+import { sortWorktrees, splitFolderPath } from './worktreeDisplay';
 
 function worktree(overrides: Partial<WorktreeInfo> & Pick<WorktreeInfo, 'path'>): WorktreeInfo {
     return {
+        displayPath: overrides.path,
         isMain: false,
         isCurrent: false,
         isActiveRepository: false,
@@ -14,36 +15,20 @@ function worktree(overrides: Partial<WorktreeInfo> & Pick<WorktreeInfo, 'path'>)
     };
 }
 
-describe('getShortestUniqueSuffixes', () => {
-    it('uses the folder name when it is already unique', () => {
-        const suffixes = getShortestUniqueSuffixes([
-            '/Users/me/workspace/mixin/flutter-app',
-            '/Users/me/workspace/mixin/flutter-app-ci',
-        ]);
-
-        expect(suffixes.get('/Users/me/workspace/mixin/flutter-app')).toBe('flutter-app');
-        expect(suffixes.get('/Users/me/workspace/mixin/flutter-app-ci')).toBe('flutter-app-ci');
+describe('splitFolderPath', () => {
+    it('separates the folder name from its parent path', () => {
+        expect(splitFolderPath('~/.codex/worktrees/6e89/flutter-app')).toEqual({
+            parent: '~/.codex/worktrees/6e89/',
+            folder: 'flutter-app',
+        });
     });
 
-    it('adds parent segments only for colliding folder names', () => {
-        const suffixes = getShortestUniqueSuffixes([
-            '/Users/me/workspace/mixin/flutter-app',
-            '/Users/me/.codex/worktrees/6e89/flutter-app',
-            '/Users/me/.codex/worktrees/a1b2/flutter-app',
-            '/Users/me/worktrees/search',
-        ]);
-
-        expect(suffixes.get('/Users/me/workspace/mixin/flutter-app')).toBe('mixin/flutter-app');
-        expect(suffixes.get('/Users/me/.codex/worktrees/6e89/flutter-app')).toBe('6e89/flutter-app');
-        expect(suffixes.get('/Users/me/.codex/worktrees/a1b2/flutter-app')).toBe('a1b2/flutter-app');
-        expect(suffixes.get('/Users/me/worktrees/search')).toBe('search');
+    it('handles Windows separators and trailing separators', () => {
+        expect(splitFolderPath('C:\\work\\app\\')).toEqual({ parent: 'C:\\work\\', folder: 'app' });
     });
 
-    it('handles Windows separators', () => {
-        const suffixes = getShortestUniqueSuffixes(['C:\\work\\a\\app', 'C:\\work\\b\\app']);
-
-        expect(suffixes.get('C:\\work\\a\\app')).toBe('a/app');
-        expect(suffixes.get('C:\\work\\b\\app')).toBe('b/app');
+    it('returns the whole value as the folder when there is no parent', () => {
+        expect(splitFolderPath('app')).toEqual({ parent: '', folder: 'app' });
     });
 });
 

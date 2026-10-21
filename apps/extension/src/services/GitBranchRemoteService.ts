@@ -1,5 +1,6 @@
 import simpleGit, { type SimpleGit } from 'simple-git';
 import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
 import type {
     BranchInfo,
@@ -269,6 +270,14 @@ function normalizePath(filePath: string): string {
     }
 }
 
+function toHomeRelativePath(filePath: string): string {
+    const home = os.homedir();
+    if (home && (filePath === home || filePath.startsWith(home + path.sep))) {
+        return `~${filePath.slice(home.length)}`;
+    }
+    return filePath;
+}
+
 function parseWorktreeList(output: string): WorktreeRecord[] {
     const records: WorktreeRecord[] = [];
     let current: WorktreeRecord | undefined;
@@ -396,6 +405,7 @@ export class GitBranchRemoteService {
             const pathExists = fs.existsSync(worktreePath);
             worktrees.push({
                 path: worktreePath,
+                displayPath: toHomeRelativePath(worktreePath),
                 branch: record.branch,
                 head: record.head,
                 isDetached: Boolean(record.isDetached),

@@ -62,6 +62,8 @@ export interface BasicTreeViewProps<T = unknown> {
     onDrop?: (draggedNode: TreeNode<T>, targetNode: TreeNode<T>) => void;
     rootContextData?: Record<string, unknown>;
     ariaLabel?: string;
+    /** Uniform row height in px. Virtualization assumes every row has exactly this height. */
+    rowHeight?: number;
 }
 
 export interface BasicTreeViewRef {
@@ -367,10 +369,11 @@ const TreeNodeItem = <T,>(props: TreeNodeItemProps<T>) => {
                 {
                     paddingLeft: `${baseIndent + depth * indent}px`,
                     '--tree-depth': depth,
-                    '--tree-guide-continuation-height': continuesGuide ? `${ROW_HEIGHT / 2}px` : '0px',
+                    '--tree-guide-continuation-height': continuesGuide ? 'calc(var(--tree-row-height) / 2)' : '0px',
                     '--tree-active-guide-offset': `${Math.max(0, activeIndentDepth) * indent}px`,
                     '--tree-active-guide-opacity': activeIndentDepth >= 0 ? 1 : 0,
-                    '--tree-active-guide-height': activeIndentDepth === depth ? `${ROW_HEIGHT / 2}px` : '100%',
+                    '--tree-active-guide-height':
+                        activeIndentDepth === depth ? 'calc(var(--tree-row-height) / 2)' : '100%',
                 } as React.CSSProperties
             }
             draggable={canDrag}
@@ -484,6 +487,7 @@ function BasicTreeViewInner<T>(props: BasicTreeViewProps<T>, ref: React.Forwarde
         getDragLabel,
         rootContextData,
         ariaLabel,
+        rowHeight = ROW_HEIGHT,
     } = props;
 
     const rootRef = useRef<HTMLDivElement>(null);
@@ -517,12 +521,12 @@ function BasicTreeViewInner<T>(props: BasicTreeViewProps<T>, ref: React.Forwarde
         const maxDepth = flatNodes.reduce((maximum, item) => Math.max(maximum, item.depth), 0);
         return `max(100%, ${baseIndent + maxDepth * indent + MIN_SCROLLABLE_ROW_CONTENT_WIDTH}px)`;
     }, [horizontalScroll, flatNodes, baseIndent, indent]);
-    const totalHeight = flatNodes.length * ROW_HEIGHT;
+    const totalHeight = flatNodes.length * rowHeight;
     const rangeStart = Math.min(visibleRange.start, flatNodes.length);
     const rangeEnd = Math.min(Math.max(visibleRange.end, rangeStart), flatNodes.length);
     const visibleItems = flatNodes.slice(rangeStart, rangeEnd);
-    const topSpacerHeight = rangeStart * ROW_HEIGHT;
-    const bottomSpacerHeight = Math.max(0, totalHeight - rangeEnd * ROW_HEIGHT);
+    const topSpacerHeight = rangeStart * rowHeight;
+    const bottomSpacerHeight = Math.max(0, totalHeight - rangeEnd * rowHeight);
     const flatNodeIndexById = useMemo(() => {
         const result = new Map<string, number>();
         flatNodes.forEach((item, index) => result.set(item.node.id, index));
@@ -559,7 +563,8 @@ function BasicTreeViewInner<T>(props: BasicTreeViewProps<T>, ref: React.Forwarde
         visibleRange.visibleTop,
         stickyHeaders,
         visibleRange.viewportHeight,
-        isStickyHeader
+        isStickyHeader,
+        rowHeight
     );
 
     useLayoutEffect(() => {
@@ -597,24 +602,27 @@ function BasicTreeViewInner<T>(props: BasicTreeViewProps<T>, ref: React.Forwarde
         [expandedIds, onToggle, controlledExpandedIds]
     );
 
-    const scrollIndexIntoView = useCallback((index: number) => {
-        const root = rootRef.current;
-        if (!root) return;
+    const scrollIndexIntoView = useCallback(
+        (index: number) => {
+            const root = rootRef.current;
+            if (!root) return;
 
-        const scrollParent = getScrollParent(root);
-        const rootRect = root.getBoundingClientRect();
-        const viewportTop = scrollParent instanceof Window ? 0 : scrollParent.getBoundingClientRect().top;
-        const viewportBottom =
-            scrollParent instanceof Window ? window.innerHeight : scrollParent.getBoundingClientRect().bottom;
-        const itemTop = rootRect.top + index * ROW_HEIGHT;
-        const itemBottom = itemTop + ROW_HEIGHT;
+            const scrollParent = getScrollParent(root);
+            const rootRect = root.getBoundingClientRect();
+            const viewportTop = scrollParent instanceof Window ? 0 : scrollParent.getBoundingClientRect().top;
+            const viewportBottom =
+                scrollParent instanceof Window ? window.innerHeight : scrollParent.getBoundingClientRect().bottom;
+            const itemTop = rootRect.top + index * rowHeight;
+            const itemBottom = itemTop + rowHeight;
 
-        if (itemTop < viewportTop) {
-            scrollTargetBy(scrollParent, itemTop - viewportTop);
-        } else if (itemBottom > viewportBottom) {
-            scrollTargetBy(scrollParent, itemBottom - viewportBottom);
-        }
-    }, []);
+            if (itemTop < viewportTop) {
+                scrollTargetBy(scrollParent, itemTop - viewportTop);
+            } else if (itemBottom > viewportBottom) {
+                scrollTargetBy(scrollParent, itemBottom - viewportBottom);
+            }
+        },
+        [rowHeight]
+    );
 
     const focusItemAtIndex = useCallback(
         (index: number) => {
@@ -754,8 +762,8 @@ function BasicTreeViewInner<T>(props: BasicTreeViewProps<T>, ref: React.Forwarde
         const viewportBottom = viewportTop + viewportHeight;
         const visibleTop = Math.max(0, viewportTop - rootRect.top);
         const visibleBottom = Math.min(totalHeight, viewportBottom - rootRect.top);
-        const nextStart = Math.max(0, Math.floor(visibleTop / ROW_HEIGHT) - OVERSCAN_ROWS);
-        const nextEnd = Math.min(flatNodes.length, Math.ceil(visibleBottom / ROW_HEIGHT) + OVERSCAN_ROWS);
+        const nextStart = Math.max(0, Math.floor(visibleTop / rowHeight) - OVERSCAN_ROWS);
+        const nextEnd = Math.min(flatNodes.length, Math.ceil(visibleBottom / rowHeight) + OVERSCAN_ROWS);
         const end = Math.max(nextEnd, Math.min(flatNodes.length, nextStart + 1));
         const nextStickyHeaderStates = getStickyHeaderStates(
             flatNodes,
@@ -763,7 +771,8 @@ function BasicTreeViewInner<T>(props: BasicTreeViewProps<T>, ref: React.Forwarde
             visibleTop,
             stickyHeaders,
             viewportHeight,
-            isStickyHeader
+            isStickyHeader,
+            rowHeight
         );
 
         applyStickyHeaderTransforms(stickyHeaderRefs.current, nextStickyHeaderStates);
@@ -776,7 +785,7 @@ function BasicTreeViewInner<T>(props: BasicTreeViewProps<T>, ref: React.Forwarde
                 ? prev
                 : { start: nextStart, end, visibleTop, viewportHeight }
         );
-    }, [flatNodeIndexById, flatNodes, isStickyHeader, stickyHeaders, totalHeight]);
+    }, [flatNodeIndexById, flatNodes, isStickyHeader, stickyHeaders, totalHeight, rowHeight]);
 
     useEffect(() => {
         const focusedIndex = focusedId ? flatNodeIndexById.get(focusedId) : undefined;
@@ -936,7 +945,8 @@ function BasicTreeViewInner<T>(props: BasicTreeViewProps<T>, ref: React.Forwarde
                 visibleTop,
                 stickyHeaders,
                 viewportHeight,
-                isStickyHeader
+                isStickyHeader,
+                rowHeight
             );
 
             applyStickyHeaderTransforms(stickyHeaderRefs.current, nextStickyHeaderStates);
@@ -969,7 +979,7 @@ function BasicTreeViewInner<T>(props: BasicTreeViewProps<T>, ref: React.Forwarde
                 window.cancelAnimationFrame(frameId);
             }
         };
-    }, [flatNodeIndexById, flatNodes, isStickyHeader, stickyHeaders, updateVisibleRange]);
+    }, [flatNodeIndexById, flatNodes, isStickyHeader, stickyHeaders, updateVisibleRange, rowHeight]);
 
     React.useImperativeHandle(
         ref,
@@ -1007,6 +1017,7 @@ function BasicTreeViewInner<T>(props: BasicTreeViewProps<T>, ref: React.Forwarde
                 {
                     minWidth: scrollableMinWidth,
                     '--tree-indent': `${indent}px`,
+                    '--tree-row-height': `${rowHeight}px`,
                     '--tree-guide-left': `${baseIndent + 7}px`,
                 } as React.CSSProperties
             }
