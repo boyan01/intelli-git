@@ -22,7 +22,7 @@
 .node {
     display: flex;
     align-items: center;
-    height: 22px;
+    height: var(--tree-row-height, 22px);
     padding-right: 8px;
     font-size: var(--ig-font-size);
     line-height: 22px;

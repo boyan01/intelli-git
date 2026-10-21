@@ -5,7 +5,12 @@ import type { WorktreeItemContext } from '@shared/webviewContext';
 import { BasicTreeView, type TreeNode } from '../common/BasicTreeView';
 import { LoadingProgressBar } from '../common/LoadingProgressBar';
 import { emitRefresh, rpc } from '../../lib/rpc_client';
+import { sortWorktrees, splitFolderPath } from './worktreeDisplay';
 import styles from './WorktreeDrawer.module.css';
+
+// Two text lines (branch, path) per row.
+const WORKTREE_ROW_HEIGHT = 40;
+const hideTwistie = () => true;
 
 interface WorktreeDrawerProps {
     open: boolean;
@@ -14,30 +19,23 @@ interface WorktreeDrawerProps {
     onClose: () => void;
 }
 
-interface WorktreeState {
-    label: string;
+interface WorktreeKind {
     icon: string;
     className: string;
 }
 
 interface WorktreeNodeData {
     worktree: WorktreeInfo;
-    state: WorktreeState;
+    kind: WorktreeKind;
 }
 
-function getDisplayPath(worktreePath: string): string {
-    const parts = worktreePath.split('/').filter(Boolean);
-    if (parts.length > 4) {
-        return `.../${parts.slice(-4).join('/')}`;
-    }
-    return worktreePath;
-}
+type TranslateFn = (key: string, options?: Record<string, string>) => string;
 
 function getShortHead(head?: string): string {
     return head ? head.slice(0, 8) : '';
 }
 
-function getWorktreeRef(worktree: WorktreeInfo, t: (key: string, options?: Record<string, string>) => string): string {
+function getWorktreeRef(worktree: WorktreeInfo, t: TranslateFn): string {
     return (
         worktree.branch ||
         (worktree.isDetached
@@ -46,58 +44,43 @@ function getWorktreeRef(worktree: WorktreeInfo, t: (key: string, options?: Recor
     );
 }
 
-function getWorktreeState(
-    worktree: WorktreeInfo,
-    t: (key: string, options?: Record<string, string>) => string
-): WorktreeState {
+// The leading icon only encodes the worktree kind; dirty state is a separate marker after the ref.
+function getWorktreeKind(worktree: WorktreeInfo): WorktreeKind {
     if (!worktree.pathExists) {
-        return {
-            label: t('Missing'),
-            icon: 'codicon-warning',
-            className: styles.missingState,
-        };
+        return { icon: 'codicon-warning', className: styles.missingKind };
     }
-
-    if (worktree.isDirty) {
-        return {
-            label: t('Dirty'),
-            icon: 'codicon-circle-filled',
-            className: styles.dirtyState,
-        };
+    if (worktree.isMain) {
+        return { icon: 'codicon-repo', className: styles.normalKind };
     }
-
     return {
-        label: t('Checked out'),
-        icon: 'codicon-git-branch',
-        className: styles.normalState,
+        icon: worktree.isDetached ? 'codicon-git-commit' : 'codicon-git-branch',
+        className: styles.normalKind,
     };
+}
+
+function getWorktreeStatusLabel(worktree: WorktreeInfo, t: TranslateFn): string {
+    if (!worktree.pathExists) {
+        return t('Missing');
+    }
+    return worktree.isDirty ? t('Dirty') : t('Checked out');
 }
 
 export function WorktreeDrawer({ open, worktrees, loading, onClose }: WorktreeDrawerProps) {
     const { t } = useTranslation();
-    const sortedWorktrees = useMemo(
-        () =>
-            [...worktrees].sort((a, b) => {
-                if (a.pathExists !== b.pathExists) {
-                    return a.pathExists ? -1 : 1;
-                }
-                return a.path.localeCompare(b.path);
-            }),
-        [worktrees]
-    );
+    const sortedWorktrees = useMemo(() => sortWorktrees(worktrees), [worktrees]);
 
     const nodes = useMemo<TreeNode<WorktreeNodeData>[]>(
         () =>
             sortedWorktrees.map((worktree) => {
-                const state = getWorktreeState(worktree, t);
                 const ref = getWorktreeRef(worktree, t);
 
                 // Show detailed multiline information on hover for rich context
                 const tooltip = [
+                    ...(worktree.isMain ? [t('Main Worktree')] : []),
                     worktree.branch
                         ? `${t('Branch')}: ${worktree.branch}`
                         : `${t('Detached HEAD')}: ${getShortHead(worktree.head)}`,
-                    `${t('Status')}: ${state.label}`,
+                    `${t('Status')}: ${getWorktreeStatusLabel(worktree, t)}`,
                     `${t('Path')}: ${worktree.path}`,
                 ].join('\n');
 
@@ -105,7 +88,7 @@ export function WorktreeDrawer({ open, worktrees, loading, onClose }: WorktreeDr
                     id: worktree.path,
                     label: ref,
                     title: tooltip,
-                    data: { worktree, state },
+                    data: { worktree, kind: getWorktreeKind(worktree) },
                 };
             }),
         [sortedWorktrees, t]
@@ -162,34 +145,83 @@ export function WorktreeDrawer({ open, worktrees, loading, onClose }: WorktreeDr
         } satisfies WorktreeItemContext;
     }, []);
 
-    const renderLabel = useCallback((node: TreeNode<WorktreeNodeData>) => {
-        if (!node.data) {
-            return node.label;
-        }
+    const renderLabel = useCallback(
+        (node: TreeNode<WorktreeNodeData>) => {
+            if (!node.data) {
+                return node.label;
+            }
 
-        const { worktree, state } = node.data;
+            const { worktree, kind } = node.data;
+            const { parent, folder } = splitFolderPath(worktree.displayPath);
 
-        return (
-            <span className={styles.worktreeLabel}>
-                <span className={`${styles.stateIcon} ${state.className}`} aria-hidden="true">
-                    <i className={`codicon ${state.icon}`}></i>
+            return (
+                <span className={styles.worktreeLabel}>
+                    <span className={`${styles.kindIcon} ${kind.className}`} aria-hidden="true">
+                        <i className={`codicon ${kind.icon}`}></i>
+                    </span>
+                    <span className={styles.text}>
+                        <span className={`${styles.ref} ${worktree.isActiveRepository ? styles.activeRef : ''}`}>
+                            {node.label}
+                        </span>
+                        <span className={styles.pathLine}>
+                            {!worktree.pathExists && <span className={styles.missingLabel}>{t('Missing')}</span>}
+                            <span className={styles.path}>
+                                <bdi>
+                                    <span className={styles.pathParent}>{parent}</span>
+                                    <span className={styles.pathFolder}>{folder}</span>
+                                </bdi>
+                            </span>
+                        </span>
+                    </span>
                 </span>
-                <span className={styles.ref}>{node.label}</span>
-                <span className={styles.path}>{getDisplayPath(worktree.path)}</span>
-            </span>
-        );
-    }, []);
+            );
+        },
+        [t]
+    );
 
-    const renderTrailing = useCallback(() => {
-        // Do not render status label text in trailing position to prevent layout redundancy
-        return null;
-    }, []);
+    const renderTrailing = useCallback(
+        (node: TreeNode<WorktreeNodeData>) => {
+            const worktree = node.data?.worktree;
+            if (!worktree) {
+                return null;
+            }
+
+            // Opening the worktree that already backs this window would only duplicate it.
+            const canOpen = worktree.pathExists && !worktree.isCurrent;
+
+            // Dirty dot and hover action share one fixed column so markers line up across rows.
+            return (
+                <span className={styles.status}>
+                    {worktree.isDirty && (
+                        <span className={styles.dirtyMark} role="img" aria-label={t('Dirty')}>
+                            <i className="codicon codicon-circle-filled"></i>
+                        </span>
+                    )}
+                    {canOpen && (
+                        <button
+                            type="button"
+                            className={styles.rowAction}
+                            title={t('Open in New Window')}
+                            aria-label={t('Open in New Window')}
+                            onClick={(event) => {
+                                event.stopPropagation();
+                                void rpc.openWorktree(worktree.path);
+                            }}
+                            // dblclick is a separate event; without this the row would also switch scope.
+                            onDoubleClick={(event) => event.stopPropagation()}
+                        >
+                            <i className="codicon codicon-empty-window"></i>
+                        </button>
+                    )}
+                </span>
+            );
+        },
+        [t]
+    );
+
+    const getNodeClassName = useCallback(() => styles.worktreeNode, []);
 
     const handlePrune = async () => {
-        if (!hasStaleWorktrees) {
-            return;
-        }
-
         await rpc.pruneWorktrees();
         emitRefresh(['worktrees'], 'worktrees-pruned');
     };
@@ -205,16 +237,17 @@ export function WorktreeDrawer({ open, worktrees, loading, onClose }: WorktreeDr
                     <span>{t('Worktrees')}</span>
                 </div>
                 <div className={styles.actions}>
-                    <button
-                        className={styles.iconBtn}
-                        type="button"
-                        title={t('Prune Stale Worktrees')}
-                        aria-label={t('Prune Stale Worktrees')}
-                        disabled={!hasStaleWorktrees}
-                        onClick={handlePrune}
-                    >
-                        <span className="intelli-git-icon intelli-git-icon-broom" aria-hidden="true" />
-                    </button>
+                    {hasStaleWorktrees && (
+                        <button
+                            className={styles.iconBtn}
+                            type="button"
+                            title={t('Prune Stale Worktrees')}
+                            aria-label={t('Prune Stale Worktrees')}
+                            onClick={handlePrune}
+                        >
+                            <span className="intelli-git-icon intelli-git-icon-broom" aria-hidden="true" />
+                        </button>
+                    )}
                     <button
                         className={styles.iconBtn}
                         type="button"
@@ -242,7 +275,10 @@ export function WorktreeDrawer({ open, worktrees, loading, onClose }: WorktreeDr
                         renderLabel={renderLabel}
                         renderTrailing={renderTrailing}
                         getContextData={getContextData}
-                        baseIndent={0}
+                        getNodeClassName={getNodeClassName}
+                        hideTwistie={hideTwistie}
+                        rowHeight={WORKTREE_ROW_HEIGHT}
+                        baseIndent={8}
                         ariaLabel={t('Worktrees')}
                     />
                 )}

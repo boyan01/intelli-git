@@ -375,6 +375,7 @@
   "Missing": "缺失",
   "Dirty": "有更改",
   "Checked out": "已检出",
+  "Main Worktree": "主 Worktree",
   "Remove": "移除",
   "Remove worktree {0}?": "移除 worktree {0}?",
   "Worktree {0} has uncommitted changes. Removing it will permanently delete all uncommitted changes on disk. Are you sure you want to force remove it?": "Worktree {0} 包含未提交的改动。移除它将永久删除磁盘上所有未提交的改动。确定要强制移除吗？",

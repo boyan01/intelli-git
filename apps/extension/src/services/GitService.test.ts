@@ -1874,6 +1874,7 @@ describe('GitService branch remote workflows', () => {
                 expect.objectContaining({
                     branch: 'main',
                     path: fs.realpathSync(tempDir),
+                    isMain: true,
                     isCurrent: true,
                     isActiveRepository: true,
                     pathExists: true,
@@ -1882,6 +1883,7 @@ describe('GitService branch remote workflows', () => {
                 expect.objectContaining({
                     branch: 'feature',
                     path: fs.realpathSync(linkedWorktreePath),
+                    isMain: false,
                     isCurrent: false,
                     pathExists: true,
                     isDirty: true,
