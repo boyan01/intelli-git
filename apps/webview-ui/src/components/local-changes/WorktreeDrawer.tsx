@@ -207,6 +207,8 @@ export function WorktreeDrawer({ open, worktrees, loading, onClose }: WorktreeDr
                                 event.stopPropagation();
                                 void rpc.openWorktree(worktree.path);
                             }}
+                            // dblclick is a separate event; without this the row would also switch scope.
+                            onDoubleClick={(event) => event.stopPropagation()}
                         >
                             <i className="codicon codicon-empty-window"></i>
                         </button>
