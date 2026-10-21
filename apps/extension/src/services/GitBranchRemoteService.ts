@@ -387,7 +387,7 @@ export class GitBranchRemoteService {
         const activePath = activeRepositoryPath ? normalizePath(activeRepositoryPath) : currentGitRoot;
         const worktrees: WorktreeInfo[] = [];
 
-        for (const record of records) {
+        for (const [index, record] of records.entries()) {
             if (record.isBare) {
                 continue;
             }
@@ -399,6 +399,8 @@ export class GitBranchRemoteService {
                 branch: record.branch,
                 head: record.head,
                 isDetached: Boolean(record.isDetached),
+                // `git worktree list` always reports the main worktree first.
+                isMain: index === 0,
                 isCurrent: worktreePath === currentGitRoot,
                 isActiveRepository: worktreePath === activePath,
                 pathExists,

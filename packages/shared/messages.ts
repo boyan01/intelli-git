@@ -292,6 +292,7 @@ export interface WorktreeInfo {
     branch?: string;
     head?: string;
     isDetached?: boolean;
+    isMain: boolean;
     isCurrent: boolean;
     isActiveRepository: boolean;
     pathExists: boolean;

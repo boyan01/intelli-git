@@ -70,21 +70,12 @@
     background: var(--vscode-toolbar-hoverBackground);
 }
 
-.iconBtn:disabled {
-    color: var(--vscode-disabledForeground, var(--vscode-descriptionForeground));
-    cursor: default;
-    opacity: 0.45;
-}
-
-.iconBtn:disabled:hover {
-    background: transparent;
-}
-
 .list {
     composes: scrollable from '../common/Scrollbar.module.css';
     max-height: 156px;
     overflow-y: auto;
     padding-bottom: 4px;
+    container-type: inline-size;
 }
 
 .worktreeLabel {
@@ -94,18 +85,25 @@
     gap: 4px;
 }
 
-.stateIcon {
+.kindIcon {
     display: flex;
     width: 16px;
     height: 22px;
     flex-shrink: 0;
     align-items: center;
     justify-content: center;
-    color: var(--vscode-descriptionForeground);
 }
 
-.stateIcon :global(.codicon) {
+.kindIcon :global(.codicon) {
     font-size: 14px;
+}
+
+.normalKind {
+    color: var(--vscode-icon-foreground, var(--vscode-descriptionForeground));
+}
+
+.missingKind {
+    color: var(--vscode-errorForeground);
 }
 
 .ref,
@@ -114,33 +112,67 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    line-height: 22px;
 }
 
+/* The branch name is the primary identifier, so the path column gives up width first. */
 .ref {
-    /* Allow branch name to expand wider since the trailing status text is removed */
-    max-width: 65%;
     flex: 0 1 auto;
-    font-weight: 500;
-    line-height: 22px;
 }
 
-.path {
-    flex: 1 1 auto;
-    color: var(--vscode-descriptionForeground);
-    font-size: var(--ig-font-size-xs);
-    line-height: 22px;
+.activeRef {
+    font-weight: 600;
 }
 
-.dirtyState {
+.dirtyMark {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
     color: var(--vscode-gitDecoration-modifiedResourceForeground);
 }
 
-.missingState {
+.dirtyMark :global(.codicon) {
+    font-size: 8px;
+}
+
+/* Right-aligned and truncated at the start so the distinguishing folder name stays visible. */
+.path {
+    flex: 1 1 0;
+    margin-left: 8px;
+    color: var(--vscode-descriptionForeground);
+    font-size: var(--ig-font-size-xs);
+    direction: rtl;
+    text-align: right;
+}
+
+.missingPath {
     color: var(--vscode-errorForeground);
 }
 
-.normalState {
-    color: var(--vscode-descriptionForeground);
+@container (max-width: 200px) {
+    .path {
+        display: none;
+    }
+}
+
+.rowAction {
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 3px;
+    background: transparent;
+    color: var(--vscode-icon-foreground, var(--vscode-foreground));
+    cursor: pointer;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.rowAction:hover {
+    background: var(--vscode-toolbar-hoverBackground);
 }
 
 .empty {

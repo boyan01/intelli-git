@@ -5,6 +5,7 @@ import type { WorktreeItemContext } from '@shared/webviewContext';
 import { BasicTreeView, type TreeNode } from '../common/BasicTreeView';
 import { LoadingProgressBar } from '../common/LoadingProgressBar';
 import { emitRefresh, rpc } from '../../lib/rpc_client';
+import { getShortestUniqueSuffixes, sortWorktrees } from './worktreeDisplay';
 import styles from './WorktreeDrawer.module.css';
 
 interface WorktreeDrawerProps {
@@ -14,30 +15,24 @@ interface WorktreeDrawerProps {
     onClose: () => void;
 }
 
-interface WorktreeState {
-    label: string;
+interface WorktreeKind {
     icon: string;
     className: string;
 }
 
 interface WorktreeNodeData {
     worktree: WorktreeInfo;
-    state: WorktreeState;
+    kind: WorktreeKind;
+    displayPath: string;
 }
 
-function getDisplayPath(worktreePath: string): string {
-    const parts = worktreePath.split('/').filter(Boolean);
-    if (parts.length > 4) {
-        return `.../${parts.slice(-4).join('/')}`;
-    }
-    return worktreePath;
-}
+type TranslateFn = (key: string, options?: Record<string, string>) => string;
 
 function getShortHead(head?: string): string {
     return head ? head.slice(0, 8) : '';
 }
 
-function getWorktreeRef(worktree: WorktreeInfo, t: (key: string, options?: Record<string, string>) => string): string {
+function getWorktreeRef(worktree: WorktreeInfo, t: TranslateFn): string {
     return (
         worktree.branch ||
         (worktree.isDetached
@@ -46,58 +41,47 @@ function getWorktreeRef(worktree: WorktreeInfo, t: (key: string, options?: Recor
     );
 }
 
-function getWorktreeState(
-    worktree: WorktreeInfo,
-    t: (key: string, options?: Record<string, string>) => string
-): WorktreeState {
+// The leading icon only encodes the worktree kind; dirty state is a separate marker after the ref.
+function getWorktreeKind(worktree: WorktreeInfo): WorktreeKind {
     if (!worktree.pathExists) {
-        return {
-            label: t('Missing'),
-            icon: 'codicon-warning',
-            className: styles.missingState,
-        };
+        return { icon: 'codicon-warning', className: styles.missingKind };
     }
-
-    if (worktree.isDirty) {
-        return {
-            label: t('Dirty'),
-            icon: 'codicon-circle-filled',
-            className: styles.dirtyState,
-        };
+    if (worktree.isMain) {
+        return { icon: 'codicon-repo', className: styles.normalKind };
     }
-
     return {
-        label: t('Checked out'),
-        icon: 'codicon-git-branch',
-        className: styles.normalState,
+        icon: worktree.isDetached ? 'codicon-git-commit' : 'codicon-git-branch',
+        className: styles.normalKind,
     };
+}
+
+function getWorktreeStatusLabel(worktree: WorktreeInfo, t: TranslateFn): string {
+    if (!worktree.pathExists) {
+        return t('Missing');
+    }
+    return worktree.isDirty ? t('Dirty') : t('Checked out');
 }
 
 export function WorktreeDrawer({ open, worktrees, loading, onClose }: WorktreeDrawerProps) {
     const { t } = useTranslation();
-    const sortedWorktrees = useMemo(
-        () =>
-            [...worktrees].sort((a, b) => {
-                if (a.pathExists !== b.pathExists) {
-                    return a.pathExists ? -1 : 1;
-                }
-                return a.path.localeCompare(b.path);
-            }),
+    const sortedWorktrees = useMemo(() => sortWorktrees(worktrees), [worktrees]);
+    const displayPaths = useMemo(
+        () => getShortestUniqueSuffixes(worktrees.map((worktree) => worktree.path)),
         [worktrees]
     );
 
     const nodes = useMemo<TreeNode<WorktreeNodeData>[]>(
         () =>
             sortedWorktrees.map((worktree) => {
-                const state = getWorktreeState(worktree, t);
                 const ref = getWorktreeRef(worktree, t);
 
                 // Show detailed multiline information on hover for rich context
                 const tooltip = [
+                    ...(worktree.isMain ? [t('Main Worktree')] : []),
                     worktree.branch
                         ? `${t('Branch')}: ${worktree.branch}`
                         : `${t('Detached HEAD')}: ${getShortHead(worktree.head)}`,
-                    `${t('Status')}: ${state.label}`,
+                    `${t('Status')}: ${getWorktreeStatusLabel(worktree, t)}`,
                     `${t('Path')}: ${worktree.path}`,
                 ].join('\n');
 
@@ -105,10 +89,14 @@ export function WorktreeDrawer({ open, worktrees, loading, onClose }: WorktreeDr
                     id: worktree.path,
                     label: ref,
                     title: tooltip,
-                    data: { worktree, state },
+                    data: {
+                        worktree,
+                        kind: getWorktreeKind(worktree),
+                        displayPath: displayPaths.get(worktree.path) ?? worktree.path,
+                    },
                 };
             }),
-        [sortedWorktrees, t]
+        [sortedWorktrees, displayPaths, t]
     );
 
     const selectedId = useMemo(() => {
@@ -162,34 +150,67 @@ export function WorktreeDrawer({ open, worktrees, loading, onClose }: WorktreeDr
         } satisfies WorktreeItemContext;
     }, []);
 
-    const renderLabel = useCallback((node: TreeNode<WorktreeNodeData>) => {
-        if (!node.data) {
-            return node.label;
-        }
+    const renderLabel = useCallback(
+        (node: TreeNode<WorktreeNodeData>) => {
+            if (!node.data) {
+                return node.label;
+            }
 
-        const { worktree, state } = node.data;
+            const { worktree, kind, displayPath } = node.data;
 
-        return (
-            <span className={styles.worktreeLabel}>
-                <span className={`${styles.stateIcon} ${state.className}`} aria-hidden="true">
-                    <i className={`codicon ${state.icon}`}></i>
+            return (
+                <span className={styles.worktreeLabel}>
+                    <span className={`${styles.kindIcon} ${kind.className}`} aria-hidden="true">
+                        <i className={`codicon ${kind.icon}`}></i>
+                    </span>
+                    <span className={`${styles.ref} ${worktree.isActiveRepository ? styles.activeRef : ''}`}>
+                        {node.label}
+                    </span>
+                    {worktree.isDirty && (
+                        <span className={styles.dirtyMark} role="img" aria-label={t('Dirty')}>
+                            <i className="codicon codicon-circle-filled"></i>
+                        </span>
+                    )}
+                    {worktree.pathExists ? (
+                        <span className={styles.path}>
+                            <bdi>{displayPath}</bdi>
+                        </span>
+                    ) : (
+                        <span className={`${styles.path} ${styles.missingPath}`}>{t('Missing')}</span>
+                    )}
                 </span>
-                <span className={styles.ref}>{node.label}</span>
-                <span className={styles.path}>{getDisplayPath(worktree.path)}</span>
-            </span>
-        );
-    }, []);
+            );
+        },
+        [t]
+    );
 
-    const renderTrailing = useCallback(() => {
-        // Do not render status label text in trailing position to prevent layout redundancy
-        return null;
-    }, []);
+    const renderTrailing = useCallback(
+        (node: TreeNode<WorktreeNodeData>) => {
+            const worktree = node.data?.worktree;
+            // Opening the worktree that already backs this window would only duplicate it.
+            if (!worktree?.pathExists || worktree.isCurrent) {
+                return null;
+            }
+
+            return (
+                <button
+                    type="button"
+                    className={styles.rowAction}
+                    title={t('Open in New Window')}
+                    aria-label={t('Open in New Window')}
+                    onClick={(event) => {
+                        event.stopPropagation();
+                        void rpc.openWorktree(worktree.path);
+                    }}
+                >
+                    <i className="codicon codicon-empty-window"></i>
+                </button>
+            );
+        },
+        [t]
+    );
 
     const handlePrune = async () => {
-        if (!hasStaleWorktrees) {
-            return;
-        }
-
         await rpc.pruneWorktrees();
         emitRefresh(['worktrees'], 'worktrees-pruned');
     };
@@ -205,16 +226,17 @@ export function WorktreeDrawer({ open, worktrees, loading, onClose }: WorktreeDr
                     <span>{t('Worktrees')}</span>
                 </div>
                 <div className={styles.actions}>
-                    <button
-                        className={styles.iconBtn}
-                        type="button"
-                        title={t('Prune Stale Worktrees')}
-                        aria-label={t('Prune Stale Worktrees')}
-                        disabled={!hasStaleWorktrees}
-                        onClick={handlePrune}
-                    >
-                        <span className="intelli-git-icon intelli-git-icon-broom" aria-hidden="true" />
-                    </button>
+                    {hasStaleWorktrees && (
+                        <button
+                            className={styles.iconBtn}
+                            type="button"
+                            title={t('Prune Stale Worktrees')}
+                            aria-label={t('Prune Stale Worktrees')}
+                            onClick={handlePrune}
+                        >
+                            <span className="intelli-git-icon intelli-git-icon-broom" aria-hidden="true" />
+                        </button>
+                    )}
                     <button
                         className={styles.iconBtn}
                         type="button"
