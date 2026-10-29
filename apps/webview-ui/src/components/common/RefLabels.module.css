@@ -2,11 +2,12 @@
     position: relative;
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: 3px;
     margin-left: 6px;
     min-width: 0;
-    max-width: min(46%, 280px);
-    flex-shrink: 1;
+    /* Keep the ref readable; the commit subject next to it shrinks first. */
+    flex: 0 0 auto;
+    max-width: 60%;
     vertical-align: middle;
 }
 
@@ -41,36 +42,33 @@
     line-height: 16px;
     border: 1px solid transparent;
     white-space: nowrap;
-    max-width: 120px;
-    font-weight: 500;
+    max-width: 200px;
     box-sizing: border-box;
 }
 
-.head {
-    background-color: color-mix(in srgb, var(--vscode-charts-yellow, #cca700) 16%, transparent);
-    border-color: color-mix(in srgb, var(--vscode-charts-yellow, #cca700) 48%, transparent);
-    color: var(--vscode-editorWarning-foreground, #cca700);
+/* Only the checked-out branch gets an accent; branch text inherits the row color so selection stays legible. */
+.current {
+    background-color: color-mix(in srgb, var(--vscode-focusBorder) 18%, transparent);
+    border-color: color-mix(in srgb, var(--vscode-focusBorder) 55%, transparent);
+    color: inherit;
+    font-weight: 600;
 }
 
 .local {
-    background-color: color-mix(
-        in srgb,
-        var(--vscode-gitDecoration-untrackedResourceForeground, #73c991) 14%,
-        transparent
-    );
-    border-color: color-mix(in srgb, var(--vscode-gitDecoration-untrackedResourceForeground, #73c991) 42%, transparent);
-    color: var(--vscode-gitDecoration-untrackedResourceForeground, #73c991);
+    border-color: color-mix(in srgb, currentColor 40%, transparent);
+    color: inherit;
 }
 
 .remote {
-    background-color: color-mix(in srgb, var(--vscode-charts-blue, #3794ff) 14%, transparent);
-    border-color: color-mix(in srgb, var(--vscode-charts-blue, #3794ff) 42%, transparent);
-    color: var(--vscode-charts-blue, #3794ff);
+    border-style: dashed;
+    border-color: color-mix(in srgb, currentColor 40%, transparent);
+    color: inherit;
+    opacity: 0.75;
 }
 
 .tag {
-    background-color: color-mix(in srgb, var(--vscode-charts-orange, #d18616) 16%, transparent);
-    border-color: color-mix(in srgb, var(--vscode-charts-orange, #d18616) 52%, transparent);
+    background-color: color-mix(in srgb, var(--vscode-charts-orange, #d18616) 14%, transparent);
+    border-color: color-mix(in srgb, var(--vscode-charts-orange, #d18616) 50%, transparent);
     color: var(--vscode-charts-orange, #d18616);
 }
 
@@ -80,24 +78,24 @@
     color: currentColor;
 }
 
+.syncIcon:global(.codicon[class*='codicon-']) {
+    font-size: 10px;
+    opacity: 0.7;
+}
+
 .text {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
-.extraBadge {
+.extraCount {
     flex: 0 0 auto;
-    height: 16px;
-    padding: 0 4px;
-    border: 1px solid var(--vscode-badge-background, #4d4d4d);
-    border-radius: 4px;
-    background-color: color-mix(in srgb, var(--vscode-badge-background, #4d4d4d) 16%, transparent);
-    color: var(--vscode-descriptionForeground);
-    font-size: var(--ig-font-size-3xs);
-    line-height: 14px;
+    padding: 0 2px;
+    color: inherit;
+    opacity: 0.7;
+    font-size: var(--ig-font-size-2xs);
     font-weight: 600;
-    box-sizing: border-box;
 }
 
 .tooltip {
@@ -112,6 +110,8 @@
     flex-direction: column;
     gap: 4px;
     min-width: max-content;
+    color: var(--vscode-editorHoverWidget-foreground, var(--vscode-foreground));
+    font-weight: normal;
 }
 
 .tooltipItem {
@@ -124,4 +124,5 @@
     background: none !important;
     border: none !important;
     padding: 0;
+    opacity: 1;
 }

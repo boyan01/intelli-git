@@ -64,7 +64,7 @@ export class GitLogService {
 
     public getLog = async (options: LogOptions): Promise<LogCommit[]> => {
         try {
-            const args = ['log', '--date=iso'];
+            const args = ['log', '--date=iso', '--decorate=full'];
 
             const format = '%H%x00%h%x00%s%x00%an%x00%ae%x00%aI%x00%P%x00%D';
             args.push(`--format=${format}`);
@@ -249,6 +249,7 @@ export class GitLogService {
         try {
             const showMsg = await this.git.show([
                 hash,
+                '--decorate=full',
                 '--format=%B%x00%P%x00%an%x00%ae%x00%aI%x00%h%x00%D',
                 '--no-patch',
             ]);
@@ -405,24 +406,25 @@ export class GitLogService {
         return null;
     }
 
+    // Expects `%D` with `--decorate=full`, so local branches containing `/` are not mistaken for remotes.
     private parseRefs(refsStr: string): RefInfo[] {
         if (!refsStr) return [];
 
-        return refsStr
-            .split(', ')
-            .filter(Boolean)
-            .map((ref) => {
-                ref = ref.trim();
-                if (ref.startsWith('HEAD -> ')) {
-                    return { name: ref.replace('HEAD -> ', ''), type: 'head' };
-                }
-                if (ref.startsWith('tag: ')) {
-                    return { name: ref.replace('tag: ', ''), type: 'tag' };
-                }
-                if (ref.includes('/')) {
-                    return { name: ref, type: 'remote' };
-                }
-                return { name: ref, type: 'local' };
-            });
+        const refs: RefInfo[] = [];
+        for (const rawRef of refsStr.split(', ')) {
+            const ref = rawRef.trim();
+            if (ref === 'HEAD') {
+                refs.push({ name: 'HEAD', type: 'head' });
+            } else if (ref.startsWith('HEAD -> refs/heads/')) {
+                refs.push({ name: ref.slice('HEAD -> refs/heads/'.length), type: 'head' });
+            } else if (ref.startsWith('tag: refs/tags/')) {
+                refs.push({ name: ref.slice('tag: refs/tags/'.length), type: 'tag' });
+            } else if (ref.startsWith('refs/heads/')) {
+                refs.push({ name: ref.slice('refs/heads/'.length), type: 'local' });
+            } else if (ref.startsWith('refs/remotes/')) {
+                refs.push({ name: ref.slice('refs/remotes/'.length), type: 'remote' });
+            }
+        }
+        return refs;
     }
 }

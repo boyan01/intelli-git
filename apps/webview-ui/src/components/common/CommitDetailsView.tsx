@@ -100,10 +100,8 @@ export const CommitDetailsView: React.FC<CommitDetailsViewProps> = ({
 
     const containingBranchesRefs = useMemo<RefInfo[]>(() => {
         if (!commit || !showBranches || commit.containingBranches.length === 0) return [];
-        return commit.containingBranches.map((b) => ({
-            name: b,
-            type: b.includes('/') ? 'remote' : 'local',
-        }));
+        // `git branch --contains` lists local branches only, so a `/` in the name does not mean remote.
+        return commit.containingBranches.map((b) => ({ name: b, type: 'local' }));
     }, [commit, showBranches]);
 
     const tagRefs = useMemo<RefInfo[]>(() => {

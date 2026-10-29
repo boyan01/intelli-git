@@ -123,6 +123,28 @@ describe('GitLogService', () => {
         expect(details.containingBranches).toEqual(expect.arrayContaining(['release']));
     });
 
+    it('classifies refs by namespace so local branches with slashes stay local', async () => {
+        await git.raw(['branch', 'feat/glass', hashes[2]]);
+        await git.raw(['update-ref', 'refs/remotes/origin/feat/glass', hashes[2]]);
+        await git.raw(['symbolic-ref', 'refs/remotes/origin/HEAD', 'refs/remotes/origin/feat/glass']);
+        await git.raw(['tag', 'release/v2', hashes[2]]);
+        const currentBranch = (await git.revparse(['--abbrev-ref', 'HEAD'])).trim();
+
+        const [head] = await service.getLog({ branch: 'all', maxCount: 1 });
+        const details = await service.getCommitDetails(hashes[2]);
+
+        const expected = [
+            { name: currentBranch, type: 'head' },
+            { name: 'feat/glass', type: 'local' },
+            { name: 'origin/feat/glass', type: 'remote' },
+            { name: 'origin/HEAD', type: 'remote' },
+            { name: 'release/v2', type: 'tag' },
+        ];
+        expect(head.refs).toEqual(expect.arrayContaining(expected));
+        expect(head.refs).toHaveLength(expected.length);
+        expect(details.refs).toEqual(expect.arrayContaining(expected));
+    });
+
     it('returns sorted authors and the configured user', async () => {
         await expect(service.getAuthors()).resolves.toEqual(['Test User']);
         await expect(service.getCurrentUser()).resolves.toBe('Test User');

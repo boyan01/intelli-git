@@ -273,6 +273,7 @@
 }
 
 .subject > span:first-child {
+    min-width: 48px;
     overflow: hidden;
     text-overflow: ellipsis;
 }
