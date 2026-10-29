@@ -99,7 +99,9 @@
 }
 
 .tooltip {
-    position: absolute;
+    position: fixed;
+    top: 0;
+    left: 0;
     z-index: 1000;
     background-color: var(--vscode-editorHoverWidget-background, #252526);
     border: 1px solid var(--vscode-editorHoverWidget-border, #454545);
