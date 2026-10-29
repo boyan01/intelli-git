@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.0.13
+
+- Show new untracked files next to modified files in the commit view: under Changes in staged mode, and in the active changelist in changes mode. The separate Untracked Changes group is removed.
+- Removed the inactive changes feature; existing inactive changes move once into an ordinary "Inactive Changes" changelist.
+- Added per-file reviewed marks in both commit view modes. Reviewed files are dimmed, the mark clears when the file changes again, and it never changes what gets committed.
+- Fixed changes mode commits of renamed files leaving the old path behind, and kept partly staged files hunk-precise in changes mode. Editor change block labels and actions now appear only in changes mode.
+- Made the worktree drawer easier to scan with two-line rows showing the branch and path, an inline Open in New Window action, and Prune Stale Worktrees shown only when stale worktrees exist.
+- Made Git Log branch and tag labels readable: each row shows one primary label plus a +N count, a local branch and its same-named remote branch share one label, remote HEAD is hidden, and hovering lists every ref without being clipped by the list.
+- Fixed local branches whose names contain "/" being shown as remote branches in Git Log and commit details.
+- Removed empty folder icon spacing in the branch list when the active icon theme provides no folder icon.
+
 ## 0.0.12
 
 - Preview image changes with VS Code's native image diff editor, including staged, unstaged, history, and stash comparisons.
