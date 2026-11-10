@@ -239,6 +239,59 @@ describe('GitService blame lookup', () => {
 
         await expect(service.getBlameCommitForLine('tracked.txt', 2)).resolves.toBeNull();
     });
+
+    it('returns per-line blame with commit metadata for a saved file', async () => {
+        fs.writeFileSync(path.join(tempDir, 'tracked.txt'), 'first\nsecond\n');
+        await git.add('tracked.txt');
+        await git.commit('Initial commit');
+        const firstHash = (await git.revparse(['HEAD'])).trim();
+        fs.writeFileSync(path.join(tempDir, 'tracked.txt'), 'first\nchanged\nthird\n');
+        await git.add('tracked.txt');
+        await git.commit(['Change second line', '', 'Longer body']);
+        const secondHash = (await git.revparse(['HEAD'])).trim();
+
+        const service = new GitService(tempDir, tempDir, git);
+        const blame = await service.getFileBlame('tracked.txt');
+
+        expect(blame?.lines).toEqual([firstHash, secondHash, secondHash]);
+        const commit = blame?.commits.get(secondHash);
+        expect(commit).toMatchObject({
+            author: 'Test User',
+            authorEmail: 'test@example.com',
+            summary: 'Change second line',
+            filename: 'tracked.txt',
+            previousHash: firstHash,
+            isUncommitted: false,
+        });
+        const messages = await service.getCommitMessages([secondHash, firstHash]);
+        expect(messages.get(secondHash)).toBe('Change second line\n\nLonger body');
+        expect(messages.get(firstHash)).toBe('Initial commit');
+    });
+
+    it('blames unsaved editor contents and marks new lines as uncommitted', async () => {
+        fs.writeFileSync(path.join(tempDir, 'tracked.txt'), 'first\nsecond\n');
+        await git.add('tracked.txt');
+        await git.commit('Initial commit');
+        const hash = (await git.revparse(['HEAD'])).trim();
+
+        const service = new GitService(tempDir, tempDir, git);
+        const blame = await service.getFileBlame('tracked.txt', { contents: 'first\ninserted\nsecond\n' });
+
+        expect(blame?.lines[0]).toBe(hash);
+        expect(blame?.lines[2]).toBe(hash);
+        expect(blame?.commits.get(blame.lines[1])?.isUncommitted).toBe(true);
+    });
+
+    it('returns null for untracked files', async () => {
+        fs.writeFileSync(path.join(tempDir, 'tracked.txt'), 'first\n');
+        await git.add('tracked.txt');
+        await git.commit('Initial commit');
+        fs.writeFileSync(path.join(tempDir, 'untracked.txt'), 'new\n');
+
+        const service = new GitService(tempDir, tempDir, git);
+
+        await expect(service.getFileBlame('untracked.txt')).resolves.toBeNull();
+    });
 });
 
 describe('GitService conflict resolution', () => {

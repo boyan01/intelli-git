@@ -181,6 +181,26 @@ describe('RepositoryManager worktree discovery', () => {
         expect(manager.getRepositories().map((repo) => repo.repoPath)).not.toContain(fs.realpathSync(appRepoPath));
     });
 
+    it('resolves a file to the innermost repository that contains it', async () => {
+        const repoPath = path.join(tempDir, 'repo');
+        const nestedRepoPath = path.join(repoPath, 'nested');
+        await createCommittedRepository(repoPath);
+        await createCommittedRepository(nestedRepoPath);
+
+        __setWorkspaceFolders([repoPath]);
+        manager = new RepositoryManager(createExtensionContext() as never);
+        await manager.initialize();
+        await manager.addRepository(nestedRepoPath);
+
+        expect(manager.getRepositoryForFile(path.join(repoPath, 'README.md'))?.scope.repoPath).toBe(
+            fs.realpathSync(repoPath)
+        );
+        expect(manager.getRepositoryForFile(path.join(nestedRepoPath, 'README.md'))?.scope.repoPath).toBe(
+            fs.realpathSync(nestedRepoPath)
+        );
+        expect(manager.getRepositoryForFile(path.join(tempDir, 'outside.txt'))).toBeUndefined();
+    });
+
     it('restores the selected active repository from workspace state', async () => {
         const repoAPath = path.join(tempDir, 'repo-a');
         const repoBPath = path.join(tempDir, 'repo-b');

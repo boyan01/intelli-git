@@ -636,5 +636,12 @@
   "extension.codexEffortPrompt": "Choose a supported effort level. Higher effort may take longer.",
   "extension.codexConfigurationSummary": "Model: {0} • Reasoning effort: {1}",
   "extension.codexDefaultModelValue": "CLI default",
-  "extension.codexDefaultEffortValue": "Model default"
+  "extension.codexDefaultEffortValue": "Model default",
+  "You": "You",
+  "Uncommitted changes": "Uncommitted changes",
+  "Open in Git Log": "Open in Git Log",
+  "Copy Hash": "Copy Hash",
+  "Git blame is not available for this file.": "Git blame is not available for this file.",
+  "The selected line has no committed revision.": "The selected line has no committed revision.",
+  "The selected revision has no earlier version of this file.": "The selected revision has no earlier version of this file."
 }

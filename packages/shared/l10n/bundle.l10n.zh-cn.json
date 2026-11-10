@@ -638,5 +638,12 @@
   "extension.codexEffortPrompt": "选择模型支持的思考强度。更高强度可能需要更长时间。",
   "extension.codexConfigurationSummary": "模型：{0} • 思考强度：{1}",
   "extension.codexDefaultModelValue": "CLI 默认模型",
-  "extension.codexDefaultEffortValue": "模型默认强度"
+  "extension.codexDefaultEffortValue": "模型默认强度",
+  "You": "你",
+  "Uncommitted changes": "未提交的改动",
+  "Open in Git Log": "在 Git 日志中打开",
+  "Copy Hash": "复制哈希",
+  "Git blame is not available for this file.": "此文件无法使用 Git blame。",
+  "The selected line has no committed revision.": "所选行没有已提交的修订版本。",
+  "The selected revision has no earlier version of this file.": "所选修订版本中此文件没有更早的版本。"
 }

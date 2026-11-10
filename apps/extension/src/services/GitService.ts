@@ -16,12 +16,14 @@ import { i18n } from '../utils/i18n';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import { spawn } from 'node:child_process';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { isUtf8 } from 'node:buffer';
 import { createHash } from 'node:crypto';
 import { parseDiffToFileHunks, parseDiffToHunks } from '../utils/diffParser';
 import { GitLogService } from './GitLogService';
 import { GitBranchRemoteService } from './GitBranchRemoteService';
+import { parseBlamePorcelain, type FileBlame } from './blame/blameParser';
 import type { ChangelistStateService, ChangelistStateSnapshot, CommitPlan } from './ChangelistStateService';
 import type { ReviewedStateService } from './ReviewedStateService';
 
@@ -681,6 +683,96 @@ export class GitService implements vscode.Disposable {
         }
         return hash;
     };
+
+    /**
+     * Blames a whole file. When `contents` is given it is piped to `git blame --contents -`
+     * so line numbers match an unsaved editor buffer. Returns null when the file cannot be blamed
+     * (for example untracked files or paths outside the repository).
+     */
+    public async getFileBlame(
+        filePath: string,
+        options: { contents?: string; ignoreWhitespace?: boolean; revision?: string; pathKind?: 'workspace' | 'repo' } = {}
+    ): Promise<FileBlame | null> {
+        const repoPath = options.pathKind === 'repo' ? filePath : this.toRepoPath(filePath);
+        if (options.revision !== undefined && !/^[0-9a-f]{7,64}$/i.test(options.revision)) {
+            return null;
+        }
+        const args = ['blame', '--porcelain'];
+        if (options.ignoreWhitespace) {
+            args.push('-w');
+        }
+        if (fs.existsSync(path.join(this._gitRoot, '.git-blame-ignore-revs'))) {
+            args.push('--ignore-revs-file', '.git-blame-ignore-revs');
+        }
+        if (options.revision !== undefined) {
+            args.push(options.revision);
+        } else if (options.contents !== undefined) {
+            args.push('--contents', '-');
+        }
+        args.push('--', repoPath);
+
+        try {
+            const output = await this.runReadOnlyGit(args, options.contents);
+            return parseBlamePorcelain(output);
+        } catch (error) {
+            logger.debug(`git blame skipped for ${repoPath}: ${formatGitError(error)}`);
+            return null;
+        }
+    }
+
+    /**
+     * Reads full commit messages for many commits with a single git call per chunk.
+     */
+    public async getCommitMessages(hashes: string[]): Promise<Map<string, string>> {
+        const messages = new Map<string, string>();
+        const unique = Array.from(new Set(hashes.filter((hash) => /^[0-9a-f]{7,64}$/i.test(hash))));
+        const chunkSize = 100;
+        for (let index = 0; index < unique.length; index += chunkSize) {
+            const chunk = unique.slice(index, index + chunkSize);
+            try {
+                const output = await this.runReadOnlyGit(['show', '-s', '--format=%H%x00%B%x1e', ...chunk, '--']);
+                for (const record of output.split('\x1e')) {
+                    const separator = record.indexOf('\x00');
+                    if (separator < 0) {
+                        continue;
+                    }
+                    const hash = record.substring(0, separator).trim();
+                    if (hash) {
+                        messages.set(hash, record.substring(separator + 1).trim());
+                    }
+                }
+            } catch (error) {
+                logger.debug(`Failed to read commit messages: ${formatGitError(error)}`);
+            }
+        }
+        return messages;
+    }
+
+    private runReadOnlyGit(args: string[], input?: string): Promise<string> {
+        return new Promise((resolve, reject) => {
+            const child = spawn('git', args, {
+                cwd: this._gitRoot,
+                env: this.createGitEnv({ GIT_OPTIONAL_LOCKS: '0' }),
+                stdio: ['pipe', 'pipe', 'pipe'],
+            });
+            const stdout: Buffer[] = [];
+            const stderr: Buffer[] = [];
+            child.stdout.on('data', (chunk: Buffer) => stdout.push(chunk));
+            child.stderr.on('data', (chunk: Buffer) => stderr.push(chunk));
+            child.on('error', reject);
+            child.on('close', (code) => {
+                if (code === 0) {
+                    resolve(Buffer.concat(stdout).toString('utf8'));
+                    return;
+                }
+                reject(new Error(Buffer.concat(stderr).toString('utf8') || `git exited with code ${code}`));
+            });
+            child.stdin.on('error', () => {
+                // The process may exit before consuming stdin; the close handler reports the failure.
+            });
+            child.stdin.end(input ?? '');
+        });
+    }
 
     private isResolvedConflictCandidate(
         stages: Set<number> | undefined,
