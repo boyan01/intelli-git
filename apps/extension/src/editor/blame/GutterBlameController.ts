@@ -58,6 +58,7 @@ export class GutterBlameController implements vscode.Disposable {
     private readonly editorTimers = new Map<vscode.TextEditor, NodeJS.Timeout>();
     private readonly editorRequests = new Map<vscode.TextEditor, number>();
     private readonly highlightedCommits = new Map<vscode.TextEditor, string | undefined>();
+    private readonly lastSelections = new WeakMap<vscode.TextEditor, readonly vscode.Selection[]>();
     private readonly _onDidClickAnnotation = new vscode.EventEmitter<BlameLineTarget>();
     private clickTimer: NodeJS.Timeout | undefined;
     private settings: BlameSettings = readBlameSettings();
@@ -82,9 +83,11 @@ export class GutterBlameController implements vscode.Disposable {
             vscode.window.onDidChangeVisibleTextEditors(() => this.scheduleAll(0)),
             vscode.window.onDidChangeActiveTextEditor(() => this.updateContextKey()),
             vscode.window.onDidChangeTextEditorSelection((event) => {
+                const previous = this.lastSelections.get(event.textEditor) ?? [];
+                this.lastSelections.set(event.textEditor, event.selections);
                 if (this.isAnnotated(event.textEditor.document)) {
                     this.updateHighlight(event.textEditor);
-                    this.detectAnnotationClick(event);
+                    this.detectAnnotationClick(event, previous);
                 }
             }),
             vscode.window.onDidChangeTextEditorVisibleRanges((event) => {
@@ -242,36 +245,44 @@ export class GutterBlameController implements vscode.Disposable {
     }
 
     /**
-     * Decorations cannot receive clicks, but a click on the annotation drawn in front of a line moves
-     * the cursor to column 0 of that line. Empty lines are skipped because any click on them lands
-     * there too.
+     * Decorations cannot receive clicks. A multi-cursor modifier click (Alt+click, or Cmd/Ctrl+click
+     * with `editor.multiCursorModifier: ctrlCmd`) on the annotation adds a cursor at column 0 of that
+     * line, which a plain click on the code never does. The added cursor is removed again and the
+     * commit is opened, so plain clicks only move the cursor.
      */
-    private detectAnnotationClick(event: vscode.TextEditorSelectionChangeEvent): void {
+    private detectAnnotationClick(
+        event: vscode.TextEditorSelectionChangeEvent,
+        previous: readonly vscode.Selection[]
+    ): void {
         clearTimeout(this.clickTimer);
         this.clickTimer = undefined;
         const { textEditor: editor, selections } = event;
         if (
             this.settings.gutterClickAction !== 'openInGitLog' ||
-            event.kind !== vscode.TextEditorSelectionChangeKind.Mouse ||
-            !isClickAtLineStart(editor.document, selections)
+            event.kind !== vscode.TextEditorSelectionChangeKind.Mouse
         ) {
+            return;
+        }
+        const added = findAddedLineStartCursor(editor.document, previous, selections);
+        if (!added) {
             return;
         }
 
         const { document } = editor;
         const version = document.version;
-        const position = selections[0].active;
         this.clickTimer = setTimeout(async () => {
             this.clickTimer = undefined;
+            const current = editor.selections;
+            // A drag after the modifier click turns the cursor into a selection; leave it alone.
             if (
                 document.version !== version ||
-                editor.selections.length !== 1 ||
-                !editor.selection.isEmpty ||
-                !editor.selection.active.isEqual(position)
+                current.length !== selections.length ||
+                !current.some((selection) => selection.isEmpty && selection.active.isEqual(added.active))
             ) {
                 return;
             }
-            const target = await this.getLineTarget(document.uri, position.line);
+            editor.selections = [...previous];
+            const target = await this.getLineTarget(document.uri, added.active.line);
             if (target && !target.commit.isUncommitted) {
                 this._onDidClickAnnotation.fire(target);
             }
@@ -325,6 +336,9 @@ export class GutterBlameController implements vscode.Disposable {
     private async render(editor: vscode.TextEditor): Promise<void> {
         const requestId = (this.editorRequests.get(editor) ?? 0) + 1;
         this.editorRequests.set(editor, requestId);
+        if (!this.lastSelections.has(editor)) {
+            this.lastSelections.set(editor, editor.selections);
+        }
         const isCurrent = () =>
             this.editorRequests.get(editor) === requestId &&
             this.isAnnotated(editor.document) &&
@@ -465,17 +479,27 @@ function createCellStyle(width: number, tint: string | undefined, highlighted: b
     ].join('; ');
 }
 
-export function isClickAtLineStart(
+/**
+ * Returns the cursor a multi-cursor modifier click added at column 0 of a non-empty line, when the
+ * selection change kept every previous selection and added exactly that one cursor. Empty lines are
+ * skipped because any click on them lands on column 0.
+ */
+export function findAddedLineStartCursor(
     document: Pick<vscode.TextDocument, 'lineAt'>,
-    selections: readonly vscode.Selection[]
-): boolean {
-    if (selections.length !== 1) {
-        return false;
+    previous: readonly vscode.Selection[],
+    current: readonly vscode.Selection[]
+): vscode.Selection | undefined {
+    if (previous.length === 0 || current.length !== previous.length + 1) {
+        return undefined;
     }
-    const [selection] = selections;
-    return (
-        selection.isEmpty && selection.active.character === 0 && document.lineAt(selection.active.line).text.length > 0
-    );
+    const added = current.filter((selection) => !previous.some((old) => old.isEqual(selection)));
+    if (added.length !== 1) {
+        return undefined;
+    }
+    const [cursor] = added;
+    return cursor.isEmpty && cursor.active.character === 0 && document.lineAt(cursor.active.line).text.length > 0
+        ? cursor
+        : undefined;
 }
 
 function toAnnotationText(value: string): string {

@@ -92,7 +92,7 @@
   "intelli-git.config.blame.gutter.colorBy.age": "按提交时间着色，从较新（暖色）到较旧（冷色）。",
   "intelli-git.config.blame.gutter.colorBy.author": "为每位作者使用不同的颜色。",
   "intelli-git.config.blame.gutter.colorBy.none": "不为注解着色。",
-  "intelli-git.config.blame.gutter.clickAction.description": "点击 Git blame 注解时执行的操作。点击空行时不会触发。",
+  "intelli-git.config.blame.gutter.clickAction.description": "按住 Option 点击（Windows 和 Linux 上为 Alt+点击）Git blame 注解时执行的操作。如果 `editor.multiCursorModifier` 设置为 `ctrlCmd`，则改用 Cmd+点击（Ctrl+点击）。普通点击只移动光标，点击空行时不会触发。",
   "intelli-git.config.blame.gutter.clickAction.openInGitLog": "在 Git Log 面板中显示该行所属的提交。",
   "intelli-git.config.blame.gutter.clickAction.none": "不执行任何操作；可通过悬停提示或行号右键菜单操作。",
   "intelli-git.config.blame.dateFormat.description": "`${date}` 和 `${committerDate}` blame 变量使用的日期格式。支持 `YYYY`、`YY`、`MM`、`M`、`DD`、`D`、`HH`、`H`、`mm`、`ss`；字面文本请用 `[...]` 包裹。",

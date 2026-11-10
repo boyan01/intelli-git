@@ -92,7 +92,7 @@
   "intelli-git.config.blame.gutter.colorBy.age": "Tint by commit age, from recent (warm) to old (cold).",
   "intelli-git.config.blame.gutter.colorBy.author": "Give every author a distinct tint.",
   "intelli-git.config.blame.gutter.colorBy.none": "Do not color annotations.",
-  "intelli-git.config.blame.gutter.clickAction.description": "What happens when you click a Git blame annotation. Clicks on empty lines are ignored.",
+  "intelli-git.config.blame.gutter.clickAction.description": "What happens when you Option+click (Alt+click on Windows and Linux) a Git blame annotation. With `editor.multiCursorModifier` set to `ctrlCmd`, use Cmd+click (Ctrl+click) instead. A plain click only moves the cursor, and clicks on empty lines are ignored.",
   "intelli-git.config.blame.gutter.clickAction.openInGitLog": "Show the line's commit in the Git Log panel.",
   "intelli-git.config.blame.gutter.clickAction.none": "Do nothing; use the hover or the line number context menu instead.",
   "intelli-git.config.blame.dateFormat.description": "Date format used by the `${date}` and `${committerDate}` blame tokens. Supports `YYYY`, `YY`, `MM`, `M`, `DD`, `D`, `HH`, `H`, `mm`, `ss`; wrap literal text in `[...]`.",
