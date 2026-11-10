@@ -94,6 +94,12 @@ export class GitLogViewProvider extends BaseWebviewProvider implements vscode.We
             return;
         }
 
+        if (!this._view.visible) {
+            // A hidden Git Log webview is not retained; it reloads on show and consumes the pending reveal.
+            this._view.show?.();
+            return;
+        }
+
         this._view.show?.();
         this._pendingReveal = undefined;
         await this._rpc?.proxy.revealLog(params);
