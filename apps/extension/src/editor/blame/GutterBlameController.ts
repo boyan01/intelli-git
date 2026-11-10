@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import type { BlameCommit } from '../../services/blame/blameParser';
+import { getBlameLineSource, type BlameCommit, type BlameLineSource } from '../../services/blame/blameParser';
 import { BlameService, type DocumentBlame } from '../../services/blame/BlameService';
 import { i18n } from '../../utils/i18n';
 import { logger } from '../../utils/logger';
@@ -46,6 +46,8 @@ export interface BlameLineTarget {
     line: number;
     /** One-based line of the same text inside the blamed commit. */
     originalLine: number;
+    /** Paths of this line in the blamed commit and its parent. */
+    source: BlameLineSource;
 }
 
 /**
@@ -135,10 +137,15 @@ export class GutterBlameController implements vscode.Disposable {
             return undefined;
         }
         const documentBlame = await this.blameService.getBlame(document);
-        const hash = documentBlame?.blame.lines[line];
-        const commit = hash ? documentBlame?.blame.commits.get(hash) : undefined;
-        return documentBlame && commit
-            ? { documentBlame, commit, line, originalLine: documentBlame.blame.originalLines[line] ?? line + 1 }
+        if (!documentBlame) {
+            return undefined;
+        }
+        const { blame } = documentBlame;
+        const hash = blame.lines[line];
+        const commit = hash ? blame.commits.get(hash) : undefined;
+        const source = getBlameLineSource(blame, line);
+        return commit && source
+            ? { documentBlame, commit, line, originalLine: blame.originalLines[line] ?? line + 1, source }
             : undefined;
     }
 
@@ -391,15 +398,7 @@ export class GutterBlameController implements vscode.Disposable {
         width = Math.max(1, Math.min(width, MAX_ANNOTATION_WIDTH));
 
         const lines = getLinesToRender(editor);
-        const commitsInRange = new Set<string>();
-        for (const line of lines) {
-            const hash = blame.lines[line];
-            if (hash) {
-                commitsInRange.add(hash);
-            }
-        }
-
-        const hovers = await this.buildHovers(documentBlame, commitsInRange, options);
+        const hovers = await this.buildHovers(documentBlame, lines, options);
         const tints =
             this.settings.gutterColorBy === 'age'
                 ? createHeatColors(blame.commits)
@@ -419,7 +418,7 @@ export class GutterBlameController implements vscode.Disposable {
             const highlighted = !!commit && commit.hash === highlightedHash;
             decorations.push({
                 range: new vscode.Range(line, 0, line, 0),
-                hoverMessage: commit ? hovers.get(commit.hash) : undefined,
+                hoverMessage: hovers.get(line),
                 renderOptions: {
                     before: {
                         contentText: (text.length > width ? text.slice(0, width - 1) + '\u2026' : text) || '\u00a0',
@@ -435,24 +434,46 @@ export class GutterBlameController implements vscode.Disposable {
 
     private async buildHovers(
         documentBlame: DocumentBlame,
-        hashes: Set<string>,
+        lines: Iterable<number>,
         options: BlameFormatOptions
-    ): Promise<Map<string, vscode.MarkdownString>> {
-        const hovers = new Map<string, vscode.MarkdownString>();
+    ): Promise<Map<number, vscode.MarkdownString>> {
+        const hovers = new Map<number, vscode.MarkdownString>();
         if (!this.settings.gutterHoverEnabled) {
             return hovers;
         }
 
-        const committed = [...hashes].filter((hash) => !documentBlame.blame.commits.get(hash)?.isUncommitted);
-        const messages = await this.blameService.getCommitMessages(documentBlame.service, committed);
-        for (const hash of hashes) {
-            const commit = documentBlame.blame.commits.get(hash);
-            if (commit) {
-                hovers.set(
-                    hash,
-                    createBlameHover(commit, { repoPath: documentBlame.repoPath, message: messages.get(hash), options })
-                );
+        const { blame } = documentBlame;
+        const lineList = [...lines];
+        const committed = new Set<string>();
+        for (const line of lineList) {
+            const hash = blame.lines[line];
+            if (hash && !blame.commits.get(hash)?.isUncommitted) {
+                committed.add(hash);
             }
+        }
+        const messages = await this.blameService.getCommitMessages(documentBlame.service, [...committed]);
+
+        // Lines of one blame block share a source object, so they can share one hover.
+        const bySource = new Map<BlameLineSource, vscode.MarkdownString>();
+        for (const line of lineList) {
+            const hash = blame.lines[line];
+            const commit = hash ? blame.commits.get(hash) : undefined;
+            const source = getBlameLineSource(blame, line);
+            if (!commit || !source) {
+                continue;
+            }
+            const key = blame.sources[line] ?? source;
+            let hover = bySource.get(key);
+            if (!hover) {
+                hover = createBlameHover(commit, {
+                    repoPath: documentBlame.repoPath,
+                    message: messages.get(commit.hash),
+                    options,
+                    source,
+                });
+                bySource.set(key, hover);
+            }
+            hovers.set(line, hover);
         }
         return hovers;
     }

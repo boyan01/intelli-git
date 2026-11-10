@@ -16,11 +16,26 @@ export interface BlameCommit {
     isUncommitted: boolean;
 }
 
+/**
+ * Where a block of blamed lines came from. Git reports this per block, so one commit can own
+ * lines that came from different paths, for example a merge that combines two renamed files.
+ */
+export interface BlameLineSource {
+    hash: string;
+    /** Git-root-relative path of the file in `hash`. */
+    filename: string;
+    previousHash?: string;
+    /** Git-root-relative path of the file in `previousHash`. */
+    previousFilename?: string;
+}
+
 export interface FileBlame {
     /** Commit hash per final line; index 0 is line 1. */
     lines: string[];
     /** One-based line number of each final line inside its blamed commit; same indexing as `lines`. */
     originalLines: number[];
+    /** Source path details per final line; same indexing as `lines`. Lines of one block share an object. */
+    sources: BlameLineSource[];
     commits: Map<string, BlameCommit>;
 }
 
@@ -52,9 +67,28 @@ function createCommit(hash: string): BlameCommit {
 export function parseBlamePorcelain(output: string): FileBlame {
     const lines: string[] = [];
     const originalLines: number[] = [];
+    const sources: BlameLineSource[] = [];
     const commits = new Map<string, BlameCommit>();
+    // Git prints `filename`/`previous` only for the first block of a commit, unless the commit
+    // touched the file under more than one path; later blocks reuse the commit's last source.
+    const lastSources = new Map<string, BlameLineSource>();
     const rows = output.split('\n');
     let current: BlameCommit | undefined;
+    let group: BlameLineSource | undefined;
+
+    const finishGroup = () => {
+        if (!group) {
+            return;
+        }
+        if (group.filename) {
+            lastSources.set(group.hash, group);
+        } else {
+            const known = lastSources.get(group.hash);
+            group.filename = known?.filename ?? '';
+            group.previousHash = known?.previousHash;
+            group.previousFilename = known?.previousFilename;
+        }
+    };
 
     for (const rawRow of rows) {
         const row = rawRow.endsWith('\r') ? rawRow.slice(0, -1) : rawRow;
@@ -71,8 +105,13 @@ export function parseBlamePorcelain(output: string): FileBlame {
                 current = createCommit(hash);
                 commits.set(hash, current);
             }
+            if (header[4] !== undefined || !group || group.hash !== hash) {
+                finishGroup();
+                group = { hash, filename: '' };
+            }
             lines[finalLine - 1] = hash;
             originalLines[finalLine - 1] = Number(header[2]);
+            sources[finalLine - 1] = group;
             continue;
         }
 
@@ -106,23 +145,57 @@ export function parseBlamePorcelain(output: string): FileBlame {
             case 'summary':
                 current.summary = value;
                 break;
-            case 'filename':
+            case 'filename': {
+                const filename = unquoteGitPath(value);
                 if (!current.filename) {
-                    current.filename = unquoteGitPath(value);
+                    current.filename = filename;
+                }
+                if (group) {
+                    group.filename = filename;
                 }
                 break;
+            }
             case 'previous': {
                 const previousSeparator = value.indexOf(' ');
-                if (previousSeparator > 0 && !current.previousHash) {
-                    current.previousHash = value.substring(0, previousSeparator);
-                    current.previousFilename = unquoteGitPath(value.substring(previousSeparator + 1));
+                if (previousSeparator > 0) {
+                    const previousHash = value.substring(0, previousSeparator);
+                    const previousFilename = unquoteGitPath(value.substring(previousSeparator + 1));
+                    if (!current.previousHash) {
+                        current.previousHash = previousHash;
+                        current.previousFilename = previousFilename;
+                    }
+                    if (group) {
+                        group.previousHash = previousHash;
+                        group.previousFilename = previousFilename;
+                    }
                 }
                 break;
             }
         }
     }
+    finishGroup();
 
-    return { lines, originalLines, commits };
+    return { lines, originalLines, sources, commits };
+}
+
+/**
+ * Returns where a final line (zero-based) came from, falling back to the commit-level details.
+ */
+export function getBlameLineSource(blame: FileBlame, line: number): BlameLineSource | undefined {
+    const source = blame.sources[line];
+    if (source?.filename) {
+        return source;
+    }
+    const hash = blame.lines[line];
+    const commit = hash ? blame.commits.get(hash) : undefined;
+    return commit
+        ? {
+              hash: commit.hash,
+              filename: commit.filename,
+              previousHash: commit.previousHash,
+              previousFilename: commit.previousFilename,
+          }
+        : undefined;
 }
 
 const GIT_PATH_ESCAPES: Record<string, number> = {

@@ -331,6 +331,42 @@ describe('GitService blame lookup', () => {
         });
     });
 
+    it('keeps per-line source paths when one commit owns lines from two paths', async () => {
+        fs.writeFileSync(path.join(tempDir, 'a.txt'), 'alpha one\nalpha two\nalpha three\n');
+        fs.writeFileSync(path.join(tempDir, 'b.txt'), 'beta one\nbeta two\nbeta three\n');
+        await git.add('.');
+        await git.commit('Add a and b');
+        const addHash = (await git.revparse(['HEAD'])).trim();
+        const mainBranch = (await git.revparse(['--abbrev-ref', 'HEAD'])).trim();
+
+        await git.checkoutLocalBranch('side');
+        await git.mv('a.txt', 'c.txt');
+        await git.commit('Rename a to c');
+        await git.checkout(mainBranch);
+        await git.mv('b.txt', 'c.txt');
+        await git.commit('Rename b to c');
+        await git.raw(['merge', '--no-commit', 'side']).catch(() => undefined);
+        fs.writeFileSync(
+            path.join(tempDir, 'c.txt'),
+            'alpha one\nalpha two\nalpha three\nbeta one\nbeta two\nbeta three\n'
+        );
+        await git.raw(['add', '-A', '.']);
+        await git.raw(['commit', '--no-edit', '-m', 'Merge side']);
+
+        const service = new GitService(tempDir, tempDir, git);
+        const blame = await service.getFileBlame('c.txt');
+
+        expect(blame?.lines).toEqual(Array(6).fill(addHash));
+        expect(blame?.sources.map((source) => source.filename)).toEqual([
+            'a.txt',
+            'a.txt',
+            'a.txt',
+            'b.txt',
+            'b.txt',
+            'b.txt',
+        ]);
+    });
+
     it('reads the HEAD commit and returns null for an unborn branch', async () => {
         const service = new GitService(tempDir, tempDir, git);
         await expect(service.getHeadCommit()).resolves.toBeNull();

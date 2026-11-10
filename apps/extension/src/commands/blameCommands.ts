@@ -51,16 +51,16 @@ function toLine(value: unknown): { uri: vscode.Uri; line: number } | undefined {
 }
 
 function toCommandArgs(target: BlameLineTarget): BlameCommandArgs | undefined {
-    const { commit, documentBlame } = target;
+    const { commit, documentBlame, source } = target;
     if (commit.isUncommitted) {
         return undefined;
     }
     return {
         repoPath: documentBlame.repoPath,
         hash: commit.hash,
-        filePath: commit.filename,
-        previousHash: commit.previousHash,
-        previousFilePath: commit.previousFilename,
+        filePath: source.filename,
+        previousHash: source.previousHash,
+        previousFilePath: source.previousFilename,
     };
 }
 
@@ -111,20 +111,20 @@ export function registerBlameCommands(
      * Opens the file as of the line's commit (or the commit before it) and annotates that revision.
      */
     const annotateRevision = async (target: BlameLineTarget, previous: boolean) => {
-        const { commit, documentBlame } = target;
+        const { commit, documentBlame, source } = target;
         if (commit.isUncommitted) {
             void vscode.window.showInformationMessage(vscode.l10n.t('The selected line has no committed revision.'));
             return;
         }
-        if (previous && !commit.previousHash) {
+        if (previous && !source.previousHash) {
             void vscode.window.showInformationMessage(
                 vscode.l10n.t('The selected revision has no earlier version of this file.')
             );
             return;
         }
 
-        const ref = previous ? commit.previousHash! : commit.hash;
-        const filePath = previous ? (commit.previousFilename ?? commit.filename) : commit.filename;
+        const ref = previous ? source.previousHash! : commit.hash;
+        const filePath = previous ? (source.previousFilename ?? source.filename) : source.filename;
         const uri = createRevisionContentUri(documentBlame.service, filePath, { ref, pathKind: 'repo' });
         const document = await vscode.workspace.openTextDocument(uri);
         const line = Math.min(Math.max(0, target.originalLine - 1), Math.max(0, document.lineCount - 1));

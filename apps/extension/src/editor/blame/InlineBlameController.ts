@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { BlameService } from '../../services/blame/BlameService';
+import { getBlameLineSource } from '../../services/blame/blameParser';
 import { logger } from '../../utils/logger';
 import { renderBlameTemplate } from './blameFormat';
 import {
@@ -162,6 +163,7 @@ export class InlineBlameController implements vscode.Disposable {
                 repoPath: documentBlame.repoPath,
                 message: messages.get(commit.hash),
                 options,
+                source: getBlameLineSource(documentBlame.blame, line),
             });
         }
 

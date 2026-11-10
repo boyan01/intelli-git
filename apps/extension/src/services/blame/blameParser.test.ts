@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseBlamePorcelain, UNCOMMITTED_HASH, unquoteGitPath } from './blameParser';
+import { getBlameLineSource, parseBlamePorcelain, UNCOMMITTED_HASH, unquoteGitPath } from './blameParser';
 
 const HASH_A = 'a'.repeat(40);
 const HASH_B = 'b'.repeat(40);
@@ -56,6 +56,47 @@ describe('parseBlamePorcelain', () => {
         expect(blame.lines).toEqual([HASH_A, HASH_A, UNCOMMITTED_HASH, HASH_B]);
         expect(blame.originalLines).toEqual([1, 2, 3, 3]);
         expect(blame.commits.size).toBe(3);
+    });
+
+    it('records source paths per block and reuses them for repeated blocks', () => {
+        const blame = parseBlamePorcelain(
+            [
+                `${HASH_A} 1 1 1`,
+                'author Alice',
+                'summary Add a and b',
+                'filename a.txt',
+                '\talpha',
+                `${HASH_B} 1 2 1`,
+                'author Bob',
+                'summary Change b',
+                `previous ${HASH_A} b.txt`,
+                'filename b.txt',
+                '\tbeta',
+                `${HASH_A} 2 3 1`,
+                'filename b.txt',
+                '\tgamma',
+                `${HASH_A} 2 4 1`,
+                '\tdelta',
+                `${HASH_A} 5 5 2`,
+                'filename a.txt',
+                '\tepsilon',
+                `${HASH_A} 6 6`,
+                '\tzeta',
+                '',
+            ].join('\n')
+        );
+
+        expect(blame.sources.map((source) => source.filename)).toEqual([
+            'a.txt',
+            'b.txt',
+            'b.txt',
+            'b.txt',
+            'a.txt',
+            'a.txt',
+        ]);
+        expect(blame.sources[1]).toMatchObject({ previousHash: HASH_A, previousFilename: 'b.txt' });
+        expect(blame.commits.get(HASH_A)?.filename).toBe('a.txt');
+        expect(getBlameLineSource(blame, 2)).toMatchObject({ hash: HASH_A, filename: 'b.txt' });
     });
 
     it('parses commit metadata once per commit', () => {

@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import type { BlameCommit } from '../../services/blame/blameParser';
+import type { BlameCommit, BlameLineSource } from '../../services/blame/blameParser';
 import { i18n } from '../../utils/i18n';
 import { formatBlameDate, formatRelativeTime, type BlameFormatOptions } from './blameFormat';
 
@@ -79,7 +79,7 @@ function createCommandUri(command: string, args: unknown): string {
  */
 export function createBlameHover(
     commit: BlameCommit,
-    context: { repoPath: string; message?: string; options: BlameFormatOptions }
+    context: { repoPath: string; message?: string; options: BlameFormatOptions; source?: BlameLineSource }
 ): vscode.MarkdownString {
     const markdown = new vscode.MarkdownString(undefined, true);
     markdown.isTrusted = {
@@ -109,12 +109,13 @@ export function createBlameHover(
         markdown.appendMarkdown(`${escapeMarkdown(message).replace(/\r?\n/g, '  \n')}\n\n`);
     }
 
+    const source = context.source ?? commit;
     const args: BlameCommandArgs = {
         repoPath: context.repoPath,
         hash: commit.hash,
-        filePath: commit.filename,
-        previousHash: commit.previousHash,
-        previousFilePath: commit.previousFilename,
+        filePath: source.filename,
+        previousHash: source.previousHash,
+        previousFilePath: source.previousFilename,
     };
     markdown.appendMarkdown('---\n\n');
     markdown.appendMarkdown(
