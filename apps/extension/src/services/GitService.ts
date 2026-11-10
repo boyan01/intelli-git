@@ -23,6 +23,7 @@ import { createHash } from 'node:crypto';
 import { parseDiffToFileHunks, parseDiffToHunks } from '../utils/diffParser';
 import { GitLogService } from './GitLogService';
 import { GitBranchRemoteService } from './GitBranchRemoteService';
+import { mapNewLineToOldLine, parseDiffHunkRanges } from './blame/blameLineMapping';
 import { parseBlamePorcelain, type FileBlame } from './blame/blameParser';
 import type { ChangelistStateService, ChangelistStateSnapshot, CommitPlan } from './ChangelistStateService';
 import type { ReviewedStateService } from './ReviewedStateService';
@@ -766,6 +767,38 @@ export class GitService implements vscode.Disposable {
             return output.trim() || null;
         } catch {
             return null;
+        }
+    }
+
+    /**
+     * Maps a one-based line of a file in one revision to the matching line of the file in another
+     * revision, by walking the zero-context diff between the two. Paths are git-root-relative.
+     * Returns the line unchanged when the diff cannot be read.
+     */
+    public async mapLineBetweenRevisions(
+        from: { ref: string; path: string },
+        to: { ref: string; path: string },
+        line: number
+    ): Promise<number> {
+        if (![from.ref, to.ref].every((ref) => /^[0-9a-f]{7,64}$/i.test(ref))) {
+            return line;
+        }
+        try {
+            const diff = await this.runReadOnlyGit([
+                'diff',
+                '-U0',
+                '--no-color',
+                '--no-ext-diff',
+                '--no-textconv',
+                `${to.ref}:${to.path}`,
+                `${from.ref}:${from.path}`,
+            ]);
+            return mapNewLineToOldLine(parseDiffHunkRanges(diff), line);
+        } catch (error) {
+            logger.debug(
+                `Failed to map line between ${from.ref} and ${to.ref}: ${error instanceof Error ? error.message : String(error)}`
+            );
+            return line;
         }
     }
 

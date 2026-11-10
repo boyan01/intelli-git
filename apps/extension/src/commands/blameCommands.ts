@@ -126,8 +126,17 @@ export function registerBlameCommands(
         const ref = previous ? source.previousHash! : commit.hash;
         const filePath = previous ? (source.previousFilename ?? source.filename) : source.filename;
         const uri = createRevisionContentUri(documentBlame.service, filePath, { ref, pathKind: 'repo' });
+        // `originalLine` is the line inside `commit.hash`; the parent revision can have lines added or
+        // removed above it, so map it through the diff between the two revisions.
+        const revisionLine = previous
+            ? await documentBlame.service.mapLineBetweenRevisions(
+                  { ref: commit.hash, path: source.filename },
+                  { ref, path: filePath },
+                  target.originalLine
+              )
+            : target.originalLine;
         const document = await vscode.workspace.openTextDocument(uri);
-        const line = Math.min(Math.max(0, target.originalLine - 1), Math.max(0, document.lineCount - 1));
+        const line = Math.min(Math.max(0, revisionLine - 1), Math.max(0, document.lineCount - 1));
         const editor = await vscode.window.showTextDocument(document, {
             preview: true,
             selection: new vscode.Range(line, 0, line, 0),

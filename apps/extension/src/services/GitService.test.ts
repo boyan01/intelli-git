@@ -367,6 +367,30 @@ describe('GitService blame lookup', () => {
         ]);
     });
 
+    it('maps a line of a revision to the same text in its parent revision', async () => {
+        fs.writeFileSync(path.join(tempDir, 'old.txt'), 'one\ntwo\nthree\nfour\n');
+        await git.add('.');
+        await git.commit('Add file');
+        const parentHash = (await git.revparse(['HEAD'])).trim();
+        await git.mv('old.txt', 'new.txt');
+        fs.writeFileSync(path.join(tempDir, 'new.txt'), 'header\nmore\none\ntwo\nTHREE\nfour\n');
+        await git.add('.');
+        await git.commit('Rename and edit');
+        const hash = (await git.revparse(['HEAD'])).trim();
+
+        const service = new GitService(tempDir, tempDir, git);
+        const map = (line: number) =>
+            service.mapLineBetweenRevisions({ ref: hash, path: 'new.txt' }, { ref: parentHash, path: 'old.txt' }, line);
+
+        await expect(map(4)).resolves.toBe(2);
+        await expect(map(5)).resolves.toBe(3);
+        await expect(map(6)).resolves.toBe(4);
+        await expect(map(1)).resolves.toBe(1);
+        await expect(
+            service.mapLineBetweenRevisions({ ref: hash, path: 'new.txt' }, { ref: parentHash, path: 'missing.txt' }, 6)
+        ).resolves.toBe(6);
+    });
+
     it('reads the HEAD commit and returns null for an unborn branch', async () => {
         const service = new GitService(tempDir, tempDir, git);
         await expect(service.getHeadCommit()).resolves.toBeNull();
