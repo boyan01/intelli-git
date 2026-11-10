@@ -21,6 +21,7 @@ export class InlineBlameController implements vscode.Disposable {
     private readonly disposables: vscode.Disposable[] = [];
     private settings: BlameSettings = readBlameSettings();
     private updateTimer?: NodeJS.Timeout;
+    private editPending = false;
     private requestId = 0;
     private decoratedEditor?: vscode.TextEditor;
 
@@ -39,16 +40,19 @@ export class InlineBlameController implements vscode.Disposable {
             this.decorationType,
             vscode.window.onDidChangeActiveTextEditor(() => {
                 this.clear();
+                this.editPending = false;
                 this.scheduleUpdate(SELECTION_DELAY_MS);
             }),
             vscode.window.onDidChangeTextEditorSelection((event) => {
                 if (event.textEditor === vscode.window.activeTextEditor) {
-                    this.scheduleUpdate(SELECTION_DELAY_MS);
+                    // Typing also moves the cursor; keep the edit debounce so blame waits for a pause.
+                    this.scheduleUpdate(this.editPending ? EDIT_DELAY_MS : SELECTION_DELAY_MS);
                 }
             }),
             vscode.workspace.onDidChangeTextDocument((event) => {
                 if (event.contentChanges.length > 0 && event.document === vscode.window.activeTextEditor?.document) {
                     this.clear();
+                    this.editPending = true;
                     this.scheduleUpdate(EDIT_DELAY_MS);
                 }
             }),
@@ -58,7 +62,9 @@ export class InlineBlameController implements vscode.Disposable {
                     this.scheduleUpdate(0);
                 }
             }),
-            blameService.onDidInvalidate(() => this.scheduleUpdate(SELECTION_DELAY_MS))
+            blameService.onDidInvalidate(() =>
+                this.scheduleUpdate(this.editPending ? EDIT_DELAY_MS : SELECTION_DELAY_MS)
+            )
         );
 
         this.scheduleUpdate(0);
@@ -89,6 +95,7 @@ export class InlineBlameController implements vscode.Disposable {
         }
         this.updateTimer = setTimeout(() => {
             this.updateTimer = undefined;
+            this.editPending = false;
             void this.update();
         }, delay);
     }
