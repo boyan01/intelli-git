@@ -557,8 +557,7 @@ export class RepositoryManager implements vscode.Disposable {
         for (const entry of this.repositories.values()) {
             const root = normalizeExistingPath(entry.info.workspaceRoot);
             const relativePath = path.relative(root, normalizedFilePath);
-            const isInside =
-                relativePath !== '' && !relativePath.startsWith('..') && !path.isAbsolute(relativePath);
+            const isInside = relativePath !== '' && !relativePath.startsWith('..') && !path.isAbsolute(relativePath);
             if (isInside && (!best || root.length > normalizeExistingPath(best.info.workspaceRoot).length)) {
                 best = entry;
             }

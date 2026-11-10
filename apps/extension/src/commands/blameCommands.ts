@@ -151,7 +151,9 @@ export function registerBlameCommands(
             if (args) {
                 await run(args);
             } else {
-                void vscode.window.showInformationMessage(vscode.l10n.t('The selected line has no committed revision.'));
+                void vscode.window.showInformationMessage(
+                    vscode.l10n.t('The selected line has no committed revision.')
+                );
             }
         });
 
@@ -210,15 +212,17 @@ export function registerBlameCommands(
         ),
         // Extension menus cannot show check marks, so every option has a `.checked` twin whose
         // title carries the mark; the menu shows whichever matches the current setting.
-        ...([
-            ['toggleDate', () => toggleColumn('date')],
-            ['toggleAuthor', () => toggleColumn('author')],
-            ['toggleCommit', () => toggleColumn('commit')],
-            ['toggleMessage', () => toggleColumn('message')],
-            ['colorByAge', () => setColorBy('age')],
-            ['colorByAuthor', () => setColorBy('author')],
-            ['noColors', () => setColorBy('none')],
-        ] as Array<[string, () => Thenable<void>]>).flatMap(([name, run]) => [
+        ...(
+            [
+                ['toggleDate', () => toggleColumn('date')],
+                ['toggleAuthor', () => toggleColumn('author')],
+                ['toggleCommit', () => toggleColumn('commit')],
+                ['toggleMessage', () => toggleColumn('message')],
+                ['colorByAge', () => setColorBy('age')],
+                ['colorByAuthor', () => setColorBy('author')],
+                ['noColors', () => setColorBy('none')],
+            ] as Array<[string, () => Thenable<void>]>
+        ).flatMap(([name, run]) => [
             vscode.commands.registerCommand(`intelli-git.blame.gutter.${name}`, run),
             vscode.commands.registerCommand(`intelli-git.blame.gutter.${name}.checked`, run),
         ])

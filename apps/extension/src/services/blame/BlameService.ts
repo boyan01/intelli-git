@@ -168,7 +168,8 @@ export class BlameService implements vscode.Disposable {
         if (!blame) {
             return undefined;
         }
-        const filePath = query.pathKind === 'repo' ? (service.toWorkspacePath(query.filePath) ?? query.filePath) : query.filePath;
+        const filePath =
+            query.pathKind === 'repo' ? (service.toWorkspacePath(query.filePath) ?? query.filePath) : query.filePath;
         return { service, repoPath: query.repoPath, filePath, blame };
     }
 

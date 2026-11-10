@@ -48,7 +48,8 @@ export function readBlameSettings(): BlameSettings {
         gutterFormat: config.get<string>('gutter.format', DEFAULT_GUTTER_FORMAT) || DEFAULT_GUTTER_FORMAT,
         gutterHoverEnabled: config.get<boolean>('gutter.hover.enabled', true),
         gutterColorBy: toColorBy(config.get<string>('gutter.colorBy', 'age')),
-        gutterClickAction: config.get<string>('gutter.clickAction', 'openInGitLog') === 'none' ? 'none' : 'openInGitLog',
+        gutterClickAction:
+            config.get<string>('gutter.clickAction', 'openInGitLog') === 'none' ? 'none' : 'openInGitLog',
         dateFormat: config.get<string>('dateFormat', DEFAULT_DATE_FORMAT) || DEFAULT_DATE_FORMAT,
         messageMaxLength: Math.max(0, config.get<number>('messageMaxLength', DEFAULT_MESSAGE_MAX_LENGTH)),
     };
@@ -82,7 +83,11 @@ export function createBlameHover(
 ): vscode.MarkdownString {
     const markdown = new vscode.MarkdownString(undefined, true);
     markdown.isTrusted = {
-        enabledCommands: ['intelli-git.blame.openCommitInLog', 'intelli-git.blame.showCommitDiff', 'intelli-git.copyCommitHash'],
+        enabledCommands: [
+            'intelli-git.blame.openCommitInLog',
+            'intelli-git.blame.showCommitDiff',
+            'intelli-git.copyCommitHash',
+        ],
     };
 
     if (commit.isUncommitted) {
@@ -95,7 +100,9 @@ export function createBlameHover(
     const ago = formatRelativeTime(commit.authorTime, context.options.now, context.options.locale);
     const date = formatBlameDate(commit.authorTime, 'YYYY-MM-DD HH:mm');
     const email = commit.authorEmail ? ` \\<${escapeMarkdown(commit.authorEmail)}\\>` : '';
-    markdown.appendMarkdown(`$(account) **${escapeMarkdown(commit.author)}**${email}, ${escapeMarkdown(ago)} (${date})\n\n`);
+    markdown.appendMarkdown(
+        `$(account) **${escapeMarkdown(commit.author)}**${email}, ${escapeMarkdown(ago)} (${date})\n\n`
+    );
 
     const message = (context.message || commit.summary).trim();
     if (message) {

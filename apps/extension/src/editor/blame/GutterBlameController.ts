@@ -10,7 +10,13 @@ import {
     type BlameColumn,
     type BlameFormatOptions,
 } from './blameFormat';
-import { BLAME_CONFIG_SECTION, createBlameFormatOptions, createBlameHover, readBlameSettings, type BlameSettings } from './blameUi';
+import {
+    BLAME_CONFIG_SECTION,
+    createBlameFormatOptions,
+    createBlameHover,
+    readBlameSettings,
+    type BlameSettings,
+} from './blameUi';
 
 const ANNOTATED_CONTEXT_KEY = 'intelli-git.blame.activeFileAnnotated';
 const MAX_ANNOTATION_WIDTH = 60;
@@ -82,7 +88,10 @@ export class GutterBlameController implements vscode.Disposable {
                 }
             }),
             vscode.window.onDidChangeTextEditorVisibleRanges((event) => {
-                if (this.isAnnotated(event.textEditor.document) && event.textEditor.document.lineCount > FULL_RENDER_LINE_LIMIT) {
+                if (
+                    this.isAnnotated(event.textEditor.document) &&
+                    event.textEditor.document.lineCount > FULL_RENDER_LINE_LIMIT
+                ) {
                     this.scheduleEditor(event.textEditor, SCROLL_DELAY_MS);
                 }
             }),
@@ -148,7 +157,9 @@ export class GutterBlameController implements vscode.Disposable {
             return;
         }
 
-        const documentBlame = BlameService.isBlameable(document) ? await this.blameService.getBlame(document) : undefined;
+        const documentBlame = BlameService.isBlameable(document)
+            ? await this.blameService.getBlame(document)
+            : undefined;
         if (!documentBlame) {
             void vscode.window.showInformationMessage(i18n.t('Git blame is not available for this file.'));
             return;
@@ -201,7 +212,11 @@ export class GutterBlameController implements vscode.Disposable {
 
     private updateContextKey(): void {
         const document = vscode.window.activeTextEditor?.document;
-        void vscode.commands.executeCommand('setContext', ANNOTATED_CONTEXT_KEY, !!document && this.isAnnotated(document));
+        void vscode.commands.executeCommand(
+            'setContext',
+            ANNOTATED_CONTEXT_KEY,
+            !!document && this.isAnnotated(document)
+        );
     }
 
     private updateViewContextKeys(): void {
@@ -328,7 +343,9 @@ export class GutterBlameController implements vscode.Disposable {
                 editor.setDecorations(this.decorationType, decorations);
             }
         } catch (error) {
-            logger.debug(`Failed to render blame annotations: ${error instanceof Error ? error.message : String(error)}`);
+            logger.debug(
+                `Failed to render blame annotations: ${error instanceof Error ? error.message : String(error)}`
+            );
         } finally {
             if (this.editorRequests.get(editor) === requestId && !vscode.window.visibleTextEditors.includes(editor)) {
                 this.editorRequests.delete(editor);
@@ -336,7 +353,10 @@ export class GutterBlameController implements vscode.Disposable {
         }
     }
 
-    private async buildDecorations(editor: vscode.TextEditor, documentBlame: DocumentBlame): Promise<vscode.DecorationOptions[]> {
+    private async buildDecorations(
+        editor: vscode.TextEditor,
+        documentBlame: DocumentBlame
+    ): Promise<vscode.DecorationOptions[]> {
         const { blame } = documentBlame;
         const options = createBlameFormatOptions(this.settings);
 
@@ -344,7 +364,9 @@ export class GutterBlameController implements vscode.Disposable {
         const texts = new Map<string, string>();
         let width = 0;
         for (const [hash, commit] of blame.commits) {
-            const text = toAnnotationText(renderBlameTemplate(this.settings.gutterFormat, commit, options, columnWidths));
+            const text = toAnnotationText(
+                renderBlameTemplate(this.settings.gutterFormat, commit, options, columnWidths)
+            );
             texts.set(hash, text);
             width = Math.max(width, text.length);
         }
@@ -374,7 +396,8 @@ export class GutterBlameController implements vscode.Disposable {
             const hash = blame.lines[line];
             const commit = hash ? blame.commits.get(hash) : undefined;
             const text = commit ? (texts.get(commit.hash) ?? '') : '';
-            const tint = commit && tints ? (commit.isUncommitted ? UNCOMMITTED_TINT : tints.get(commit.hash)) : undefined;
+            const tint =
+                commit && tints ? (commit.isUncommitted ? UNCOMMITTED_TINT : tints.get(commit.hash)) : undefined;
             const highlighted = !!commit && commit.hash === highlightedHash;
             decorations.push({
                 range: new vscode.Range(line, 0, line, 0),
@@ -447,14 +470,15 @@ export function isClickAtLineStart(
     }
     const [selection] = selections;
     return (
-        selection.isEmpty &&
-        selection.active.character === 0 &&
-        document.lineAt(selection.active.line).text.length > 0
+        selection.isEmpty && selection.active.character === 0 && document.lineAt(selection.active.line).text.length > 0
     );
 }
 
 function toAnnotationText(value: string): string {
-    return value.replace(/[\r\n\t]+/g, ' ').trimEnd().replace(/ /g, '\u00a0');
+    return value
+        .replace(/[\r\n\t]+/g, ' ')
+        .trimEnd()
+        .replace(/ /g, '\u00a0');
 }
 
 function getLinesToRender(editor: vscode.TextEditor): number[] {

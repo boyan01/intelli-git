@@ -77,7 +77,9 @@ describe('renderBlameTemplate', () => {
     it('truncates the message to the configured length', () => {
         const commit = createCommit({ summary: 'a very long commit message' });
 
-        expect(renderBlameTemplate('${message}', commit, createOptions({ messageMaxLength: 10 }))).toBe('a very lo\u2026');
+        expect(renderBlameTemplate('${message}', commit, createOptions({ messageMaxLength: 10 }))).toBe(
+            'a very lo\u2026'
+        );
         expect(renderBlameTemplate('${message}', commit, createOptions({ messageMaxLength: 0 }))).toBe(
             'a very long commit message'
         );
@@ -139,8 +141,12 @@ describe('gutter columns', () => {
         const widths = measureBlameColumns('${date} ${author}', commits, createOptions());
 
         expect(widths.get('date')).toBe('2025/12/27'.length);
-        expect(renderBlameTemplate('${date} ${author}', commits[1], createOptions(), widths)).toBe('2024/1/1   phuctt4');
-        expect(renderBlameTemplate('${date} ${author}', commits[0], createOptions(), widths)).toBe('2025/12/27 Al     ');
+        expect(renderBlameTemplate('${date} ${author}', commits[1], createOptions(), widths)).toBe(
+            '2024/1/1   phuctt4'
+        );
+        expect(renderBlameTemplate('${date} ${author}', commits[0], createOptions(), widths)).toBe(
+            '2025/12/27 Al     '
+        );
     });
 
     it('keeps explicit widths over measured ones', () => {

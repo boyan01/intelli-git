@@ -2,7 +2,13 @@ import * as vscode from 'vscode';
 import { BlameService } from '../../services/blame/BlameService';
 import { logger } from '../../utils/logger';
 import { renderBlameTemplate } from './blameFormat';
-import { BLAME_CONFIG_SECTION, createBlameFormatOptions, createBlameHover, readBlameSettings, type BlameSettings } from './blameUi';
+import {
+    BLAME_CONFIG_SECTION,
+    createBlameFormatOptions,
+    createBlameHover,
+    readBlameSettings,
+    type BlameSettings,
+} from './blameUi';
 
 const SELECTION_DELAY_MS = 100;
 const EDIT_DELAY_MS = 500;

@@ -691,7 +691,12 @@ export class GitService implements vscode.Disposable {
      */
     public async getFileBlame(
         filePath: string,
-        options: { contents?: string; ignoreWhitespace?: boolean; revision?: string; pathKind?: 'workspace' | 'repo' } = {}
+        options: {
+            contents?: string;
+            ignoreWhitespace?: boolean;
+            revision?: string;
+            pathKind?: 'workspace' | 'repo';
+        } = {}
     ): Promise<FileBlame | null> {
         const repoPath = options.pathKind === 'repo' ? filePath : this.toRepoPath(filePath);
         if (options.revision !== undefined && !/^[0-9a-f]{7,64}$/i.test(options.revision)) {
