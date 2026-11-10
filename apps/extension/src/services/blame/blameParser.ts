@@ -108,14 +108,14 @@ export function parseBlamePorcelain(output: string): FileBlame {
                 break;
             case 'filename':
                 if (!current.filename) {
-                    current.filename = value;
+                    current.filename = unquoteGitPath(value);
                 }
                 break;
             case 'previous': {
                 const previousSeparator = value.indexOf(' ');
                 if (previousSeparator > 0 && !current.previousHash) {
                     current.previousHash = value.substring(0, previousSeparator);
-                    current.previousFilename = value.substring(previousSeparator + 1);
+                    current.previousFilename = unquoteGitPath(value.substring(previousSeparator + 1));
                 }
                 break;
             }
@@ -123,4 +123,50 @@ export function parseBlamePorcelain(output: string): FileBlame {
     }
 
     return { lines, originalLines, commits };
+}
+
+const GIT_PATH_ESCAPES: Record<string, number> = {
+    a: 0x07,
+    b: 0x08,
+    f: 0x0c,
+    n: 0x0a,
+    r: 0x0d,
+    t: 0x09,
+    v: 0x0b,
+    '"': 0x22,
+    '\\': 0x5c,
+};
+
+/**
+ * Decodes a path that Git C-quoted because it contains special or non-ASCII characters
+ * (`core.quotePath`), for example `"src/\344\275\240.ts"`. Unquoted paths are returned as-is.
+ */
+export function unquoteGitPath(value: string): string {
+    if (value.length < 2 || !value.startsWith('"') || !value.endsWith('"')) {
+        return value;
+    }
+
+    const bytes: number[] = [];
+    const body = Array.from(value.slice(1, -1));
+    for (let index = 0; index < body.length; index++) {
+        const char = body[index];
+        if (char !== '\\' || index === body.length - 1) {
+            bytes.push(...Buffer.from(char, 'utf8'));
+            continue;
+        }
+
+        const next = body[index + 1];
+        const octal = /^[0-3][0-7]{2}/.exec(body.slice(index + 1, index + 4).join(''));
+        if (octal) {
+            bytes.push(parseInt(octal[0], 8));
+            index += 3;
+        } else if (next in GIT_PATH_ESCAPES) {
+            bytes.push(GIT_PATH_ESCAPES[next]);
+            index += 1;
+        } else {
+            bytes.push(...Buffer.from(next, 'utf8'));
+            index += 1;
+        }
+    }
+    return Buffer.from(bytes).toString('utf8');
 }

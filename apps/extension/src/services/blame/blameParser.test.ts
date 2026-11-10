@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseBlamePorcelain, UNCOMMITTED_HASH } from './blameParser';
+import { parseBlamePorcelain, UNCOMMITTED_HASH, unquoteGitPath } from './blameParser';
 
 const HASH_A = 'a'.repeat(40);
 const HASH_B = 'b'.repeat(40);
@@ -94,5 +94,38 @@ describe('parseBlamePorcelain', () => {
 
         expect(blame.lines).toEqual([]);
         expect(blame.commits.size).toBe(0);
+    });
+});
+
+describe('unquoteGitPath', () => {
+    it('returns unquoted paths unchanged', () => {
+        expect(unquoteGitPath('src/config.ts')).toBe('src/config.ts');
+        expect(unquoteGitPath('src/新文件.ts')).toBe('src/新文件.ts');
+    });
+
+    it('decodes octal UTF-8 bytes and C escapes', () => {
+        expect(unquoteGitPath('"src/\\346\\226\\260.ts"')).toBe('src/新.ts');
+        expect(unquoteGitPath('"a\\"b\\\\c\\td.ts"')).toBe('a"b\\c\td.ts');
+    });
+
+    it('decodes quoted filename and previous fields from porcelain output', () => {
+        const blame = parseBlamePorcelain(
+            [
+                `${HASH_A} 1 1 1`,
+                'author Alice',
+                'author-mail <alice@example.com>',
+                'author-time 1700000000',
+                'committer Alice',
+                'committer-mail <alice@example.com>',
+                'committer-time 1700000000',
+                'summary Rename',
+                `previous ${HASH_B} "\\346\\227\\247.ts"`,
+                'filename "\\346\\226\\260.ts"',
+                '\tline',
+                '',
+            ].join('\n')
+        );
+
+        expect(blame.commits.get(HASH_A)).toMatchObject({ filename: '新.ts', previousFilename: '旧.ts' });
     });
 });

@@ -292,6 +292,41 @@ describe('GitService blame lookup', () => {
 
         await expect(service.getFileBlame('untracked.txt')).resolves.toBeNull();
     });
+
+    it('decodes quoted non-ASCII paths in blame output', async () => {
+        await git.addConfig('core.quotePath', 'true');
+        fs.mkdirSync(path.join(tempDir, 'docs'));
+        fs.writeFileSync(path.join(tempDir, 'docs', '旧 文件.txt'), 'one\ntwo\nthree\nfour\nfive\n');
+        await git.add('.');
+        await git.commit('Add file');
+        const firstHash = (await git.revparse(['HEAD'])).trim();
+        await git.mv('docs/旧 文件.txt', 'docs/新文件.txt');
+        fs.appendFileSync(path.join(tempDir, 'docs', '新文件.txt'), 'second\n');
+        await git.add('.');
+        await git.commit('Rename file');
+        const secondHash = (await git.revparse(['HEAD'])).trim();
+
+        const service = new GitService(tempDir, tempDir, git);
+        const blame = await service.getFileBlame('docs/新文件.txt');
+
+        expect(blame?.commits.get(firstHash)?.filename).toBe('docs/旧 文件.txt');
+        expect(blame?.commits.get(secondHash)).toMatchObject({
+            filename: 'docs/新文件.txt',
+            previousHash: firstHash,
+            previousFilename: 'docs/旧 文件.txt',
+        });
+    });
+
+    it('reads the HEAD commit and returns null for an unborn branch', async () => {
+        const service = new GitService(tempDir, tempDir, git);
+        await expect(service.getHeadCommit()).resolves.toBeNull();
+
+        fs.writeFileSync(path.join(tempDir, 'tracked.txt'), 'first\n');
+        await git.add('tracked.txt');
+        await git.commit('Initial commit');
+
+        await expect(service.getHeadCommit()).resolves.toBe((await git.revparse(['HEAD'])).trim());
+    });
 });
 
 describe('GitService conflict resolution', () => {

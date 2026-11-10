@@ -36,6 +36,9 @@ export class BlameService implements vscode.Disposable {
     private readonly cache = new Map<string, BlameCacheEntry>();
     private readonly messageCache = new Map<string, string>();
     private readonly serviceSubscriptions = new Map<GitService, vscode.Disposable>();
+    private readonly knownHeads = new Map<GitService, Promise<string | null>>();
+    private headCheck: Promise<void> | undefined;
+    private headCheckPending = false;
     private readonly disposables: vscode.Disposable[] = [];
     private readonly _onDidInvalidate = new vscode.EventEmitter<void>();
     private generation = 0;
@@ -108,6 +111,25 @@ export class BlameService implements vscode.Disposable {
         return result;
     }
 
+    /**
+     * Invalidates cached blame when HEAD moved outside Intelli Git, for example after a commit,
+     * checkout or reset made with the Git CLI or another tool.
+     */
+    public checkRepositoryHeads(): Promise<void> {
+        if (this.headCheck) {
+            this.headCheckPending = true;
+            return this.headCheck;
+        }
+        this.headCheck = this.runHeadCheck().finally(() => {
+            this.headCheck = undefined;
+            if (this.headCheckPending) {
+                this.headCheckPending = false;
+                void this.checkRepositoryHeads();
+            }
+        });
+        return this.headCheck;
+    }
+
     public invalidateAll(): void {
         this.generation++;
         this.cache.clear();
@@ -173,10 +195,28 @@ export class BlameService implements vscode.Disposable {
         return { service, repoPath: query.repoPath, filePath, blame };
     }
 
+    private async runHeadCheck(): Promise<void> {
+        let changed = false;
+        for (const [service, known] of [...this.knownHeads]) {
+            const [previous, current] = await Promise.all([known, service.getHeadCommit()]);
+            if (this.knownHeads.get(service) !== known) {
+                continue;
+            }
+            if (current !== previous) {
+                this.knownHeads.set(service, Promise.resolve(current));
+                changed = true;
+            }
+        }
+        if (changed) {
+            this.invalidateAll();
+        }
+    }
+
     private watchService(service: GitService): void {
         if (this.serviceSubscriptions.has(service)) {
             return;
         }
+        this.knownHeads.set(service, service.getHeadCommit());
         this.serviceSubscriptions.set(
             service,
             service.onDidChange((kind) => {
@@ -190,6 +230,7 @@ export class BlameService implements vscode.Disposable {
     private disposeServiceSubscriptions(): void {
         this.serviceSubscriptions.forEach((subscription) => subscription.dispose());
         this.serviceSubscriptions.clear();
+        this.knownHeads.clear();
     }
 }
 

@@ -753,6 +753,18 @@ export class GitService implements vscode.Disposable {
         return messages;
     }
 
+    /**
+     * Returns the commit HEAD points to, or null for an unborn branch or a failed lookup.
+     */
+    public async getHeadCommit(): Promise<string | null> {
+        try {
+            const output = await this.runReadOnlyGit(['rev-parse', '--verify', '-q', 'HEAD']);
+            return output.trim() || null;
+        } catch {
+            return null;
+        }
+    }
+
     private runReadOnlyGit(args: string[], input?: string): Promise<string> {
         return new Promise((resolve, reject) => {
             const child = spawn('git', args, {
