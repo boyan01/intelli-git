@@ -293,6 +293,20 @@ describe('GitService blame lookup', () => {
         await expect(service.getFileBlame('untracked.txt')).resolves.toBeNull();
     });
 
+    it('stops blame when its signal aborts', async () => {
+        fs.writeFileSync(path.join(tempDir, 'tracked.txt'), 'first\n');
+        await git.add('tracked.txt');
+        await git.commit('Initial commit');
+        const service = new GitService(tempDir, tempDir, git);
+
+        const controller = new AbortController();
+        const pending = service.getFileBlame('tracked.txt', { contents: 'first\n', signal: controller.signal });
+        controller.abort();
+        await expect(pending).resolves.toBeNull();
+
+        await expect(service.getFileBlame('tracked.txt', { signal: controller.signal })).resolves.toBeNull();
+    });
+
     it('decodes quoted non-ASCII paths in blame output', async () => {
         await git.addConfig('core.quotePath', 'true');
         fs.mkdirSync(path.join(tempDir, 'docs'));

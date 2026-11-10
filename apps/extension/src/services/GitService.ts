@@ -696,6 +696,8 @@ export class GitService implements vscode.Disposable {
             ignoreWhitespace?: boolean;
             revision?: string;
             pathKind?: 'workspace' | 'repo';
+            /** Stops the git process when the result is no longer needed. */
+            signal?: AbortSignal;
         } = {}
     ): Promise<FileBlame | null> {
         const repoPath = options.pathKind === 'repo' ? filePath : this.toRepoPath(filePath);
@@ -717,10 +719,12 @@ export class GitService implements vscode.Disposable {
         args.push('--', repoPath);
 
         try {
-            const output = await this.runReadOnlyGit(args, options.contents);
+            const output = await this.runReadOnlyGit(args, options.contents, options.signal);
             return parseBlamePorcelain(output);
         } catch (error) {
-            logger.debug(`git blame skipped for ${repoPath}: ${formatGitError(error)}`);
+            if (!options.signal?.aborted) {
+                logger.debug(`git blame skipped for ${repoPath}: ${formatGitError(error)}`);
+            }
             return null;
         }
     }
@@ -765,19 +769,33 @@ export class GitService implements vscode.Disposable {
         }
     }
 
-    private runReadOnlyGit(args: string[], input?: string): Promise<string> {
+    private runReadOnlyGit(args: string[], input?: string, signal?: AbortSignal): Promise<string> {
         return new Promise((resolve, reject) => {
+            if (signal?.aborted) {
+                reject(new Error('git command aborted'));
+                return;
+            }
             const child = spawn('git', args, {
                 cwd: this._gitRoot,
                 env: this.createGitEnv({ GIT_OPTIONAL_LOCKS: '0' }),
                 stdio: ['pipe', 'pipe', 'pipe'],
             });
+            const onAbort = () => child.kill();
+            signal?.addEventListener('abort', onAbort, { once: true });
             const stdout: Buffer[] = [];
             const stderr: Buffer[] = [];
             child.stdout.on('data', (chunk: Buffer) => stdout.push(chunk));
             child.stderr.on('data', (chunk: Buffer) => stderr.push(chunk));
-            child.on('error', reject);
+            child.on('error', (error) => {
+                signal?.removeEventListener('abort', onAbort);
+                reject(error);
+            });
             child.on('close', (code) => {
+                signal?.removeEventListener('abort', onAbort);
+                if (signal?.aborted) {
+                    reject(new Error('git command aborted'));
+                    return;
+                }
                 if (code === 0) {
                     resolve(Buffer.concat(stdout).toString('utf8'));
                     return;

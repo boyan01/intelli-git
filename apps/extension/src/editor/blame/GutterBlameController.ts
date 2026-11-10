@@ -83,7 +83,7 @@ export class GutterBlameController implements vscode.Disposable {
             vscode.window.onDidChangeActiveTextEditor(() => this.updateContextKey()),
             vscode.window.onDidChangeTextEditorSelection((event) => {
                 if (this.isAnnotated(event.textEditor.document)) {
-                    void this.updateHighlight(event.textEditor);
+                    this.updateHighlight(event.textEditor);
                     this.detectAnnotationClick(event);
                 }
             }),
@@ -226,11 +226,15 @@ export class GutterBlameController implements vscode.Disposable {
     }
 
     /**
-     * Emphasizes every annotation of the commit under the cursor, like IntelliJ does.
+     * Emphasizes every annotation of the commit under the cursor, like IntelliJ does. It never starts
+     * git: while the buffer has moved past the last blame, the pending edit render updates the highlight.
      */
-    private async updateHighlight(editor: vscode.TextEditor): Promise<void> {
-        const documentBlame = await this.blameService.getBlame(editor.document);
-        const hash = documentBlame?.blame.lines[editor.selection.active.line];
+    private updateHighlight(editor: vscode.TextEditor): void {
+        const last = this.blameService.getLastBlame(editor.document);
+        if (!last || last.version !== editor.document.version) {
+            return;
+        }
+        const hash = last.documentBlame.blame.lines[editor.selection.active.line];
         if (this.highlightedCommits.get(editor) !== hash) {
             this.highlightedCommits.set(editor, hash);
             this.scheduleEditor(editor, 0);

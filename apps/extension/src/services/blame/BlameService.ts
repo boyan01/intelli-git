@@ -26,6 +26,13 @@ interface BlameCacheEntry {
     version: number;
     generation: number;
     promise: Promise<DocumentBlame | undefined>;
+    controller: AbortController;
+}
+
+export interface CompletedBlame {
+    /** Document version the blame was computed for. */
+    version: number;
+    documentBlame: DocumentBlame;
 }
 
 /**
@@ -34,6 +41,7 @@ interface BlameCacheEntry {
  */
 export class BlameService implements vscode.Disposable {
     private readonly cache = new Map<string, BlameCacheEntry>();
+    private readonly completed = new Map<string, CompletedBlame>();
     private readonly messageCache = new Map<string, string>();
     private readonly serviceSubscriptions = new Map<GitService, vscode.Disposable>();
     private readonly knownHeads = new Map<GitService, Promise<string | null>>();
@@ -42,6 +50,7 @@ export class BlameService implements vscode.Disposable {
     private readonly disposables: vscode.Disposable[] = [];
     private readonly _onDidInvalidate = new vscode.EventEmitter<void>();
     private generation = 0;
+    private disposed = false;
 
     public readonly onDidInvalidate = this._onDidInvalidate.event;
 
@@ -53,7 +62,10 @@ export class BlameService implements vscode.Disposable {
                 this.invalidateAll();
             }),
             vscode.workspace.onDidCloseTextDocument((document) => {
-                this.cache.delete(document.uri.toString());
+                const key = document.uri.toString();
+                this.cache.get(key)?.controller.abort();
+                this.cache.delete(key);
+                this.completed.delete(key);
             }),
             vscode.workspace.onDidChangeConfiguration((event) => {
                 if (event.affectsConfiguration('intelli-git.blame.ignoreWhitespace')) {
@@ -81,9 +93,35 @@ export class BlameService implements vscode.Disposable {
             return cached.promise;
         }
 
-        const promise = this.computeBlame(document);
-        this.cache.set(key, { version: document.version, generation: this.generation, promise });
+        // Only the newest buffer state matters; stop the git process of the one it replaces.
+        cached?.controller.abort();
+        const controller = new AbortController();
+        const version = document.version;
+        const promise = this.computeBlame(document, controller.signal).then((result) => {
+            if (controller.signal.aborted) {
+                // Callers still waiting on a superseded run get the newest result instead.
+                const latest = this.cache.get(key);
+                if (latest && latest.controller !== controller) {
+                    return latest.promise;
+                }
+                return this.disposed || document.isClosed ? undefined : this.getBlame(document);
+            }
+            if (result) {
+                this.completed.set(key, { version, documentBlame: result });
+            }
+            return result;
+        });
+        this.cache.set(key, { version, generation: this.generation, promise, controller });
         return promise;
+    }
+
+    /**
+     * Returns the newest finished blame of a document without starting git, even when it was
+     * computed for an older version. Cheap callers such as cursor-driven highlights use it while
+     * the user is typing.
+     */
+    public getLastBlame(document: vscode.TextDocument): CompletedBlame | undefined {
+        return this.completed.get(document.uri.toString());
     }
 
     /**
@@ -132,21 +170,25 @@ export class BlameService implements vscode.Disposable {
 
     public invalidateAll(): void {
         this.generation++;
+        this.cache.forEach((entry) => entry.controller.abort());
         this.cache.clear();
         this._onDidInvalidate.fire();
     }
 
     public dispose(): void {
+        this.disposed = true;
         this.disposeServiceSubscriptions();
+        this.cache.forEach((entry) => entry.controller.abort());
         this.cache.clear();
+        this.completed.clear();
         this.messageCache.clear();
         this.disposables.forEach((disposable) => disposable.dispose());
         this.disposables.length = 0;
     }
 
-    private async computeBlame(document: vscode.TextDocument): Promise<DocumentBlame | undefined> {
+    private async computeBlame(document: vscode.TextDocument, signal: AbortSignal): Promise<DocumentBlame | undefined> {
         if (document.uri.scheme === REVISION_SCHEME) {
-            return this.computeRevisionBlame(document.uri);
+            return this.computeRevisionBlame(document.uri, signal);
         }
 
         const repository = this.repositoryManager.getRepositoryForFile(document.uri.fsPath);
@@ -164,6 +206,7 @@ export class BlameService implements vscode.Disposable {
         const blame = await service.getFileBlame(filePath, {
             contents: document.isDirty ? document.getText() : undefined,
             ignoreWhitespace,
+            signal,
         });
         return blame ? { service, repoPath: scope.repoPath, filePath, blame } : undefined;
     }
@@ -172,7 +215,7 @@ export class BlameService implements vscode.Disposable {
      * Blames a read-only revision document (for example one opened by "Annotate Revision"),
      * so its lines are attributed as of that commit.
      */
-    private async computeRevisionBlame(uri: vscode.Uri): Promise<DocumentBlame | undefined> {
+    private async computeRevisionBlame(uri: vscode.Uri, signal: AbortSignal): Promise<DocumentBlame | undefined> {
         const query = getRevisionDocumentQuery(uri);
         const service = query ? this.repositoryManager.getService(query.repoPath) : undefined;
         if (!query || !service) {
@@ -186,6 +229,7 @@ export class BlameService implements vscode.Disposable {
             revision: query.ref,
             pathKind: query.pathKind,
             ignoreWhitespace,
+            signal,
         });
         if (!blame) {
             return undefined;
