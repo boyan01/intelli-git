@@ -39,7 +39,9 @@ export function buildRefLabels(refs: RefInfo[]): RefLabel[] {
         }
         if (ref.type !== 'head' && ref.type !== 'local') continue;
 
-        const syncedRemotes = remotes.filter((remote) => remote.parts?.branch === ref.name).map((remote) => remote.name);
+        const syncedRemotes = remotes
+            .filter((remote) => remote.parts?.branch === ref.name)
+            .map((remote) => remote.name);
         syncedRemotes.forEach((name) => foldedRemotes.add(name));
         labels.push({ kind: ref.type === 'head' ? 'current' : 'local', name: ref.name, syncedRemotes });
     }

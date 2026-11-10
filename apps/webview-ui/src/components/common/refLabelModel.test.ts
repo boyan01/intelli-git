@@ -10,7 +10,9 @@ describe('buildRefLabels', () => {
                 { name: 'feat/glass', type: 'head' },
                 { name: 'upstream/feat/glass', type: 'remote' },
             ])
-        ).toEqual([{ kind: 'current', name: 'feat/glass', syncedRemotes: ['origin/feat/glass', 'upstream/feat/glass'] }]);
+        ).toEqual([
+            { kind: 'current', name: 'feat/glass', syncedRemotes: ['origin/feat/glass', 'upstream/feat/glass'] },
+        ]);
     });
 
     it('keeps remote-only branches with their remote prefix', () => {
