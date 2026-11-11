@@ -4,7 +4,7 @@ import type { GitService } from '../GitService';
 import type { RepositoryManager } from '../RepositoryManager';
 import { BlameService } from './BlameService';
 
-function createService(head: () => string | null) {
+function createService(head: () => string | null, index: () => string | null = () => 'index-1') {
     return {
         getWorkspaceRoot: () => '/repo',
         getFileBlame: vi.fn(
@@ -18,6 +18,7 @@ function createService(head: () => string | null) {
             })
         ),
         getHeadCommit: vi.fn(async () => head()),
+        getIndexSignature: vi.fn(async () => index()),
         onDidChange: () => ({ dispose() {} }),
     };
 }
@@ -53,7 +54,7 @@ describe('BlameService', () => {
         blameService.onDidInvalidate(invalidated);
 
         await blameService.getBlame(document);
-        await blameService.checkRepositoryHeads();
+        await blameService.checkRepositoryState();
         await blameService.getBlame(document);
 
         expect(invalidated).not.toHaveBeenCalled();
@@ -69,7 +70,7 @@ describe('BlameService', () => {
 
         const first = await blameService.getBlame(document);
         head = 'b'.repeat(40);
-        await blameService.checkRepositoryHeads();
+        await blameService.checkRepositoryState();
         const second = await blameService.getBlame(document);
 
         expect(invalidated).toHaveBeenCalledTimes(1);
@@ -109,6 +110,50 @@ describe('BlameService', () => {
             version: 1,
             documentBlame: result,
         });
+        expect(service.getFileBlame).toHaveBeenCalledTimes(1);
+    });
+
+    it('retries an unavailable blame after the index changes', async () => {
+        let index = 'index-1';
+        const service = createService(
+            () => 'a'.repeat(40),
+            () => index
+        );
+        service.getFileBlame.mockResolvedValueOnce(null as never);
+        blameService = createBlameService(service);
+        const invalidated = vi.fn();
+        blameService.onDidInvalidate(invalidated);
+
+        expect(await blameService.getBlame(document)).toBeUndefined();
+        await blameService.checkRepositoryState();
+        expect(await blameService.getBlame(document)).toBeUndefined();
+        expect(service.getFileBlame).toHaveBeenCalledTimes(1);
+
+        index = 'index-2';
+        await blameService.checkRepositoryState();
+        const retried = await blameService.getBlame(document);
+
+        expect(invalidated).toHaveBeenCalledTimes(1);
+        expect(service.getFileBlame).toHaveBeenCalledTimes(2);
+        expect(retried?.service).toBe(service as unknown as GitService);
+    });
+
+    it('keeps available blame when only the index changes', async () => {
+        let index = 'index-1';
+        const service = createService(
+            () => 'a'.repeat(40),
+            () => index
+        );
+        blameService = createBlameService(service);
+        const invalidated = vi.fn();
+        blameService.onDidInvalidate(invalidated);
+
+        const first = await blameService.getBlame(document);
+        index = 'index-2';
+        await blameService.checkRepositoryState();
+
+        expect(await blameService.getBlame(document)).toBe(first);
+        expect(invalidated).not.toHaveBeenCalled();
         expect(service.getFileBlame).toHaveBeenCalledTimes(1);
     });
 });

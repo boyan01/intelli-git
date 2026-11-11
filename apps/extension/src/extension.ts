@@ -332,7 +332,7 @@ export async function activate(context: vscode.ExtensionContext) {
                     }
                 }
 
-                void blameService.checkRepositoryHeads();
+                void blameService.checkRepositoryState();
 
                 if (change.kind === 'repositories') {
                     void repositoryManager

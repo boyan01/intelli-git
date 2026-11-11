@@ -203,6 +203,7 @@ export class GitService implements vscode.Disposable {
     private git: SimpleGit;
     private _workspaceRoot: string;
     private _gitRoot: string;
+    private indexPath?: { gitRoot: string; path: string };
     private _changelistStateService?: ChangelistStateService;
     private _reviewedStateService?: ReviewedStateService;
     private _onDidChange = new vscode.EventEmitter<'local' | 'remote'>();
@@ -765,6 +766,24 @@ export class GitService implements vscode.Disposable {
         try {
             const output = await this.runReadOnlyGit(['rev-parse', '--verify', '-q', 'HEAD']);
             return output.trim() || null;
+        } catch {
+            return null;
+        }
+    }
+
+    /**
+     * Returns a cheap fingerprint of the index file (size and timestamps), or null when there is no
+     * index. It changes whenever Git rewrites the index, for example after staging.
+     */
+    public async getIndexSignature(): Promise<string | null> {
+        try {
+            const gitRoot = this._gitRoot;
+            if (this.indexPath?.gitRoot !== gitRoot) {
+                const output = await this.runReadOnlyGit(['rev-parse', '--git-path', 'index']);
+                this.indexPath = { gitRoot, path: path.resolve(gitRoot, output.trim()) };
+            }
+            const stat = await fs.promises.stat(this.indexPath.path);
+            return `${stat.size}:${stat.mtimeMs}:${stat.ctimeMs}:${stat.ino}`;
         } catch {
             return null;
         }

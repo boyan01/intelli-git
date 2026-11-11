@@ -29,6 +29,11 @@ interface BlameCacheEntry {
     controller: AbortController;
 }
 
+interface RepositoryState {
+    head: string | null;
+    index: string | null;
+}
+
 export interface CompletedBlame {
     /** Document version the blame was computed for. */
     version: number;
@@ -44,9 +49,11 @@ export class BlameService implements vscode.Disposable {
     private readonly completed = new Map<string, CompletedBlame>();
     private readonly messageCache = new Map<string, string>();
     private readonly serviceSubscriptions = new Map<GitService, vscode.Disposable>();
-    private readonly knownHeads = new Map<GitService, Promise<string | null>>();
-    private headCheck: Promise<void> | undefined;
-    private headCheckPending = false;
+    private readonly knownStates = new Map<GitService, Promise<RepositoryState>>();
+    /** Documents whose latest blame could not be computed, for example an unstaged rename. */
+    private readonly unavailable = new Set<string>();
+    private stateCheck: Promise<void> | undefined;
+    private stateCheckPending = false;
     private readonly disposables: vscode.Disposable[] = [];
     private readonly _onDidInvalidate = new vscode.EventEmitter<void>();
     private generation = 0;
@@ -66,6 +73,7 @@ export class BlameService implements vscode.Disposable {
                 this.cache.get(key)?.controller.abort();
                 this.cache.delete(key);
                 this.completed.delete(key);
+                this.unavailable.delete(key);
             }),
             vscode.workspace.onDidChangeConfiguration((event) => {
                 if (event.affectsConfiguration('intelli-git.blame.ignoreWhitespace')) {
@@ -105,6 +113,13 @@ export class BlameService implements vscode.Disposable {
                     return latest.promise;
                 }
                 return this.disposed || document.isClosed ? undefined : this.getBlame(document);
+            }
+            if (this.cache.get(key)?.controller === controller) {
+                if (result) {
+                    this.unavailable.delete(key);
+                } else {
+                    this.unavailable.add(key);
+                }
             }
             if (result) {
                 this.completed.set(key, { version, documentBlame: result });
@@ -150,28 +165,31 @@ export class BlameService implements vscode.Disposable {
     }
 
     /**
-     * Invalidates cached blame when HEAD moved outside Intelli Git, for example after a commit,
-     * checkout or reset made with the Git CLI or another tool.
+     * Reacts to repository changes made outside Intelli Git. A moved HEAD (commit, checkout or reset
+     * from the Git CLI or another tool) invalidates every cached blame. A rewritten index (for
+     * example a staged rename) only retries documents whose blame was unavailable, so ordinary
+     * worktree events never restart full-file blame of files that already have one.
      */
-    public checkRepositoryHeads(): Promise<void> {
-        if (this.headCheck) {
-            this.headCheckPending = true;
-            return this.headCheck;
+    public checkRepositoryState(): Promise<void> {
+        if (this.stateCheck) {
+            this.stateCheckPending = true;
+            return this.stateCheck;
         }
-        this.headCheck = this.runHeadCheck().finally(() => {
-            this.headCheck = undefined;
-            if (this.headCheckPending) {
-                this.headCheckPending = false;
-                void this.checkRepositoryHeads();
+        this.stateCheck = this.runStateCheck().finally(() => {
+            this.stateCheck = undefined;
+            if (this.stateCheckPending) {
+                this.stateCheckPending = false;
+                void this.checkRepositoryState();
             }
         });
-        return this.headCheck;
+        return this.stateCheck;
     }
 
     public invalidateAll(): void {
         this.generation++;
         this.cache.forEach((entry) => entry.controller.abort());
         this.cache.clear();
+        this.unavailable.clear();
         this._onDidInvalidate.fire();
     }
 
@@ -181,6 +199,7 @@ export class BlameService implements vscode.Disposable {
         this.cache.forEach((entry) => entry.controller.abort());
         this.cache.clear();
         this.completed.clear();
+        this.unavailable.clear();
         this.messageCache.clear();
         this.disposables.forEach((disposable) => disposable.dispose());
         this.disposables.length = 0;
@@ -239,28 +258,43 @@ export class BlameService implements vscode.Disposable {
         return { service, repoPath: query.repoPath, filePath, blame };
     }
 
-    private async runHeadCheck(): Promise<void> {
-        let changed = false;
-        for (const [service, known] of [...this.knownHeads]) {
-            const [previous, current] = await Promise.all([known, service.getHeadCommit()]);
-            if (this.knownHeads.get(service) !== known) {
+    private async runStateCheck(): Promise<void> {
+        let headChanged = false;
+        let indexChanged = false;
+        for (const [service, known] of [...this.knownStates]) {
+            const [previous, current] = await Promise.all([known, readRepositoryState(service)]);
+            if (this.knownStates.get(service) !== known) {
                 continue;
             }
-            if (current !== previous) {
-                this.knownHeads.set(service, Promise.resolve(current));
-                changed = true;
+            if (current.head !== previous.head || current.index !== previous.index) {
+                this.knownStates.set(service, Promise.resolve(current));
+                headChanged ||= current.head !== previous.head;
+                indexChanged ||= current.index !== previous.index;
             }
         }
-        if (changed) {
+        if (headChanged) {
             this.invalidateAll();
+        } else if (indexChanged) {
+            this.retryUnavailable();
         }
+    }
+
+    private retryUnavailable(): void {
+        if (this.unavailable.size === 0) {
+            return;
+        }
+        for (const key of this.unavailable) {
+            this.cache.delete(key);
+        }
+        this.unavailable.clear();
+        this._onDidInvalidate.fire();
     }
 
     private watchService(service: GitService): void {
         if (this.serviceSubscriptions.has(service)) {
             return;
         }
-        this.knownHeads.set(service, service.getHeadCommit());
+        this.knownStates.set(service, readRepositoryState(service));
         this.serviceSubscriptions.set(
             service,
             service.onDidChange((kind) => {
@@ -274,8 +308,13 @@ export class BlameService implements vscode.Disposable {
     private disposeServiceSubscriptions(): void {
         this.serviceSubscriptions.forEach((subscription) => subscription.dispose());
         this.serviceSubscriptions.clear();
-        this.knownHeads.clear();
+        this.knownStates.clear();
     }
+}
+
+async function readRepositoryState(service: GitService): Promise<RepositoryState> {
+    const [head, index] = await Promise.all([service.getHeadCommit(), service.getIndexSignature()]);
+    return { head, index };
 }
 
 interface RevisionDocumentQuery {

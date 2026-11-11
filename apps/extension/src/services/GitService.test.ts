@@ -401,6 +401,26 @@ describe('GitService blame lookup', () => {
 
         await expect(service.getHeadCommit()).resolves.toBe((await git.revparse(['HEAD'])).trim());
     });
+
+    it('changes the index signature when a rename is staged and blame becomes available', async () => {
+        fs.writeFileSync(path.join(tempDir, 'old.txt'), 'one\ntwo\n');
+        await git.add('old.txt');
+        await git.commit('Add old file');
+        fs.renameSync(path.join(tempDir, 'old.txt'), path.join(tempDir, 'new.txt'));
+
+        const service = new GitService(tempDir, tempDir, git);
+        await expect(service.getFileBlame('new.txt')).resolves.toBeNull();
+        const before = await service.getIndexSignature();
+
+        await git.add(['-A']);
+
+        const after = await service.getIndexSignature();
+        expect(before).not.toBeNull();
+        expect(after).not.toBe(before);
+        const blame = await service.getFileBlame('new.txt');
+        expect(blame?.lines).toHaveLength(2);
+        expect(blame?.commits.get(blame.lines[0])?.summary).toBe('Add old file');
+    });
 });
 
 describe('GitService conflict resolution', () => {
