@@ -97,7 +97,7 @@ export class GutterBlameController implements vscode.Disposable {
                     this.isAnnotated(event.textEditor.document) &&
                     event.textEditor.document.lineCount > FULL_RENDER_LINE_LIMIT
                 ) {
-                    this.scheduleEditor(event.textEditor, SCROLL_DELAY_MS);
+                    this.scheduleScrollRender(event.textEditor);
                 }
             }),
             vscode.workspace.onDidChangeTextDocument((event) => {
@@ -320,6 +320,22 @@ export class GutterBlameController implements vscode.Disposable {
         }
     }
 
+    /**
+     * Renders newly visible lines of a large file. Scrolling only reuses a finished blame of the
+     * current buffer; while the buffer is ahead of it, the pending edit render keeps its deadline so
+     * scrolling while typing never starts git early.
+     */
+    private scheduleScrollRender(editor: vscode.TextEditor): void {
+        const delay = getScrollRenderDelay(
+            this.blameService.getLastBlame(editor.document)?.version,
+            editor.document.version,
+            this.editorTimers.has(editor)
+        );
+        if (delay !== undefined) {
+            this.scheduleEditor(editor, delay);
+        }
+    }
+
     private scheduleEditor(editor: vscode.TextEditor, delay: number): void {
         this.cancelEditor(editor);
         this.editorTimers.set(
@@ -498,6 +514,22 @@ function createCellStyle(width: number, tint: string | undefined, highlighted: b
         'overflow: hidden',
         'white-space: pre',
     ].join('; ');
+}
+
+/**
+ * Decides when a scroll re-renders a large annotated file: soon when the last finished blame matches
+ * the buffer, otherwise not before the edit debounce. A pending render keeps its own deadline.
+ * Returns undefined when nothing needs to be scheduled.
+ */
+export function getScrollRenderDelay(
+    lastBlameVersion: number | undefined,
+    documentVersion: number,
+    hasPendingRender: boolean
+): number | undefined {
+    if (lastBlameVersion === documentVersion) {
+        return SCROLL_DELAY_MS;
+    }
+    return hasPendingRender ? undefined : EDIT_DELAY_MS;
 }
 
 /**

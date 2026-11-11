@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type * as vscode from 'vscode';
-import { findAddedLineStartCursor } from './GutterBlameController';
+import { findAddedLineStartCursor, getScrollRenderDelay } from './GutterBlameController';
 
 const document = {
     lineAt: (line: number) => ({ text: ['const a = 1;', '', 'const b = 2;'][line] ?? '' }),
@@ -47,5 +47,22 @@ describe('findAddedLineStartCursor', () => {
             findAddedLineStartCursor(document, [selection(0, 4)], [selection(0, 5), selection(2, 0)])
         ).toBeUndefined();
         expect(findAddedLineStartCursor(document, [], [selection(2, 0)])).toBeUndefined();
+    });
+});
+
+describe('getScrollRenderDelay', () => {
+    it('renders newly visible lines soon when the finished blame matches the buffer', () => {
+        expect(getScrollRenderDelay(4, 4, false)).toBe(50);
+        expect(getScrollRenderDelay(4, 4, true)).toBe(50);
+    });
+
+    it('keeps the pending edit deadline while the buffer is ahead of the last blame', () => {
+        expect(getScrollRenderDelay(4, 5, true)).toBeUndefined();
+        expect(getScrollRenderDelay(undefined, 5, true)).toBeUndefined();
+    });
+
+    it('waits for the edit debounce when no render is pending and the blame is stale', () => {
+        expect(getScrollRenderDelay(4, 5, false)).toBe(500);
+        expect(getScrollRenderDelay(undefined, 1, false)).toBe(500);
     });
 });
