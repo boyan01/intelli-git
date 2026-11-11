@@ -223,6 +223,108 @@
         "title": "%intelli-git.commands.showFileHistory.title%"
       },
       {
+        "command": "intelli-git.blame.toggleInline",
+        "title": "%intelli-git.commands.blame.toggleInline.title%"
+      },
+      {
+        "command": "intelli-git.blame.toggleFileAnnotations",
+        "title": "%intelli-git.commands.blame.toggleFileAnnotations.title%",
+        "icon": "$(account)"
+      },
+      {
+        "command": "intelli-git.blame.annotateFile",
+        "title": "%intelli-git.commands.blame.annotateFile.title%"
+      },
+      {
+        "command": "intelli-git.blame.closeFileAnnotations",
+        "title": "%intelli-git.commands.blame.closeFileAnnotations.title%",
+        "icon": "$(account)"
+      },
+      {
+        "command": "intelli-git.blame.openCommitInLog",
+        "title": "%intelli-git.commands.blame.openCommitInLog.title%"
+      },
+      {
+        "command": "intelli-git.blame.showCommitDiff",
+        "title": "%intelli-git.commands.blame.showCommitDiff.title%"
+      },
+      {
+        "command": "intelli-git.blame.annotation.annotateRevision",
+        "title": "%intelli-git.commands.blame.annotation.annotateRevision.title%"
+      },
+      {
+        "command": "intelli-git.blame.annotation.annotatePreviousRevision",
+        "title": "%intelli-git.commands.blame.annotation.annotatePreviousRevision.title%"
+      },
+      {
+        "command": "intelli-git.blame.annotation.showDiff",
+        "title": "%intelli-git.commands.blame.annotation.showDiff.title%"
+      },
+      {
+        "command": "intelli-git.blame.annotation.showInGitLog",
+        "title": "%intelli-git.commands.blame.annotation.showInGitLog.title%"
+      },
+      {
+        "command": "intelli-git.blame.annotation.copyRevision",
+        "title": "%intelli-git.commands.blame.annotation.copyRevision.title%"
+      },
+      {
+        "command": "intelli-git.blame.gutter.toggleDate",
+        "title": "%intelli-git.commands.blame.gutter.toggleDate.title%"
+      },
+      {
+        "command": "intelli-git.blame.gutter.toggleAuthor",
+        "title": "%intelli-git.commands.blame.gutter.toggleAuthor.title%"
+      },
+      {
+        "command": "intelli-git.blame.gutter.toggleCommit",
+        "title": "%intelli-git.commands.blame.gutter.toggleCommit.title%"
+      },
+      {
+        "command": "intelli-git.blame.gutter.toggleMessage",
+        "title": "%intelli-git.commands.blame.gutter.toggleMessage.title%"
+      },
+      {
+        "command": "intelli-git.blame.gutter.colorByAge",
+        "title": "%intelli-git.commands.blame.gutter.colorByAge.title%"
+      },
+      {
+        "command": "intelli-git.blame.gutter.colorByAuthor",
+        "title": "%intelli-git.commands.blame.gutter.colorByAuthor.title%"
+      },
+      {
+        "command": "intelli-git.blame.gutter.noColors",
+        "title": "%intelli-git.commands.blame.gutter.noColors.title%"
+      },
+      {
+        "command": "intelli-git.blame.gutter.toggleDate.checked",
+        "title": "%intelli-git.commands.blame.gutter.toggleDate.checked.title%"
+      },
+      {
+        "command": "intelli-git.blame.gutter.toggleAuthor.checked",
+        "title": "%intelli-git.commands.blame.gutter.toggleAuthor.checked.title%"
+      },
+      {
+        "command": "intelli-git.blame.gutter.toggleCommit.checked",
+        "title": "%intelli-git.commands.blame.gutter.toggleCommit.checked.title%"
+      },
+      {
+        "command": "intelli-git.blame.gutter.toggleMessage.checked",
+        "title": "%intelli-git.commands.blame.gutter.toggleMessage.checked.title%"
+      },
+      {
+        "command": "intelli-git.blame.gutter.colorByAge.checked",
+        "title": "%intelli-git.commands.blame.gutter.colorByAge.checked.title%"
+      },
+      {
+        "command": "intelli-git.blame.gutter.colorByAuthor.checked",
+        "title": "%intelli-git.commands.blame.gutter.colorByAuthor.checked.title%"
+      },
+      {
+        "command": "intelli-git.blame.gutter.noColors.checked",
+        "title": "%intelli-git.commands.blame.gutter.noColors.checked.title%"
+      },
+      {
         "command": "intelli-git.branch.checkout",
         "title": "%intelli-git.commands.branch.checkout.title%"
       },
@@ -519,6 +621,10 @@
       {
         "id": "intelli-git.createPatch",
         "label": "%intelli-git.submenus.createPatch.label%"
+      },
+      {
+        "id": "intelli-git.blameAnnotationOptions",
+        "label": "%intelli-git.submenus.blameAnnotationOptions.label%"
       }
     ],
     "menus": {
@@ -542,6 +648,102 @@
         {
           "command": "intelli-git.showFileHistory",
           "when": "intelli-git.hasActiveRepository"
+        },
+        {
+          "command": "intelli-git.blame.toggleFileAnnotations",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.blame.annotateFile",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.blame.closeFileAnnotations",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.blame.openCommitInLog",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.blame.showCommitDiff",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.blame.annotation.annotateRevision",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.blame.annotation.annotatePreviousRevision",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.blame.annotation.showDiff",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.blame.annotation.showInGitLog",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.blame.annotation.copyRevision",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.blame.gutter.toggleDate",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.blame.gutter.toggleAuthor",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.blame.gutter.toggleCommit",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.blame.gutter.toggleMessage",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.blame.gutter.colorByAge",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.blame.gutter.colorByAuthor",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.blame.gutter.noColors",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.blame.gutter.toggleDate.checked",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.blame.gutter.toggleAuthor.checked",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.blame.gutter.toggleCommit.checked",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.blame.gutter.toggleMessage.checked",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.blame.gutter.colorByAge.checked",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.blame.gutter.colorByAuthor.checked",
+          "when": "false"
+        },
+        {
+          "command": "intelli-git.blame.gutter.noColors.checked",
+          "when": "false"
         },
         {
           "command": "intelli-git.branch.create",
@@ -1279,9 +1481,93 @@
       ],
       "editor/context": [
         {
+          "command": "intelli-git.blame.annotation.annotateRevision",
+          "when": "intelli-git.blame.activeFileAnnotated && editorTextFocus",
+          "group": "0_intelliGitBlame_1_revision@1"
+        },
+        {
+          "command": "intelli-git.blame.annotation.annotatePreviousRevision",
+          "when": "intelli-git.blame.activeFileAnnotated && editorTextFocus",
+          "group": "0_intelliGitBlame_1_revision@2"
+        },
+        {
+          "command": "intelli-git.blame.annotation.showDiff",
+          "when": "intelli-git.blame.activeFileAnnotated && editorTextFocus",
+          "group": "0_intelliGitBlame_2_commit@1"
+        },
+        {
+          "command": "intelli-git.blame.annotation.showInGitLog",
+          "when": "intelli-git.blame.activeFileAnnotated && editorTextFocus",
+          "group": "0_intelliGitBlame_2_commit@2"
+        },
+        {
+          "command": "intelli-git.blame.annotation.copyRevision",
+          "when": "intelli-git.blame.activeFileAnnotated && editorTextFocus",
+          "group": "0_intelliGitBlame_2_commit@3"
+        },
+        {
+          "submenu": "intelli-git.blameAnnotationOptions",
+          "when": "intelli-git.blame.activeFileAnnotated && editorTextFocus",
+          "group": "0_intelliGitBlame_3_view@1"
+        },
+        {
+          "command": "intelli-git.blame.closeFileAnnotations",
+          "when": "intelli-git.blame.activeFileAnnotated && editorTextFocus",
+          "group": "0_intelliGitBlame_3_view@2"
+        },
+        {
           "submenu": "intelli-git.editorGit",
           "when": "editorTextFocus && (resourceScheme == file || intelli-git.hasCurrentChangeBlock)",
           "group": "7_modification@0"
+        }
+      ],
+      "editor/lineNumber/context": [
+        {
+          "command": "intelli-git.blame.annotateFile",
+          "when": "(resourceScheme == file || resourceScheme == intelli-git-revision) && !intelli-git.blame.activeFileAnnotated",
+          "group": "1_intelliGitBlame_0@1"
+        },
+        {
+          "command": "intelli-git.blame.annotation.annotateRevision",
+          "when": "intelli-git.blame.activeFileAnnotated",
+          "group": "1_intelliGitBlame_1_revision@1"
+        },
+        {
+          "command": "intelli-git.blame.annotation.annotatePreviousRevision",
+          "when": "intelli-git.blame.activeFileAnnotated",
+          "group": "1_intelliGitBlame_1_revision@2"
+        },
+        {
+          "command": "intelli-git.blame.annotation.showDiff",
+          "when": "intelli-git.blame.activeFileAnnotated",
+          "group": "1_intelliGitBlame_2_commit@1"
+        },
+        {
+          "command": "intelli-git.blame.annotation.showInGitLog",
+          "when": "intelli-git.blame.activeFileAnnotated",
+          "group": "1_intelliGitBlame_2_commit@2"
+        },
+        {
+          "command": "intelli-git.blame.annotation.copyRevision",
+          "when": "intelli-git.blame.activeFileAnnotated",
+          "group": "1_intelliGitBlame_2_commit@3"
+        },
+        {
+          "submenu": "intelli-git.blameAnnotationOptions",
+          "when": "intelli-git.blame.activeFileAnnotated",
+          "group": "1_intelliGitBlame_3_view@1"
+        },
+        {
+          "command": "intelli-git.blame.closeFileAnnotations",
+          "when": "intelli-git.blame.activeFileAnnotated",
+          "group": "1_intelliGitBlame_3_view@2"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "intelli-git.blame.closeFileAnnotations",
+          "when": "(resourceScheme == file || resourceScheme == intelli-git-revision) && intelli-git.blame.activeFileAnnotated",
+          "group": "navigation@100"
         }
       ],
       "intelli-git.editorGit": [
@@ -1348,6 +1634,78 @@
           "command": "intelli-git.log.file.createPatch.save",
           "when": "webviewSection == 'gitLogCommitFile'",
           "group": "1_export@2"
+        }
+      ],
+      "intelli-git.blameAnnotationOptions": [
+        {
+          "command": "intelli-git.blame.gutter.toggleDate.checked",
+          "when": "intelli-git.blame.gutter.showDate",
+          "group": "1_columns@1"
+        },
+        {
+          "command": "intelli-git.blame.gutter.toggleDate",
+          "when": "!intelli-git.blame.gutter.showDate",
+          "group": "1_columns@1"
+        },
+        {
+          "command": "intelli-git.blame.gutter.toggleAuthor.checked",
+          "when": "intelli-git.blame.gutter.showAuthor",
+          "group": "1_columns@2"
+        },
+        {
+          "command": "intelli-git.blame.gutter.toggleAuthor",
+          "when": "!intelli-git.blame.gutter.showAuthor",
+          "group": "1_columns@2"
+        },
+        {
+          "command": "intelli-git.blame.gutter.toggleCommit.checked",
+          "when": "intelli-git.blame.gutter.showCommit",
+          "group": "1_columns@3"
+        },
+        {
+          "command": "intelli-git.blame.gutter.toggleCommit",
+          "when": "!intelli-git.blame.gutter.showCommit",
+          "group": "1_columns@3"
+        },
+        {
+          "command": "intelli-git.blame.gutter.toggleMessage.checked",
+          "when": "intelli-git.blame.gutter.showMessage",
+          "group": "1_columns@4"
+        },
+        {
+          "command": "intelli-git.blame.gutter.toggleMessage",
+          "when": "!intelli-git.blame.gutter.showMessage",
+          "group": "1_columns@4"
+        },
+        {
+          "command": "intelli-git.blame.gutter.colorByAge.checked",
+          "when": "config.intelli-git.blame.gutter.colorBy == 'age'",
+          "group": "2_colors@1"
+        },
+        {
+          "command": "intelli-git.blame.gutter.colorByAge",
+          "when": "config.intelli-git.blame.gutter.colorBy != 'age'",
+          "group": "2_colors@1"
+        },
+        {
+          "command": "intelli-git.blame.gutter.colorByAuthor.checked",
+          "when": "config.intelli-git.blame.gutter.colorBy == 'author'",
+          "group": "2_colors@2"
+        },
+        {
+          "command": "intelli-git.blame.gutter.colorByAuthor",
+          "when": "config.intelli-git.blame.gutter.colorBy != 'author'",
+          "group": "2_colors@2"
+        },
+        {
+          "command": "intelli-git.blame.gutter.noColors.checked",
+          "when": "config.intelli-git.blame.gutter.colorBy == 'none'",
+          "group": "2_colors@3"
+        },
+        {
+          "command": "intelli-git.blame.gutter.noColors",
+          "when": "config.intelli-git.blame.gutter.colorBy != 'none'",
+          "group": "2_colors@3"
         }
       ]
     },
@@ -1450,6 +1808,85 @@
             "%intelli-git.config.editor.changeBlockDecorations.allEditors%"
           ],
           "description": "%intelli-git.config.editor.changeBlockDecorations.description%"
+        },
+        "intelli-git.blame.inline.enabled": {
+          "type": "boolean",
+          "default": true,
+          "scope": "window",
+          "description": "%intelli-git.config.blame.inline.enabled.description%"
+        },
+        "intelli-git.blame.inline.format": {
+          "type": "string",
+          "default": "${author}, ${ago} • ${message}",
+          "scope": "window",
+          "markdownDescription": "%intelli-git.config.blame.inline.format.description%"
+        },
+        "intelli-git.blame.inline.hover.enabled": {
+          "type": "boolean",
+          "default": false,
+          "scope": "window",
+          "description": "%intelli-git.config.blame.inline.hover.enabled.description%"
+        },
+        "intelli-git.blame.gutter.format": {
+          "type": "string",
+          "default": "${date} ${author}",
+          "scope": "window",
+          "markdownDescription": "%intelli-git.config.blame.gutter.format.description%"
+        },
+        "intelli-git.blame.gutter.hover.enabled": {
+          "type": "boolean",
+          "default": true,
+          "scope": "window",
+          "description": "%intelli-git.config.blame.gutter.hover.enabled.description%"
+        },
+        "intelli-git.blame.gutter.colorBy": {
+          "type": "string",
+          "enum": [
+            "age",
+            "author",
+            "none"
+          ],
+          "enumDescriptions": [
+            "%intelli-git.config.blame.gutter.colorBy.age%",
+            "%intelli-git.config.blame.gutter.colorBy.author%",
+            "%intelli-git.config.blame.gutter.colorBy.none%"
+          ],
+          "default": "age",
+          "scope": "window",
+          "description": "%intelli-git.config.blame.gutter.colorBy.description%"
+        },
+        "intelli-git.blame.gutter.clickAction": {
+          "type": "string",
+          "enum": [
+            "openInGitLog",
+            "none"
+          ],
+          "enumDescriptions": [
+            "%intelli-git.config.blame.gutter.clickAction.openInGitLog%",
+            "%intelli-git.config.blame.gutter.clickAction.none%"
+          ],
+          "default": "openInGitLog",
+          "scope": "window",
+          "description": "%intelli-git.config.blame.gutter.clickAction.description%"
+        },
+        "intelli-git.blame.dateFormat": {
+          "type": "string",
+          "default": "YYYY/M/D",
+          "scope": "window",
+          "markdownDescription": "%intelli-git.config.blame.dateFormat.description%"
+        },
+        "intelli-git.blame.messageMaxLength": {
+          "type": "number",
+          "default": 50,
+          "minimum": 0,
+          "scope": "window",
+          "description": "%intelli-git.config.blame.messageMaxLength.description%"
+        },
+        "intelli-git.blame.ignoreWhitespace": {
+          "type": "boolean",
+          "default": false,
+          "scope": "window",
+          "description": "%intelli-git.config.blame.ignoreWhitespace.description%"
         },
         "intelli-git.ai.copilot.model": {
           "type": "string",

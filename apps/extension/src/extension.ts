@@ -23,9 +23,13 @@ import {
     registerChangelistCommands,
     registerAiCommands,
     registerEditorGitCommands,
+    registerBlameCommands,
 } from './commands';
 import { logger } from './utils/logger';
 import { ChangeBlockEditorController } from './editor/ChangeBlockEditorController';
+import { BlameService } from './services/blame/BlameService';
+import { InlineBlameController } from './editor/blame/InlineBlameController';
+import { GutterBlameController } from './editor/blame/GutterBlameController';
 import type { ConflictResolverContextAction, RefreshScope } from '@shared/messages';
 import type { MergeEditorContext } from '@shared/webviewContext';
 
@@ -328,6 +332,8 @@ export async function activate(context: vscode.ExtensionContext) {
                     }
                 }
 
+                void blameService.checkRepositoryState();
+
                 if (change.kind === 'repositories') {
                     void repositoryManager
                         .initialize()
@@ -517,6 +523,13 @@ export async function activate(context: vscode.ExtensionContext) {
     // Register webview providers
     context.subscriptions.push(vscode.window.registerWebviewViewProvider(CommitViewProvider.viewType, provider));
     context.subscriptions.push(vscode.window.registerWebviewViewProvider(GitLogViewProvider.viewType, gitLogProvider));
+
+    // Git blame works per file across all repositories, so it is not bound to the active repository.
+    const blameService = new BlameService(repositoryManager);
+    const gutterBlameController = new GutterBlameController(blameService);
+    const inlineBlameController = new InlineBlameController(blameService);
+    context.subscriptions.push(gutterBlameController, inlineBlameController, blameService);
+    registerBlameCommands(context, repositoryManager, gitLogProvider, inlineBlameController, gutterBlameController);
     context.subscriptions.push(
         vscode.commands.registerCommand(
             'intelli-git.openConflictResolver',

@@ -78,6 +78,30 @@ const CONTEXT_ONLY_COMMANDS = [
     'intelli-git.ai.selectCopilotModelFromWebview',
     'intelli-git.ai.testProviderFromWebview',
     'intelli-git.ai.openCommitPromptSettingsFromWebview',
+    'intelli-git.blame.annotateFile',
+    'intelli-git.blame.closeFileAnnotations',
+    'intelli-git.blame.openCommitInLog',
+    'intelli-git.blame.showCommitDiff',
+    'intelli-git.blame.toggleFileAnnotations',
+    'intelli-git.blame.annotation.annotateRevision',
+    'intelli-git.blame.annotation.annotatePreviousRevision',
+    'intelli-git.blame.annotation.showDiff',
+    'intelli-git.blame.annotation.showInGitLog',
+    'intelli-git.blame.annotation.copyRevision',
+    'intelli-git.blame.gutter.toggleDate',
+    'intelli-git.blame.gutter.toggleAuthor',
+    'intelli-git.blame.gutter.toggleCommit',
+    'intelli-git.blame.gutter.toggleMessage',
+    'intelli-git.blame.gutter.colorByAge',
+    'intelli-git.blame.gutter.colorByAuthor',
+    'intelli-git.blame.gutter.noColors',
+    'intelli-git.blame.gutter.toggleDate.checked',
+    'intelli-git.blame.gutter.toggleAuthor.checked',
+    'intelli-git.blame.gutter.toggleCommit.checked',
+    'intelli-git.blame.gutter.toggleMessage.checked',
+    'intelli-git.blame.gutter.colorByAge.checked',
+    'intelli-git.blame.gutter.colorByAuthor.checked',
+    'intelli-git.blame.gutter.noColors.checked',
 ];
 
 const GLOBAL_COMMANDS = [
@@ -94,6 +118,7 @@ const GLOBAL_COMMANDS = [
     'intelli-git.ai.configureProvider',
     'intelli-git.ai.setApiKey',
     'intelli-git.ai.openCommitPromptSettings',
+    'intelli-git.blame.toggleInline',
 ];
 
 const ACTIVE_REPOSITORY_COMMANDS = [

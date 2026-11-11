@@ -64,6 +64,9 @@ export const workspace = {
     onDidChangeConfiguration(listener: (event: { affectsConfiguration(section: string): boolean }) => unknown) {
         return configurationEmitter.event(listener);
     },
+    onDidCloseTextDocument(listener: (document: unknown) => unknown) {
+        return closeTextDocumentEmitter.event(listener);
+    },
     getConfiguration(section?: string) {
         return {
             get<T>(key: string, defaultValue: T): T {
@@ -106,6 +109,7 @@ export const workspace = {
 
 const workspaceFolderEmitter = new EventEmitter<void>();
 const configurationEmitter = new EventEmitter<{ affectsConfiguration(section: string): boolean }>();
+const closeTextDocumentEmitter = new EventEmitter<unknown>();
 
 class MockUri {
     public readonly path: string;

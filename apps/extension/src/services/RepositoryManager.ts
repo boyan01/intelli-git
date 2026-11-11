@@ -547,6 +547,24 @@ export class RepositoryManager implements vscode.Disposable {
         return this.repositories.get(normalizeExistingPath(repoPath))?.service;
     }
 
+    /**
+     * Finds the repository whose workspace root contains the given file. Nested repositories
+     * (submodules, worktrees inside the workspace) win over their parents.
+     */
+    public getRepositoryForFile(filePath: string): { scope: RepositoryScope; service: GitService } | undefined {
+        const normalizedFilePath = normalizeExistingPath(filePath);
+        let best: RepositoryEntry | undefined;
+        for (const entry of this.repositories.values()) {
+            const root = normalizeExistingPath(entry.info.workspaceRoot);
+            const relativePath = path.relative(root, normalizedFilePath);
+            const isInside = relativePath !== '' && !relativePath.startsWith('..') && !path.isAbsolute(relativePath);
+            if (isInside && (!best || root.length > normalizeExistingPath(best.info.workspaceRoot).length)) {
+                best = entry;
+            }
+        }
+        return best ? { scope: best.info, service: best.service } : undefined;
+    }
+
     public getActiveRepoPath(): string | undefined {
         return this.activeRepoPath;
     }

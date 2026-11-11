@@ -239,6 +239,188 @@ describe('GitService blame lookup', () => {
 
         await expect(service.getBlameCommitForLine('tracked.txt', 2)).resolves.toBeNull();
     });
+
+    it('returns per-line blame with commit metadata for a saved file', async () => {
+        fs.writeFileSync(path.join(tempDir, 'tracked.txt'), 'first\nsecond\n');
+        await git.add('tracked.txt');
+        await git.commit('Initial commit');
+        const firstHash = (await git.revparse(['HEAD'])).trim();
+        fs.writeFileSync(path.join(tempDir, 'tracked.txt'), 'first\nchanged\nthird\n');
+        await git.add('tracked.txt');
+        await git.commit(['Change second line', '', 'Longer body']);
+        const secondHash = (await git.revparse(['HEAD'])).trim();
+
+        const service = new GitService(tempDir, tempDir, git);
+        const blame = await service.getFileBlame('tracked.txt');
+
+        expect(blame?.lines).toEqual([firstHash, secondHash, secondHash]);
+        const commit = blame?.commits.get(secondHash);
+        expect(commit).toMatchObject({
+            author: 'Test User',
+            authorEmail: 'test@example.com',
+            summary: 'Change second line',
+            filename: 'tracked.txt',
+            previousHash: firstHash,
+            isUncommitted: false,
+        });
+        const messages = await service.getCommitMessages([secondHash, firstHash]);
+        expect(messages.get(secondHash)).toBe('Change second line\n\nLonger body');
+        expect(messages.get(firstHash)).toBe('Initial commit');
+    });
+
+    it('blames unsaved editor contents and marks new lines as uncommitted', async () => {
+        fs.writeFileSync(path.join(tempDir, 'tracked.txt'), 'first\nsecond\n');
+        await git.add('tracked.txt');
+        await git.commit('Initial commit');
+        const hash = (await git.revparse(['HEAD'])).trim();
+
+        const service = new GitService(tempDir, tempDir, git);
+        const blame = await service.getFileBlame('tracked.txt', { contents: 'first\ninserted\nsecond\n' });
+
+        expect(blame?.lines[0]).toBe(hash);
+        expect(blame?.lines[2]).toBe(hash);
+        expect(blame?.commits.get(blame.lines[1])?.isUncommitted).toBe(true);
+    });
+
+    it('returns null for untracked files', async () => {
+        fs.writeFileSync(path.join(tempDir, 'tracked.txt'), 'first\n');
+        await git.add('tracked.txt');
+        await git.commit('Initial commit');
+        fs.writeFileSync(path.join(tempDir, 'untracked.txt'), 'new\n');
+
+        const service = new GitService(tempDir, tempDir, git);
+
+        await expect(service.getFileBlame('untracked.txt')).resolves.toBeNull();
+    });
+
+    it('stops blame when its signal aborts', async () => {
+        fs.writeFileSync(path.join(tempDir, 'tracked.txt'), 'first\n');
+        await git.add('tracked.txt');
+        await git.commit('Initial commit');
+        const service = new GitService(tempDir, tempDir, git);
+
+        const controller = new AbortController();
+        const pending = service.getFileBlame('tracked.txt', { contents: 'first\n', signal: controller.signal });
+        controller.abort();
+        await expect(pending).resolves.toBeNull();
+
+        await expect(service.getFileBlame('tracked.txt', { signal: controller.signal })).resolves.toBeNull();
+    });
+
+    it('decodes quoted non-ASCII paths in blame output', async () => {
+        await git.addConfig('core.quotePath', 'true');
+        fs.mkdirSync(path.join(tempDir, 'docs'));
+        fs.writeFileSync(path.join(tempDir, 'docs', '旧 文件.txt'), 'one\ntwo\nthree\nfour\nfive\n');
+        await git.add('.');
+        await git.commit('Add file');
+        const firstHash = (await git.revparse(['HEAD'])).trim();
+        await git.mv('docs/旧 文件.txt', 'docs/新文件.txt');
+        fs.appendFileSync(path.join(tempDir, 'docs', '新文件.txt'), 'second\n');
+        await git.add('.');
+        await git.commit('Rename file');
+        const secondHash = (await git.revparse(['HEAD'])).trim();
+
+        const service = new GitService(tempDir, tempDir, git);
+        const blame = await service.getFileBlame('docs/新文件.txt');
+
+        expect(blame?.commits.get(firstHash)?.filename).toBe('docs/旧 文件.txt');
+        expect(blame?.commits.get(secondHash)).toMatchObject({
+            filename: 'docs/新文件.txt',
+            previousHash: firstHash,
+            previousFilename: 'docs/旧 文件.txt',
+        });
+    });
+
+    it('keeps per-line source paths when one commit owns lines from two paths', async () => {
+        fs.writeFileSync(path.join(tempDir, 'a.txt'), 'alpha one\nalpha two\nalpha three\n');
+        fs.writeFileSync(path.join(tempDir, 'b.txt'), 'beta one\nbeta two\nbeta three\n');
+        await git.add('.');
+        await git.commit('Add a and b');
+        const addHash = (await git.revparse(['HEAD'])).trim();
+        const mainBranch = (await git.revparse(['--abbrev-ref', 'HEAD'])).trim();
+
+        await git.checkoutLocalBranch('side');
+        await git.mv('a.txt', 'c.txt');
+        await git.commit('Rename a to c');
+        await git.checkout(mainBranch);
+        await git.mv('b.txt', 'c.txt');
+        await git.commit('Rename b to c');
+        await git.raw(['merge', '--no-commit', 'side']).catch(() => undefined);
+        fs.writeFileSync(
+            path.join(tempDir, 'c.txt'),
+            'alpha one\nalpha two\nalpha three\nbeta one\nbeta two\nbeta three\n'
+        );
+        await git.raw(['add', '-A', '.']);
+        await git.raw(['commit', '--no-edit', '-m', 'Merge side']);
+
+        const service = new GitService(tempDir, tempDir, git);
+        const blame = await service.getFileBlame('c.txt');
+
+        expect(blame?.lines).toEqual(Array(6).fill(addHash));
+        expect(blame?.sources.map((source) => source.filename)).toEqual([
+            'a.txt',
+            'a.txt',
+            'a.txt',
+            'b.txt',
+            'b.txt',
+            'b.txt',
+        ]);
+    });
+
+    it('maps a line of a revision to the same text in its parent revision', async () => {
+        fs.writeFileSync(path.join(tempDir, 'old.txt'), 'one\ntwo\nthree\nfour\n');
+        await git.add('.');
+        await git.commit('Add file');
+        const parentHash = (await git.revparse(['HEAD'])).trim();
+        await git.mv('old.txt', 'new.txt');
+        fs.writeFileSync(path.join(tempDir, 'new.txt'), 'header\nmore\none\ntwo\nTHREE\nfour\n');
+        await git.add('.');
+        await git.commit('Rename and edit');
+        const hash = (await git.revparse(['HEAD'])).trim();
+
+        const service = new GitService(tempDir, tempDir, git);
+        const map = (line: number) =>
+            service.mapLineBetweenRevisions({ ref: hash, path: 'new.txt' }, { ref: parentHash, path: 'old.txt' }, line);
+
+        await expect(map(4)).resolves.toBe(2);
+        await expect(map(5)).resolves.toBe(3);
+        await expect(map(6)).resolves.toBe(4);
+        await expect(map(1)).resolves.toBe(1);
+        await expect(
+            service.mapLineBetweenRevisions({ ref: hash, path: 'new.txt' }, { ref: parentHash, path: 'missing.txt' }, 6)
+        ).resolves.toBe(6);
+    });
+
+    it('reads the HEAD commit and returns null for an unborn branch', async () => {
+        const service = new GitService(tempDir, tempDir, git);
+        await expect(service.getHeadCommit()).resolves.toBeNull();
+
+        fs.writeFileSync(path.join(tempDir, 'tracked.txt'), 'first\n');
+        await git.add('tracked.txt');
+        await git.commit('Initial commit');
+
+        await expect(service.getHeadCommit()).resolves.toBe((await git.revparse(['HEAD'])).trim());
+    });
+
+    it('changes the index signature when a rename is staged and blame becomes available', async () => {
+        fs.writeFileSync(path.join(tempDir, 'old.txt'), 'one\ntwo\n');
+        await git.add('old.txt');
+        await git.commit('Add old file');
+        fs.renameSync(path.join(tempDir, 'old.txt'), path.join(tempDir, 'new.txt'));
+
+        const service = new GitService(tempDir, tempDir, git);
+        await expect(service.getFileBlame('new.txt')).resolves.toBeNull();
+        const before = await service.getIndexSignature();
+
+        await git.add(['-A']);
+
+        const after = await service.getIndexSignature();
+        expect(before).not.toBeNull();
+        expect(after).not.toBe(before);
+        const blame = await service.getFileBlame('new.txt');
+        expect(blame?.lines).toHaveLength(2);
+        expect(blame?.commits.get(blame.lines[0])?.summary).toBe('Add old file');
+    });
 });
 
 describe('GitService conflict resolution', () => {

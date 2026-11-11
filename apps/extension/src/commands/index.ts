@@ -6,3 +6,4 @@ export { registerChangelistCommands } from './changelistCommands';
 export { registerAiCommands } from './aiCommands';
 export { registerLogFileCommands } from './registerLogFileCommands';
 export { registerEditorGitCommands } from './editorGitCommands';
+export { registerBlameCommands } from './blameCommands';
